@@ -46,9 +46,9 @@ if [ -r "$HMA_TOKEN" ]; then
 fi
 
 # A manager started by an older run.sh (plain docker run) would hold the name.
-if [ -n "$(docker ps -aq -f name=^hma-manager$)" ] && \
-   [ -z "$(docker ps -aq -f name=^hma-manager$ -f label=com.docker.compose.project=proxy-farm)" ]; then
-  docker rm -f hma-manager >/dev/null
+if [ -n "$(docker ps -aq -f name=^pf-manager$)" ] && \
+   [ -z "$(docker ps -aq -f name=^pf-manager$ -f label=com.docker.compose.project=proxy-farm)" ]; then
+  docker rm -f pf-manager >/dev/null
 fi
 
 docker compose build -q node manager

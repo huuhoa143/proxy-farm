@@ -2,7 +2,7 @@
 # `docker compose up`. After that, plain `docker compose up -d` / `down` works too.
 #
 # Only the manager is a compose service. Each proxy port is its own container, created
-# and removed by the manager at runtime from the hma-node image built here. Those
+# and removed by the manager at runtime from the proxy-farm-node image built here. Those
 # containers carry this project's label, so Docker Desktop shows them grouped under
 # "proxy-farm", but `docker compose down` leaves them alone: stop ports from the UI.
 name: proxy-farm
@@ -11,13 +11,13 @@ services:
   # Build-only: the image every proxy port runs. Never started by compose.
   node:
     build: ./node
-    image: hma-node
+    image: proxy-farm-node
     profiles: [build]
 
   manager:
     build: ./manager
-    image: hma-manager
-    container_name: hma-manager
+    image: proxy-farm-manager
+    container_name: pf-manager
     restart: unless-stopped
     # Published port rather than host networking: it works the same on Linux, macOS and
     # Windows. Bound to 127.0.0.1 so the UI never reaches the network.
@@ -32,20 +32,20 @@ services:
       - ${FARM}/inbox:/inbox
       - ${SCAN}:/scan:ro
     environment:
-      HMA_UI_PORT: ${PORT:-8090}
-      HMA_UI_BIND: 0.0.0.0
-      HMA_BIND: ${BIND:-127.0.0.1}
-      HMA_STATE: /data/farm-state.json
-      HMA_COMPOSE_PROJECT: proxy-farm
+      PF_UI_PORT: ${PORT:-8090}
+      PF_UI_BIND: 0.0.0.0
+      PF_BIND: ${BIND:-127.0.0.1}
+      PF_STATE: /data/farm-state.json
+      PF_COMPOSE_PROJECT: proxy-farm
       # The manager starts port containers through the host's Docker, so it needs the
       # host-side path of every folder it mounts into them.
-      HMA_STATUS_DIR: /status
-      HMA_STATUS_HOST: ${FARM}/status
-      HMA_CONFIG_DIR: /configs
-      HMA_CONFIG_HOST: ${FARM}/configs
-      HMA_SECRETS_DIR: /secrets
-      HMA_SECRETS: ${FARM}/secrets
-      HMA_INBOX: /inbox
-      HMA_INBOX_HOST: ${FARM}/inbox
-      HMA_SCAN: /scan
-      HMA_SCAN_HOST: ${SCAN}
+      PF_STATUS_DIR: /status
+      PF_STATUS_HOST: ${FARM}/status
+      PF_CONFIG_DIR: /configs
+      PF_CONFIG_HOST: ${FARM}/configs
+      PF_SECRETS_DIR: /secrets
+      PF_SECRETS: ${FARM}/secrets
+      PF_INBOX: /inbox
+      PF_INBOX_HOST: ${FARM}/inbox
+      PF_SCAN: /scan
+      PF_SCAN_HOST: ${SCAN}

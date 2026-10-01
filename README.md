@@ -138,12 +138,12 @@ GET http://127.0.0.1:8090/api/rotate?key=<rotate_key>&all=1
 ### CLI
 
 ```bash
-docker exec hma-manager python3 farm.py up US JP DE-16-BERLIN   # mã nước / key / all
-docker exec hma-manager python3 farm.py ls
-docker exec hma-manager python3 farm.py rotate US-NY-NEW-YORK
-docker exec hma-manager python3 farm.py stop|start|down <KEY..>
-docker exec hma-manager python3 farm.py autorotate <KEY..> 30
-docker exec hma-manager python3 farm.py logs <KEY>
+docker exec pf-manager python3 farm.py up US JP DE-16-BERLIN   # mã nước / key / all
+docker exec pf-manager python3 farm.py ls
+docker exec pf-manager python3 farm.py rotate US-NY-NEW-YORK
+docker exec pf-manager python3 farm.py stop|start|down <KEY..>
+docker exec pf-manager python3 farm.py autorotate <KEY..> 30
+docker exec pf-manager python3 farm.py logs <KEY>
 ```
 
 ## Cấu hình
@@ -166,10 +166,10 @@ cổng chỉ có hiệu lực sau khi dựng lại — nút *Lưu & dựng lại
 ```
                     Docker trên máy bạn
   ┌──────────────────────────────────────────────────────────────┐
-  │  hma-manager  ── UI :8090 ──  điều khiển qua docker.sock      │
+  │  pf-manager   ── UI :8090 ──  điều khiển qua docker.sock      │
   │      │ docker run                                             │
   │      ▼                                                        │
-  │  hma-<vị-trí>   (1 container / cổng)                          │
+  │  pf-<vị-trí>    (1 container / cổng)                         │
   │    drivers/<protocol>.sh ══► máy chủ VPN của nhà cung cấp     │
   │    gost SOCKS5+HTTP trên :1080 → publish 127.0.0.1:290NN      │
   │    kill-switch · DoH · watchdog tự phục hồi                   │
@@ -248,7 +248,7 @@ không gửi kèm đã nằm sẵn trong image (`node/ca/`).
 | Cổng *Chờ thử lại · không trả lời* | Máy chủ điều phối không trả lời; farm tự thử lại và đổi sang IP khác của vị trí. |
 | Tất cả cổng rớt cùng lúc | Máy vừa ngủ hoặc Docker vừa khởi động lại; các cổng tự lên lại trong vài phút. |
 | Docker Desktop báo `Internal Server Error` | Máy ảo Docker bị treo: thoát và mở lại Docker Desktop. |
-| Xem chi tiết một cổng | Nút log trên dòng đó, hoặc `docker logs hma-<vị-trí>`. |
+| Xem chi tiết một cổng | Nút log trên dòng đó, hoặc `docker logs pf-<vị-trí>`. |
 
 ## Đóng góp
 

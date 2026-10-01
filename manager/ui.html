@@ -692,9 +692,9 @@ const flag=cc=>`/flags/${(cc||'').toLowerCase()}.png`;
 let LOCS=null, RUNNING=new Set(), busy=new Set();
 
 /* theme */
-const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.hmaTheme=t;
+const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.pfTheme=t;
   $('#themeIcon').setAttribute('href',t==='dark'?'#ic-moon':'#ic-sun')};
-setTheme(new URLSearchParams(location.search).get('theme')||localStorage.hmaTheme||'dark');
+setTheme(new URLSearchParams(location.search).get('theme')||localStorage.pfTheme||'dark');
 $('#theme').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 
 /* toast */

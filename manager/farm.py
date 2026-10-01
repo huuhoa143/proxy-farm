@@ -16,34 +16,34 @@ import json, os, re, base64, subprocess, sys, time, threading, http.server, urll
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOCS = json.load(open(os.path.join(HERE, "locations.json")))
-STATE_FILE = os.environ.get("HMA_STATE", os.path.join(HERE, "farm-state.json"))
-IMAGE = os.environ.get("HMA_IMAGE", "hma-node")
-SECRETS = os.environ.get("HMA_SECRETS", os.path.expanduser("~/hma-farm/secrets"))  # host path for -v
+STATE_FILE = os.environ.get("PF_STATE", os.path.join(HERE, "farm-state.json"))
+IMAGE = os.environ.get("PF_IMAGE", "proxy-farm-node")
+SECRETS = os.environ.get("PF_SECRETS", os.path.expanduser("~/proxy-farm/secrets"))  # host path for -v
 # Where the manager itself reads/writes the certificate. Same as SECRETS when it runs with
 # host networking and no mount indirection; a published container must mount it.
-COMPOSE_PROJECT = os.environ.get("HMA_COMPOSE_PROJECT", "")
-SECRETS_DIR = os.environ.get("HMA_SECRETS_DIR", SECRETS)
-BASE_PORT = int(os.environ.get("HMA_BASE_PORT", "29001"))
-FLAGS_DIR = os.environ.get("HMA_FLAGS", os.path.join(HERE, "flags"))
-STATUS_DIR = os.environ.get("HMA_STATUS_DIR", os.path.join(HERE, "status"))   # in-container path
-STATUS_DIR_HOST = os.environ.get("HMA_STATUS_HOST", STATUS_DIR)               # host path for -v mounts
+COMPOSE_PROJECT = os.environ.get("PF_COMPOSE_PROJECT", "")
+SECRETS_DIR = os.environ.get("PF_SECRETS_DIR", SECRETS)
+BASE_PORT = int(os.environ.get("PF_BASE_PORT", "29001"))
+FLAGS_DIR = os.environ.get("PF_FLAGS", os.path.join(HERE, "flags"))
+STATUS_DIR = os.environ.get("PF_STATUS_DIR", os.path.join(HERE, "status"))   # in-container path
+STATUS_DIR_HOST = os.environ.get("PF_STATUS_HOST", STATUS_DIR)               # host path for -v mounts
 os.makedirs(STATUS_DIR, exist_ok=True)
-BIND = os.environ.get("HMA_BIND", "127.0.0.1")          # host iface proxies listen on
-UI_PORT = int(os.environ.get("HMA_UI_PORT", "8080"))
+BIND = os.environ.get("PF_BIND", "127.0.0.1")          # host iface proxies listen on
+UI_PORT = int(os.environ.get("PF_UI_PORT", "8090"))
 # Where the UI socket itself binds. Same as BIND when the manager runs with host
 # networking; when it runs as a published container it must bind 0.0.0.0 inside the
 # container and let `-p 127.0.0.1:...` do the restricting.
-UI_BIND = os.environ.get("HMA_UI_BIND", BIND)
+UI_BIND = os.environ.get("PF_UI_BIND", BIND)
 
 # Drop zone on disk: anything left here is imported automatically. run.sh seeds it with
 # the HMA device token when the app is installed on this machine.
-INBOX = os.environ.get("HMA_INBOX", "")
+INBOX = os.environ.get("PF_INBOX", "")
 # Read-only directories scanned for VPN configs. Findings are only ever *suggested*;
 # nothing outside INBOX is imported without the user asking.
-SCAN_DIR = os.environ.get("HMA_SCAN", "")
+SCAN_DIR = os.environ.get("PF_SCAN", "")
 
-CONFIG_DIR = os.environ.get("HMA_CONFIG_DIR", os.path.join(HERE, "configs"))
-CONFIG_DIR_HOST = os.environ.get("HMA_CONFIG_HOST", CONFIG_DIR)
+CONFIG_DIR = os.environ.get("PF_CONFIG_DIR", os.path.join(HERE, "configs"))
+CONFIG_DIR_HOST = os.environ.get("PF_CONFIG_HOST", CONFIG_DIR)
 os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # ---- targets -----------------------------------------------------------------
@@ -405,18 +405,18 @@ CREDS_FILE = os.path.join(os.path.dirname(STATE_FILE), "creds.json")   # pre-set
 # Environment gives the defaults; settings.json (written by the UI) overrides them, so a
 # user who never opens Settings behaves exactly as the docker run flags say.
 DEFAULTS = {
-    "proxy_user": os.environ.get("HMA_PROXY_USER", "hma"),
-    "proxy_pass": os.environ.get("HMA_PROXY_PASS", ""),
+    "proxy_user": os.environ.get("PF_PROXY_USER", "proxy"),
+    "proxy_pass": os.environ.get("PF_PROXY_PASS", ""),
     "rotate_key": "",
     "bind": BIND,
     "base_port": BASE_PORT,
-    "mtu": int(os.environ.get("HMA_MTU", "1400")),
-    "watchdog_interval": int(os.environ.get("HMA_WATCHDOG_INTERVAL", "15")),
-    "watchdog_fails": int(os.environ.get("HMA_WATCHDOG_FAILS", "3")),
+    "mtu": int(os.environ.get("PF_MTU", "1400")),
+    "watchdog_interval": int(os.environ.get("PF_WATCHDOG_INTERVAL", "15")),
+    "watchdog_fails": int(os.environ.get("PF_WATCHDOG_FAILS", "3")),
     # Nodes already back off to one attempt per 30 min, which is cheap and self-heals
     # when a gateway lifts its block. Giving up for good is therefore opt-in.
-    "give_up_after": int(os.environ.get("HMA_GIVE_UP_AFTER", "0")),
-    "dns": os.environ.get("HMA_TUNNEL_DNS", "1.1.1.1 8.8.8.8"),
+    "give_up_after": int(os.environ.get("PF_GIVE_UP_AFTER", "0")),
+    "dns": os.environ.get("PF_TUNNEL_DNS", "1.1.1.1 8.8.8.8"),
 }
 SETTABLE = [k for k in DEFAULTS if k != "rotate_key"]
 
@@ -450,7 +450,7 @@ def rotate_key(): return load_settings()["rotate_key"]
 def docker(*a, check=True, capture=True):
     return subprocess.run(["docker", *a], text=True, check=check,
                           capture_output=capture)
-def cname(key): return "hma-" + key.lower()
+def cname(key): return "pf-" + key.lower()
 
 def used_ports(state):
     return {v["port"] for v in state.values()}
@@ -502,7 +502,7 @@ def up(keys):
                 "-e", f"WATCHDOG_FAILS={st['watchdog_fails']}",
                 "-v", f"{STATUS_DIR_HOST}:/status",
                 "-p", f"{st['bind']}:{port}:1080",
-                "--label", "hma-farm=1", "--label", f"hma-key={k}"]
+                "--label", "proxy-farm.port=1", "--label", f"proxy-farm.key={k}"]
         if COMPOSE_PROJECT:   # group the ports under the compose project in Docker Desktop
             args += ["--label", f"com.docker.compose.project={COMPOSE_PROJECT}",
                      "--label", "com.docker.compose.service=port",
@@ -784,8 +784,8 @@ def supervisor_loop():
             print("supervisor:", e, flush=True)
 
 def running_containers():
-    out = docker("ps", "-a", "--filter", "label=hma-farm=1",
-                 "--format", "{{.Label \"hma-key\"}}\t{{.State}}\t{{.Names}}",
+    out = docker("ps", "-a", "--filter", "label=proxy-farm.port=1",
+                 "--format", "{{.Label \"proxy-farm.key\"}}\t{{.State}}\t{{.Names}}",
                  check=False)
     r = {}
     for line in out.stdout.strip().splitlines():
@@ -859,8 +859,8 @@ class H(http.server.BaseHTTPRequestHandler):
                 "rotate_key": rotate_key()}))
         if p == "/api/discover":
             return self._send(200, json.dumps(
-                {"found": discover(), "scan": os.environ.get("HMA_SCAN_HOST", SCAN_DIR),
-                 "inbox": os.environ.get("HMA_INBOX_HOST", INBOX)}))
+                {"found": discover(), "scan": os.environ.get("PF_SCAN_HOST", SCAN_DIR),
+                 "inbox": os.environ.get("PF_INBOX_HOST", INBOX)}))
         if p == "/api/providers":
             return self._send(200, json.dumps({"providers": providers_list()}))
         if p == "/api/settings":
