@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Proxy Farm</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..48,600;12..48,700;12..48,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@440;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080b13; --bg-grid:rgba(255,255,255,.014);
+  --rail:#0b0f1a; --panel:#0f1524; --panel-2:#131a2c; --raise:#18213600;
+  --line:rgba(255,255,255,.065); --line-2:rgba(255,255,255,.11);
+  --tx:#eef2fb; --dim:#a6b2cc; --mut:#8591ad;
+  --acc:#00dd8a; --acc-2:#00b975; --acc-ink:#03150e; --acc-soft:rgba(0,221,138,.13); --acc-line:rgba(0,221,138,.34);
+  --ok:#25d69b; --warn:#f6b53d; --bad:#ff6a6a; --info:#5aa8ff;
+  --ok-soft:rgba(37,214,155,.13); --warn-soft:rgba(246,181,61,.14); --bad-soft:rgba(255,106,106,.13);
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 4px 9px -4px rgba(0,0,0,.6), 0 1px 2px rgba(0,0,0,.45);
+  --sh-3:0 16px 34px -14px rgba(0,0,0,.72), 0 5px 12px -6px rgba(0,0,0,.55);
+  --r:13px; --r-sm:9px;
+  --ff:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  --fd:"Bricolage Grotesque","Inter",system-ui,sans-serif;
+  --fm:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+html[data-theme="light"]{
+  --bg:#eef1f7; --bg-grid:rgba(10,22,48,.022);
+  --rail:#0b0f1a; --panel:#ffffff; --panel-2:#f6f8fc;
+  --line:rgba(12,24,50,.09); --line-2:rgba(12,24,50,.16);
+  --tx:#111827; --dim:#3f4a61; --mut:#68738c;
+  --acc:#009a5b; --acc-2:#00834d; --acc-ink:#ffffff; --acc-soft:rgba(0,154,91,.10); --acc-line:rgba(0,154,91,.30);
+  --ok:#0f9d63; --warn:#b9770a; --bad:#d33b3b; --info:#2b74c9;
+  --ok-soft:rgba(15,157,99,.12); --warn-soft:rgba(185,119,10,.13); --bad-soft:rgba(211,59,59,.11);
+  --sh-1:0 1px 2px rgba(20,30,60,.08);
+  --sh-2:0 4px 9px -4px rgba(20,35,80,.18), 0 1px 2px rgba(20,35,80,.10);
+  --sh-3:0 16px 34px -14px rgba(20,35,80,.26), 0 5px 12px -6px rgba(20,35,80,.15);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--tx);font-family:var(--ff);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--acc-soft);color:var(--tx)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+*::-webkit-scrollbar{width:11px;height:11px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:9px;border:3px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--mut)}
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* layout */
+.app{display:grid;grid-template-columns:64px 1fr;min-height:100vh}
+.rail{
+  position:sticky;top:0;height:100vh;background:var(--rail);
+  border-right:1px solid rgba(255,255,255,.06);
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 0;z-index:20;
+}
+.brand{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:var(--acc-ink);
+  background:linear-gradient(150deg,var(--acc),var(--acc-2));box-shadow:var(--sh-2),inset 0 1px 0 rgba(255,255,255,.35);margin-bottom:10px}
+.brand svg{width:21px;height:21px;stroke-width:2}
+.rail-sp{flex:1}
+.rail-btn{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#8b96b3;
+  background:transparent;border:1px solid transparent;cursor:pointer;transition:.16s;font-size:18px}
+.rail-btn:hover{color:#eaf0ff;background:rgba(255,255,255,.06)}
+.rail-btn.on{color:var(--acc);background:var(--acc-soft)}
+.health{width:9px;height:9px;border-radius:50%;background:var(--mut);margin:6px 0;transition:.3s}
+.health.live{background:var(--ok)}
+
+main{min-width:0;display:flex;flex-direction:column}
+
+/* deck / header */
+.deck{padding:22px 30px 0;position:sticky;top:0;background:linear-gradient(var(--bg) 72%,transparent);z-index:10}
+.deck-top{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.title{font-family:var(--fd);font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1.05}
+.title small{display:block;font-size:12.5px;font-weight:500;letter-spacing:0;color:var(--dim);margin-top:3px}
+.title small b{color:var(--tx);font-weight:600;font-family:var(--fm);font-size:12px}
+.deck-actions{margin-left:auto;display:flex;gap:9px}
+
+/* integrated stat rail (not boxed cards) */
+.stats{display:flex;align-items:stretch;gap:0;margin:20px 0 4px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-2);overflow:hidden}
+.stat{padding:15px 22px;display:flex;flex-direction:column;gap:3px;position:relative;flex:1;min-width:0}
+.stat + .stat{border-left:1px solid var(--line)}
+.stat .k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);display:flex;align-items:center;gap:6px}
+.stat .v{font-family:var(--fd);font-size:27px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.05}
+.stat .v small{font-size:13px;font-weight:600;color:var(--dim);letter-spacing:0}
+.stat.hero{background:linear-gradient(160deg,var(--acc-soft),transparent 70%)}
+.stat.hero .v{color:var(--acc)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.live-dot.pulse{animation:pulse 1.8s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--ok-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+/* credentials chip */
+.creds{display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--r-sm);
+  background:var(--panel);border:1px solid var(--line);box-shadow:var(--sh-1);align-self:center}
+.creds .cl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.creds .cs{color:var(--mut)}
+.creds .cv{font-family:var(--fm);font-size:12.5px;color:var(--tx);background:none;border:0;
+  padding:2px 4px;border-radius:5px;cursor:pointer;transition:.14s}
+.creds .cv:hover{color:var(--acc);background:var(--acc-soft)}
+.ceye{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line-2);
+  background:var(--panel-2);color:var(--dim);cursor:pointer;transition:.14s}
+.ceye svg{width:14px;height:14px}
+.ceye:hover{color:var(--tx);border-color:var(--mut)}
+
+/* toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;padding:16px 30px 12px;flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:200px;max-width:420px}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut);width:16px;height:16px}
+.search input{width:100%;padding:9px 12px 9px 36px}
+.count{color:var(--mut);font-size:12.5px;font-variant-numeric:tabular-nums;margin-left:auto}
+.seg.view{margin:0}
+.seg.view b{font-weight:700;margin-left:4px;color:var(--mut);font-variant-numeric:tabular-nums}
+.seg.view button[aria-pressed="true"] b{color:inherit}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;gap:7px;font-family:inherit;font-size:13px;font-weight:600;
+  padding:9px 14px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--panel-2);color:var(--tx);
+  cursor:pointer;transition:.15s;white-space:nowrap;box-shadow:var(--sh-1)}
+.btn svg{width:15px;height:15px}
+.btn:hover{border-color:var(--mut);transform:translateY(-1px);box-shadow:var(--sh-2)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:linear-gradient(150deg,var(--acc),var(--acc-2));border-color:transparent;color:var(--acc-ink);
+  box-shadow:var(--sh-2),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;box-shadow:none}
+.btn.ghost:hover{background:var(--panel-2)}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.45;pointer-events:none}
+input,select{font-family:inherit;font-size:13px;color:var(--tx);background:var(--panel-2);
+  border:1px solid var(--line-2);border-radius:var(--r-sm);padding:9px 12px;transition:.15s}
+input::placeholder{color:var(--mut)}
+input:focus,select:focus{outline:none;border-color:var(--acc-line);box-shadow:0 0 0 3px var(--acc-soft)}
+
+/* table */
+.tablewrap{margin:0 30px 30px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-2);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);
+  padding:13px 18px;border-bottom:1px solid var(--line);background:var(--panel-2);position:sticky;top:0}
+thead th.num{text-align:right}
+tbody tr{border-bottom:1px solid var(--line);transition:background .13s}
+tbody tr:last-child{border-bottom:0}
+tbody tr:hover{background:var(--panel-2)}
+td{padding:13px 18px;vertical-align:middle}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.st{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:600;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.dot.online{background:var(--ok)}
+.dot.connecting{background:var(--warn);animation:pulse-w 1.5s ease-out infinite}
+.dot.wait{background:var(--mut)}
+.dot.stopped{background:var(--mut)}
+.dot.error{background:var(--bad)}
+@keyframes pulse-w{0%{box-shadow:0 0 0 0 var(--warn-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.st .lbl.online{color:var(--ok)} .st .lbl.error{color:var(--bad)} .st .lbl.connecting{color:var(--warn)}
+.st .lbl.stopped{color:var(--mut)} .st .lbl.wait{color:var(--dim)}
+.loc{display:flex;align-items:center;gap:11px}
+.flag{width:26px;height:19px;border-radius:3px;object-fit:cover;box-shadow:0 0 0 1px var(--line-2);flex:none;background:var(--panel-2)}
+.loc b{font-weight:600;font-size:13.5px}
+.loc span{color:var(--dim);font-size:12.5px}
+.mono{font-family:var(--fm);font-size:12.5px;font-variant-numeric:tabular-nums}
+.endpoint{display:inline-flex;align-items:center;gap:7px;user-select:all;-webkit-user-select:all;padding:5px 9px;border-radius:7px;background:var(--panel-2);
+  border:1px solid var(--line);cursor:pointer;transition:.14s;color:var(--tx)}
+.endpoint:hover{border-color:var(--acc-line);color:var(--acc)}
+.endpoint svg{width:13px;height:13px;color:var(--mut)}
+.endpoint:hover svg{color:var(--acc)}
+.proto{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--mut)}
+.lat{font-family:var(--fm);font-size:12.5px;font-variant-numeric:tabular-nums}
+.lat.g{color:var(--ok)} .lat.m{color:var(--dim)} .lat.b{color:var(--warn)}
+.rowact{display:flex;gap:6px;justify-content:flex-end}
+.iconbtn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line-2);
+  background:var(--panel-2);color:var(--dim);cursor:pointer;transition:.15s}
+.iconbtn svg{width:15px;height:15px}
+.iconbtn:hover{color:var(--tx);border-color:var(--mut);transform:translateY(-1px)}
+.iconbtn.danger:hover{color:var(--bad);border-color:var(--bad)}
+.iconbtn.spin svg{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* selection + bulk */
+td.c-sel,th.c-sel{width:40px;padding-right:0}
+.ck2{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line-2);display:grid;place-items:center;
+  cursor:pointer;color:transparent;transition:.13s;background:var(--panel-2)}
+.ck2 svg{width:12px;height:12px;stroke-width:2.8}
+.ck2[aria-checked="true"]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.bulk{display:flex;align-items:center;gap:9px;margin:0 30px 10px;padding:10px 14px;border-radius:var(--r);
+  background:var(--panel);border:1px solid var(--acc-line);box-shadow:var(--sh-2);flex-wrap:wrap}
+.bulk .n{font-size:13px;font-weight:650}
+.bulk .n b{color:var(--acc);font-variant-numeric:tabular-nums}
+.bulk .sp{flex:1}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--info);
+  background:rgba(90,168,255,.12);padding:2px 7px;border-radius:20px;margin-left:7px}
+.badge svg{width:11px;height:11px}
+.badge.prov{color:var(--acc);background:var(--acc-soft)}
+
+/* modal */
+.modal{position:fixed;inset:0;display:none;place-items:center;z-index:60;padding:20px}
+.modal.open{display:grid}
+.modal .box{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);box-shadow:var(--sh-3);
+  width:min(780px,96vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden}
+.modal h3{margin:0;font-size:16px;font-weight:700;letter-spacing:-.01em;flex:1}
+.modal .mh{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.modal .mb{padding:14px 18px;overflow:auto;flex:1}
+.modal .mf{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:9px;align-items:center}
+.modal textarea,.modal pre{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;
+  color:var(--tx);font-family:var(--fm);font-size:12px;line-height:1.55;padding:11px;resize:vertical;margin:0}
+.modal textarea{min-height:230px}
+.modal pre{max-height:52vh;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.modal .box.wide{width:min(900px,96vw)}
+.modal input[type=text],.modal input[type=password],.modal input[type=number]{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--tx);
+  font:inherit;font-size:13px;padding:9px 11px;transition:.14s}
+.modal input:focus{outline:none;border-color:var(--acc)}
+.modal input::placeholder{color:var(--mut)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label{font-size:11.5px;font-weight:650;letter-spacing:.03em;text-transform:uppercase;color:var(--dim)}
+.field .hint{font-size:11.5px;color:var(--mut);line-height:1.5}
+.field.mono input{font-family:var(--fm);font-size:12.5px}
+.sect{border-top:1px solid var(--line);margin-top:18px;padding-top:16px}
+.sect:first-child{border-top:0;margin-top:0;padding-top:0}
+.sect>h4{margin:0 0 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+.note{font-size:12.5px;color:var(--mut);line-height:1.6;margin:0 0 12px}
+.note code,.kv code{font-family:var(--fm);font-size:11.5px;background:var(--panel-2);padding:1px 5px;border-radius:5px;color:var(--dim)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px;align-items:baseline}
+.kv dt{color:var(--mut)}
+.kv dd{margin:0;color:var(--dim);font-family:var(--fm);font-size:11.5px;word-break:break-all}
+.pv{display:flex;align-items:center;gap:12px;padding:12px 13px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px}
+.pv .ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;
+  background:var(--panel-2);color:var(--dim)}
+.pv .ic svg{width:17px;height:17px}
+.pv.on .ic{background:var(--ok-soft);color:var(--ok)}
+.pv .bd{flex:1;min-width:0}
+.pv .t{font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pv .s{font-size:11.5px;color:var(--mut);margin-top:3px;word-break:break-all;line-height:1.5}
+.cmd{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;margin:10px 0 0}
+.cmd code{flex:1;font-family:var(--fm);font-size:11.5px;color:var(--dim);user-select:all;overflow:auto;white-space:nowrap}
+.btn.sm{padding:5px 9px;font-size:12px;border-radius:8px}
+/* quota */
+.quota{display:flex;gap:6px;flex-wrap:wrap;padding:10px 22px 0}
+.qchip{font-size:11.5px;font-weight:650;padding:4px 9px;border-radius:20px;background:var(--panel-2);
+  border:1px solid var(--line);color:var(--dim);font-variant-numeric:tabular-nums}
+.qchip.full{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.opt.full{opacity:.45;cursor:not-allowed}
+.opt .tag.full{color:var(--warn);background:var(--warn-soft)}
+.pv .lim{display:flex;align-items:center;gap:8px;flex:none;font-size:11.5px;color:var(--mut)}
+.pv .lim input[type=number]{width:58px;padding:5px 7px;font-size:12.5px;text-align:center}
+.pv .sw{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.pv .sw input{accent-color:var(--acc);width:14px;height:14px;margin:0;cursor:pointer}
+.st.busy{gap:10px}
+.st .stk{display:flex;flex-direction:column;gap:3px;line-height:1.15}
+.st .sub{font-size:11px;font-weight:500;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.st .ring{width:13px;height:13px;border-radius:50%;flex:none;box-sizing:border-box;
+  border:2px solid var(--warn-soft);border-top-color:var(--warn);animation:spin .85s linear infinite}
+/* countdown: fills clockwise until the next attempt is due */
+.st .ring.cd{border:0;animation:none;--p:0;
+  background:conic-gradient(var(--dim) calc(var(--p)*1turn),var(--line) 0);
+  -webkit-mask:radial-gradient(circle,transparent 3.5px,#000 4px);mask:radial-gradient(circle,transparent 3.5px,#000 4px)}
+@media (prefers-reduced-motion:reduce){.st .ring{animation-duration:2.4s}}
+.pv .use{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--panel-2);color:var(--dim);font-variant-numeric:tabular-nums}
+.pv .use.full{color:var(--warn);background:var(--warn-soft)}
+/* test */
+.ttable{width:100%;border-collapse:collapse;font-size:12.5px}
+.ttable th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);
+  padding:8px 8px;border-bottom:1px solid var(--line)}
+.ttable td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.ttable td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--fm);font-size:12px}
+.ttable .sub{color:var(--mut);font-size:11.5px;margin-top:2px}
+.res{font-weight:700;font-size:12px}
+.res.ok{color:var(--ok)} .res.bad{color:var(--bad)} .res.run{color:var(--dim)}
+.geo-no{color:var(--warn);font-weight:700}
+.topt{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);cursor:pointer;user-select:none}
+.topt input{accent-color:var(--acc)}
+.btn.sm svg{width:12px;height:12px}
+.seg{display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap}
+.seg button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line-2);background:var(--panel-2);color:var(--dim);transition:.14s}
+.seg button[aria-pressed="true"]{background:var(--acc-soft);border-color:var(--acc-line);color:var(--acc)}
+.hint{color:var(--dim);font-size:12.5px;margin:12px 0 5px}
+.hint code{font-family:var(--fm);font-size:11.5px;background:var(--panel-2);padding:2px 6px;border-radius:5px;
+  border:1px solid var(--line);user-select:all}
+
+/* row enter */
+tbody tr{animation:rise .5s cubic-bezier(.16,1,.3,1) both}
+body.flat tbody tr{animation:none}
+/* Static-capture mode: no motion, and no backdrop-filter — headless compositors
+   crash copying a blurred layer, which silently produces no screenshot at all. */
+body.flat .scrim,body.flat .modal{backdrop-filter:none}
+body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* empty */
+.empty{padding:70px 30px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.empty .glyph{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;color:var(--acc);
+  background:var(--acc-soft);margin-bottom:12px}
+.empty .glyph svg{width:30px;height:30px}
+.empty h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.empty p{margin:0 0 16px;color:var(--dim);max-width:380px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(4,7,14,.55);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s;z-index:30}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(460px,94vw);background:var(--panel);z-index:40;
+  border-left:1px solid var(--line);box-shadow:var(--sh-3);transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);
+  display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.drawer-h{padding:20px 22px 14px;border-bottom:1px solid var(--line)}
+.drawer-h .row{display:flex;align-items:center;gap:12px}
+.drawer-h h2{margin:0;font-size:17px;font-weight:750;letter-spacing:-.02em;flex:1}
+.drawer-h p{margin:3px 0 0;color:var(--dim);font-size:12.5px}
+.close{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;border:1px solid var(--line-2);
+  background:var(--panel-2);color:var(--dim);cursor:pointer;transition:.15s}
+.close:hover{color:var(--tx);border-color:var(--mut)}
+.drawer-search{padding:14px 22px 6px}
+.drawer-search .search{max-width:none}
+.picklist{flex:1;overflow:auto;padding:6px 14px 14px}
+.grp{margin-top:12px}
+.grp-h{display:flex;align-items:center;gap:9px;padding:6px 8px;color:var(--dim);font-size:11.5px;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;position:sticky;top:0;background:var(--panel);z-index:1}
+.grp-h .flag{width:20px;height:15px}
+.grp-h .n{margin-left:auto;color:var(--mut);letter-spacing:0}
+.opt{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;cursor:pointer;transition:.12s}
+.opt:hover{background:var(--panel-2)}
+.opt .city{flex:1;font-size:13.5px;font-weight:500}
+.opt.run .city{color:var(--dim)}
+.tag{font-size:10.5px;font-weight:700;color:var(--ok);background:var(--ok-soft);padding:2px 7px;border-radius:20px;letter-spacing:.02em}
+.ck{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;transition:.14s;color:transparent}
+.ck svg{width:12px;height:12px;stroke-width:2.6}
+.opt[aria-checked="true"] .ck{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.drawer-tabs{padding:14px 22px 0}
+.drawer-tabs .seg{margin-bottom:0}
+.pane{flex:1;display:flex;flex-direction:column;min-height:0}
+.drop{margin:16px 22px 0;border:1.5px dashed var(--line-2);border-radius:12px;padding:26px 20px;text-align:center;
+  cursor:pointer;transition:.16s;background:var(--panel-2)}
+.drop:hover,.drop.over{border-color:var(--acc);background:var(--acc-soft)}
+.drop svg{width:22px;height:22px;color:var(--dim);margin-bottom:9px}
+.drop.over svg,.drop:hover svg{color:var(--acc)}
+.drop b{display:block;font-size:13.5px;font-weight:650}
+.drop span{display:block;margin-top:4px;color:var(--mut);font-size:12px;line-height:1.55}
+.cfglist{flex:1;overflow:auto;padding:16px 22px 14px}
+.cfglist h4{margin:0 0 9px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+.cfg{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px}
+.cfg>svg{width:16px;height:16px;color:var(--mut);flex:none}
+.cfg .nm{flex:1;min-width:0;font-size:13px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfg .meta{font-size:11.5px;color:var(--mut);margin-top:2px;font-weight:400}
+.cfg .del,.pv .del{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line-2);
+  background:transparent;color:var(--mut);cursor:pointer;flex:none;transition:.14s}
+.cfg .del:hover,.pv .del:hover{color:var(--bad);border-color:var(--bad)}
+.cfg .del svg,.pv .del svg{width:14px;height:14px}
+.empty-cfg{color:var(--mut);font-size:12.5px;text-align:center;padding:24px 10px;line-height:1.6}
+.drawer-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.drawer-f .sum{font-size:12.5px;color:var(--dim);flex:1}
+.drawer-f .sum b{color:var(--tx);font-variant-numeric:tabular-nums}
+
+/* toast */
+.toast{position:fixed;bottom:26px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:var(--panel);border:1px solid var(--line-2);box-shadow:var(--sh-3);color:var(--tx);
+  padding:11px 16px;border-radius:11px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:9px;z-index:50;
+  transition:.28s cubic-bezier(.16,1,.3,1)}
+.toast svg{width:16px;height:16px;color:var(--acc)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(max-width:920px){
+  .app{grid-template-columns:56px 1fr}
+  .deck,.toolbar{padding-left:16px;padding-right:16px}
+  .tablewrap{margin:0 16px 20px}
+  .stats{flex-wrap:wrap}.stat{flex:1 1 45%}.stat+.stat{border-left:0}.stat:nth-child(n+2){border-top:1px solid var(--line)}
+  .stat:nth-child(even){border-left:1px solid var(--line)}
+  thead th.hide-m,td.hide-m{display:none}
+  .deck-actions .btn span{display:none}.deck-actions .btn{padding:9px 11px}
+}
+/* mobile: table becomes stacked cards */
+@media(max-width:720px){
+  .search{flex:1 1 100%;max-width:none}.count{margin-left:2px}
+  table,tbody,tr,td{display:block;width:auto}
+  thead{display:none}
+  tbody tr{padding:15px 16px;display:grid;grid-template-columns:auto 1fr auto;
+    grid-template-areas:"sel loc act" "st st st" "end end end";gap:12px;align-items:center;animation:none}
+  td.c-sel{grid-area:sel;width:auto}
+  .bulk{margin:0 16px 10px}
+  td{padding:0;min-width:0}
+  td.c-loc{grid-area:loc}
+  td.c-act{grid-area:act}
+  td.c-st{grid-area:st}
+  td.c-end{grid-area:end}
+  .c-end .endpoint{width:100%;justify-content:space-between}
+  .st .lbl{white-space:nowrap}
+  .rowact{justify-content:flex-end}
+}
+</style>
+</head>
+<body>
+<svg style="display:none">
+<symbol id="ic-relay" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4"/><path d="M12 4a8 8 0 0 0-8 8"/><path d="M12 16a4 4 0 0 0 4-4"/><path d="M12 20a8 8 0 0 0 8-8"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></symbol>
+<symbol id="ic-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/></symbol>
+<symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="ic-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></symbol>
+<symbol id="ic-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/></symbol>
+<symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></symbol>
+<symbol id="ic-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.4"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+<symbol id="ic-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+<symbol id="ic-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="ic-eye" viewBox="0 0 24 24"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+<symbol id="ic-export" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7.5 7.5 4.5-4.5 4.5 4.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+<symbol id="ic-activity" viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></symbol>
+<symbol id="ic-logs" viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/></symbol>
+<symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></symbol>
+<symbol id="ic-plug" viewBox="0 0 24 24"><path d="M9 3v6M15 3v6"/><path d="M6 9h12v3a6 6 0 0 1-12 0z"/><path d="M12 18v3"/></symbol>
+<symbol id="ic-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+<symbol id="ic-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7"/></symbol>
+<symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+<symbol id="ic-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand" title="Proxy Farm"><svg><use href="#ic-relay"/></svg></div>
+    <button class="rail-btn on" title="Proxy"><svg class="i" style="width:20px;height:20px"><use href="#ic-globe"/></svg></button>
+    <button class="rail-btn" id="openProv" title="Nhà cung cấp VPN"><svg class="i" style="width:19px;height:19px"><use href="#ic-plug"/></svg></button>
+    <button class="rail-btn" id="openSet" title="Cài đặt"><svg class="i" style="width:19px;height:19px"><use href="#ic-gear"/></svg></button>
+    <div class="rail-sp"></div>
+    <div class="health" id="health" title="Trạng thái nền"></div>
+    <button class="rail-btn" id="theme" title="Đổi sáng / tối"><svg class="i" style="width:19px;height:19px"><use href="#ic-moon" id="themeIcon"/></svg></button>
+  </aside>
+
+  <main>
+    <div class="deck">
+      <div class="deck-top">
+        <h1 class="title">Proxy Farm<small>một tài khoản VPN → nhiều cổng ra riêng · <b id="host">—</b></small></h1>
+        <div class="creds" id="creds" hidden>
+          <span class="cl">Đăng nhập proxy</span>
+          <button class="cv" id="credUser" title="Copy username"></button>
+          <span class="cs">:</span>
+          <button class="cv" id="credPass" title="Copy password"></button>
+          <button class="ceye" id="credEye" title="Hiện / ẩn mật khẩu"><svg class="i"><use href="#ic-eye"/></svg></button>
+        </div>
+        <div class="deck-actions">
+          <button class="btn ghost" id="rotateAll"><svg class="i"><use href="#ic-bolt"/></svg><span>Xoay tất cả</span></button>
+          <button class="btn primary" id="openAdd"><svg class="i"><use href="#ic-plus"/></svg><span>Thêm vị trí</span></button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat hero"><div class="k"><span class="live-dot" id="liveDot"></span>Đang online</div><div class="v" id="sOnline">0 <small>/ 0</small></div></div>
+        <div class="stat"><div class="k">Đang thử lại</div><div class="v" id="sRetry">0</div></div>
+        <div class="stat"><div class="k">Quốc gia đang bật</div><div class="v" id="sCountries">0</div></div>
+        <div class="stat"><div class="k">Độ trễ (trung vị)</div><div class="v" id="sLatency">— <small>ms</small></div></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search"><svg class="i"><use href="#ic-search"/></svg>
+        <input id="filter" placeholder="Lọc theo quốc gia, thành phố, IP…"></div>
+      <div class="seg view" id="viewSeg" role="group" aria-label="Hiện cổng">
+        <button data-view="on" aria-pressed="true">Đang bật <b id="vOn">0</b></button>
+        <button data-view="off" aria-pressed="false">Đã tắt <b id="vOff">0</b></button>
+        <button data-view="all" aria-pressed="false">Tất cả <b id="vAll">0</b></button>
+      </div>
+      <button class="btn ghost" id="exportAll"><svg class="i"><use href="#ic-export"/></svg><span>Xuất tất cả</span></button>
+      <span class="count" id="count"></span>
+    </div>
+
+    <div class="bulk" id="bulkbar" hidden>
+      <span class="n"><b id="selN">0</b> cổng đã chọn</span>
+      <button class="btn ghost" id="bStart"><svg class="i"><use href="#ic-power"/></svg><span>Bật</span></button>
+      <button class="btn ghost" id="bStop"><svg class="i"><use href="#ic-power"/></svg><span>Tắt</span></button>
+      <button class="btn ghost" id="bRotate"><svg class="i"><use href="#ic-rotate"/></svg><span>Xoay IP</span></button>
+      <button class="btn ghost" id="bAuto"><svg class="i"><use href="#ic-clock"/></svg><span>Tự xoay…</span></button>
+      <button class="btn ghost" id="bTest"><svg class="i"><use href="#ic-activity"/></svg><span>Kiểm tra</span></button>
+      <button class="btn ghost" id="bExport"><svg class="i"><use href="#ic-export"/></svg><span>Xuất</span></button>
+      <span class="sp"></span>
+      <button class="btn danger ghost" id="bDelete"><svg class="i"><use href="#ic-x"/></svg><span>Xoá</span></button>
+      <button class="btn ghost" id="bClear">Bỏ chọn</button>
+    </div>
+    <div class="tablewrap" id="tablewrap"></div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-h">
+    <div class="row"><h2>Thêm vị trí</h2><button class="close" id="closeDrawer"><svg class="i"><use href="#ic-x"/></svg></button></div>
+    <p>Mỗi vị trí thành một cổng SOCKS5 + HTTP riêng. Chọn rồi bấm bật.</p>
+  </div>
+  <div class="quota" id="pickQuota"></div>
+  <div class="drawer-search"><div class="search"><svg class="i"><use href="#ic-search"/></svg>
+    <input id="pickFilter" placeholder="Tìm quốc gia hoặc thành phố…"></div></div>
+  <div class="picklist" id="picklist"></div>
+  <div class="drawer-f">
+    <div class="sum"><b id="selCount">0</b> vị trí đã chọn</div>
+    <button class="btn ghost" id="pickAll">Chọn hết đang lọc</button>
+    <button class="btn primary" id="startSel"><svg class="i"><use href="#ic-power"/></svg><span>Bật</span></button>
+  </div>
+</aside>
+
+<div class="modal" id="mProv"><div class="box wide">
+  <div class="mh"><h3>Nhà cung cấp VPN</h3><button class="close" data-mclose><svg class="i"><use href="#ic-x"/></svg></button></div>
+  <div class="mb">
+    <div class="sect">
+      <h4>Đang dùng</h4>
+      <div id="provlist"></div>
+    </div>
+    <div class="sect">
+      <h4>Thêm nhà cung cấp</h4>
+      <div class="seg" id="provSeg">
+        <button data-add="hma" aria-pressed="true">HMA / SurfEasy</button>
+        <button data-add="file" aria-pressed="false">WireGuard · OpenVPN</button>
+        <button data-add="eap" aria-pressed="false">IKEv2 user/mật khẩu</button>
+      </div>
+
+      <div id="addHma">
+        <div id="hmaOk" hidden>
+          <div class="pv on" style="margin:0 0 12px">
+            <div class="ic"><svg class="i"><use href="#ic-check"/></svg></div>
+            <div class="bd"><div class="t">Đã nhận chứng chỉ từ app HMA trên máy này</div>
+              <div class="s" id="hmaOkSub"></div></div>
+          </div>
+          <p class="note">Chạy lại <code>./run.sh</code> là chứng chỉ được đồng bộ lại tự động.
+            Muốn nạp thủ công thì dùng ô bên dưới.</p>
+        </div>
+        <p class="note" id="hmaHow">HMA không cho tải file cấu hình, nhưng app trên máy đã có sẵn chứng chỉ thiết bị.
+          Kéo thả <code>tokenCoreSE.json</code> vào đây là xong — nó chứa cả chứng chỉ lẫn mật khẩu.
+          Trên macOS file nằm ở:</p>
+        <div class="cmd"><code id="hmaPath">/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json</code>
+          <button class="btn ghost sm" id="copyHmaPath"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
+        <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:14px 0 0">
+          <svg class="i"><use href="#ic-export"/></svg>
+          <b>Kéo thả tokenCoreSE.json</b>
+          <span>Hoặc file <code>.p12</code> nếu bạn đã tự trích — khi đó điền thêm mật khẩu bên dưới.</span>
+          <input type="file" id="hmaFile" accept=".json,.p12,.pfx" hidden>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label for="hmaPw">Mật khẩu chứng chỉ (chỉ cần khi nạp .p12)</label>
+          <input type="password" id="hmaPw" placeholder="để trống nếu dùng tokenCoreSE.json">
+        </div>
+      </div>
+
+      <div id="addFile" hidden>
+        <p class="note">Một file = một vị trí = một cổng proxy. Nhà cung cấp và quốc gia được đoán từ
+          tên file, ví dụ <code>mullvad-se-got.conf</code> → mullvad / Thuỵ Điển.</p>
+        <div class="drop" id="drop" role="button" tabindex="0">
+          <svg class="i"><use href="#ic-export"/></svg>
+          <b>Kéo thả file vào đây</b>
+          <span>WireGuard <code>.conf</code> hoặc OpenVPN <code>.ovpn</code> — Mullvad, Proton,<br>Surfshark, IVPN hoặc máy chủ của bạn. Chọn nhiều file cũng được.</span>
+          <input type="file" id="cfgFile" accept=".conf,.ovpn,.txt" multiple hidden>
+        </div>
+        <div id="foundwrap" hidden style="margin-top:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">
+            <h4 style="margin:0;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);flex:1">
+              Tìm thấy trên máy</h4>
+            <button class="btn ghost sm" id="importAll"><svg class="i"><use href="#ic-check"/></svg><span>Nạp tất cả</span></button>
+          </div>
+          <div id="foundlist"></div>
+        </div>
+        <p class="note" id="inboxNote" style="margin-top:14px"></p>
+        <div class="cfglist" id="cfglist" style="padding:14px 0 0"></div>
+      </div>
+
+      <div id="addEap" hidden>
+        <p class="note">Dành cho nhà cung cấp hướng dẫn “IKEv2 thủ công” bằng tài khoản
+          (NordVPN, Proton…). Mỗi máy chủ thêm vào thành một vị trí.</p>
+        <div class="grid2">
+          <div class="field"><label for="eName">Tên hiển thị</label>
+            <input type="text" id="eName" placeholder="nordvpn"></div>
+          <div class="field mono"><label for="eServer">Máy chủ</label>
+            <input type="text" id="eServer" placeholder="nl123.nordvpn.com"></div>
+          <div class="field"><label for="eUser">Tên đăng nhập</label>
+            <input type="text" id="eUser" autocomplete="off"></div>
+          <div class="field"><label for="ePass">Mật khẩu</label>
+            <input type="password" id="ePass" autocomplete="new-password"></div>
+          <div class="field"><label for="eCountry">Mã quốc gia</label>
+            <input type="text" id="eCountry" maxlength="2" placeholder="NL"></div>
+          <div class="field"><label for="eCity">Tên vị trí</label>
+            <input type="text" id="eCity" placeholder="Amsterdam"></div>
+        </div>
+        <div class="field" style="margin-top:12px"><label for="eSid">ID máy chủ (tuỳ chọn)</label>
+          <input type="text" id="eSid" placeholder="để trống thì dùng chính tên máy chủ">
+          <span class="hint">Chỉ cần khi nhà cung cấp yêu cầu một IDr khác với tên miền.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="mf">
+    <div class="sum" style="flex:1;font-size:12.5px;color:var(--dim)" id="provMsg"></div>
+    <button class="btn" data-mclose>Đóng</button>
+    <button class="btn primary" id="provSave" hidden aria-hidden="true"><svg class="i"><use href="#ic-check"/></svg><span>Thêm</span></button>
+  </div>
+</div></div>
+
+<div class="modal" id="mSet"><div class="box">
+  <div class="mh"><h3>Cài đặt</h3><button class="close" data-mclose><svg class="i"><use href="#ic-x"/></svg></button></div>
+  <div class="mb">
+    <div class="sect">
+      <h4>Đăng nhập proxy</h4>
+      <div class="grid2">
+        <div class="field mono"><label for="sUser">Tên đăng nhập</label><input type="text" id="sUser"></div>
+        <div class="field mono"><label for="sPass">Mật khẩu</label><input type="text" id="sPass"></div>
+      </div>
+      <p class="note" style="margin:10px 0 0">Dùng chung cho mọi cổng. Đổi xong phải khởi động lại cổng mới có hiệu lực.</p>
+    </div>
+    <div class="sect">
+      <h4>Mạng</h4>
+      <div class="grid2">
+        <div class="field mono"><label for="sBind">Địa chỉ lắng nghe</label><input type="text" id="sBind">
+          <span class="hint"><code>127.0.0.1</code> = chỉ máy này. Đổi sang IP LAN/Tailscale để máy khác dùng được.</span></div>
+        <div class="field mono"><label for="sBase">Cổng bắt đầu</label><input type="number" id="sBase">
+          <span class="hint">Chỉ áp dụng cho cổng tạo mới.</span></div>
+      </div>
+    </div>
+    <div class="sect">
+      <h4>Tunnel</h4>
+      <div class="grid2">
+        <div class="field mono"><label for="sMtu">MTU</label><input type="number" id="sMtu">
+          <span class="hint">1400 hợp với hầu hết đường truyền. Hạ xuống nếu tunnel lên mà không tải được trang.</span></div>
+        <div class="field mono"><label for="sDns">DNS trong tunnel</label><input type="text" id="sDns"></div>
+        <div class="field mono"><label for="sWi">Watchdog: chu kỳ (giây)</label><input type="number" id="sWi"></div>
+        <div class="field mono"><label for="sWf">Watchdog: số lần lỗi thì dựng lại</label><input type="number" id="sWf"></div>
+        <div class="field mono"><label for="sGu">Dựng lại bao nhiêu lần thì bỏ cuộc</label><input type="number" id="sGu">
+          <span class="hint">Cổng chưa từng chạy được sẽ bị tắt và đánh dấu lỗi thay vì restart vô hạn. 0 = không bỏ cuộc.</span></div>
+      </div>
+    </div>
+    <div class="sect">
+      <h4>Webhook xoay IP</h4>
+      <div class="cmd"><code id="hookUrl">—</code>
+        <button class="btn ghost sm" id="copyHook"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
+      <p class="note" style="margin:10px 0 0">Thêm <code>&amp;all=1</code> để xoay mọi cổng.
+        <button class="btn ghost sm" id="newHook" style="margin-left:6px">Tạo khoá mới</button></p>
+    </div>
+    <div class="sect">
+      <h4>Đường dẫn trên máy</h4>
+      <dl class="kv" id="setPaths"></dl>
+    </div>
+  </div>
+  <div class="mf">
+    <div class="sum" style="flex:1;font-size:12.5px;color:var(--dim)" id="setMsg"></div>
+    <button class="btn" data-mclose>Đóng</button>
+    <button class="btn ghost" id="setSave">Lưu</button>
+    <button class="btn primary" id="setApply"><svg class="i"><use href="#ic-power"/></svg><span>Lưu &amp; dựng lại cổng</span></button>
+  </div>
+</div></div>
+
+<div class="modal" id="mExport"><div class="box">
+  <div class="mh"><h3>Xuất danh sách proxy</h3><button class="close" data-mclose><svg class="i"><use href="#ic-x"/></svg></button></div>
+  <div class="mb">
+    <div class="seg" id="fmtSeg">
+      <button data-fmt="hpup" aria-pressed="true">host:port:user:pass</button>
+      <button data-fmt="url" aria-pressed="false">socks5://user:pass@host:port</button>
+      <button data-fmt="hp" aria-pressed="false">host:port</button>
+      <button data-fmt="curl" aria-pressed="false">lệnh curl</button>
+    </div>
+    <textarea id="exOut" readonly spellcheck="false"></textarea>
+    <p class="hint">Webhook xoay IP (gọi từ script/hệ thống khác):<br>
+      <code id="hookUrl">—</code></p>
+  </div>
+  <div class="mf"><span class="hint" style="margin:0;flex:1" id="exCount"></span>
+    <button class="btn" data-mclose>Đóng</button>
+    <button class="btn primary" id="exCopy"><svg class="i"><use href="#ic-copy"/></svg><span>Copy tất cả</span></button></div>
+</div></div>
+
+<div class="modal" id="mTest"><div class="box wide">
+  <div class="mh"><h3 id="testTitle">Kiểm tra proxy</h3>
+    <label class="topt"><input type="checkbox" id="testSpeed"> Đo cả tốc độ (tải 5 MB)</label>
+    <button class="btn ghost" id="testRun"><svg class="i"><use href="#ic-rotate"/></svg><span>Chạy lại</span></button>
+    <button class="close" data-mclose><svg class="i"><use href="#ic-x"/></svg></button></div>
+  <div class="mb">
+    <table class="ttable"><thead><tr><th>Cổng</th><th>Kết quả</th><th>IP lối ra</th><th>Ra ở đâu</th>
+      <th class="num">Độ trễ</th><th class="num">Tốc độ</th></tr></thead><tbody id="testBody"></tbody></table>
+    <div id="testCurl" hidden style="margin-top:16px">
+      <div class="sect" style="border:0;padding:0;margin:0"><h4>Tự thử bằng curl</h4></div>
+      <div class="cmd"><code id="testCurlCmd"></code>
+        <button class="btn ghost sm" id="copyTestCurl"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="modal" id="mLog"><div class="box">
+  <div class="mh"><h3 id="logTitle">Log</h3>
+    <button class="btn ghost" id="logRefresh"><svg class="i"><use href="#ic-rotate"/></svg><span>Tải lại</span></button>
+    <button class="close" data-mclose><svg class="i"><use href="#ic-x"/></svg></button></div>
+  <div class="mb"><pre id="logBody">Đang tải…</pre></div>
+</div></div>
+
+<div class="toast" id="toast"><svg class="i"><use href="#ic-check"/></svg><span id="toastMsg"></span></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const flag=cc=>`/flags/${(cc||'').toLowerCase()}.png`;
+let LOCS=null, RUNNING=new Set(), busy=new Set();
+
+/* theme */
+const setTheme=t=>{document.documentElement.dataset.theme=t;localStorage.hmaTheme=t;
+  $('#themeIcon').setAttribute('href',t==='dark'?'#ic-moon':'#ic-sun')};
+setTheme(new URLSearchParams(location.search).get('theme')||localStorage.hmaTheme||'dark');
+$('#theme').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+
+/* toast */
+let toastT;
+const toast=m=>{$('#toastMsg').textContent=m;$('#toast').classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>$('#toast').classList.remove('show'),1900)};
+
+/* drawer */
+const openDrawer=()=>{$('#scrim').classList.add('open');$('#drawer').classList.add('open');
+  $('#drawer').setAttribute('aria-hidden','false');renderPick();setTimeout(()=>$('#pickFilter').focus(),260)};
+const closeDrawer=()=>{$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');
+  $('#drawer').setAttribute('aria-hidden','true')};
+$('#openAdd').onclick=openDrawer;$('#closeDrawer').onclick=closeDrawer;$('#scrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
+
+/* location picker */
+const sel=new Set();
+let HAS_TARGETS=true, PROVS=[];
+// Mirrors farm.py limit_key(): HMA certificates share one account cap, everything else is
+// capped per provider name.
+const limitKey=t=>t.protocol==='ikev2-cert'?'hma':String(t.provider||'custom').toLowerCase();
+const provByKey=k=>PROVS.find(p=>p.limit_key===k);
+async function loadProvs(){ try{PROVS=(await j('/api/providers')).providers}catch(e){} }
+function quotaLeft(k){ const p=provByKey(k); if(!p||!p.limit)return Infinity; return Math.max(0,p.limit-p.used) }
+function refusedMsg(refused){
+  if(!refused||!refused.length)return '';
+  const by={}; for(const r of refused)(by[r.provider]=by[r.provider]||{n:0,limit:r.limit}).n++;
+  return Object.entries(by).map(([k,v])=>`${v.n} cổng ${k.toUpperCase()} (đã đủ ${v.limit})`).join(', ');
+}
+async function loadLocs(){LOCS=await j('/api/locations');HAS_TARGETS=LOCS.locations.length>0;await loadProvs()}
+function renderPick(){
+  const f=$('#pickFilter').value.toLowerCase();
+  const byC={};
+  for(const l of LOCS.locations){
+    const t=(l.countryName+' '+l.city+' '+l.country).toLowerCase();
+    if(f&&!t.includes(f))continue;
+    (byC[l.country]=byC[l.country]||{name:l.countryName,items:[]}).items.push(l);
+  }
+  const box=$('#picklist');box.innerHTML='';
+  // Remaining room per provider, counting what is already ticked in this drawer.
+  const selBy={}; for(const k of sel){const l=LOCS.locations.find(x=>x.key===k); if(l&&!RUNNING.has(k)){const q=limitKey(l);selBy[q]=(selBy[q]||0)+1}}
+  const room=q=>quotaLeft(q)-(selBy[q]||0);
+  // A chip only earns its place when a cap applies; an unlimited provider just shows what
+  // will be running, so nobody reads "/∞" as a limit to watch.
+  $('#pickQuota').innerHTML=PROVS.filter(p=>p.ready).map(p=>{
+    const n=p.used+(selBy[p.limit_key]||0);
+    if(!p.limit)return `<span class="qchip" title="Số cổng sẽ chạy">${esc(p.name)} · ${n} cổng</span>`;
+    const full=n>=p.limit;
+    return `<span class="qchip${full?' full':''}" title="Đang chạy / giới hạn">${esc(p.name)} · ${n}/${p.limit}${full?' · đã đủ':''}</span>`}).join('');
+  const codes=Object.keys(byC).sort((a,b)=>byC[a].name.localeCompare(byC[b].name));
+  if(!codes.length){box.innerHTML=LOCS.locations.length
+    ? '<p class="empty-cfg">Không có vị trí khớp.</p>'
+    : '<p class="empty-cfg">Chưa có nhà cung cấp nào.<br>Mở <b>Nhà cung cấp</b> ở thanh bên trái để nạp chứng chỉ HMA<br>hoặc file cấu hình WireGuard/OpenVPN.</p>';return}
+  for(const cc of codes){
+    const g=byC[cc];let h=`<div class="grp"><div class="grp-h"><img class="flag" src="${flag(cc)}" alt="" loading="lazy"><span>${esc(g.name)}</span><span class="n">${g.items.length}</span></div>`;
+    for(const l of g.items){
+      const run=RUNNING.has(l.key), on=sel.has(l.key), full=!run&&!on&&room(limitKey(l))<=0;
+      h+=`<div class="opt${run?' run':''}${full?' full':''}" data-k="${l.key}" role="checkbox" aria-checked="${on}" aria-disabled="${full}" tabindex="0">
+        <div class="ck"><svg class="i"><use href="#ic-check"/></svg></div>
+        <div class="city">${esc(l.city)}</div>${run?'<span class="tag">đang chạy</span>':full?'<span class="tag full">đã đủ</span>':''}</div>`;
+    }
+    box.insertAdjacentHTML('beforeend',h+'</div>');
+  }
+  $('#selCount').textContent=sel.size;
+}
+$('#pickFilter').addEventListener('input',renderPick);
+
+/* modals: providers + settings */
+const openModal=id=>{$('#'+id).classList.add('open')};
+$('#openProv').onclick=()=>{loadProviders();showAdd('hma');$('#mProv').classList.add('open')};
+$('#openSet').onclick=()=>{loadSettings();$('#mSet').classList.add('open')};
+
+function showAdd(name){
+  for(const b of $$('#provSeg button'))b.setAttribute('aria-pressed',b.dataset.add===name);
+  $('#addHma').hidden=name!=='hma'; $('#addFile').hidden=name!=='file'; $('#addEap').hidden=name!=='eap';
+  $('#provSave').hidden=name!=='eap';   // the other two act the moment a file lands
+  $('#provMsg').textContent='';
+  if(name==='file'){renderCfgs();loadFound()}
+}
+$('#provSeg').onclick=e=>{const b=e.target.closest('button');if(b)showAdd(b.dataset.add)};
+
+// #add / #providers / #settings open their surface directly, so each is linkable.
+function applyHash(){
+  const h=location.hash;
+  if(h==='#add')return openDrawer();
+  if(h==='#settings')return $('#openSet').click();
+  const m=/^#providers(?:-(hma|file|eap))?$/.exec(h);
+  if(m){$('#openProv').click(); if(m[1])showAdd(m[1])}
+}
+addEventListener('hashchange',applyHash);
+
+const PKIND={'ikev2-cert':'IKEv2 · chứng chỉ','ikev2-eap':'IKEv2 · user/mật khẩu',
+             wireguard:'WireGuard',openvpn:'OpenVPN'};
+async function loadProviders(){
+  const d=await j('/api/providers'); const box=$('#provlist');
+  const hma=d.providers.find(p=>p.id==='hma');
+  $('#hmaOk').hidden=!hma?.ready; $('#hmaHow').hidden=!!hma?.ready;
+  if(hma?.ready)$('#hmaOkSub').textContent=
+    `${hma.locations} vị trí · hạn ${hma.expires||'—'} · UDID ${(hma.udid||'').slice(0,26)}…`;
+  box.innerHTML=d.providers.map(p=>{
+    const sub=p.ready
+      ? [p.locations?`${p.locations} vị trí`:'', p.udid?`UDID ${p.udid.slice(0,22)}…`:'',
+         p.expires?`hạn ${p.expires}`:'', p.note].filter(Boolean).join(' · ')
+      : 'Chưa cấu hình — nạp chứng chỉ bên dưới để mở khoá 115 vị trí';
+    return `<div class="pv${p.ready?' on':''}">
+      <div class="ic"><svg class="i"><use href="#ic-${p.kind.startsWith('ikev2')?'plug':'file'}"/></svg></div>
+      <div class="bd"><div class="t">${esc(p.name)}<span class="badge">${esc(PKIND[p.kind]||p.kind)}</span></div>
+        <div class="s">${esc(sub)}</div></div>
+      ${p.ready?`<span class="use${p.limit&&p.used>=p.limit?' full':''}">${p.limit?`${p.used}/${p.limit} cổng`:`${p.used} cổng đang chạy`}</span>
+        <div class="lim" title="${esc(limitHint(p))}">
+          <label class="sw"><input type="checkbox" data-limon="${esc(p.limit_key)}"${p.limit?' checked':''}><span>Giới hạn</span></label>
+          <input type="number" min="1" value="${p.limit||p.limit_default||10}" data-limit="${esc(p.limit_key)}"${p.limit?'':' hidden'} aria-label="Số cổng tối đa">
+        </div>
+        <button class="del" data-pid="${esc(p.id)}" title="Xoá nhà cung cấp"><svg class="i"><use href="#ic-trash"/></svg></button>`:''}
+    </div>`;
+  }).join('');
+}
+function limitHint(p){
+  if(p.limit_key==='hma')return 'HMA không giới hạn số kết nối cùng lúc (đã chạy 27+ cổng). '+
+    'Chỉ bật giới hạn nếu bạn muốn tự chặn số cổng.';
+  return p.limit_default?`Nhà cung cấp này thường cho tối đa ${p.limit_default} kết nối cùng lúc.`
+                        :'Không có giới hạn đã biết.';
+}
+async function setLimit(key,n){
+  await j('/api/limit',{method:'POST',body:JSON.stringify({provider:key,limit:n})});
+  await loadProvs(); loadProviders();
+  toast(n?`${key.toUpperCase()}: tối đa ${n} cổng cùng lúc`:`${key.toUpperCase()}: không giới hạn`);
+}
+$('#provlist').addEventListener('change',e=>{
+  const sw=e.target.closest('[data-limon]');
+  if(sw){ const box=sw.closest('.lim').querySelector('[data-limit]');
+    return setLimit(sw.dataset.limon, sw.checked?Math.max(1,parseInt(box.value,10)||1):0) }
+  const i=e.target.closest('[data-limit]'); if(!i)return;
+  setLimit(i.dataset.limit, Math.max(1,parseInt(i.value||'1',10)||1));
+});
+$('#provlist').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-pid]');if(!b)return;
+  if(!confirm('Xoá nhà cung cấp này? Mọi cổng của nó sẽ bị tắt và xoá.'))return;
+  await j('/api/provider/delete',{method:'POST',body:JSON.stringify({id:b.dataset.pid})});
+  await loadLocs();loadProviders();toast('Đã xoá nhà cung cấp');tick();
+});
+
+/* what is already on this machine */
+async function loadFound(){
+  const d=await j('/api/discover');
+  $('#inboxNote').innerHTML=d.inbox
+    ? `Hoặc thả file vào <code>${esc(d.inbox)}</code> — tự nạp trong vòng một phút.`
+    : '';
+  const box=$('#foundlist');
+  $('#foundwrap').hidden=!d.found.length;
+  if(!d.found.length)return;
+  $('#importAll').querySelector('span').textContent=`Nạp ${d.found.length} file`;
+  box.innerHTML=d.found.map(f=>`<div class="cfg">
+    <svg class="i"><use href="#ic-file"/></svg>
+    <div class="nm">${esc(f.name)}<div class="meta">${esc(f.protocol)} · ${esc(f.provider)}${f.where&&f.where!=='.'?' · '+esc(f.where):''}</div></div>
+    <button class="btn ghost sm" data-imp="${esc(f.path)}">Nạp</button></div>`).join('');
+}
+async function importFound(paths){
+  const r=await fetch('/api/discover',{method:'POST',body:JSON.stringify({paths})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
+  await loadLocs();renderCfgs();loadFound();loadProviders();renderPick();
+  toast(d.imported.length?`Đã nạp ${d.imported.length} file`:'Không nạp được file nào');
+}
+$('#foundlist').addEventListener('click',e=>{
+  const b=e.target.closest('[data-imp]');if(b)importFound([b.dataset.imp])});
+$('#importAll').onclick=()=>importFound(
+  [...$$('#foundlist [data-imp]')].map(b=>b.dataset.imp));
+
+/* HMA certificate import */
+const dropHma=$('#dropHma'),hmaFile=$('#hmaFile');
+dropHma.onclick=()=>hmaFile.click();
+dropHma.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();hmaFile.click()}};
+hmaFile.onchange=()=>{if(hmaFile.files[0])importHma(hmaFile.files[0]);hmaFile.value=''};
+for(const ev of ['dragenter','dragover'])dropHma.addEventListener(ev,e=>{e.preventDefault();dropHma.classList.add('over')});
+for(const ev of ['dragleave','drop'])dropHma.addEventListener(ev,e=>{e.preventDefault();dropHma.classList.remove('over')});
+dropHma.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f)importHma(f)});
+async function importHma(f){
+  $('#provMsg').textContent='Đang đọc chứng chỉ…';
+  let body;
+  if(/\.(p12|pfx)$/i.test(f.name)){
+    // .p12 is binary: base64 it here rather than mangling it through text decoding.
+    const b=new Uint8Array(await f.arrayBuffer());
+    let bin='';for(const x of b)bin+=String.fromCharCode(x);
+    body={p12:btoa(bin),password:$('#hmaPw').value};
+  }else{
+    body={token:await f.text()};
+  }
+  const r=await fetch('/api/provider/hma',{method:'POST',body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error){$('#provMsg').textContent='';return toast(d.error||('Lỗi '+r.status))}
+  $('#provMsg').textContent='';
+  $('#hmaPw').value='';
+  await loadLocs();loadProviders();
+  toast(`Đã nạp chứng chỉ · ${d.status.locations} vị trí · hạn ${d.status.expires||'—'}`);
+}
+$('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');
+
+/* IKEv2 user/password provider */
+$('#provSave').onclick=async()=>{
+  const body={name:$('#eName').value,server:$('#eServer').value,user:$('#eUser').value,
+    pass:$('#ePass').value,server_id:$('#eSid').value,country:$('#eCountry').value,city:$('#eCity').value};
+  const r=await fetch('/api/provider/eap',{method:'POST',body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
+  for(const id of ['eName','eServer','eUser','ePass','eSid','eCountry','eCity'])$('#'+id).value='';
+  await loadLocs();loadProviders();
+  toast(`Đã thêm ${d.target.city} — bật ở mục Thêm vị trí`);
+};
+
+/* settings */
+const SFIELDS={proxy_user:'sUser',proxy_pass:'sPass',bind:'sBind',base_port:'sBase',
+               mtu:'sMtu',dns:'sDns',watchdog_interval:'sWi',watchdog_fails:'sWf',
+               give_up_after:'sGu'};
+let SET=null;
+async function loadSettings(){
+  SET=await j('/api/settings');
+  for(const [k,id] of Object.entries(SFIELDS))$('#'+id).value=SET.settings[k];
+  $('#hookUrl').textContent=`${location.origin}/api/rotate?key=${SET.rotate_key}&port=${(LAST[0]||{}).port||29001}`;
+  $('#setPaths').innerHTML=Object.entries(SET.paths)
+    .map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('#setMsg').textContent='';
+  $('#setApply').querySelector('span').textContent=`Lưu & dựng lại ${SET.running} cổng`;
+}
+async function saveSettings(restart){
+  const body={settings:{},restart};
+  for(const [k,id] of Object.entries(SFIELDS))body.settings[k]=$('#'+id).value.trim();
+  const r=await fetch('/api/settings',{method:'POST',body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
+  if(!d.changed.length)return toast('Không có gì thay đổi');
+  // Saying "saved" when the running containers still carry the old flags would be a lie.
+  $('#setMsg').textContent=d.needs_restart
+    ? 'Đã lưu — các cổng đang chạy vẫn dùng giá trị cũ cho tới khi dựng lại.' : '';
+  toast(d.restarted?`Đã lưu, đang dựng lại ${d.restarted} cổng…`:'Đã lưu');
+  loadSettings();tick();
+}
+$('#setSave').onclick=()=>saveSettings(false);
+$('#setApply').onclick=()=>saveSettings(true);
+$('#copyHook').onclick=()=>copyText($('#hookUrl').textContent,'Đã chép webhook');
+$('#newHook').onclick=async()=>{
+  await fetch('/api/settings',{method:'POST',body:JSON.stringify({new_rotate_key:true})});
+  loadSettings();toast('Đã tạo khoá webhook mới');
+};
+
+/* uploaded configs */
+function renderCfgs(){
+  const list=(LOCS?.locations||[]).filter(l=>l.config);
+  const box=$('#cfglist');
+  // The drop zone above already says what to do; an empty list here is just noise.
+  if(!list.length){box.innerHTML='';return}
+  box.innerHTML='<h4 style="margin:0 0 9px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)">Đã nạp</h4>'+
+    list.map(l=>`<div class="cfg">
+    <svg class="i"><use href="#ic-file"/></svg>
+    <div class="nm">${esc(l.config)}<div class="meta">${esc(l.provider)} · ${esc(l.protocol)} · ${esc(l.countryName)}${RUNNING.has(l.key)?' · đang chạy':''}</div></div>
+    <button class="del" data-k="${l.key}" title="Xoá cấu hình"><svg class="i"><use href="#ic-trash"/></svg></button></div>`).join('');
+}
+$('#cfglist').addEventListener('click',async e=>{
+  const b=e.target.closest('.del');if(!b)return;
+  if(!confirm('Xoá cấu hình này? Cổng đang chạy của nó cũng sẽ bị tắt.'))return;
+  await j('/api/delete-config',{method:'POST',body:JSON.stringify({keys:[b.dataset.k]})});
+  await loadLocs();renderCfgs();toast('Đã xoá cấu hình');tick();
+});
+
+/* upload */
+const drop=$('#drop'),cfgFile=$('#cfgFile');
+drop.onclick=()=>cfgFile.click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();cfgFile.click()}};
+cfgFile.onchange=()=>{uploadFiles([...cfgFile.files]);cfgFile.value=''};
+for(const ev of ['dragenter','dragover'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')});
+for(const ev of ['dragleave','drop'])drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')});
+drop.addEventListener('drop',e=>uploadFiles([...(e.dataTransfer?.files||[])]));
+async function uploadFiles(files){
+  if(!files.length)return;
+  let ok=0,err=null;
+  for(const f of files){
+    const content=await f.text();
+    // Report the first real reason instead of a generic count: with one bad file in a
+    // batch, "1/3 nạp được" alone leaves the user guessing which line was wrong.
+    try{
+      const r=await fetch('/api/upload',{method:'POST',body:JSON.stringify({name:f.name,content})});
+      const d=await r.json();
+      if(!r.ok||d.error)err=err||`${f.name}: ${d.error||r.status}`; else ok++;
+    }catch(ex){err=err||`${f.name}: ${ex.message}`}
+  }
+  await loadLocs();renderCfgs();renderPick();loadProviders();
+  if(ok)toast(ok===files.length?`Đã nạp ${ok} cấu hình`:`Đã nạp ${ok}/${files.length} — ${err}`);
+  else toast(err||'Không nạp được file nào');
+}
+$('#picklist').addEventListener('click',e=>{const o=e.target.closest('.opt');if(!o)return;toggle(o)});
+$('#picklist').addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();const o=e.target.closest('.opt');if(o)toggle(o)}});
+function toggle(o){const k=o.dataset.k;
+  if(!sel.has(k)&&o.getAttribute('aria-disabled')==='true'){
+    const l=LOCS.locations.find(x=>x.key===k), p=provByKey(limitKey(l));
+    return toast(`${p?p.name:'Nhà cung cấp'} đã đủ ${p?p.limit:''} cổng — tắt bớt hoặc tăng giới hạn ở Nhà cung cấp`)}
+  sel.has(k)?sel.delete(k):sel.add(k);renderPick()}
+$('#pickAll').onclick=()=>{const f=$('#pickFilter').value.toLowerCase();
+  // Tick as many as each provider still has room for, not blindly everything in view.
+  const room={};
+  for(const l of LOCS.locations){const t=(l.countryName+' '+l.city+' '+l.country).toLowerCase();
+    if(f&&!t.includes(f)||RUNNING.has(l.key)||sel.has(l.key))continue;
+    const q=limitKey(l); if(!(q in room))room[q]=quotaLeft(q)-[...sel].filter(k=>{const x=LOCS.locations.find(y=>y.key===k);return x&&!RUNNING.has(k)&&limitKey(x)===q}).length;
+    if(room[q]>0){sel.add(l.key);room[q]--}}
+  renderPick()};
+$('#startSel').onclick=async()=>{
+  if(!sel.size)return toast('Chưa chọn vị trí nào');
+  const n=sel.size;const b=$('#startSel');b.disabled=true;
+  const r=await j('/api/up',{method:'POST',body:JSON.stringify({keys:[...sel]})});
+  sel.clear();b.disabled=false;closeDrawer();
+  const miss=refusedMsg(r.refused);
+  toast(miss?`Đang bật ${r.started.length} · không bật ${miss}`:`Đang bật ${r.started.length} vị trí…`);
+  await loadProvs();tick();
+};
+
+/* top actions */
+$('#rotateAll').onclick=async()=>{await j('/api/rotate',{method:'POST',body:JSON.stringify({keys:'*'})});toast('Đang xoay IP tất cả cổng…');tick()};
+async function rowAct(a,k,btn){
+  if(busy.has(k))return;busy.add(k);if(btn)btn.classList.add('spin');
+  const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({keys:[k]})});
+  const miss=refusedMsg(r&&r.refused);
+  toast(miss?`Không bật: ${miss}. Tắt bớt cổng khác hoặc tăng giới hạn.`
+            :{rotate:'Đang đổi IP…',start:'Đang bật cổng…',stop:'Đã tắt cổng'}[a]||'Xong');
+  busy.delete(k);await loadProvs();tick();
+}
+// The UI is served over plain http on a LAN/Tailscale IP, which is NOT a secure context,
+// so navigator.clipboard is unavailable there. Fall back to execCommand, and only claim
+// success when a copy actually happened.
+let AUTH=null, showPass=false;
+function renderCreds(){
+  if(!AUTH||!AUTH.user){ $('#creds').hidden=true; return; }
+  $('#creds').hidden=false;
+  $('#credUser').textContent=AUTH.user;
+  $('#credPass').textContent=showPass?AUTH.pass:'•'.repeat(Math.min(AUTH.pass.length,12));
+}
+$('#credEye').onclick=()=>{showPass=!showPass;renderCreds()};
+$('#credUser').onclick=()=>copyText(AUTH.user,'username');
+$('#credPass').onclick=()=>copyText(AUTH.pass,'mật khẩu');
+async function copyText(t,label){
+  try{
+    if(window.isSecureContext && navigator.clipboard){ await navigator.clipboard.writeText(t); }
+    else{
+      const ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);
+      const ok=document.execCommand('copy');document.body.removeChild(ta);
+      if(!ok) throw new Error('rejected');
+    }
+    toast('Đã copy '+label);
+  }catch(e){ toast('Trình duyệt chặn copy — '+label+': '+t); }
+}
+async function copyEndpoint(port){
+  const s=location.hostname+':'+port;
+  try{
+    if(window.isSecureContext && navigator.clipboard){ await navigator.clipboard.writeText(s); }
+    else{
+      const ta=document.createElement('textarea');
+      ta.value=s; ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,s.length);
+      const ok=document.execCommand('copy'); document.body.removeChild(ta);
+      if(!ok) throw new Error('execCommand copy rejected');
+    }
+    toast('Đã copy '+s);
+  }catch(e){ toast('Trình duyệt chặn copy — bôi đen thủ công: '+s); }
+}
+
+/* render table */
+const latClass=v=>v==null?'m':v<600?'g':v<1100?'m':'b';
+function stateOf(r){
+  if(r.failed)return 'error';
+  if(r.state!=='running'&&r.state!=='restarting')return 'stopped';
+  if(r.ok)return 'online';
+  // A port that is on but not up keeps trying until it connects; the node says which step.
+  return r.wait?'wait':'connecting';
+}
+// m:ss, or h:mm:ss past an hour.
+const clock=sec=>{sec=Math.max(0,Math.round(sec));const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),x=String(sec%60).padStart(2,'0');
+  return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
+const mmss=sec=>sec<=0?'sắp thử':clock(sec);
+// Why the previous attempt failed, as written by the node into <key>.wait.json.
+const WHY={
+  nodata:'Gateway nhận kết nối nhưng không gửi dữ liệu về — lỗi phía HMA (app chính chủ cũng gặp), thường hết sau vài lần thử.',
+  silent:'Máy điều phối của nhà cung cấp không trả lời.',
+  noconnect:'Tunnel không lên được.',
+  dead:'Tunnel đang chạy thì mất kết nối.'};
+const WHY_SHORT={nodata:'không có dữ liệu',silent:'không trả lời',noconnect:'chưa lên',dead:'mất kết nối'};
+// What an attempt is doing right now (<key>.phase.json).
+const PHASE={queue:'Chờ lượt',handshake:'Đang bắt tay',verify:'Chờ dữ liệu'};
+const PHASE_WHY={queue:'Chờ vài giây trước khi kết nối để các cổng không bật dồn một lúc.',
+  handshake:'Đang xác thực với máy chủ VPN.',
+  verify:'Tunnel đã dựng, đang chờ dữ liệu đầu tiên chạy qua.'};
+function stateWhy(r){
+  if(r.failed)return r.failed.why||'tunnel không lên được';
+  const s=stateOf(r), p=r.phase||{};
+  if(s==='wait')return `${WHY[r.wait.why]||'Lần trước chưa kết nối được.'} Lần thử tới sau đếm ngược; `+
+    `farm tự thử cho tới khi kết nối được. Bấm Đổi IP để thử ngay.`;
+  if(s==='connecting')return `${PHASE_WHY[p.phase]||'Đang kết nối.'} Farm tự thử cho tới khi kết nối được.`;
+  return '';
+}
+const stLabel={online:'Online',connecting:'Đang kết nối',wait:'Chờ thử lại',stopped:'Đã tắt',error:'Không kết nối được'};
+let RENDER_SIG=null, SHOWN=[];
+const stCell=r=>{const s=stateOf(r), why=stateWhy(r), t=why?` title="${esc(why)}"`:'';
+  if(s!=='connecting'&&s!=='wait')
+    return `<span class="st"${t}><span class="dot ${s}"></span><span class="lbl ${s}">${stLabel[s]}</span></span>`;
+  const p=r.phase||{}, w=r.wait, n=p.attempt||w?.attempt, from=w?(p.phase==='wait'&&p.at)||Math.round(Date.now()/1000):0;
+  // Connecting spins; waiting shows a ring that fills up as the next attempt comes due.
+  const icon=s==='wait'
+    ? `<span class="ring cd" data-from="${from}" data-until="${w.until}"></span>`
+    : `<span class="ring"></span>`;
+  const sub=[
+    s==='wait'?`thử lại sau <span class="tk" data-until="${w.until}">${mmss(w.until-Date.now()/1000)}</span>`:'',
+    s==='wait'&&WHY_SHORT[w.why]?WHY_SHORT[w.why]:'',
+    n?`lần ${n}`:'',
+    p.since?`đã thử <span class="tk" data-since="${p.since}">${clock(Date.now()/1000-p.since)}</span>`:''
+  ].filter(Boolean).join(' · ');
+  return `<span class="st busy"${t}>${icon}<span class="stk"><span class="lbl ${s}">${
+    s==='wait'?stLabel.wait:(PHASE[p.phase]||stLabel.connecting)}</span>${sub?`<span class="sub">${sub}</span>`:''}</span></span>`};
+const locCell=r=>`<b>${esc(r.name)}</b> <span>${esc(r.city)}</span>`+
+  (r.provider&&r.provider!=='hma'?`<span class="badge prov" title="${esc(r.protocol||'')}">${esc(r.provider)}</span>`:'')+
+  (r.rotate_minutes?`<span class="badge" title="Tự xoay IP"><svg class="i"><use href="#ic-clock"/></svg>${r.rotate_minutes}p</span>`:'');
+const ipCell=r=>r.ip?esc(r.ip):'<span style="color:var(--mut)">—</span>';
+const latCell=r=>`<span class="lat ${latClass(r.latency)}">${r.latency!=null?r.latency+'ms':'—'}</span>`;
+const isOn=r=>r.state==='running'||r.state==='restarting';
+const pwAttrs=r=>{const on=isOn(r);
+  return `title="${on?'Tắt':'Bật'}" onclick="rowAct('${on?'stop':'start'}','${r.key}',this)"`};
+
+// Compare with what we last wrote, not with the live DOM: the per-second tickers below
+// rewrite text inside cells, and a redraw every 5 s would restart the spinner.
+function setHTML(el,html){ if(el&&el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html } }
+function patchRows(show,tb){
+  for(const r of show){
+    const tr=tb.querySelector(`tr[data-k="${CSS.escape(r.key)}"]`);
+    if(!tr) continue;
+    setHTML(tr.querySelector('.c-st'), stCell(r));
+    setHTML(tr.querySelector('.locbd'), locCell(r));
+    setHTML(tr.querySelector('.c-ip'), ipCell(r));
+    setHTML(tr.querySelector('.c-lat'), latCell(r));
+    setHTML(tr.querySelector('.c-rs'), String(r.restarts??'—'));
+    const pw=tr.querySelector('.pw');
+    // A row whose action is mid-flight (spinner) must not have its handler swapped out.
+    if(pw && !pw.classList.contains('spin')){
+      const on=isOn(r);
+      pw.title = on?'Tắt':'Bật';
+      pw.setAttribute('onclick', `rowAct('${on?'stop':'start'}','${r.key}',this)`);
+    }
+  }
+}
+function syncSel(show){
+  const sa=$('#selAll');
+  if(sa) sa.setAttribute('aria-checked', show.length>0 && show.every(r=>SEL.has(r.key)));
+  document.querySelectorAll('[data-sel]').forEach(el=>
+    el.setAttribute('aria-checked', SEL.has(el.dataset.sel)));
+}
+function render(rows){
+  const f=$('#filter').value.toLowerCase();
+  const inView=r=>VIEW==='all'||(VIEW==='on')===isOn(r);
+  const show=rows.filter(r=>inView(r)&&(!f||(r.name+' '+r.city+' '+r.country+' '+(r.ip||'')).toLowerCase().includes(f)));
+  const wrap=$('#tablewrap');
+  if(!rows.length){
+    wrap.innerHTML=`<div class="empty"><div class="glyph"><svg class="i"><use href="#ic-globe"/></svg></div>
+      <h2>Chưa có cổng proxy nào</h2><p>${HAS_TARGETS
+        ? 'Chọn vài vị trí để biến tài khoản VPN thành các cổng SOCKS5 + HTTP riêng, mỗi cổng một quốc gia.'
+        : 'Trước hết hãy nạp một nhà cung cấp VPN — chứng chỉ HMA từ app, hoặc file .conf/.ovpn của nhà cung cấp khác.'}</p>
+      <button class="btn primary" onclick="document.getElementById('${HAS_TARGETS?'openAdd':'openProv'}').click()">
+        <svg class="i"><use href="#ic-${HAS_TARGETS?'plus':'plug'}"/></svg>
+        <span>${HAS_TARGETS?'Thêm vị trí':'Thêm nhà cung cấp'}</span></button></div>`;
+    RENDER_SIG=null;
+    return;
+  }
+  // Re-rendering the whole table every poll re-ran the row entrance animation, which is
+  // the flash you see. Rebuild only when the visible set actually changes; otherwise
+  // patch the handful of cells that move. This also keeps hover, focus and scroll.
+  const sig = show.map(r => r.key).join('|');
+  const tb = wrap.querySelector('tbody');
+  SHOWN = show;
+  if (tb && sig === RENDER_SIG) { patchRows(show, tb); syncSel(show); return; }
+  RENDER_SIG = sig;
+
+  let h=`<table><thead><tr>
+    <th class="c-sel"><span class="ck2" id="selAll" role="checkbox" aria-checked="false" tabindex="0"><svg class="i"><use href="#ic-check"/></svg></span></th>
+    <th>Trạng thái</th><th>Vị trí</th><th>Điểm cuối</th>
+    <th class="hide-m">IP lối ra</th><th class="num hide-m">Độ trễ</th><th class="num hide-m">Restart</th><th></th></tr></thead><tbody>`;
+  show.forEach((r,i)=>{
+    h+=`<tr data-k="${r.key}" style="animation-delay:${Math.min(i*22,300)}ms">
+      <td class="c-sel"><span class="ck2" data-sel="${r.key}" role="checkbox" aria-checked="${SEL.has(r.key)}" tabindex="0"><svg class="i"><use href="#ic-check"/></svg></span></td>
+      <td class="c-st">${stCell(r)}</td>
+      <td class="c-loc"><div class="loc"><img class="flag" src="${flag(r.country)}" alt="${esc(r.country)}" loading="lazy">
+        <div class="locbd">${locCell(r)}</div></div></td>
+      <td class="c-end"><span class="endpoint" onclick="copyEndpoint(${r.port})" title="Copy host:port">
+        <span class="mono">${esc(location.hostname)}:${r.port}</span><span class="proto">S5·HTTP</span>
+        <svg class="i"><use href="#ic-copy"/></svg></span></td>
+      <td class="c-ip hide-m mono">${ipCell(r)}</td>
+      <td class="c-lat num hide-m">${latCell(r)}</td>
+      <td class="c-rs num hide-m" style="color:var(--mut)">${r.restarts??'—'}</td>
+      <td class="c-act"><div class="rowact">
+        <button class="iconbtn" title="Kiểm tra ngay" onclick="checkNow('${r.key}',this)"><svg class="i"><use href="#ic-activity"/></svg></button>
+        <button class="iconbtn" title="Xem log" onclick="openLog('${r.key}')"><svg class="i"><use href="#ic-logs"/></svg></button>
+        <button class="iconbtn" title="Đổi IP" onclick="rowAct('rotate','${r.key}',this)"><svg class="i"><use href="#ic-rotate"/></svg></button>
+        <button class="iconbtn danger pw" ${pwAttrs(r)}><svg class="i"><use href="#ic-power"/></svg></button>
+      </div></td></tr>`;
+  });
+  wrap.innerHTML=h+'</tbody></table>';
+  wrap.querySelectorAll('[data-sel]').forEach(el=>{
+    el.onclick=()=>{const k=el.dataset.sel;SEL.has(k)?SEL.delete(k):SEL.add(k);
+      el.setAttribute('aria-checked',SEL.has(k));renderSel();syncSel(show)};
+  });
+  const sa=$('#selAll');
+  if(sa) sa.onclick=()=>{ const cur=show.filter(r=>SEL.has(r.key)).length===show.length;
+    show.forEach(r=>cur?SEL.delete(r.key):SEL.add(r.key)); renderSel(); syncSel(show); };
+  syncSel(show);
+  $('#count').textContent=f?`${show.length} cổng khớp`:'';   // the view switch already counts
+}
+$('#filter').addEventListener('input',()=>render(LAST));
+
+/* ---------- selection + bulk ---------- */
+const SEL=new Set();
+function renderSel(){
+  $('#selN').textContent=SEL.size;
+  $('#bulkbar').hidden=SEL.size===0;
+}
+const selKeys=()=>[...SEL];
+async function bulk(path,body,msg){
+  if(!SEL.size)return;
+  const r=await j('/api/'+path,{method:'POST',body:JSON.stringify(body)});
+  const miss=refusedMsg(r&&r.refused);
+  toast(miss?`${msg.replace(/\d+ cổng/,(r.started||[]).length+' cổng')} · không bật ${miss}`:msg);
+  await loadProvs(); tick();
+}
+$('#bClear').onclick=()=>{SEL.clear();renderSel();syncSel(SHOWN)};
+$('#bStart').onclick=()=>bulk('start',{keys:selKeys()},`Đang bật ${SEL.size} cổng…`);
+$('#bStop').onclick=()=>bulk('stop',{keys:selKeys()},`Đã tắt ${SEL.size} cổng`);
+$('#bRotate').onclick=()=>bulk('rotate',{keys:selKeys()},`Đang xoay ${SEL.size} cổng…`);
+$('#bDelete').onclick=()=>{ if(confirm(`Xoá ${SEL.size} cổng khỏi danh sách?`))
+  bulk('down',{keys:selKeys()},'Đã xoá').then(()=>{SEL.clear();renderSel()}) };
+$('#bAuto').onclick=async()=>{
+  const v=prompt('Tự xoay IP mỗi bao nhiêu phút? (0 = tắt)','30');
+  if(v===null)return;
+  const m=parseInt(v,10); if(isNaN(m)||m<0)return toast('Số phút không hợp lệ');
+  await j('/api/autorotate',{method:'POST',body:JSON.stringify({keys:selKeys(),minutes:m})});
+  toast(m?`Tự xoay mỗi ${m} phút`:'Đã tắt tự xoay'); tick();
+};
+
+/* ---------- export ---------- */
+let FMT='hpup';
+function openExport(rows){
+  EXPORT_ROWS=rows; $('#mExport').classList.add('open'); buildExport();
+  $('#hookUrl').textContent=`${location.origin}/api/rotate?key=${HOOK||'—'}&port=<PORT>`;
+}
+let EXPORT_ROWS=[];
+function buildExport(){
+  const h=location.hostname, u=AUTH?AUTH.user:'', pw=AUTH?AUTH.pass:'';
+  const lines=EXPORT_ROWS.map(r=>{
+    if(FMT==='hp')   return `${h}:${r.port}`;
+    if(FMT==='hpup') return u?`${h}:${r.port}:${u}:${pw}`:`${h}:${r.port}`;
+    if(FMT==='url')  return u?`socks5://${u}:${pw}@${h}:${r.port}`:`socks5://${h}:${r.port}`;
+    return `curl -x socks5h://${u?u+':'+pw+'@':''}${h}:${r.port} https://ipinfo.io   # ${r.name} ${r.city}`;
+  });
+  $('#exOut').value=lines.join('\n');
+  $('#exCount').textContent=`${lines.length} cổng`;
+}
+$('#fmtSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-fmt]');if(!b)return;
+  FMT=b.dataset.fmt;$$('#fmtSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));buildExport()});
+$('#exCopy').onclick=()=>copyText($('#exOut').value,`${EXPORT_ROWS.length} dòng`);
+$('#bExport').onclick=()=>openExport(LAST.filter(r=>SEL.has(r.key)));
+$('#bTest').onclick=()=>{ if(SEL.size>20)return toast('Mỗi lần kiểm tra tối đa 20 cổng'); openTest(selKeys()) };
+$('#exportAll').onclick=()=>openExport(LAST);
+document.addEventListener('click',e=>{if(e.target.closest('[data-mclose]'))
+  $$('.modal').forEach(m=>m.classList.remove('open'))});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal').forEach(m=>m.classList.remove('open'))});
+$$('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+
+/* ---------- logs + check now ---------- */
+let LOGKEY=null;
+async function openLog(k){
+  LOGKEY=k; $('#mLog').classList.add('open');
+  $('#logTitle').textContent='Log · '+k; $('#logBody').textContent='Đang tải…';
+  const d=await j('/api/logs?key='+encodeURIComponent(k)+'&n=300');
+  $('#logBody').textContent=d.log||'(trống)';
+  $('#logBody').scrollTop=$('#logBody').scrollHeight;
+}
+$('#logRefresh').onclick=()=>LOGKEY&&openLog(LOGKEY);
+let TEST_KEYS=[];
+function checkNow(k){ openTest([k]) }
+function openTest(keys){
+  TEST_KEYS=keys; $('#mTest').classList.add('open');
+  $('#testTitle').textContent=keys.length>1?`Kiểm tra ${keys.length} cổng`:'Kiểm tra proxy';
+  const one=keys.length===1&&LAST.find(r=>r.key===keys[0]);
+  $('#testCurl').hidden=!one;
+  if(one)$('#testCurlCmd').textContent=
+    `curl -x socks5h://${AUTH?.user||'user'}:${AUTH?.pass||'pass'}@${location.hostname}:${one.port} https://ipinfo.io/json`;
+  runTest();
+}
+async function runTest(){
+  const rows=TEST_KEYS.map(k=>LAST.find(r=>r.key===k)).filter(Boolean);
+  const speed=$('#testSpeed').checked;
+  $('#testBody').innerHTML=rows.map(r=>`<tr data-t="${r.key}">
+    <td><b>${esc(r.name)}</b> ${esc(r.city)}<div class="sub">:${r.port}</div></td>
+    <td><span class="res run">đang thử${speed?' + đo tốc độ':''}…</span></td><td></td><td></td><td></td><td></td></tr>`).join('');
+  $('#testRun').disabled=true;
+  // One request per port so results land as they finish instead of all at the end.
+  await Promise.all(rows.map(async r=>{
+    let d; try{d=(await j('/api/test',{method:'POST',body:JSON.stringify({keys:[r.key],speed})})).results[0]}catch(e){d={ok:false,error:String(e)}}
+    const tr=$(`#testBody tr[data-t="${CSS.escape(r.key)}"]`); if(!tr||!d)return;
+    const c=tr.children;
+    if(d.ok){
+      c[1].innerHTML='<span class="res ok">Hoạt động</span>';
+      c[2].innerHTML=`<span class="mono">${esc(d.ip)}</span><div class="sub">${esc(d.org||'')}</div>`;
+      c[3].innerHTML=`${esc(d.city||'')}, ${esc(d.country||'')}`+
+        (d.geo_match?'':`<div class="sub geo-no">khác nước mong đợi (${esc(d.expected_country||'?')})</div>`);
+      c[4].innerHTML=`${d.total_ms} ms<div class="sub">TLS ${d.tls_ms} ms</div>`;
+      c[5].textContent=d.mbps!=null?`${d.mbps} Mbps`:(speed?'không đo được':'—');
+    }else{
+      c[1].innerHTML=`<span class="res bad">Không chạy</span><div class="sub">${esc(d.error||('HTTP '+(d.http||'—')))}</div>`;
+    }
+  }));
+  $('#testRun').disabled=false; tick();
+}
+$('#testRun').onclick=runTest;
+$('#copyTestCurl').onclick=()=>copyText($('#testCurlCmd').textContent,'Đã chép lệnh curl');
+
+/* poll */
+let LAST=[], HOOK=null, VIEW=null;
+function setView(v){
+  VIEW=v; for(const b of $$('#viewSeg button'))b.setAttribute('aria-pressed',b.dataset.view===v);
+  RENDER_SIG=null; if(LAST.length)render(LAST);
+}
+$('#viewSeg').onclick=e=>{const b=e.target.closest('button');if(b)setView(b.dataset.view)};
+async function tick(){ loadProvs(); return await _tick() }
+async function _tick(){
+  const d=await j('/api/status');LAST=d.rows;
+  RUNNING=new Set(d.rows.filter(r=>r.state==='running').map(r=>r.key));
+  $('#host').textContent=d.bind;
+  AUTH=d.auth||null; HOOK=d.rotate_key||null; renderCreds();
+  const on=d.rows.filter(r=>r.ok), lit=d.rows.filter(isOn);
+  // Online out of the ports that are switched on: stopped ports are a choice, not a fault.
+  $('#sOnline').innerHTML=`${on.length} <small>/ ${lit.length} đang bật</small>`;
+  $('#sRetry').textContent=lit.length-on.length;
+  $('#sCountries').textContent=new Set(lit.map(r=>r.country)).size;
+  $('#vOn').textContent=lit.length; $('#vOff').textContent=d.rows.length-lit.length;
+  $('#vAll').textContent=d.rows.length;
+  // First load lands on what is running; with nothing on, show everything instead.
+  if(VIEW===null)setView(lit.length?'on':'all');
+  // median, not mean: one slow tunnel shouldn't misrepresent the whole farm
+  const lats=on.map(r=>r.latency).filter(v=>v!=null).sort((a,b)=>a-b);
+  const med=lats.length?(lats.length%2?lats[(lats.length-1)/2]:Math.round((lats[lats.length/2-1]+lats[lats.length/2])/2)):null;
+  $('#sLatency').innerHTML=med!=null?`${med} <small>ms</small>`:`— <small>ms</small>`;
+  const live=on.length>0;
+  $('#health').classList.toggle('live',live);
+  $('#liveDot').classList.toggle('pulse',d.rows.some(r=>stateOf(r)==='connecting'));
+  render(d.rows);
+}
+setInterval(()=>{const now=Date.now()/1000;
+  for(const el of document.querySelectorAll('.tk[data-until]'))el.textContent=mmss(+el.dataset.until-now);
+  for(const el of document.querySelectorAll('.tk[data-since]'))el.textContent=clock(now-el.dataset.since);
+  for(const el of document.querySelectorAll('.ring.cd')){const a=+el.dataset.from,b=+el.dataset.until;
+    el.style.setProperty('--p',b>a?Math.min(1,Math.max(0,(now-a)/(b-a))):1)}},1000);
+if(new URLSearchParams(location.search).has('once'))document.body.classList.add('flat');
+loadLocs().then(applyHash);tick().then(()=>{
+  if(location.hash==='#export')openExport(LAST);
+  if(location.hash==='#test')openTest(LAST.filter(r=>r.state==='running').map(r=>r.key).slice(0,20));
+});
+if(!new URLSearchParams(location.search).has('once'))setInterval(tick,5000);
+</script>
+</body>
+</html>

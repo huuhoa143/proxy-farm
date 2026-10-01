@@ -1,0 +1,1181 @@
+{
+"countries": [
+{
+"code": "AE",
+"name": "United Arab Emirates",
+"fqdn": "AE.ult.surfeasy.mobi"
+},
+{
+"code": "AL",
+"name": "Albania",
+"fqdn": "AL.ult.surfeasy.mobi"
+},
+{
+"code": "AR",
+"name": "Argentina",
+"fqdn": "AR.ult.surfeasy.mobi"
+},
+{
+"code": "AT",
+"name": "Austria",
+"fqdn": "AT.ult.surfeasy.mobi"
+},
+{
+"code": "AU",
+"name": "Australia",
+"fqdn": "AU.ult.surfeasy.mobi"
+},
+{
+"code": "AZ",
+"name": "Azerbaijan",
+"fqdn": "AZ.ult.surfeasy.mobi"
+},
+{
+"code": "BA",
+"name": "Bosnia & Herzegovina",
+"fqdn": "BA.ult.surfeasy.mobi"
+},
+{
+"code": "BE",
+"name": "Belgium",
+"fqdn": "BE.ult.surfeasy.mobi"
+},
+{
+"code": "BG",
+"name": "Bulgaria",
+"fqdn": "BG.ult.surfeasy.mobi"
+},
+{
+"code": "BN",
+"name": "Brunei",
+"fqdn": "BN.ult.surfeasy.mobi"
+},
+{
+"code": "BR",
+"name": "Brazil",
+"fqdn": "BR.ult.surfeasy.mobi"
+},
+{
+"code": "CA",
+"name": "Canada",
+"fqdn": "CA.ult.surfeasy.mobi"
+},
+{
+"code": "CH",
+"name": "Switzerland",
+"fqdn": "CH.ult.surfeasy.mobi"
+},
+{
+"code": "CL",
+"name": "Chile",
+"fqdn": "CL.ult.surfeasy.mobi"
+},
+{
+"code": "CO",
+"name": "Colombia",
+"fqdn": "CO.ult.surfeasy.mobi"
+},
+{
+"code": "CR",
+"name": "Costa Rica",
+"fqdn": "CR.ult.surfeasy.mobi"
+},
+{
+"code": "CY",
+"name": "Cyprus",
+"fqdn": "CY.ult.surfeasy.mobi"
+},
+{
+"code": "CZ",
+"name": "Czech Republic",
+"fqdn": "CZ.ult.surfeasy.mobi"
+},
+{
+"code": "DE",
+"name": "Germany",
+"fqdn": "DE.ult.surfeasy.mobi"
+},
+{
+"code": "DK",
+"name": "Denmark",
+"fqdn": "DK.ult.surfeasy.mobi"
+},
+{
+"code": "EC",
+"name": "Ecuador",
+"fqdn": "EC.ult.surfeasy.mobi"
+},
+{
+"code": "EE",
+"name": "Estonia",
+"fqdn": "EE.ult.surfeasy.mobi"
+},
+{
+"code": "ES",
+"name": "Spain",
+"fqdn": "ES.ult.surfeasy.mobi"
+},
+{
+"code": "FI",
+"name": "Finland",
+"fqdn": "FI.ult.surfeasy.mobi"
+},
+{
+"code": "FR",
+"name": "France",
+"fqdn": "FR.ult.surfeasy.mobi"
+},
+{
+"code": "GB",
+"name": "United Kingdom",
+"fqdn": "GB.ult.surfeasy.mobi"
+},
+{
+"code": "GR",
+"name": "Greece",
+"fqdn": "GR.ult.surfeasy.mobi"
+},
+{
+"code": "HK",
+"name": "Hong Kong",
+"fqdn": "HK.ult.surfeasy.mobi"
+},
+{
+"code": "HR",
+"name": "Croatia",
+"fqdn": "HR.ult.surfeasy.mobi"
+},
+{
+"code": "HU",
+"name": "Hungary",
+"fqdn": "HU.ult.surfeasy.mobi"
+},
+{
+"code": "IE",
+"name": "Ireland",
+"fqdn": "IE.ult.surfeasy.mobi"
+},
+{
+"code": "IL",
+"name": "Israel",
+"fqdn": "IL.ult.surfeasy.mobi"
+},
+{
+"code": "IS",
+"name": "Iceland",
+"fqdn": "IS.ult.surfeasy.mobi"
+},
+{
+"code": "IT",
+"name": "Italy",
+"fqdn": "IT.ult.surfeasy.mobi"
+},
+{
+"code": "JP",
+"name": "Japan",
+"fqdn": "JP.ult.surfeasy.mobi"
+},
+{
+"code": "KR",
+"name": "South Korea",
+"fqdn": "KR.ult.surfeasy.mobi"
+},
+{
+"code": "KH",
+"name": "Cambodia",
+"fqdn": "KH.ult.surfeasy.mobi"
+},
+{
+"code": "LA",
+"name": "Laos",
+"fqdn": "LA.ult.surfeasy.mobi"
+},
+{
+"code": "LT",
+"name": "Lithuania",
+"fqdn": "LT.ult.surfeasy.mobi"
+},
+{
+"code": "LV",
+"name": "Latvia",
+"fqdn": "LV.ult.surfeasy.mobi"
+},
+{
+"code": "LU",
+"name": "Luxembourg",
+"fqdn": "LU.ult.surfeasy.mobi"
+},
+{
+"code": "LY",
+"name": "Libya",
+"fqdn": "LY.ult.surfeasy.mobi"
+},
+{
+"code": "MA",
+"name": "Morocco",
+"fqdn": "MA.ult.surfeasy.mobi"
+},
+{
+"code": "MD",
+"name": "Moldova",
+"fqdn": "MD.ult.surfeasy.mobi"
+},
+{
+"code": "MX",
+"name": "Mexico",
+"fqdn": "MX.ult.surfeasy.mobi"
+},
+{
+"code": "MY",
+"name": "Malaysia",
+"fqdn": "MY.ult.surfeasy.mobi"
+},
+{
+"code": "NG",
+"name": "Nigeria",
+"fqdn": "NG.ult.surfeasy.mobi"
+},
+{
+"code": "NL",
+"name": "Netherlands",
+"fqdn": "NL.ult.surfeasy.mobi"
+},
+{
+"code": "NO",
+"name": "Norway",
+"fqdn": "NO.ult.surfeasy.mobi"
+},
+{
+"code": "NZ",
+"name": "New Zealand",
+"fqdn": "NZ.ult.surfeasy.mobi"
+},
+{
+"code": "PA",
+"name": "Panama",
+"fqdn": "PA.ult.surfeasy.mobi"
+},
+{
+"code": "PE",
+"name": "Peru",
+"fqdn": "PE.ult.surfeasy.mobi"
+},
+{
+"code": "PK",
+"name": "Pakistan",
+"fqdn": "PK.ult.surfeasy.mobi"
+},
+{
+"code": "PL",
+"name": "Poland",
+"fqdn": "PL.ult.surfeasy.mobi"
+},
+{
+"code": "PT",
+"name": "Portugal",
+"fqdn": "PT.ult.surfeasy.mobi"
+},
+{
+"code": "QA",
+"name": "Qatar",
+"fqdn": "QA.ult.surfeasy.mobi"
+},
+{
+"code": "RO",
+"name": "Romania",
+"fqdn": "RO.ult.surfeasy.mobi"
+},
+{
+"code": "RS",
+"name": "Serbia",
+"fqdn": "RS.ult.surfeasy.mobi"
+},
+{
+"code": "SA",
+"name": "Saudi Arabia",
+"fqdn": "SA.ult.surfeasy.mobi"
+},
+{
+"code": "SE",
+"name": "Sweden",
+"fqdn": "SE.ult.surfeasy.mobi"
+},
+{
+"code": "SI",
+"name": "Slovenia",
+"fqdn": "SI.ult.surfeasy.mobi"
+},
+{
+"code": "SG",
+"name": "Singapore",
+"fqdn": "SG.ult.surfeasy.mobi"
+},
+{
+"code": "SK",
+"name": "Slovakia",
+"fqdn": "SK.ult.surfeasy.mobi"
+},
+{
+"code": "TN",
+"name": "Tunisia",
+"fqdn": "TN.ult.surfeasy.mobi"
+},
+{
+"code": "TR",
+"name": "Türkiye",
+"fqdn": "TR.ult.surfeasy.mobi"
+},
+{
+"code": "UA",
+"name": "Ukraine",
+"fqdn": "UA.ult.surfeasy.mobi"
+},
+{
+"code": "US",
+"name": "United States",
+"fqdn": "US.ult.surfeasy.mobi"
+},
+{
+"code": "VN",
+"name": "Vietnam",
+"fqdn": "VN.ult.surfeasy.mobi"
+},
+{
+"code": "ZA",
+"name": "South Africa",
+"fqdn": "ZA.ult.surfeasy.mobi"
+},
+{
+"code": "TH",
+"name": "Thailand",
+"fqdn": "TH.ult.surfeasy.mobi"
+},
+{
+"code": "TW",
+"name": "Taiwan",
+"fqdn": "TW.ult.surfeasy.mobi"
+},
+{
+"code": "PH",
+"name": "Philippines",
+"fqdn": "PH.ult.surfeasy.mobi"
+},
+{
+"code": "IN",
+"name": "India",
+"fqdn": "IN.ult.surfeasy.mobi"
+},
+{
+"code": "ID",
+"name": "Indonesia",
+"fqdn": "ID.ult.surfeasy.mobi"
+}
+],
+"locations": [
+{
+"key": "AL-50-TIRANA",
+"country": "AL",
+"countryName": "Albania",
+"city": "Tirana",
+"fqdn": "AL-50-TIRANA.ult.surfeasy.mobi"
+},
+{
+"key": "AR-1-BUENOS-AIRES",
+"country": "AR",
+"countryName": "Argentina",
+"city": "Buenos Aires",
+"fqdn": "AR-1-BUENOS-AIRES.ult.surfeasy.mobi"
+},
+{
+"key": "AU-7-MELBOURNE",
+"country": "AU",
+"countryName": "Australia",
+"city": "Melbourne",
+"fqdn": "AU-7-MELBOURNE.ult.surfeasy.mobi"
+},
+{
+"key": "AU-8-PERTH-ULT",
+"country": "AU",
+"countryName": "Australia",
+"city": "Perth",
+"fqdn": "AU-8-PERTH-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "AU-2-SYDNEY-ULT",
+"country": "AU",
+"countryName": "Australia",
+"city": "Sydney",
+"fqdn": "AU-2-SYDNEY-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "AT-1-VIENNA",
+"country": "AT",
+"countryName": "Austria",
+"city": "Vienna",
+"fqdn": "AT-1-VIENNA.ult.surfeasy.mobi"
+},
+{
+"key": "AZ-9-BAKU",
+"country": "AZ",
+"countryName": "Azerbaijan",
+"city": "Baku",
+"fqdn": "AZ-9-BAKU.ult.surfeasy.mobi"
+},
+{
+"key": "BE-1-BRUSSEL",
+"country": "BE",
+"countryName": "Belgium",
+"city": "Brussel",
+"fqdn": "BE-1-BRUSSEL.ult.surfeasy.mobi"
+},
+{
+"key": "BA-1-NOVI-TRAVNIK",
+"country": "BA",
+"countryName": "Bosnia & Herzegovina",
+"city": "Novi Travnik",
+"fqdn": "BA-1-NOVI-TRAVNIK.ult.surfeasy.mobi"
+},
+{
+"key": "BR-27-SAO-PAULO",
+"country": "BR",
+"countryName": "Brazil",
+"city": "Sao Paulo",
+"fqdn": "BR-27-SAO-PAULO.ult.surfeasy.mobi"
+},
+{
+"key": "BN-0-BANDAR-SERI-BEGAWAN",
+"country": "BN",
+"countryName": "Brunei",
+"city": "Bandar Seri Begawan",
+"fqdn": "BN-0-BANDAR-SERI-BEGAWAN.ult.surfeasy.mobi"
+},
+{
+"key": "BG-58-SOFIA",
+"country": "BG",
+"countryName": "Bulgaria",
+"city": "Sofia",
+"fqdn": "BG-58-SOFIA.ult.surfeasy.mobi"
+},
+{
+"key": "KH-11-PHNOM-PENH",
+"country": "KH",
+"countryName": "Cambodia",
+"city": "Phnom Penh",
+"fqdn": "KH-11-PHNOM-PENH.ult.surfeasy.mobi"
+},
+{
+"key": "CA-AB-CALGARY",
+"country": "CA",
+"countryName": "Canada",
+"city": "Calgary",
+"fqdn": "CA-AB-CALGARY.ult.surfeasy.mobi"
+},
+{
+"key": "CA-QC-MONTREAL-ULT",
+"country": "CA",
+"countryName": "Canada",
+"city": "Montreal",
+"fqdn": "CA-QC-MONTREAL-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "CA-ON-TORONTO",
+"country": "CA",
+"countryName": "Canada",
+"city": "Toronto",
+"fqdn": "CA-ON-TORONTO.ult.surfeasy.mobi"
+},
+{
+"key": "CA-BC-VANCOUVER",
+"country": "CA",
+"countryName": "Canada",
+"city": "Vancouver",
+"fqdn": "CA-BC-VANCOUVER.ult.surfeasy.mobi"
+},
+{
+"key": "CL-12-SANTIAGO",
+"country": "CL",
+"countryName": "Chile",
+"city": "Santiago",
+"fqdn": "CL-12-SANTIAGO.ult.surfeasy.mobi"
+},
+{
+"key": "CO-34-BOGOTA",
+"country": "CO",
+"countryName": "Colombia",
+"city": "Bogota",
+"fqdn": "CO-34-BOGOTA.ult.surfeasy.mobi"
+},
+{
+"key": "CR-8-SAN-JOSE",
+"country": "CR",
+"countryName": "Costa Rica",
+"city": "San Jose",
+"fqdn": "CR-8-SAN-JOSE.ult.surfeasy.mobi"
+},
+{
+"key": "HR-21-ZAGREB",
+"country": "HR",
+"countryName": "Croatia",
+"city": "Zagreb",
+"fqdn": "HR-21-ZAGREB.ult.surfeasy.mobi"
+},
+{
+"key": "CY-4-NICOSIA",
+"country": "CY",
+"countryName": "Cyprus",
+"city": "Nicosia",
+"fqdn": "CY-4-NICOSIA.ult.surfeasy.mobi"
+},
+{
+"key": "CZ-52-PRAGUE",
+"country": "CZ",
+"countryName": "Czech Republic",
+"city": "Prague",
+"fqdn": "CZ-52-PRAGUE.ult.surfeasy.mobi"
+},
+{
+"key": "DK-17-COPENHAGEN",
+"country": "DK",
+"countryName": "Denmark",
+"city": "Copenhagen",
+"fqdn": "DK-17-COPENHAGEN.ult.surfeasy.mobi"
+},
+{
+"key": "EC-18-QUITO",
+"country": "EC",
+"countryName": "Ecuador",
+"city": "Quito",
+"fqdn": "EC-18-QUITO.ult.surfeasy.mobi"
+},
+{
+"key": "EE-1-TALLINN",
+"country": "EE",
+"countryName": "Estonia",
+"city": "Tallinn",
+"fqdn": "EE-1-TALLINN.ult.surfeasy.mobi"
+},
+{
+"key": "FI-13-HELSINKI",
+"country": "FI",
+"countryName": "Finland",
+"city": "Helsinki",
+"fqdn": "FI-13-HELSINKI.ult.surfeasy.mobi"
+},
+{
+"key": "FR-B8-MARSEILLE",
+"country": "FR",
+"countryName": "France",
+"city": "Marseille",
+"fqdn": "FR-B8-MARSEILLE.ult.surfeasy.mobi"
+},
+{
+"key": "FR-A8-PARIS",
+"country": "FR",
+"countryName": "France",
+"city": "Paris",
+"fqdn": "FR-A8-PARIS.ult.surfeasy.mobi"
+},
+{
+"key": "DE-16-BERLIN",
+"country": "DE",
+"countryName": "Germany",
+"city": "Berlin",
+"fqdn": "DE-16-BERLIN.ult.surfeasy.mobi"
+},
+{
+"key": "DE-7-DUSSELDORF",
+"country": "DE",
+"countryName": "Germany",
+"city": "Dusseldorf",
+"fqdn": "DE-7-DUSSELDORF.ult.surfeasy.mobi"
+},
+{
+"key": "DE-1-FRANKFURT-ULT",
+"country": "DE",
+"countryName": "Germany",
+"city": "Frankfurt",
+"fqdn": "DE-1-FRANKFURT-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "DE-4-HAMBURG",
+"country": "DE",
+"countryName": "Germany",
+"city": "Hamburg",
+"fqdn": "DE-4-HAMBURG.ult.surfeasy.mobi"
+},
+{
+"key": "GR-35-ATHENS",
+"country": "GR",
+"countryName": "Greece",
+"city": "Athens",
+"fqdn": "GR-35-ATHENS.ult.surfeasy.mobi"
+},
+{
+"key": "HK-0-HONGKONG",
+"country": "HK",
+"countryName": "Hong Kong",
+"city": "Hong kong",
+"fqdn": "HK-0-HONGKONG.ult.surfeasy.mobi"
+},
+{
+"key": "HU-5-BUDAPEST",
+"country": "HU",
+"countryName": "Hungary",
+"city": "Budapest",
+"fqdn": "HU-5-BUDAPEST.ult.surfeasy.mobi"
+},
+{
+"key": "IS-10-REYKJAVIK",
+"country": "IS",
+"countryName": "Iceland",
+"city": "Reykjavik",
+"fqdn": "IS-10-REYKJAVIK.ult.surfeasy.mobi"
+},
+{
+"key": "IN-7-NEW-DELHI",
+"country": "IN",
+"countryName": "India",
+"city": "New Delhi",
+"fqdn": "IN-7-NEW-DELHI.ult.surfeasy.mobi"
+},
+{
+"key": "ID-4-JAKARTA",
+"country": "ID",
+"countryName": "Indonesia",
+"city": "Jakarta",
+"fqdn": "ID-4-JAKARTA.ult.surfeasy.mobi"
+},
+{
+"key": "IE-1-DUBLIN",
+"country": "IE",
+"countryName": "Ireland",
+"city": "Dublin",
+"fqdn": "IE-1-DUBLIN.ult.surfeasy.mobi"
+},
+{
+"key": "IL-5-TEL-AVIV",
+"country": "IL",
+"countryName": "Israel",
+"city": "Tel Aviv",
+"fqdn": "IL-5-TEL-AVIV.ult.surfeasy.mobi"
+},
+{
+"key": "IT-16-FLORENCE",
+"country": "IT",
+"countryName": "Italy",
+"city": "Florence",
+"fqdn": "IT-16-FLORENCE.ult.surfeasy.mobi"
+},
+{
+"key": "IT-9-MILANO",
+"country": "IT",
+"countryName": "Italy",
+"city": "Milano",
+"fqdn": "IT-9-MILANO.ult.surfeasy.mobi"
+},
+{
+"key": "IT-15-PALERMO",
+"country": "IT",
+"countryName": "Italy",
+"city": "Palermo",
+"fqdn": "IT-15-PALERMO.ult.surfeasy.mobi"
+},
+{
+"key": "IT-7-ROME",
+"country": "IT",
+"countryName": "Italy",
+"city": "Rome",
+"fqdn": "IT-7-ROME.ult.surfeasy.mobi"
+},
+{
+"key": "JP-40-TOKYO-ULT",
+"country": "JP",
+"countryName": "Japan",
+"city": "Tokyo",
+"fqdn": "JP-40-TOKYO-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "LA-11-VIENTIANE",
+"country": "LA",
+"countryName": "Laos",
+"city": "Vientiane",
+"fqdn": "LA-11-VIENTIANE.ult.surfeasy.mobi"
+},
+{
+"key": "LV-25-RIGA",
+"country": "LV",
+"countryName": "Latvia",
+"city": "Riga",
+"fqdn": "LV-25-RIGA.ult.surfeasy.mobi"
+},
+{
+"key": "LY-61-TRIPOLI",
+"country": "LY",
+"countryName": "Libya",
+"city": "Tripoli",
+"fqdn": "LY-61-TRIPOLI.ult.surfeasy.mobi"
+},
+{
+"key": "LT-60-VILNIUS",
+"country": "LT",
+"countryName": "Lithuania",
+"city": "Vilnius",
+"fqdn": "LT-60-VILNIUS.ult.surfeasy.mobi"
+},
+{
+"key": "LU-3-LUXEMBOURG",
+"country": "LU",
+"countryName": "Luxembourg",
+"city": "Luxembourg City",
+"fqdn": "LU-3-LUXEMBOURG.ult.surfeasy.mobi"
+},
+{
+"key": "MY-14-KUALA-LUMPUR",
+"country": "MY",
+"countryName": "Malaysia",
+"city": "Kuala Lumpur",
+"fqdn": "MY-14-KUALA-LUMPUR.ult.surfeasy.mobi"
+},
+{
+"key": "MX-22-QUERETARO",
+"country": "MX",
+"countryName": "Mexico",
+"city": "Queretaro",
+"fqdn": "MX-22-QUERETARO.ult.surfeasy.mobi"
+},
+{
+"key": "MD-57-CHISINAU",
+"country": "MD",
+"countryName": "Moldova",
+"city": "Chisinau",
+"fqdn": "MD-57-CHISINAU.ult.surfeasy.mobi"
+},
+{
+"key": "MA-46-FEZ",
+"country": "MA",
+"countryName": "Morocco",
+"city": "Fez",
+"fqdn": "MA-46-FEZ.ult.surfeasy.mobi"
+},
+{
+"key": "NL-7-AMSTERDAM",
+"country": "NL",
+"countryName": "Netherlands",
+"city": "Amsterdam",
+"fqdn": "NL-7-AMSTERDAM.ult.surfeasy.mobi"
+},
+{
+"key": "NZ-E7-AUCKLAND",
+"country": "NZ",
+"countryName": "New Zealand",
+"city": "Auckland",
+"fqdn": "NZ-E7-AUCKLAND.ult.surfeasy.mobi"
+},
+{
+"key": "NG-5-LAGOS",
+"country": "NG",
+"countryName": "Nigeria",
+"city": "Lagos",
+"fqdn": "NG-5-LAGOS.ult.surfeasy.mobi"
+},
+{
+"key": "NO-12-OSLO",
+"country": "NO",
+"countryName": "Norway",
+"city": "Oslo",
+"fqdn": "NO-12-OSLO.ult.surfeasy.mobi"
+},
+{
+"key": "PK-8-ISLAMABAD",
+"country": "PK",
+"countryName": "Pakistan",
+"city": "Islamabad",
+"fqdn": "PK-8-ISLAMABAD.ult.surfeasy.mobi"
+},
+{
+"key": "PA-8-PANAMA-CITY",
+"country": "PA",
+"countryName": "Panama",
+"city": "Panama City",
+"fqdn": "PA-8-PANAMA-CITY.ult.surfeasy.mobi"
+},
+{
+"key": "PE-15-LIMA",
+"country": "PE",
+"countryName": "Peru",
+"city": "Lima",
+"fqdn": "PE-15-LIMA.ult.surfeasy.mobi"
+},
+{
+"key": "PH-D9-MANILA",
+"country": "PH",
+"countryName": "Philippines",
+"city": "Manila",
+"fqdn": "PH-D9-MANILA.ult.surfeasy.mobi"
+},
+{
+"key": "PL-78-WARSAW",
+"country": "PL",
+"countryName": "Poland",
+"city": "Warsaw",
+"fqdn": "PL-78-WARSAW.ult.surfeasy.mobi"
+},
+{
+"key": "PT-14-LISBON",
+"country": "PT",
+"countryName": "Portugal",
+"city": "Lisbon",
+"fqdn": "PT-14-LISBON.ult.surfeasy.mobi"
+},
+{
+"key": "PT-17-PORTO",
+"country": "PT",
+"countryName": "Portugal",
+"city": "Porto",
+"fqdn": "PT-17-PORTO.ult.surfeasy.mobi"
+},
+{
+"key": "QA-1-DOHA",
+"country": "QA",
+"countryName": "Qatar",
+"city": "Doha",
+"fqdn": "QA-1-DOHA.ult.surfeasy.mobi"
+},
+{
+"key": "RO-10-BUCHAREST",
+"country": "RO",
+"countryName": "Romania",
+"city": "Bucharest",
+"fqdn": "RO-10-BUCHAREST.ult.surfeasy.mobi"
+},
+{
+"key": "SA-10-RIYADH",
+"country": "SA",
+"countryName": "Saudi Arabia",
+"city": "Riyadh",
+"fqdn": "SA-10-RIYADH.ult.surfeasy.mobi"
+},
+{
+"key": "RS-0-BELGRADE",
+"country": "RS",
+"countryName": "Serbia",
+"city": "Belgrade",
+"fqdn": "RS-0-BELGRADE.ult.surfeasy.mobi"
+},
+{
+"key": "SG-0-SINGAPORE-ULT",
+"country": "SG",
+"countryName": "Singapore",
+"city": "Singapore",
+"fqdn": "SG-0-SINGAPORE-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "SK-2-BRATISLAVA",
+"country": "SK",
+"countryName": "Slovakia",
+"city": "Bratislava",
+"fqdn": "SK-2-BRATISLAVA.ult.surfeasy.mobi"
+},
+{
+"key": "SI-61-LJUBLJANA",
+"country": "SI",
+"countryName": "Slovenia",
+"city": "Ljubljana",
+"fqdn": "SI-61-LJUBLJANA.ult.surfeasy.mobi"
+},
+{
+"key": "ZA-6-JOHANNESBURG",
+"country": "ZA",
+"countryName": "South Africa",
+"city": "Johannesburg",
+"fqdn": "ZA-6-JOHANNESBURG.ult.surfeasy.mobi"
+},
+{
+"key": "KR-11-SEOUL",
+"country": "KR",
+"countryName": "South Korea",
+"city": "Seoul",
+"fqdn": "KR-11-SEOUL.ult.surfeasy.mobi"
+},
+{
+"key": "ES-29-MADRID",
+"country": "ES",
+"countryName": "Spain",
+"city": "Madrid",
+"fqdn": "ES-29-MADRID.ult.surfeasy.mobi"
+},
+{
+"key": "SE-26-STOCKHOLM",
+"country": "SE",
+"countryName": "Sweden",
+"city": "Stockholm",
+"fqdn": "SE-26-STOCKHOLM.ult.surfeasy.mobi"
+},
+{
+"key": "CH-25-ZURICH",
+"country": "CH",
+"countryName": "Switzerland",
+"city": "Zurich",
+"fqdn": "CH-25-ZURICH.ult.surfeasy.mobi"
+},
+{
+"key": "TW-3-TAIPEI",
+"country": "TW",
+"countryName": "Taiwan",
+"city": "Taipei",
+"fqdn": "TW-3-TAIPEI.ult.surfeasy.mobi"
+},
+{
+"key": "TH-40-BANGKOK",
+"country": "TH",
+"countryName": "Thailand",
+"city": "Bangkok",
+"fqdn": "TH-40-BANGKOK.ult.surfeasy.mobi"
+},
+{
+"key": "TN-36-TUNIS",
+"country": "TN",
+"countryName": "Tunisia",
+"city": "Tunis",
+"fqdn": "TN-36-TUNIS.ult.surfeasy.mobi"
+},
+{
+"key": "TR-87-ISTANBUL",
+"country": "TR",
+"countryName": "Türkiye",
+"city": "Istanbul",
+"fqdn": "TR-87-ISTANBUL.ult.surfeasy.mobi"
+},
+{
+"key": "UA-12-KYIV",
+"country": "UA",
+"countryName": "Ukraine",
+"city": "Kyiv",
+"fqdn": "UA-12-KYIV.ult.surfeasy.mobi"
+},
+{
+"key": "AE-1-ABU-DHABI",
+"country": "AE",
+"countryName": "United Arab Emirates",
+"city": "Abu Dhabi",
+"fqdn": "AE-1-ABU-DHABI.ult.surfeasy.mobi"
+},
+{
+"key": "GB-U8-EDINBURGH",
+"country": "GB",
+"countryName": "United Kingdom",
+"city": "Edinburgh",
+"fqdn": "GB-U8-EDINBURGH.ult.surfeasy.mobi"
+},
+{
+"key": "GB-V2-GLASGOW",
+"country": "GB",
+"countryName": "United Kingdom",
+"city": "Glasgow",
+"fqdn": "GB-V2-GLASGOW.ult.surfeasy.mobi"
+},
+{
+"key": "GB-H9-LONDON-ULT",
+"country": "GB",
+"countryName": "United Kingdom",
+"city": "London",
+"fqdn": "GB-H9-LONDON-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "GB-I2-MANCHESTER",
+"country": "GB",
+"countryName": "United Kingdom",
+"city": "Manchester",
+"fqdn": "GB-I2-MANCHESTER.ult.surfeasy.mobi"
+},
+{
+"key": "GB-J8-NOTTINGHAM",
+"country": "GB",
+"countryName": "United Kingdom",
+"city": "Nottingham",
+"fqdn": "GB-J8-NOTTINGHAM.ult.surfeasy.mobi"
+},
+{
+"key": "US-VA-ASHBURN-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Ashburn",
+"fqdn": "US-VA-ASHBURN-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-GA-ATLANTA",
+"country": "US",
+"countryName": "United States",
+"city": "Atlanta",
+"fqdn": "US-GA-ATLANTA.ult.surfeasy.mobi"
+},
+{
+"key": "US-OR-BOARDMAN-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Boardman",
+"fqdn": "US-OR-BOARDMAN-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-MA-BOSTON-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Boston",
+"fqdn": "US-MA-BOSTON-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-NC-CHARLOTTE",
+"country": "US",
+"countryName": "United States",
+"city": "Charlotte",
+"fqdn": "US-NC-CHARLOTTE.ult.surfeasy.mobi"
+},
+{
+"key": "US-IL-CHICAGO-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Chicago",
+"fqdn": "US-IL-CHICAGO-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-OH-COLUMBUS-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Columbus",
+"fqdn": "US-OH-COLUMBUS-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-TX-DALLAS",
+"country": "US",
+"countryName": "United States",
+"city": "Dallas",
+"fqdn": "US-TX-DALLAS.ult.surfeasy.mobi"
+},
+{
+"key": "US-CO-DENVER-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Denver",
+"fqdn": "US-CO-DENVER-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-HI-HONOLULU",
+"country": "US",
+"countryName": "United States",
+"city": "Honolulu",
+"fqdn": "US-HI-HONOLULU.ult.surfeasy.mobi"
+},
+{
+"key": "US-TX-HOUSTON",
+"country": "US",
+"countryName": "United States",
+"city": "Houston",
+"fqdn": "US-TX-HOUSTON.ult.surfeasy.mobi"
+},
+{
+"key": "US-MO-KANSAS-CITY-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Kansas City",
+"fqdn": "US-MO-KANSAS-CITY-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-NV-LAS-VEGAS",
+"country": "US",
+"countryName": "United States",
+"city": "Las Vegas",
+"fqdn": "US-NV-LAS-VEGAS.ult.surfeasy.mobi"
+},
+{
+"key": "US-CA-LOS-ANGELES-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Los Angeles",
+"fqdn": "US-CA-LOS-ANGELES-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-TX-MCALLEN",
+"country": "US",
+"countryName": "United States",
+"city": "McAllen",
+"fqdn": "US-TX-MCALLEN.ult.surfeasy.mobi"
+},
+{
+"key": "US-FL-MIAMI",
+"country": "US",
+"countryName": "United States",
+"city": "Miami",
+"fqdn": "US-FL-MIAMI.ult.surfeasy.mobi"
+},
+{
+"key": "US-MN-MINNEAPOLIS",
+"country": "US",
+"countryName": "United States",
+"city": "Minneapolis",
+"fqdn": "US-MN-MINNEAPOLIS.ult.surfeasy.mobi"
+},
+{
+"key": "US-NY-NEW-YORK",
+"country": "US",
+"countryName": "United States",
+"city": "New York",
+"fqdn": "US-NY-NEW-YORK.ult.surfeasy.mobi"
+},
+{
+"key": "US-CA-PALO-ALTO-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Palo Alto",
+"fqdn": "US-CA-PALO-ALTO-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-PA-PHILADELPHIA-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Philadelphia",
+"fqdn": "US-PA-PHILADELPHIA-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-AZ-PHOENIX",
+"country": "US",
+"countryName": "United States",
+"city": "Phoenix",
+"fqdn": "US-AZ-PHOENIX.ult.surfeasy.mobi"
+},
+{
+"key": "US-OR-PORTLAND",
+"country": "US",
+"countryName": "United States",
+"city": "Portland",
+"fqdn": "US-OR-PORTLAND.ult.surfeasy.mobi"
+},
+{
+"key": "US-WA-SEATTLE-ULT",
+"country": "US",
+"countryName": "United States",
+"city": "Seattle",
+"fqdn": "US-WA-SEATTLE-ULT.ult.surfeasy.mobi"
+},
+{
+"key": "US-FL-TAMPA",
+"country": "US",
+"countryName": "United States",
+"city": "Tampa",
+"fqdn": "US-FL-TAMPA.ult.surfeasy.mobi"
+},
+{
+"key": "US-DC-WASHINGTON",
+"country": "US",
+"countryName": "United States",
+"city": "Washington, DC",
+"fqdn": "US-DC-WASHINGTON.ult.surfeasy.mobi"
+},
+{
+"key": "VN-51-HANOI",
+"country": "VN",
+"countryName": "Vietnam",
+"city": "Hanoi",
+"fqdn": "VN-51-HANOI.ult.surfeasy.mobi"
+}
+]
+}

@@ -1,0 +1,30 @@
+# Local settings written by run.sh (contains paths on your machine)
+.env
+
+# Credentials and VPN configs must never be committed
+secrets/
+*.p12
+*.pfx
+*.key
+*.pem
+!node/ca/*.pem
+*.conf
+*.ovpn
+tokenCoreSE.json
+device.json
+p12pass
+
+# Runtime data (lives in $FARM, outside the repo, but just in case)
+data/
+status/
+configs/
+inbox/
+manager/data/
+manager/farm-state.json
+
+# Tooling
+__pycache__/
+*.pyc
+.DS_Store
+.playwright-mcp/
+.codegraph/
