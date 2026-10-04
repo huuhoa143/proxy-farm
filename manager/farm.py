@@ -14,6 +14,7 @@ State: farm-state.json (chosen locations -> assigned port). Ports from BASE_PORT
 """
 import json, os, re, base64, subprocess, sys, time, threading, http.server, urllib.parse, socket
 import vendors
+import hma_activation
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.environ.get("PF_STATE", os.path.join(HERE, "farm-state.json"))
@@ -157,19 +158,29 @@ def _openssl_p12(p12_path, password, *args):
     raise ValueError("Không mở được chứng chỉ — sai mật khẩu hoặc file hỏng"
                      + (f" ({r.stderr.strip().splitlines()[-1]})" if r.stderr.strip() else ""))
 
-def import_hma(token_text=None, p12_b64=None, password=None):
+def import_hma(token_text=None, p12_b64=None, password=None, code=None, license_meta=None):
     """Install an HMA device certificate as an account. Accepts either the macOS app's
     tokenCoreSE.json (which carries the PKCS#12 *and* its password) or a raw .p12.
-    Re-importing the same device refreshes that account instead of adding another."""
+    Re-importing the same device refreshes that account instead of adding another.
+
+    `code` (activation code) and `license_meta` (validate_code() result) are stored on
+    the account when supplied, so the account is identified by the code the user typed
+    and the farm can re-check expiry/slots later."""
     meta = {}
+    if code:
+        meta["code"] = hma_activation.normalize_code(code)
+    if license_meta:
+        meta["license"] = {k: license_meta.get(k) for k in
+                           ("license_id", "product", "schema", "mode",
+                            "expires_date", "devices_used", "devices_max")}
     if token_text:
         try:
             outer = json.loads(token_text)
             dev = json.loads(base64.b64decode(outer["DeviceManager.device"]))
             p12_b64 = dev["credentials"]["certificate"]
             password = dev["credentials"]["certificatePassword"]
-            meta = {"udid": dev.get("udid", ""),
-                    "dns_format": (dev.get("dnsFormat") or [""])[0]}
+            meta.update(udid=dev.get("udid", ""),
+                        dns_format=(dev.get("dnsFormat") or [""])[0])
         except Exception as e:
             raise ValueError(f"Không đọc được tokenCoreSE.json: {e}")
     if not p12_b64:
@@ -221,6 +232,30 @@ def import_hma(token_text=None, p12_b64=None, password=None):
     info = cert_info(os.path.join(d, "client.pem"))
     return {"id": a["id"], "name": account_name(a), "locations": len(vendors.HMA_LOCATIONS),
             "accounts": len(accounts("hma")), **info}
+
+def onboard_by_code(code, token_text=None, p12_b64=None, password=None, require_hma=True):
+    """Onboard an HMA subscription by its activation code.
+
+    Step 1 (always, off-device): validate the code against Avast's licensing backend.
+    Step 2 (if a cert is supplied): install the device certificate and tag the account
+    with the code + licence info, so from then on the farm runs it on any platform.
+
+    When no cert is supplied we still validate and return the licence info, plus a
+    `needs_cert` flag and instructions — the device certificate cannot be minted from
+    the code alone (see hma_activation docstring / README: the Avast CCT wall)."""
+    v = hma_activation.validate_code(code)          # raises ActivationError if bad
+    if require_hma and not v.get("is_hma"):
+        raise ValueError("Code hợp lệ nhưng không phải license HMA")
+    v = {k: val for k, val in v.items() if k != "raw"}   # keep responses lean
+    if not (token_text or p12_b64):
+        return {"validated": True, "needs_cert": True, "license": v,
+                "message": ("Code hợp lệ. Cần nạp chứng chỉ thiết bị MỘT lần "
+                            "(tokenCoreSE.json hoặc .p12) — xem tools/hma-bootstrap-cert.sh. "
+                            "Sau đó farm chạy đa nền tảng, không cần app HMA.")}
+    st = import_hma(token_text=token_text, p12_b64=p12_b64, password=password,
+                    code=v["code"], license_meta=v)
+    return {"validated": True, "needs_cert": False, "license": v, "status": st}
+
 
 def migrate_layout():
     """Bring a farm created before accounts existed up to date, once:
@@ -1407,6 +1442,15 @@ class H(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "status": st}))
+        elif p == "/api/provider/hma-code":
+            try:
+                r = onboard_by_code(data.get("code", ""), token_text=data.get("token"),
+                                    p12_b64=data.get("p12"), password=data.get("password"))
+            except hma_activation.ActivationError as e:
+                return self._send(400, json.dumps({"error": str(e), "kind": "activation"}))
+            except Exception as e:
+                return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, **r}))
         elif p == "/api/discover":
             names = import_found(data.get("paths", []))
             return self._send(200, json.dumps({"ok": True, "imported": names}))
@@ -1459,6 +1503,45 @@ def serve():
     print(f"Proxy farm UI on http://{UI_BIND}:{UI_PORT}  (proxies bind {BIND}, image {IMAGE})", flush=True)
     httpd.serve_forever()
 
+def _cli_validate_code(a):
+    if not a:
+        print("validate-code <ACTIVATION-CODE>"); return
+    try:
+        v = hma_activation.validate_code(a[0])
+    except hma_activation.ActivationError as e:
+        print("✗", e); sys.exit(2)
+    print("✓ hợp lệ" + ("" if v["is_hma"] else "  (CẢNH BÁO: không phải HMA)"))
+    print(" ", hma_activation.summary_line(v))
+
+
+def _cli_onboard_code(a):
+    """onboard-code <CODE> [tokenCoreSE.json | cert.p12] [p12-password]"""
+    if not a:
+        print("onboard-code <CODE> [tokenCoreSE.json | cert.p12] [p12-password]"); return
+    code = a[0]
+    token_text = p12_b64 = password = None
+    if len(a) > 1 and os.path.exists(a[1]):
+        path = a[1]
+        if path.endswith(".json"):
+            token_text = open(path).read()
+        else:
+            p12_b64 = base64.b64encode(open(path, "rb").read()).decode()
+            password = a[2] if len(a) > 2 else ""
+    try:
+        r = onboard_by_code(code, token_text=token_text, p12_b64=p12_b64, password=password)
+    except hma_activation.ActivationError as e:
+        print("✗ code:", e); sys.exit(2)
+    except Exception as e:
+        print("✗", e); sys.exit(2)
+    print("✓", hma_activation.summary_line(r["license"]))
+    if r.get("needs_cert"):
+        print(" ", r["message"])
+    else:
+        s = r["status"]
+        print(f"  Đã nạp chứng chỉ → account {s['id']} ({s['name']}), "
+              f"{s['accounts']} account HMA, {s['locations']} vị trí sẵn sàng.")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "serve"
     a = sys.argv[2:]
@@ -1466,5 +1549,7 @@ if __name__ == "__main__":
      "ls": lambda: ls(), "rotate": lambda: rotate(a),
      "stop": lambda: stop(a), "start": lambda: start(a),
      "logs": lambda: print(container_logs(a[0])) if a else print("logs <KEY>"),
+     "validate-code": lambda: _cli_validate_code(a),
+     "onboard-code": lambda: _cli_onboard_code(a),
      "autorotate": lambda: set_autorotate(a[:-1], a[-1]) if len(a) > 1 else print("autorotate <KEY..> <minutes>"),
      }.get(cmd, lambda: print(__doc__))()

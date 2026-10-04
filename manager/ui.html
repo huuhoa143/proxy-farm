@@ -581,6 +581,17 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
       </div>
 
       <div id="addHma" hidden>
+        <div class="field" style="margin:0 0 6px">
+          <label for="hmaCode">Activation code (wallet key trên thẻ / email đơn hàng)</label>
+          <div class="cmd" style="gap:8px">
+            <input id="hmaCode" placeholder="VD: XXXXXX-XXXXXX-XXXXXX" style="flex:1;text-transform:uppercase">
+            <button class="btn ghost sm" id="hmaValidate"><span>Kiểm tra</span></button>
+          </div>
+          <div class="s" id="hmaCodeMsg" style="margin-top:6px"></div>
+        </div>
+        <p class="note">Nhập code để xác thực gói (off-device, không cần app). Sau đó nạp chứng chỉ
+          thiết bị <b>một lần</b> — xem <code>tools/hma-bootstrap-cert.sh</code> — rồi farm chạy đa
+          nền tảng, không cần app HMA nữa.</p>
         <div id="hmaOk" hidden>
           <div class="pv on" style="margin:0 0 12px">
             <div class="ic"><svg class="i"><use href="#ic-check"/></svg></div>
@@ -1120,14 +1131,34 @@ async function importHma(f){
   }else{
     body={token:await f.text()};
   }
-  const r=await fetch('/api/provider/hma',{method:'POST',body:JSON.stringify(body)});
+  // When an activation code is filled, onboard through the code path so the account is
+  // tagged with the code + licence; otherwise the plain certificate import.
+  const code=$('#hmaCode').value.trim();
+  const url=code?'/api/provider/hma-code':'/api/provider/hma';
+  if(code)body.code=code;
+  const r=await fetch(url,{method:'POST',body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok||d.error){$('#provMsg').textContent='';return toast(d.error||('Lỗi '+r.status))}
   $('#provMsg').textContent='';
   $('#hmaPw').value='';
+  const st=d.status||d;
   await loadLocs();loadProviders();
-  toast(`Đã nạp chứng chỉ · ${d.status.locations} vị trí · hạn ${d.status.expires||'—'}`);
+  toast(`Đã nạp chứng chỉ · ${(st.locations||'?')} vị trí${d.license?' · hạn '+d.license.expires_date:''}`);
 }
+/* Validate an activation code without a certificate (off-device licence check). */
+$('#hmaValidate').onclick=async()=>{
+  const code=$('#hmaCode').value.trim();
+  const msg=$('#hmaCodeMsg');
+  if(!code){msg.textContent='Nhập activation code trước.';return}
+  msg.textContent='Đang kiểm tra…';
+  const r=await fetch('/api/provider/hma-code',{method:'POST',body:JSON.stringify({code})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error){msg.innerHTML='<span style="color:var(--bad,#e55)">✗ '+esc(d.error||('Lỗi '+r.status))+'</span>';return}
+  const L=d.license||{};
+  msg.innerHTML='<span style="color:var(--ok,#3a7)">✓ '+esc(L.product||'HMA')+'</span> · hạn '+
+    esc(L.expires_date||'?')+' · thiết bị '+L.devices_used+'/'+L.devices_max+
+    (d.needs_cert?' · <b>cần nạp chứng chỉ bên dưới</b>':'');
+};
 $('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');
 
 /* built-in vendor account */
