@@ -217,7 +217,7 @@ td.c-sel,th.c-sel{width:40px;padding-right:0}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
 .field>label{font-size:11.5px;font-weight:650;letter-spacing:.03em;text-transform:uppercase;color:var(--dim)}
 .field .hint{font-size:11.5px;color:var(--mut);line-height:1.5}
-.field.mono input{font-family:var(--fm);font-size:12.5px}
+.field.mono input,.field.fmono input{font-family:var(--fm);font-size:12.5px}
 .sect{border-top:1px solid var(--line);margin-top:18px;padding-top:16px}
 .sect:first-child{border-top:0;margin-top:0;padding-top:0}
 .sect>h4{margin:0 0 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
@@ -261,6 +261,66 @@ td.c-sel,th.c-sel{width:40px;padding-right:0}
 @media (prefers-reduced-motion:reduce){.st .ring{animation-duration:2.4s}}
 .pv .use{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--panel-2);color:var(--dim);font-variant-numeric:tabular-nums}
 .pv .use.full{color:var(--warn);background:var(--warn-soft)}
+/* pool: a provider card that owns a list of accounts */
+.pool{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+/* totals across every provider, above the cards */
+.ptotal{display:flex;gap:0;margin-bottom:12px;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.ptotal div{flex:1;padding:9px 13px;min-width:0}
+.ptotal div+div{border-left:1px solid var(--line)}
+.ptotal b{display:block;font-family:var(--fd);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15}
+.ptotal span{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.pool>.hd{display:flex;align-items:center;gap:12px;padding:12px 13px;background:var(--panel-2)}
+.pool>.hd .ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;
+  background:var(--ok-soft);color:var(--ok)}
+.pool>.hd .ic svg{width:17px;height:17px}
+.pool>.hd .bd{flex:1;min-width:0}
+.pool>.hd .t{font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pool>.hd .s{font-size:11.5px;color:var(--mut);margin-top:3px}
+.accs{padding:4px 8px 8px}
+.acc{display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:9px}
+.acc+.acc{border-top:1px solid var(--line)}
+.acc .nm{flex:1;min-width:0}
+.acc .nm b{font-size:12.5px;font-weight:650}
+.acc .nm .d{font-size:11px;color:var(--mut);margin-top:2px;word-break:break-all}
+.acc .cnt{font-size:11.5px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums;
+  padding:2px 8px;border-radius:20px;background:var(--panel-2);white-space:nowrap}
+.acc .cnt.full{color:var(--warn);background:var(--warn-soft)}
+.acc.bad{background:var(--bad-soft)}
+.acc .flag-b{font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;letter-spacing:.02em}
+.acc .flag-b.learn{color:var(--info);background:rgba(90,168,255,.12)}
+.acc .flag-b.bad{color:var(--bad);background:var(--bad-soft)}
+.acc .lim{display:flex;align-items:center;gap:7px;flex:none;font-size:11.5px;color:var(--mut)}
+.acc .lim input[type=number]{width:54px;padding:4px 6px;font-size:12.5px;text-align:center}
+.acc .lim .sw{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.acc .lim .sw input{accent-color:var(--acc);width:14px;height:14px;margin:0;cursor:pointer}
+.acc .del{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line-2);
+  background:transparent;color:var(--mut);cursor:pointer;flex:none;transition:.14s}
+.acc .del:hover{color:var(--bad);border-color:var(--bad)}
+.acc .del svg{width:14px;height:14px}
+.pool .addacc{margin:0 8px 8px;width:calc(100% - 16px);justify-content:center}
+/* platform chooser: one tile per way of adding an account */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:9px;margin-bottom:16px}
+.ptile{display:flex;flex-direction:column;gap:3px;padding:11px 12px;border-radius:11px;cursor:pointer;
+  border:1px solid var(--line-2);background:var(--panel-2);color:var(--tx);text-align:left;font:inherit;transition:.15s}
+.ptile:hover{border-color:var(--mut);transform:translateY(-1px);box-shadow:var(--sh-2)}
+.ptile[aria-pressed="true"]{border-color:var(--acc);background:var(--acc-soft)}
+.ptile .n{font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:6px}
+.ptile .n .on{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.ptile .k{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.ptile .w{font-size:11.5px;color:var(--dim);line-height:1.45}
+.ptile[aria-pressed="true"] .w{color:var(--tx)}
+/* numbered how-to for the selected platform */
+.howto{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:14px;background:var(--panel-2)}
+.howto h5{margin:0 0 9px;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:9px}
+.howto h5 .lk{margin-left:auto;font-size:11.5px;font-weight:600}
+.howto ol{margin:0;padding-left:19px;display:flex;flex-direction:column;gap:5px}
+.howto li{font-size:12.5px;color:var(--dim);line-height:1.55}
+.howto li b{color:var(--tx);font-weight:650}
+.howto li code{font-family:var(--fm);font-size:11.5px;background:var(--panel);padding:1px 5px;border-radius:5px}
+.howto .tip{margin:10px 0 0;font-size:11.5px;color:var(--mut);line-height:1.55;
+  border-top:1px solid var(--line);padding-top:9px}
+.howto .tip b{color:var(--dim)}
+.addwrap h4 .more{font-weight:500;color:var(--mut);text-transform:none;letter-spacing:0;font-size:11.5px;margin-left:7px}
 /* test */
 .ttable{width:100%;border-collapse:collapse;font-size:12.5px}
 .ttable th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);
@@ -329,6 +389,12 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
 .ck{width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;transition:.14s;color:transparent}
 .ck svg{width:12px;height:12px;stroke-width:2.6}
 .opt[aria-checked="true"] .ck{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.opt .pt{font-size:10.5px;font-weight:700;color:var(--dim);background:var(--panel-2);border:1px solid var(--line);
+  padding:1px 7px;border-radius:20px;letter-spacing:.02em}
+.opt .pt.virtual{color:var(--info);background:rgba(90,168,255,.1);border-color:transparent}
+.opt .pt.static{color:var(--acc);background:var(--acc-soft);border-color:transparent}
+#pickProv b{font-weight:700;margin-left:4px;color:var(--mut);font-variant-numeric:tabular-nums}
+#pickProv button[aria-pressed="true"] b{color:inherit}
 .drawer-tabs{padding:14px 22px 0}
 .drawer-tabs .seg{margin-bottom:0}
 .pane{flex:1;display:flex;flex-direction:column;min-height:0}
@@ -430,7 +496,7 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
   <main>
     <div class="deck">
       <div class="deck-top">
-        <h1 class="title">Proxy Farm<small>một tài khoản VPN → nhiều cổng ra riêng · <b id="host">—</b></small></h1>
+        <h1 class="title">Proxy Farm<small>tài khoản VPN → nhiều cổng ra riêng · <b id="host">—</b></small></h1>
         <div class="creds" id="creds" hidden>
           <span class="cl">Đăng nhập proxy</span>
           <button class="cv" id="credUser" title="Copy username"></button>
@@ -486,6 +552,7 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
     <p>Mỗi vị trí thành một cổng SOCKS5 + HTTP riêng. Chọn rồi bấm bật.</p>
   </div>
   <div class="quota" id="pickQuota"></div>
+  <div class="drawer-tabs" id="pickProvWrap" hidden><div class="seg" id="pickProv" role="group" aria-label="Nhà cung cấp"></div></div>
   <div class="drawer-search"><div class="search"><svg class="i"><use href="#ic-search"/></svg>
     <input id="pickFilter" placeholder="Tìm quốc gia hoặc thành phố…"></div></div>
   <div class="picklist" id="picklist"></div>
@@ -501,29 +568,27 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
   <div class="mb">
     <div class="sect">
       <h4>Đang dùng</h4>
+      <div class="ptotal" id="ptotal" hidden></div>
       <div id="provlist"></div>
     </div>
-    <div class="sect">
-      <h4>Thêm nhà cung cấp</h4>
-      <div class="seg" id="provSeg">
-        <button data-add="hma" aria-pressed="true">HMA / SurfEasy</button>
-        <button data-add="file" aria-pressed="false">WireGuard · OpenVPN</button>
-        <button data-add="eap" aria-pressed="false">IKEv2 user/mật khẩu</button>
+    <div class="sect addwrap">
+      <h4>Thêm tài khoản <span class="more">chọn nền tảng, làm theo các bước, rồi điền</span></h4>
+      <div class="pgrid" id="provSeg"></div>
+      <div class="howto" id="howto" hidden></div>
+
+      <div id="addVendor" hidden>
+        <div class="grid2" id="vFields"></div>
       </div>
 
-      <div id="addHma">
+      <div id="addHma" hidden>
         <div id="hmaOk" hidden>
           <div class="pv on" style="margin:0 0 12px">
             <div class="ic"><svg class="i"><use href="#ic-check"/></svg></div>
             <div class="bd"><div class="t">Đã nhận chứng chỉ từ app HMA trên máy này</div>
               <div class="s" id="hmaOkSub"></div></div>
           </div>
-          <p class="note">Chạy lại <code>./run.sh</code> là chứng chỉ được đồng bộ lại tự động.
-            Muốn nạp thủ công thì dùng ô bên dưới.</p>
         </div>
-        <p class="note" id="hmaHow">HMA không cho tải file cấu hình, nhưng app trên máy đã có sẵn chứng chỉ thiết bị.
-          Kéo thả <code>tokenCoreSE.json</code> vào đây là xong — nó chứa cả chứng chỉ lẫn mật khẩu.
-          Trên macOS file nằm ở:</p>
+        <p class="note" id="hmaHow">Trên macOS file nằm ở:</p>
         <div class="cmd"><code id="hmaPath">/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json</code>
           <button class="btn ghost sm" id="copyHmaPath"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
         <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:14px 0 0">
@@ -713,23 +778,43 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 /* location picker */
 const sel=new Set();
 let HAS_TARGETS=true, PROVS=[];
-// Mirrors farm.py limit_key(): HMA certificates share one account cap, everything else is
-// capped per provider name.
-const limitKey=t=>t.protocol==='ikev2-cert'?'hma':String(t.provider||'custom').toLowerCase();
+// Mirrors farm.py limit_key(): a pool is counted as a whole (which account a port lands
+// on is decided server-side when it starts); everything else per provider name.
+const limitKey=t=>t.vendor||String(t.provider||'custom').toLowerCase();
 const provByKey=k=>PROVS.find(p=>p.limit_key===k);
 async function loadProvs(){ try{PROVS=(await j('/api/providers')).providers}catch(e){} }
-function quotaLeft(k){ const p=provByKey(k); if(!p||!p.limit)return Infinity; return Math.max(0,p.limit-p.used) }
+function quotaLeft(k){ const p=provByKey(k); const cap=p&&(p.pool?p.capacity:p.limit);
+  if(!cap)return Infinity; return Math.max(0,cap-p.used) }
 function refusedMsg(refused){
   if(!refused||!refused.length)return '';
+  const plan=refused.filter(r=>r.reason==='plan').length;
+  if(plan===refused.length)return `${plan} cổng (gói của bạn không cho dùng các máy chủ đó)`;
   const by={}; for(const r of refused)(by[r.provider]=by[r.provider]||{n:0,limit:r.limit}).n++;
   return Object.entries(by).map(([k,v])=>`${v.n} cổng ${k.toUpperCase()} (đã đủ ${v.limit})`).join(', ');
 }
 async function loadLocs(){LOCS=await j('/api/locations');HAS_TARGETS=LOCS.locations.length>0;await loadProvs()}
+// Which provider a location belongs to, for the drawer's filter.
+const provOf=l=>l.vendor||String(l.provider||'custom');
+const provLabel=k=>{const p=PROVS.find(x=>x.id===k||x.limit_key===k);return p?p.name:k};
+let PICK_PROV='all';
+function renderPickProv(){
+  const n={}; for(const l of LOCS.locations){const k=provOf(l);n[k]=(n[k]||0)+1}
+  const keys=Object.keys(n);
+  $('#pickProvWrap').hidden=keys.length<2;
+  if(!keys.includes(PICK_PROV))PICK_PROV='all';
+  $('#pickProv').innerHTML=[`<button data-pp="all" aria-pressed="${PICK_PROV==='all'}">Tất cả <b>${LOCS.locations.length}</b></button>`,
+    ...keys.map(k=>`<button data-pp="${esc(k)}" aria-pressed="${PICK_PROV===k}">${esc(provLabel(k))} <b>${n[k]}</b></button>`)].join('');
+}
+$('#pickProv').onclick=e=>{const b=e.target.closest('[data-pp]');if(!b)return;PICK_PROV=b.dataset.pp;renderPick()};
+const TAGS={virtual:['ảo','Vị trí ảo: IP mang quốc gia này nhưng máy chủ đặt ở nước khác'],
+            static:['IP tĩnh','Luôn ra cùng một IP']};
 function renderPick(){
+  renderPickProv();
   const f=$('#pickFilter').value.toLowerCase();
   const byC={};
   for(const l of LOCS.locations){
-    const t=(l.countryName+' '+l.city+' '+l.country).toLowerCase();
+    if(PICK_PROV!=='all'&&provOf(l)!==PICK_PROV)continue;
+    const t=(l.countryName+' '+l.city+' '+l.country+' '+(l.provider||'')).toLowerCase();
     if(f&&!t.includes(f))continue;
     (byC[l.country]=byC[l.country]||{name:l.countryName,items:[]}).items.push(l);
   }
@@ -740,21 +825,26 @@ function renderPick(){
   // A chip only earns its place when a cap applies; an unlimited provider just shows what
   // will be running, so nobody reads "/∞" as a limit to watch.
   $('#pickQuota').innerHTML=PROVS.filter(p=>p.ready).map(p=>{
-    const n=p.used+(selBy[p.limit_key]||0);
-    if(!p.limit)return `<span class="qchip" title="Số cổng sẽ chạy">${esc(p.name)} · ${n} cổng</span>`;
-    const full=n>=p.limit;
-    return `<span class="qchip${full?' full':''}" title="Đang chạy / giới hạn">${esc(p.name)} · ${n}/${p.limit}${full?' · đã đủ':''}</span>`}).join('');
+    const n=p.used+(selBy[p.limit_key]||0), cap=p.pool?p.capacity:p.limit;
+    if(!cap)return `<span class="qchip" title="Số cổng sẽ chạy">${esc(p.name)} · ${n} cổng</span>`;
+    const full=n>=cap;
+    return `<span class="qchip${full?' full':''}" title="Đang chạy / tổng số chỗ của mọi tài khoản">${
+      esc(p.name)} · ${n}/${cap}${full?' · đã đầy':''}</span>`}).join('');
   const codes=Object.keys(byC).sort((a,b)=>byC[a].name.localeCompare(byC[b].name));
   if(!codes.length){box.innerHTML=LOCS.locations.length
     ? '<p class="empty-cfg">Không có vị trí khớp.</p>'
-    : '<p class="empty-cfg">Chưa có nhà cung cấp nào.<br>Mở <b>Nhà cung cấp</b> ở thanh bên trái để nạp chứng chỉ HMA<br>hoặc file cấu hình WireGuard/OpenVPN.</p>';return}
+    : '<p class="empty-cfg">Chưa có nhà cung cấp nào.<br>Mở <b>Nhà cung cấp</b> ở thanh bên trái để thêm tài khoản<br>Surfshark, ZoogVPN, HMA hoặc file WireGuard/OpenVPN.</p>';return}
   for(const cc of codes){
     const g=byC[cc];let h=`<div class="grp"><div class="grp-h"><img class="flag" src="${flag(cc)}" alt="" loading="lazy"><span>${esc(g.name)}</span><span class="n">${g.items.length}</span></div>`;
     for(const l of g.items){
-      const run=RUNNING.has(l.key), on=sel.has(l.key), full=!run&&!on&&room(limitKey(l))<=0;
+      const run=RUNNING.has(l.key), on=sel.has(l.key), blocked=!run&&!on&&l.blocked,
+            full=!run&&!on&&(blocked||room(limitKey(l))<=0);
       h+=`<div class="opt${run?' run':''}${full?' full':''}" data-k="${l.key}" role="checkbox" aria-checked="${on}" aria-disabled="${full}" tabindex="0">
         <div class="ck"><svg class="i"><use href="#ic-check"/></svg></div>
-        <div class="city">${esc(l.city)}</div>${run?'<span class="tag">đang chạy</span>':full?'<span class="tag full">đã đủ</span>':''}</div>`;
+        <div class="city">${esc(l.city)}</div>${(l.tags||[]).map(g=>TAGS[g]?`<span class="pt ${g}" title="${TAGS[g][1]}">${TAGS[g][0]}</span>`:'').join('')}${
+          PICK_PROV==='all'&&provOf(l)!=='hma'?`<span class="pt">${esc(provLabel(provOf(l)))}</span>`:''}${run?'<span class="tag">đang chạy</span>':
+          blocked?'<span class="tag full" title="Nhà cung cấp đã từ chối mọi tài khoản của bạn trên máy chủ này — gói không bao gồm nó">gói không hỗ trợ</span>':
+          full?'<span class="tag full">đã đủ</span>':''}</div>`;
     }
     box.insertAdjacentHTML('beforeend',h+'</div>');
   }
@@ -764,56 +854,182 @@ $('#pickFilter').addEventListener('input',renderPick);
 
 /* modals: providers + settings */
 const openModal=id=>{$('#'+id).classList.add('open')};
-$('#openProv').onclick=()=>{loadProviders();showAdd('hma');$('#mProv').classList.add('open')};
+let VENDORS=[], ALLV=[], VCUR=null;
+// The two ways that are not a built-in provider. Same shape as a vendor's `setup` so the
+// chooser and the how-to render them without a special case.
+const GENERIC={
+  file:{id:'file',name:'File cấu hình',protocol:'wireguard/openvpn',
+    setup:{needs:'file .conf hoặc .ovpn tải từ nhà cung cấp',
+      note:'Dùng cho Mullvad, Proton, IVPN, Windscribe, PIA… hoặc máy chủ VPN của chính bạn. '+
+           'Một file = một vị trí = một cổng.',
+      steps:['Vào trang nhà cung cấp, mục **tải cấu hình thủ công** (manual / router setup).',
+             'Tải file **WireGuard `.conf`** hoặc **OpenVPN `.ovpn`** của từng vị trí bạn muốn.',
+             'Kéo thả các file đó vào ô bên dưới — chọn nhiều file một lúc cũng được.']}},
+  eap:{id:'eap',name:'IKEv2 thủ công',protocol:'ikev2-eap',
+    setup:{needs:'tên máy chủ + tài khoản VPN',
+      note:'Dùng khi nhà cung cấp hướng dẫn “IKEv2 manual setup” nhưng farm chưa hỗ trợ sẵn '+
+           '(NordVPN, Proton…). Mỗi máy chủ thêm vào thành một vị trí.',
+      steps:['Tìm trong trang nhà cung cấp mục **IKEv2 / IPsec manual setup**.',
+             'Lấy **tên máy chủ** của vị trí bạn muốn, ví dụ `nl123.nordvpn.com`.',
+             'Lấy **tài khoản IKEv2** — nhiều nhà cấp riêng, khác tài khoản đăng nhập web.',
+             'Điền xuống dưới. Lặp lại cho từng máy chủ.']}},
+};
+async function loadVendors(){
+  if(ALLV.length)return;
+  try{ALLV=(await j('/api/vendors')).vendors||[]}catch(e){}
+  VENDORS=ALLV.filter(v=>v.fields);          // HMA has no form: it takes a certificate file
+  renderChooser();
+}
+// Which platforms the user already has an account for, so the chooser can say so.
+const haveAcct=id=>((PROVS.find(p=>p.id===id)||{}).accounts||[]).length;
+// A second account only buys capacity where the provider caps sessions; saying so on an
+// uncapped platform would send people hunting for accounts they do not need.
+function tileWhy(vid,n){
+  if(!n)return '';
+  const p=PROVS.find(x=>x.id===vid)||{};
+  return n+' tài khoản · '+(p.capacity?`còn ${Math.max(0,p.capacity-p.used)} chỗ, thêm tài khoản để có thêm`
+                                      :'không giới hạn, không cần thêm');
+}
+function renderChooser(){
+  const tiles=[...ALLV.map(v=>({id:v.id==='hma'?'hma':'v:'+v.id, name:v.name,
+                                kind:PKIND[v.protocol]||v.protocol, setup:v.setup, vid:v.id})),
+               ...Object.values(GENERIC).map(g=>({id:g.id, name:g.name,
+                                kind:PKIND[g.protocol]||g.protocol, setup:g.setup}))];
+  $('#provSeg').innerHTML=tiles.map(t=>{
+    const n=t.vid?haveAcct(t.vid):0;
+    return `<button class="ptile" data-add="${esc(t.id)}" aria-pressed="${ADDING===t.id}">
+      <span class="k">${esc(t.kind)}</span>
+      <span class="n">${n?'<span class="on" title="Đã có tài khoản"></span>':''}${esc(t.name)}</span>
+      <span class="w">${esc(n?tileWhy(t.vid,n):(t.setup?.needs||''))}</span>
+    </button>`}).join('');
+}
+function renderHowto(name,setup){
+  const box=$('#howto');
+  if(!setup||!setup.steps){box.hidden=true;return}
+  box.hidden=false;
+  // **bold** and `code` only — the text comes from our own vendor files, not from input.
+  const md=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>');
+  box.innerHTML=`<h5>Cần gì cho ${esc(name)}: ${esc(setup.needs||'')}
+      ${setup.link?`<a class="lk" href="${esc(setup.link)}" target="_blank" rel="noopener">Mở trang ↗</a>`:''}</h5>
+    <ol>${setup.steps.map(x=>`<li>${md(x)}</li>`).join('')}</ol>
+    ${setup.note?`<p class="tip"><b>Lưu ý:</b> ${md(setup.note)}</p>`:''}`;
+}
+function renderVendor(id){
+  const v=VENDORS.find(x=>x.id===id); VCUR=v; if(!v)return;
+  $('#vFields').innerHTML=v.fields.map(f=>`<div class="field${f.mono?' fmono':''}"${v.fields.length===1?' style="grid-column:1/-1"':''}>
+    <label for="vf-${f.id}">${esc(f.label)}</label>
+    <input type="${f.type==='password'?'password':'text'}" id="vf-${f.id}" data-vf="${esc(f.id)}"
+      placeholder="${esc(f.placeholder||'')}" autocomplete="${f.type==='password'?'new-password':'off'}" spellcheck="false">
+    ${f.hint?`<span class="hint">${esc(f.hint)}</span>`:''}</div>`).join('');
+}
+$('#openProv').onclick=async()=>{await loadProviders();await loadVendors();
+  renderChooser(); showAdd(ADDING||'v:'+(VENDORS[0]||{id:'surfshark'}).id);
+  $('#mProv').classList.add('open')};
 $('#openSet').onclick=()=>{loadSettings();$('#mSet').classList.add('open')};
 
+let ADDING='';
 function showAdd(name){
-  for(const b of $$('#provSeg button'))b.setAttribute('aria-pressed',b.dataset.add===name);
+  ADDING=name;
+  for(const b of $$('#provSeg .ptile'))b.setAttribute('aria-pressed',b.dataset.add===name);
+  const vend=name.startsWith('v:');
+  $('#addVendor').hidden=!vend; if(vend)renderVendor(name.slice(2));
   $('#addHma').hidden=name!=='hma'; $('#addFile').hidden=name!=='file'; $('#addEap').hidden=name!=='eap';
-  $('#provSave').hidden=name!=='eap';   // the other two act the moment a file lands
+  $('#provSave').hidden=!(vend||name==='eap');   // the file tabs act the moment a file lands
+  const v=vend?VENDORS.find(x=>x.id===name.slice(2)):(name==='hma'?ALLV.find(x=>x.id==='hma'):GENERIC[name]);
+  renderHowto(v?v.name:name, v?v.setup:null);
+  $('#provSave').querySelector('span').textContent=
+    vend&&haveAcct(name.slice(2))?'Thêm tài khoản nữa':'Thêm';
   $('#provMsg').textContent='';
   if(name==='file'){renderCfgs();loadFound()}
 }
-$('#provSeg').onclick=e=>{const b=e.target.closest('button');if(b)showAdd(b.dataset.add)};
+$('#provSeg').onclick=e=>{const b=e.target.closest('.ptile');if(b)showAdd(b.dataset.add)};
 
 // #add / #providers / #settings open their surface directly, so each is linkable.
 function applyHash(){
   const h=location.hash;
   if(h==='#add')return openDrawer();
   if(h==='#settings')return $('#openSet').click();
-  const m=/^#providers(?:-(hma|file|eap))?$/.exec(h);
-  if(m){$('#openProv').click(); if(m[1])showAdd(m[1])}
+  const m=/^#providers(?:-([a-z]+))?$/.exec(h);
+  if(m)$('#openProv').onclick().then(()=>{
+    if(m[1])showAdd(['hma','file','eap'].includes(m[1])?m[1]:'v:'+m[1])});
 }
 addEventListener('hashchange',applyHash);
 
 const PKIND={'ikev2-cert':'IKEv2 · chứng chỉ','ikev2-eap':'IKEv2 · user/mật khẩu',
-             wireguard:'WireGuard',openvpn:'OpenVPN'};
+             wireguard:'WireGuard',openvpn:'OpenVPN','wireguard/openvpn':'WireGuard · OpenVPN'};
 async function loadProviders(){
-  const d=await j('/api/providers'); const box=$('#provlist');
+  const d=await j('/api/providers'); PROVS=d.providers;
   const hma=d.providers.find(p=>p.id==='hma');
-  $('#hmaOk').hidden=!hma?.ready; $('#hmaHow').hidden=!!hma?.ready;
-  if(hma?.ready)$('#hmaOkSub').textContent=
-    `${hma.locations} vị trí · hạn ${hma.expires||'—'} · UDID ${(hma.udid||'').slice(0,26)}…`;
-  box.innerHTML=d.providers.map(p=>{
-    const sub=p.ready
-      ? [p.locations?`${p.locations} vị trí`:'', p.udid?`UDID ${p.udid.slice(0,22)}…`:'',
-         p.expires?`hạn ${p.expires}`:'', p.note].filter(Boolean).join(' · ')
-      : 'Chưa cấu hình — nạp chứng chỉ bên dưới để mở khoá 115 vị trí';
-    return `<div class="pv${p.ready?' on':''}">
-      <div class="ic"><svg class="i"><use href="#ic-${p.kind.startsWith('ikev2')?'plug':'file'}"/></svg></div>
-      <div class="bd"><div class="t">${esc(p.name)}<span class="badge">${esc(PKIND[p.kind]||p.kind)}</span></div>
-        <div class="s">${esc(sub)}</div></div>
-      ${p.ready?`<span class="use${p.limit&&p.used>=p.limit?' full':''}">${p.limit?`${p.used}/${p.limit} cổng`:`${p.used} cổng đang chạy`}</span>
-        <div class="lim" title="${esc(limitHint(p))}">
-          <label class="sw"><input type="checkbox" data-limon="${esc(p.limit_key)}"${p.limit?' checked':''}><span>Giới hạn</span></label>
-          <input type="number" min="1" value="${p.limit||p.limit_default||10}" data-limit="${esc(p.limit_key)}"${p.limit?'':' hidden'} aria-label="Số cổng tối đa">
-        </div>
-        <button class="del" data-pid="${esc(p.id)}" title="Xoá nhà cung cấp"><svg class="i"><use href="#ic-trash"/></svg></button>`:''}
-    </div>`;
-  }).join('');
+  const n=hma?.accounts?.length||0;
+  $('#hmaOk').hidden=!n; $('#hmaHow').hidden=!!n;
+  if(n)$('#hmaOkSub').textContent=
+    `${n} chứng chỉ · ${hma.locations} vị trí · thả thêm file để nạp chứng chỉ của máy/tài khoản khác`;
+  const t=d.summary||{};
+  $('#ptotal').hidden=!d.providers.length;
+  $('#ptotal').innerHTML=[[t.providers,'nhà cung cấp'],[t.accounts,'tài khoản'],
+    [t.servers,'máy chủ'],[t.countries,'quốc gia'],[t.running,'cổng đang chạy']]
+    .map(([v,l])=>`<div><b>${v??0}</b><span>${l}</span></div>`).join('');
+  $('#provlist').innerHTML=d.providers.map(p=>p.pool?poolCard(p):plainCard(p)).join('')
+    || '<p class="empty-cfg">Chưa có nhà cung cấp nào. Chọn một tab bên dưới để thêm.</p>';
+}
+// A pool: the provider's locations are listed once, its accounts supply the capacity.
+function poolCard(p){
+  const cap=p.capacity, full=cap&&p.used>=cap;
+  return `<div class="pool">
+    <div class="hd">
+      <div class="ic"><svg class="i"><use href="#ic-plug"/></svg></div>
+      <div class="bd">
+        <div class="t">${esc(p.name)}<span class="badge">${esc(PKIND[p.kind]||p.kind)}</span>
+          <span class="badge prov">${p.accounts.length} tài khoản</span></div>
+        <div class="s"><b style="color:var(--tx)">${p.locations} máy chủ</b> · ${p.countries} nước · ${
+          cap?`đang dùng ${p.used}/${cap} chỗ`:`${p.used} cổng đang chạy`}</div>
+      </div>
+      <span class="use${full?' full':''}">${full?'đã đầy':cap?`còn ${cap-p.used} chỗ`:'không giới hạn'}</span>
+    </div>
+    <div class="accs">${p.accounts.map(a=>accRow(p,a)).join('')}</div>
+    <button class="btn ghost sm addacc" data-addacct="${esc(p.vendor)}">
+      <svg class="i"><use href="#ic-plus"/></svg><span>Thêm tài khoản ${esc(p.name)}</span></button>
+  </div>`;
+}
+function accRow(p,a){
+  const full=a.limit&&a.used>=a.limit;
+  const det=[a.note, a.udid?`UDID ${a.udid.slice(0,20)}…`:'', a.expires?`hạn ${a.expires}`:'']
+    .filter(Boolean).join(' · ') || 'chưa có thông tin';
+  return `<div class="acc${a.broken?' bad':''}">
+    <div class="nm"><b>Tài khoản ${a.n}</b>${
+      a.broken?'<span class="flag-b bad" title="Nhà cung cấp từ chối tài khoản này; farm đã ngừng dùng nó">lỗi</span>':''}
+      <div class="d">${esc(det)}${a.refused?` · <span style="color:var(--warn)" title="Nhà cung cấp đã từ chối tài khoản này trên các máy chủ đó; farm không gán cổng vào đó nữa">bị từ chối ở ${a.refused} máy chủ</span>`:''}</div></div>
+    <span class="cnt${full?' full':''}" title="Cổng đang chạy trên tài khoản này / tổng máy chủ nó dùng được">${
+      a.limit?`${a.used}/${a.limit}`:`${a.used}`} cổng${a.used_countries?` · ${a.used_countries} nước`:''} · ${a.refused?`${p.locations-a.refused}/${p.locations} máy chủ dùng được`:`${p.locations} máy chủ`}</span>
+    <div class="lim" title="${esc(limitHint(p))}">
+      <label class="sw"><input type="checkbox" data-limon="${esc(a.id)}"${a.limit?' checked':''}><span>Giới hạn</span></label>
+      <input type="number" min="1" value="${a.limit||a.limit_default||3}" data-limit="${esc(a.id)}"${a.limit?'':' hidden'} aria-label="Số cổng tối đa">
+    </div>
+    <button class="del" data-aid="${esc(a.id)}" data-aname="${esc(a.name)}" title="Xoá tài khoản này">
+      <svg class="i"><use href="#ic-trash"/></svg></button>
+  </div>`;
+}
+// Uploaded configs and hand-added IKEv2 servers: no accounts, one flat row.
+function plainCard(p){
+  const sub=[p.locations?`${p.locations} vị trí`:'', p.note].filter(Boolean).join(' · ');
+  return `<div class="pv on">
+    <div class="ic"><svg class="i"><use href="#ic-${p.kind.startsWith('ikev2')?'plug':'file'}"/></svg></div>
+    <div class="bd"><div class="t">${esc(p.name)}<span class="badge">${esc(PKIND[p.kind]||p.kind)}</span></div>
+      <div class="s">${esc(sub)}</div></div>
+    <span class="use${p.limit&&p.used>=p.limit?' full':''}">${p.limit?`${p.used}/${p.limit} cổng`:`${p.used} cổng đang chạy`}</span>
+    <div class="lim" title="${esc(limitHint(p))}">
+      <label class="sw"><input type="checkbox" data-limon="${esc(p.limit_key)}"${p.limit?' checked':''}><span>Giới hạn</span></label>
+      <input type="number" min="1" value="${p.limit||p.limit_default||10}" data-limit="${esc(p.limit_key)}"${p.limit?'':' hidden'} aria-label="Số cổng tối đa">
+    </div>
+    <button class="del" data-pid="${esc(p.id)}" title="Xoá nhà cung cấp"><svg class="i"><use href="#ic-trash"/></svg></button>
+  </div>`;
 }
 function limitHint(p){
-  if(p.limit_key==='hma')return 'HMA không giới hạn số kết nối cùng lúc (đã chạy 27+ cổng). '+
+  if(p.vendor==='surfshark')return 'Surfshark không giới hạn số thiết bị; một key đã chạy 26 vị trí cùng lúc. '+
+    'Để trống là không giới hạn.';
+  if(p.vendor==='zoogvpn')return 'ZoogVPN không giới hạn số kết nối (đã chạy 6 cổng trên một tài khoản), '+
+    'nhưng gói có thể chỉ cho dùng một phần máy chủ. Chỉ bật giới hạn nếu bạn muốn tự chặn.';
+  if(p.vendor==='hma')return 'HMA không giới hạn số kết nối cùng lúc (đã chạy 27+ cổng). '+
     'Chỉ bật giới hạn nếu bạn muốn tự chặn số cổng.';
   return p.limit_default?`Nhà cung cấp này thường cho tối đa ${p.limit_default} kết nối cùng lúc.`
                         :'Không có giới hạn đã biết.';
@@ -821,7 +1037,8 @@ function limitHint(p){
 async function setLimit(key,n){
   await j('/api/limit',{method:'POST',body:JSON.stringify({provider:key,limit:n})});
   await loadProvs(); loadProviders();
-  toast(n?`${key.toUpperCase()}: tối đa ${n} cổng cùng lúc`:`${key.toUpperCase()}: không giới hạn`);
+  const nm=(PROVS.flatMap(p=>p.accounts||[]).find(a=>a.id===key)||{}).name||key.toUpperCase();
+  toast(n?`${nm}: tối đa ${n} cổng cùng lúc`:`${nm}: không giới hạn`);
 }
 $('#provlist').addEventListener('change',e=>{
   const sw=e.target.closest('[data-limon]');
@@ -831,6 +1048,26 @@ $('#provlist').addEventListener('change',e=>{
   setLimit(i.dataset.limit, Math.max(1,parseInt(i.value||'1',10)||1));
 });
 $('#provlist').addEventListener('click',async e=>{
+  const add=e.target.closest('[data-addacct]');
+  if(add){
+    await loadVendors();
+    showAdd(add.dataset.addacct==='hma'?'hma':'v:'+add.dataset.addacct);
+    $('#howto').scrollIntoView({behavior:'smooth',block:'nearest'});
+    setTimeout(()=>($('#vFields input')||$('#dropHma'))?.focus(),320);
+    return;
+  }
+  const acc=e.target.closest('[data-aid]');
+  if(acc){
+    if(!confirm(`Xoá ${acc.dataset.aname}? Cổng của nó sẽ chuyển sang tài khoản khác cùng nhà; `+
+                `không còn chỗ thì cổng bị tắt.`))return;
+    const r=await j('/api/account/delete',{method:'POST',body:JSON.stringify({id:acc.dataset.aid})});
+    await loadLocs();loadProviders();
+    const bits=[r.moved?`${r.moved} cổng chuyển sang tài khoản khác`:'',
+                r.stopped?`${r.stopped} cổng bị tắt vì hết chỗ`:'',
+                r.removed?`${r.removed} cổng bị xoá`:''].filter(Boolean);
+    toast(bits.length?`Đã xoá tài khoản — ${bits.join(', ')}`:'Đã xoá tài khoản');
+    tick(); return;
+  }
   const b=e.target.closest('[data-pid]');if(!b)return;
   if(!confirm('Xoá nhà cung cấp này? Mọi cổng của nó sẽ bị tắt và xoá.'))return;
   await j('/api/provider/delete',{method:'POST',body:JSON.stringify({id:b.dataset.pid})});
@@ -893,8 +1130,22 @@ async function importHma(f){
 }
 $('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');
 
+/* built-in vendor account */
+async function saveVendor(){
+  const body={vendor:VCUR.id};
+  for(const i of $$('#vFields [data-vf]'))body[i.dataset.vf]=i.value;
+  const b=$('#provSave'); b.disabled=true; $('#provMsg').textContent='Đang kiểm tra và tải danh sách máy chủ…';
+  const r=await fetch('/api/provider/account',{method:'POST',body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({})); b.disabled=false; $('#provMsg').textContent='';
+  if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
+  for(const i of $$('#vFields [data-vf]'))i.value='';
+  await loadLocs();await loadProviders();renderChooser();showAdd(ADDING);
+  toast(d.first?`Đã thêm ${VCUR.name} · ${d.locations} vị trí ở ${d.countries} nước — bật ở mục Thêm vị trí`
+               :`Đã thêm ${d.name} · ${VCUR.name} giờ có ${d.accounts} tài khoản`);
+}
 /* IKEv2 user/password provider */
 $('#provSave').onclick=async()=>{
+  if(ADDING.startsWith('v:'))return saveVendor();
   const body={name:$('#eName').value,server:$('#eServer').value,user:$('#eUser').value,
     pass:$('#ePass').value,server_id:$('#eSid').value,country:$('#eCountry').value,city:$('#eCity').value};
   const r=await fetch('/api/provider/eap',{method:'POST',body:JSON.stringify(body)});
@@ -989,12 +1240,15 @@ $('#picklist').addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e
 function toggle(o){const k=o.dataset.k;
   if(!sel.has(k)&&o.getAttribute('aria-disabled')==='true'){
     const l=LOCS.locations.find(x=>x.key===k), p=provByKey(limitKey(l));
-    return toast(`${p?p.name:'Nhà cung cấp'} đã đủ ${p?p.limit:''} cổng — tắt bớt hoặc tăng giới hạn ở Nhà cung cấp`)}
+    if(l.blocked)return toast(`Gói ${p?p.name:''} của bạn không cho dùng máy chủ này — chọn máy chủ khác cùng nước, hoặc thêm tài khoản gói cao hơn`);
+    return toast(`${p?p.name:'Nhà cung cấp'} đã dùng hết ${p?(p.pool?p.capacity:p.limit):''} chỗ — `+
+      `tắt bớt cổng, nới giới hạn, hoặc thêm tài khoản ở mục Nhà cung cấp`)}
   sel.has(k)?sel.delete(k):sel.add(k);renderPick()}
 $('#pickAll').onclick=()=>{const f=$('#pickFilter').value.toLowerCase();
   // Tick as many as each provider still has room for, not blindly everything in view.
   const room={};
-  for(const l of LOCS.locations){const t=(l.countryName+' '+l.city+' '+l.country).toLowerCase();
+  for(const l of LOCS.locations){const t=(l.countryName+' '+l.city+' '+l.country+' '+(l.provider||'')).toLowerCase();
+    if(PICK_PROV!=='all'&&provOf(l)!==PICK_PROV)continue;
     if(f&&!t.includes(f)||RUNNING.has(l.key)||sel.has(l.key))continue;
     const q=limitKey(l); if(!(q in room))room[q]=quotaLeft(q)-[...sel].filter(k=>{const x=LOCS.locations.find(y=>y.key===k);return x&&!RUNNING.has(k)&&limitKey(x)===q}).length;
     if(room[q]>0){sel.add(l.key);room[q]--}}
@@ -1079,8 +1333,13 @@ const WHY={
   nodata:'Gateway nhận kết nối nhưng không gửi dữ liệu về — lỗi phía HMA (app chính chủ cũng gặp), thường hết sau vài lần thử.',
   silent:'Máy điều phối của nhà cung cấp không trả lời.',
   noconnect:'Tunnel không lên được.',
-  dead:'Tunnel đang chạy thì mất kết nối.'};
-const WHY_SHORT={nodata:'không có dữ liệu',silent:'không trả lời',noconnect:'chưa lên',dead:'mất kết nối'};
+  dead:'Tunnel đang chạy thì mất kết nối.',
+  nohandshake:'WireGuard không bắt tay được — key sai, đã thu hồi, hoặc tài khoản hết gói.',
+  badlogin:'Máy chủ từ chối đăng nhập — kiểm tra email và mật khẩu.',
+  keychanged:'Chứng chỉ máy chủ đã hết hạn và khoá khác lần trước — từ chối để an toàn.',
+  refused:'Mật khẩu đúng nhưng máy chủ này không nhận tài khoản: thường là gói của bạn không gồm máy chủ đó. Farm ghi nhớ và chuyển cổng sang tài khoản khác nếu có.'};
+const WHY_SHORT={nodata:'không có dữ liệu',silent:'không trả lời',noconnect:'chưa lên',dead:'mất kết nối',
+  nohandshake:'không bắt tay',badlogin:'sai tài khoản',keychanged:'khoá máy chủ đổi',refused:'gói không hỗ trợ'};
 // What an attempt is doing right now (<key>.phase.json).
 const PHASE={queue:'Chờ lượt',handshake:'Đang bắt tay',verify:'Chờ dữ liệu'};
 const PHASE_WHY={queue:'Chờ vài giây trước khi kết nối để các cổng không bật dồn một lúc.',
@@ -1112,8 +1371,15 @@ const stCell=r=>{const s=stateOf(r), why=stateWhy(r), t=why?` title="${esc(why)}
   ].filter(Boolean).join(' · ');
   return `<span class="st busy"${t}>${icon}<span class="stk"><span class="lbl ${s}">${
     s==='wait'?stLabel.wait:(PHASE[p.phase]||stLabel.connecting)}</span>${sub?`<span class="sub">${sub}</span>`:''}</span></span>`};
+const acctName=id=>{const a=PROVS.flatMap(p=>p.accounts||[]).find(x=>x.id===id);return a?a.name:id};
+const manyAccounts=v=>{const p=PROVS.find(x=>x.id===v);return p&&(p.accounts||[]).length>1};
 const locCell=r=>`<b>${esc(r.name)}</b> <span>${esc(r.city)}</span>`+
   (r.provider&&r.provider!=='hma'?`<span class="badge prov" title="${esc(r.protocol||'')}">${esc(r.provider)}</span>`:'')+
+  (r.account&&manyAccounts(r.vendor||r.provider)
+    ? `<span class="badge" title="Tài khoản đang chạy cổng này">${esc(acctName(r.account))}</span>`:'')+
+  (r.orphan?`<span class="badge" style="color:var(--warn);background:var(--warn-soft)" title="`+
+    `Nhà cung cấp đã đổi tên hoặc bỏ máy chủ này. Cổng vẫn chạy được nhưng không nằm trong `+
+    `danh sách nữa — nên xoá và chọn vị trí khác.">máy chủ cũ</span>`:'')+
   (r.rotate_minutes?`<span class="badge" title="Tự xoay IP"><svg class="i"><use href="#ic-clock"/></svg>${r.rotate_minutes}p</span>`:'');
 const ipCell=r=>r.ip?esc(r.ip):'<span style="color:var(--mut)">—</span>';
 const latCell=r=>`<span class="lat ${latClass(r.latency)}">${r.latency!=null?r.latency+'ms':'—'}</span>`;
@@ -1157,7 +1423,7 @@ function render(rows){
     wrap.innerHTML=`<div class="empty"><div class="glyph"><svg class="i"><use href="#ic-globe"/></svg></div>
       <h2>Chưa có cổng proxy nào</h2><p>${HAS_TARGETS
         ? 'Chọn vài vị trí để biến tài khoản VPN thành các cổng SOCKS5 + HTTP riêng, mỗi cổng một quốc gia.'
-        : 'Trước hết hãy nạp một nhà cung cấp VPN — chứng chỉ HMA từ app, hoặc file .conf/.ovpn của nhà cung cấp khác.'}</p>
+        : 'Trước hết hãy thêm một nhà cung cấp VPN — tài khoản Surfshark hay ZoogVPN, chứng chỉ HMA từ app, hoặc file .conf/.ovpn.'}</p>
       <button class="btn primary" onclick="document.getElementById('${HAS_TARGETS?'openAdd':'openProv'}').click()">
         <svg class="i"><use href="#ic-${HAS_TARGETS?'plus':'plug'}"/></svg>
         <span>${HAS_TARGETS?'Thêm vị trí':'Thêm nhà cung cấp'}</span></button></div>`;

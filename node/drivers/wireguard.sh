@@ -66,4 +66,8 @@ driver_up() {
 driver_established() { [ "$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}')" != 0 ]; }
 
 # No handshake at all after ~20 s: the peer is not answering this endpoint.
-driver_stuck() { [ "$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}')" = 0 ]; }
+driver_stuck() {
+  [ "$(wg show wg0 latest-handshakes 2>/dev/null | awk '{print $2}')" = 0 ] || return 1
+  echo "watchdog: WireGuard không bắt tay được (key sai, hết hạn, hoặc tài khoản hết gói?)" >&2
+  echo nohandshake > /run/why
+}
