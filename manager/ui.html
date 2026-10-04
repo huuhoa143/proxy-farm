@@ -136,15 +136,15 @@ input::placeholder{color:var(--mut)}
 input:focus,select:focus{outline:none;border-color:var(--acc-line);box-shadow:0 0 0 3px var(--acc-soft)}
 
 /* table */
-.tablewrap{margin:0 30px 30px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-2);overflow:hidden}
+.tablewrap{margin:0 30px 30px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-2);overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);
-  padding:13px 18px;border-bottom:1px solid var(--line);background:var(--panel-2);position:sticky;top:0}
+  padding:13px 14px;border-bottom:1px solid var(--line);background:var(--panel-2);position:sticky;top:0}
 thead th.num{text-align:right}
 tbody tr{border-bottom:1px solid var(--line);transition:background .13s}
 tbody tr:last-child{border-bottom:0}
 tbody tr:hover{background:var(--panel-2)}
-td{padding:13px 18px;vertical-align:middle}
+td{padding:13px 14px;vertical-align:middle}
 td.num{text-align:right;font-variant-numeric:tabular-nums}
 .st{display:inline-flex;align-items:center;gap:9px;font-size:13px;font-weight:600;white-space:nowrap}
 .dot{width:9px;height:9px;border-radius:50%;flex:none}
@@ -193,6 +193,41 @@ td.c-sel,th.c-sel{width:40px;padding-right:0}
   background:rgba(90,168,255,.12);padding:2px 7px;border-radius:20px;margin-left:7px}
 .badge svg{width:11px;height:11px}
 .badge.prov{color:var(--acc);background:var(--acc-soft)}
+
+/* provider + account attribution: which subscription is behind each port */
+.pvc{display:flex;align-items:center;gap:8px;min-width:0}
+.pvc .sw{width:8px;height:8px;border-radius:2.5px;flex:none;background:var(--pc,var(--mut))}
+.pvc .tx{min-width:0;max-width:170px}
+.pvc .pn{display:block;font-size:12.5px;font-weight:600;color:var(--tx);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.pvc .an{display:block;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pvc .an.warn{color:var(--warn)}
+/* same square swatch, inline, for the picker rows and filter */
+.psw{width:7px;height:7px;border-radius:2px;flex:none;background:var(--pc,var(--mut));display:inline-block}
+.opt .pt.pv{display:inline-flex;align-items:center;gap:5px}
+.pvsel{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dim);white-space:nowrap}
+.pvsel select{padding:7px 10px;font-size:12.5px;font-weight:600}
+/* HMA: two numbered steps instead of a wall of prose */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);overflow:hidden}
+.step.done{border-color:var(--acc-line)}
+.step>.sh{display:flex;align-items:center;gap:10px;padding:11px 13px}
+.step>.sh .num{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:11.5px;font-weight:700;background:var(--panel);border:1px solid var(--line-2);color:var(--dim)}
+.step.done>.sh .num{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.step.done>.sh .num svg{width:12px;height:12px;stroke-width:3}
+.step>.sh .t{flex:1;min-width:0;font-size:13px;font-weight:650}
+.step>.sh .t em{display:block;font-style:normal;font-size:11.5px;font-weight:450;color:var(--mut);margin-top:2px}
+.step>.sb{padding:0 13px 13px}
+.lic{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;padding:9px 11px;border-radius:9px;
+  background:var(--panel);border:1px solid var(--line)}
+.lic.ok{border-color:var(--acc-line)}
+.lic.bad{border-color:var(--bad);color:var(--bad)}
+.lic b{font-weight:650}
+.lic .sep{color:var(--mut)}
+.lic .mt{color:var(--dim)}
+.inline-row{display:flex;gap:8px;align-items:stretch}
+.inline-row input{flex:1;min-width:0}
 
 /* modal */
 .modal{position:fixed;inset:0;display:none;place-items:center;z-index:60;padding:20px}
@@ -443,13 +478,14 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
   table,tbody,tr,td{display:block;width:auto}
   thead{display:none}
   tbody tr{padding:15px 16px;display:grid;grid-template-columns:auto 1fr auto;
-    grid-template-areas:"sel loc act" "st st st" "end end end";gap:12px;align-items:center;animation:none}
+    grid-template-areas:"sel loc act" "prov prov prov" "st st st" "end end end";gap:12px;align-items:center;animation:none}
   td.c-sel{grid-area:sel;width:auto}
   .bulk{margin:0 16px 10px}
   td{padding:0;min-width:0}
   td.c-loc{grid-area:loc}
   td.c-act{grid-area:act}
   td.c-st{grid-area:st}
+  td.c-prov{grid-area:prov;display:block}
   td.c-end{grid-area:end}
   .c-end .endpoint{width:100%;justify-content:space-between}
   .st .lbl{white-space:nowrap}
@@ -525,6 +561,8 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
         <button data-view="off" aria-pressed="false">Đã tắt <b id="vOff">0</b></button>
         <button data-view="all" aria-pressed="false">Tất cả <b id="vAll">0</b></button>
       </div>
+      <label class="pvsel" id="provFilterWrap" hidden>Nhà cung cấp
+        <select id="provFilter" aria-label="Lọc theo nhà cung cấp"><option value="all">Tất cả</option></select></label>
       <button class="btn ghost" id="exportAll"><svg class="i"><use href="#ic-export"/></svg><span>Xuất tất cả</span></button>
       <span class="count" id="count"></span>
     </div>
@@ -557,6 +595,9 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
     <input id="pickFilter" placeholder="Tìm quốc gia hoặc thành phố…"></div></div>
   <div class="picklist" id="picklist"></div>
   <div class="drawer-f">
+    <label class="pvsel" id="pinWrap" hidden>Tài khoản
+      <select id="pinAcct" aria-label="Tài khoản chạy các cổng này">
+        <option value="">Tự động</option></select></label>
     <div class="sum"><b id="selCount">0</b> vị trí đã chọn</div>
     <button class="btn ghost" id="pickAll">Chọn hết đang lọc</button>
     <button class="btn primary" id="startSel"><svg class="i"><use href="#ic-power"/></svg><span>Bật</span></button>
@@ -581,36 +622,56 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
       </div>
 
       <div id="addHma" hidden>
-        <div class="field" style="margin:0 0 6px">
-          <label for="hmaCode">Activation code (wallet key trên thẻ / email đơn hàng)</label>
-          <div class="cmd" style="gap:8px">
-            <input id="hmaCode" placeholder="VD: XXXXXX-XXXXXX-XXXXXX" style="flex:1;text-transform:uppercase">
-            <button class="btn ghost sm" id="hmaValidate"><span>Kiểm tra</span></button>
-          </div>
-          <div class="s" id="hmaCodeMsg" style="margin-top:6px"></div>
-        </div>
-        <p class="note">Nhập code để xác thực gói (off-device, không cần app). Sau đó nạp chứng chỉ
-          thiết bị <b>một lần</b> — xem <code>tools/hma-bootstrap-cert.sh</code> — rồi farm chạy đa
-          nền tảng, không cần app HMA nữa.</p>
         <div id="hmaOk" hidden>
           <div class="pv on" style="margin:0 0 12px">
             <div class="ic"><svg class="i"><use href="#ic-check"/></svg></div>
-            <div class="bd"><div class="t">Đã nhận chứng chỉ từ app HMA trên máy này</div>
+            <div class="bd"><div class="t">Đã có chứng chỉ thiết bị</div>
               <div class="s" id="hmaOkSub"></div></div>
           </div>
         </div>
-        <p class="note" id="hmaHow">Trên macOS file nằm ở:</p>
-        <div class="cmd"><code id="hmaPath">/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json</code>
-          <button class="btn ghost sm" id="copyHmaPath"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
-        <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:14px 0 0">
-          <svg class="i"><use href="#ic-export"/></svg>
-          <b>Kéo thả tokenCoreSE.json</b>
-          <span>Hoặc file <code>.p12</code> nếu bạn đã tự trích — khi đó điền thêm mật khẩu bên dưới.</span>
-          <input type="file" id="hmaFile" accept=".json,.p12,.pfx" hidden>
-        </div>
-        <div class="field" style="margin-top:12px">
-          <label for="hmaPw">Mật khẩu chứng chỉ (chỉ cần khi nạp .p12)</label>
-          <input type="password" id="hmaPw" placeholder="để trống nếu dùng tokenCoreSE.json">
+        <div class="steps">
+          <div class="step" id="hmaStep1">
+            <div class="sh"><span class="num" id="hmaNum1">1</span>
+              <span class="t">Nhập activation code
+                <em>Wallet key in trên thẻ hoặc trong email đơn hàng. Kiểm tra chạy thẳng tới máy chủ cấp phép — không cần app HMA.</em></span></div>
+            <div class="sb">
+              <div class="inline-row">
+                <input id="hmaCode" placeholder="XXXXXX-XXXXXX-XXXXXX" autocomplete="off"
+                  spellcheck="false" style="text-transform:uppercase;font-family:var(--fm)">
+                <button class="btn" id="hmaValidate"><svg class="i"><use href="#ic-check"/></svg><span>Kiểm tra</span></button>
+              </div>
+              <div id="hmaCodeMsg" style="margin-top:9px" hidden></div>
+            </div>
+          </div>
+          <div class="step" id="hmaStep2">
+            <div class="sh"><span class="num" id="hmaNum2">2</span>
+              <span class="t">Nạp chứng chỉ thiết bị — chỉ một lần
+                <em>HMA không cấp chứng chỉ từ activation code, nên lần đầu phải lấy từ một máy đã cài app. Nạp xong, farm chạy trên mọi nền tảng và không cần app nữa.</em></span></div>
+            <div class="sb">
+              <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:0">
+                <svg class="i"><use href="#ic-export"/></svg>
+                <b>Kéo thả <code>tokenCoreSE.json</code></b>
+                <span>Hoặc bấm để chọn file. Nhận cả <code>.p12</code> nếu bạn đã tự trích.</span>
+                <input type="file" id="hmaFile" accept=".json,.p12,.pfx" hidden>
+              </div>
+              <div id="hmaPwRow" hidden style="margin-top:11px">
+                <div class="field">
+                  <label for="hmaPw">Mật khẩu của file .p12</label>
+                  <div class="inline-row">
+                    <input type="password" id="hmaPw" autocomplete="new-password" placeholder="mật khẩu đi kèm chứng chỉ">
+                    <button class="btn primary" id="hmaP12Go"><svg class="i"><use href="#ic-check"/></svg><span>Nạp</span></button>
+                  </div>
+                  <span class="hint" id="hmaPwFile"></span>
+                </div>
+              </div>
+              <p class="note" style="margin:12px 0 0">Lấy file ở đâu — trên máy macOS đã cài và đăng nhập app HMA:</p>
+              <div class="cmd" style="margin-top:7px"><code id="hmaPath">/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json</code>
+                <button class="btn ghost sm" id="copyHmaPath"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
+              <p class="note" style="margin:10px 0 0">Hoặc chạy script trích sẵn, nó xuất ra cả <code>.p12</code> dùng được ở mọi nơi:</p>
+              <div class="cmd" style="margin-top:7px"><code id="hmaBoot">sudo bash tools/hma-bootstrap-cert.sh &lt;ACTIVATION-CODE&gt;</code>
+                <button class="btn ghost sm" id="copyHmaBoot"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -779,7 +840,10 @@ const toast=m=>{$('#toastMsg').textContent=m;$('#toast').classList.add('show');
   clearTimeout(toastT);toastT=setTimeout(()=>$('#toast').classList.remove('show'),1900)};
 
 /* drawer */
-const openDrawer=()=>{$('#scrim').classList.add('open');$('#drawer').classList.add('open');
+const openDrawer=()=>{
+  // Never stack overlays: a modal left open would sit on top of the drawer.
+  for(const m of $$('.modal.open'))m.classList.remove('open');
+  $('#scrim').classList.add('open');$('#drawer').classList.add('open');
   $('#drawer').setAttribute('aria-hidden','false');renderPick();setTimeout(()=>$('#pickFilter').focus(),260)};
 const closeDrawer=()=>{$('#scrim').classList.remove('open');$('#drawer').classList.remove('open');
   $('#drawer').setAttribute('aria-hidden','true')};
@@ -814,13 +878,27 @@ function renderPickProv(){
   $('#pickProvWrap').hidden=keys.length<2;
   if(!keys.includes(PICK_PROV))PICK_PROV='all';
   $('#pickProv').innerHTML=[`<button data-pp="all" aria-pressed="${PICK_PROV==='all'}">Tất cả <b>${LOCS.locations.length}</b></button>`,
-    ...keys.map(k=>`<button data-pp="${esc(k)}" aria-pressed="${PICK_PROV===k}">${esc(provLabel(k))} <b>${n[k]}</b></button>`)].join('');
+    ...keys.map(k=>`<button data-pp="${esc(k)}" aria-pressed="${PICK_PROV===k}"><span class="psw" style="--pc:${provColor(k)};margin-right:6px"></span>${esc(provLabel(k))} <b>${n[k]}</b></button>`)].join('');
 }
 $('#pickProv').onclick=e=>{const b=e.target.closest('[data-pp]');if(!b)return;PICK_PROV=b.dataset.pp;renderPick()};
+// Pinning only means something inside one pool; on "Tất cả" the farm spreads as usual.
+function renderPin(){
+  const p=PICK_PROV==='all'?null:PROVS.find(x=>x.id===PICK_PROV||x.limit_key===PICK_PROV);
+  const accs=(p&&p.accounts)||[];
+  $('#pinWrap').hidden=accs.length<2;
+  if(accs.length<2){$('#pinAcct').value='';return}
+  const sig=PICK_PROV+'|'+accs.map(a=>a.id+a.used).join(',');
+  const el=$('#pinAcct');
+  if(el.dataset.sig===sig)return;
+  el.dataset.sig=sig;
+  el.innerHTML='<option value="">Tự động (rải đều)</option>'+
+    accs.map(a=>`<option value="${esc(a.id)}">Tài khoản ${a.n} · ${a.used} cổng${
+      a.broken?' · lỗi':''}</option>`).join('');
+}
 const TAGS={virtual:['ảo','Vị trí ảo: IP mang quốc gia này nhưng máy chủ đặt ở nước khác'],
             static:['IP tĩnh','Luôn ra cùng một IP']};
 function renderPick(){
-  renderPickProv();
+  renderPickProv(); renderPin();
   const f=$('#pickFilter').value.toLowerCase();
   const byC={};
   for(const l of LOCS.locations){
@@ -853,7 +931,7 @@ function renderPick(){
       h+=`<div class="opt${run?' run':''}${full?' full':''}" data-k="${l.key}" role="checkbox" aria-checked="${on}" aria-disabled="${full}" tabindex="0">
         <div class="ck"><svg class="i"><use href="#ic-check"/></svg></div>
         <div class="city">${esc(l.city)}</div>${(l.tags||[]).map(g=>TAGS[g]?`<span class="pt ${g}" title="${TAGS[g][1]}">${TAGS[g][0]}</span>`:'').join('')}${
-          PICK_PROV==='all'&&provOf(l)!=='hma'?`<span class="pt">${esc(provLabel(provOf(l)))}</span>`:''}${run?'<span class="tag">đang chạy</span>':
+          `<span class="pt pv" style="--pc:${provColor(provOf(l))}" title="Nhà cung cấp của máy chủ này"><span class="psw"></span>${esc(provLabel(provOf(l)))}</span>`}${run?'<span class="tag">đang chạy</span>':
           blocked?'<span class="tag full" title="Nhà cung cấp đã từ chối mọi tài khoản của bạn trên máy chủ này — gói không bao gồm nó">gói không hỗ trợ</span>':
           full?'<span class="tag full">đã đủ</span>':''}</div>`;
     }
@@ -931,7 +1009,10 @@ function renderVendor(id){
     <label for="vf-${f.id}">${esc(f.label)}</label>
     <input type="${f.type==='password'?'password':'text'}" id="vf-${f.id}" data-vf="${esc(f.id)}"
       placeholder="${esc(f.placeholder||'')}" autocomplete="${f.type==='password'?'new-password':'off'}" spellcheck="false">
-    ${f.hint?`<span class="hint">${esc(f.hint)}</span>`:''}</div>`).join('');
+    ${f.hint?`<span class="hint">${esc(f.hint)}</span>`:''}</div>`).join('')
+    +`<p class="note" style="grid-column:1/-1;margin:2px 0 0">Farm chỉ kiểm tra được định dạng ở bước này.
+      Đúng/sai tài khoản chỉ biết khi cổng đầu tiên kết nối — sai thì tài khoản sẽ bị đánh dấu
+      <b>lỗi</b> ở danh sách trên.</p>`;
 }
 $('#openProv').onclick=async()=>{await loadProviders();await loadVendors();
   renderChooser(); showAdd(ADDING||'v:'+(VENDORS[0]||{id:'surfshark'}).id);
@@ -947,7 +1028,7 @@ function showAdd(name){
   $('#addHma').hidden=name!=='hma'; $('#addFile').hidden=name!=='file'; $('#addEap').hidden=name!=='eap';
   $('#provSave').hidden=!(vend||name==='eap');   // the file tabs act the moment a file lands
   const v=vend?VENDORS.find(x=>x.id===name.slice(2)):(name==='hma'?ALLV.find(x=>x.id==='hma'):GENERIC[name]);
-  renderHowto(v?v.name:name, v?v.setup:null);
+  renderHowto(v?v.name:name, name==='hma'?null:(v?v.setup:null));
   $('#provSave').querySelector('span').textContent=
     vend&&haveAcct(name.slice(2))?'Thêm tài khoản nữa':'Thêm';
   $('#provMsg').textContent='';
@@ -972,9 +1053,15 @@ async function loadProviders(){
   const d=await j('/api/providers'); PROVS=d.providers;
   const hma=d.providers.find(p=>p.id==='hma');
   const n=hma?.accounts?.length||0;
-  $('#hmaOk').hidden=!n; $('#hmaHow').hidden=!!n;
-  if(n)$('#hmaOkSub').textContent=
-    `${n} chứng chỉ · ${hma.locations} vị trí · thả thêm file để nạp chứng chỉ của máy/tài khoản khác`;
+  $('#hmaOk').hidden=!n;
+  if(n){
+    const a=hma.accounts[0]||{};
+    $('#hmaOkSub').textContent=[`${n} chứng chỉ · ${hma.locations} vị trí`,
+      a.license?`${a.license.product} · hạn ${a.license.expires_date}`:'',
+      a.code_tail?`code …${a.code_tail}`:'',
+      'thả thêm file để nạp chứng chỉ của máy/tài khoản khác'].filter(Boolean).join(' · ');
+  }
+  if(typeof syncHmaSteps==='function')syncHmaSteps();
   const t=d.summary||{};
   $('#ptotal').hidden=!d.providers.length;
   $('#ptotal').innerHTML=[[t.providers,'nhà cung cấp'],[t.accounts,'tài khoản'],
@@ -1112,14 +1199,26 @@ $('#foundlist').addEventListener('click',e=>{
 $('#importAll').onclick=()=>importFound(
   [...$$('#foundlist [data-imp]')].map(b=>b.dataset.imp));
 
-/* HMA certificate import */
+/* HMA: activation code, then the one-time device certificate */
 const dropHma=$('#dropHma'),hmaFile=$('#hmaFile');
+let HMA_P12=null, HMA_LIC=null;
 dropHma.onclick=()=>hmaFile.click();
 dropHma.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();hmaFile.click()}};
-hmaFile.onchange=()=>{if(hmaFile.files[0])importHma(hmaFile.files[0]);hmaFile.value=''};
+hmaFile.onchange=()=>{if(hmaFile.files[0])stageHma(hmaFile.files[0]);hmaFile.value=''};
 for(const ev of ['dragenter','dragover'])dropHma.addEventListener(ev,e=>{e.preventDefault();dropHma.classList.add('over')});
 for(const ev of ['dragleave','drop'])dropHma.addEventListener(ev,e=>{e.preventDefault();dropHma.classList.remove('over')});
-dropHma.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f)importHma(f)});
+dropHma.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f)stageHma(f)});
+// A .p12 needs its password, so hold it and ask; tokenCoreSE.json carries its own.
+function stageHma(f){
+  if(/\.(p12|pfx)$/i.test(f.name)){
+    HMA_P12=f; $('#hmaPwRow').hidden=false;
+    $('#hmaPwFile').textContent=`Đã chọn ${f.name}`;
+    $('#hmaPw').focus(); return;
+  }
+  HMA_P12=null; $('#hmaPwRow').hidden=true; importHma(f);
+}
+$('#hmaP12Go').onclick=()=>{ if(HMA_P12)importHma(HMA_P12) };
+$('#hmaPw').addEventListener('keydown',e=>{if(e.key==='Enter'&&HMA_P12)importHma(HMA_P12)});
 async function importHma(f){
   $('#provMsg').textContent='Đang đọc chứng chỉ…';
   let body;
@@ -1131,35 +1230,59 @@ async function importHma(f){
   }else{
     body={token:await f.text()};
   }
-  // When an activation code is filled, onboard through the code path so the account is
-  // tagged with the code + licence; otherwise the plain certificate import.
+  // With an activation code filled, onboard through the code path so the account carries
+  // the code and its licence; otherwise the plain certificate import.
   const code=$('#hmaCode').value.trim();
   const url=code?'/api/provider/hma-code':'/api/provider/hma';
   if(code)body.code=code;
   const r=await fetch(url,{method:'POST',body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok||d.error){$('#provMsg').textContent='';return toast(d.error||('Lỗi '+r.status))}
   $('#provMsg').textContent='';
-  $('#hmaPw').value='';
+  if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
+  HMA_P12=null; $('#hmaPw').value=''; $('#hmaPwRow').hidden=true;
   const st=d.status||d;
-  await loadLocs();loadProviders();
-  toast(`Đã nạp chứng chỉ · ${(st.locations||'?')} vị trí${d.license?' · hạn '+d.license.expires_date:''}`);
+  await loadLocs();loadProviders();renderPick();
+  toast(`Đã nạp chứng chỉ · ${st.locations||'?'} vị trí${d.license?' · hạn '+d.license.expires_date:''}`);
 }
-/* Validate an activation code without a certificate (off-device licence check). */
+/* Validate an activation code on its own — no certificate, no app. */
 $('#hmaValidate').onclick=async()=>{
-  const code=$('#hmaCode').value.trim();
-  const msg=$('#hmaCodeMsg');
-  if(!code){msg.textContent='Nhập activation code trước.';return}
-  msg.textContent='Đang kiểm tra…';
-  const r=await fetch('/api/provider/hma-code',{method:'POST',body:JSON.stringify({code})});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok||d.error){msg.innerHTML='<span style="color:var(--bad,#e55)">✗ '+esc(d.error||('Lỗi '+r.status))+'</span>';return}
-  const L=d.license||{};
-  msg.innerHTML='<span style="color:var(--ok,#3a7)">✓ '+esc(L.product||'HMA')+'</span> · hạn '+
-    esc(L.expires_date||'?')+' · thiết bị '+L.devices_used+'/'+L.devices_max+
-    (d.needs_cert?' · <b>cần nạp chứng chỉ bên dưới</b>':'');
+  const code=$('#hmaCode').value.trim(), msg=$('#hmaCodeMsg'), btn=$('#hmaValidate');
+  if(!code){showLic({error:'Nhập activation code trước.'});return}
+  btn.disabled=true; msg.hidden=false; msg.className='lic'; msg.textContent='Đang kiểm tra…';
+  try{
+    const r=await fetch('/api/provider/hma-code',{method:'POST',body:JSON.stringify({code})});
+    const d=await r.json().catch(()=>({}));
+    showLic(!r.ok||d.error?{error:d.error||('Lỗi '+r.status)}:d.license);
+  }finally{ btn.disabled=false }
 };
+function showLic(L){
+  const msg=$('#hmaCodeMsg'); msg.hidden=false;
+  if(!L||L.error){
+    HMA_LIC=null; msg.className='lic bad';
+    msg.innerHTML=`<svg class="i"><use href="#ic-x"/></svg><b>${esc(L&&L.error||'Không kiểm tra được')}</b>`;
+  }else{
+    HMA_LIC=L; msg.className='lic ok';
+    const slots=L.devices_max?`${L.devices_used}/${L.devices_max} thiết bị`:'';
+    msg.innerHTML=`<svg class="i" style="color:var(--acc)"><use href="#ic-check"/></svg>`+
+      `<b>${esc(L.product||'HMA')}</b><span class="sep">·</span>`+
+      `<span class="mt">hạn ${esc(L.expires_date||'?')}</span>`+
+      (slots?`<span class="sep">·</span><span class="mt">${slots}</span>`:'');
+  }
+  syncHmaSteps();
+}
+// Tick each step off as it is satisfied, so the panel says what is left to do.
+function syncHmaSteps(){
+  const s1=!!HMA_LIC, s2=!$('#hmaOk').hidden;
+  const mark=(stepId,numId,done,n)=>{
+    $('#'+stepId).classList.toggle('done',done);
+    $('#'+numId).innerHTML=done?'<svg class="i"><use href="#ic-check"/></svg>':String(n);
+  };
+  mark('hmaStep1','hmaNum1',s1,1); mark('hmaStep2','hmaNum2',s2,2);
+}
 $('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');
+$('#copyHmaBoot').onclick=()=>copyText(
+  $('#hmaBoot').textContent.replace('<ACTIVATION-CODE>',$('#hmaCode').value.trim()||'<ACTIVATION-CODE>'),
+  'Đã chép lệnh');
 
 /* built-in vendor account */
 async function saveVendor(){
@@ -1171,7 +1294,10 @@ async function saveVendor(){
   if(!r.ok||d.error)return toast(d.error||('Lỗi '+r.status));
   for(const i of $$('#vFields [data-vf]'))i.value='';
   await loadLocs();await loadProviders();renderChooser();showAdd(ADDING);
-  toast(d.first?`Đã thêm ${VCUR.name} · ${d.locations} vị trí ở ${d.countries} nước — bật ở mục Thêm vị trí`
+  // Only the format is checkable here: neither Surfshark nor ZoogVPN exposes a login
+  // probe, so the account is proven when its first tunnel connects. Say so, instead of
+  // implying the credentials were verified.
+  toast(d.first?`Đã thêm ${VCUR.name} · ${d.locations} vị trí ở ${d.countries} nước — bật một cổng để xác thực tài khoản`
                :`Đã thêm ${d.name} · ${VCUR.name} giờ có ${d.accounts} tài khoản`);
 }
 /* IKEv2 user/password provider */
@@ -1287,7 +1413,8 @@ $('#pickAll').onclick=()=>{const f=$('#pickFilter').value.toLowerCase();
 $('#startSel').onclick=async()=>{
   if(!sel.size)return toast('Chưa chọn vị trí nào');
   const n=sel.size;const b=$('#startSel');b.disabled=true;
-  const r=await j('/api/up',{method:'POST',body:JSON.stringify({keys:[...sel]})});
+  const pin=$('#pinWrap').hidden?'':$('#pinAcct').value;
+  const r=await j('/api/up',{method:'POST',body:JSON.stringify({keys:[...sel],account:pin||undefined})});
   sel.clear();b.disabled=false;closeDrawer();
   const miss=refusedMsg(r.refused);
   toast(miss?`Đang bật ${r.started.length} · không bật ${miss}`:`Đang bật ${r.started.length} vị trí…`);
@@ -1402,12 +1529,27 @@ const stCell=r=>{const s=stateOf(r), why=stateWhy(r), t=why?` title="${esc(why)}
   ].filter(Boolean).join(' · ');
   return `<span class="st busy"${t}>${icon}<span class="stk"><span class="lbl ${s}">${
     s==='wait'?stLabel.wait:(PHASE[p.phase]||stLabel.connecting)}</span>${sub?`<span class="sub">${sub}</span>`:''}</span></span>`};
-const acctName=id=>{const a=PROVS.flatMap(p=>p.accounts||[]).find(x=>x.id===id);return a?a.name:id};
-const manyAccounts=v=>{const p=PROVS.find(x=>x.id===v);return p&&(p.accounts||[]).length>1};
+const acctOf=id=>PROVS.flatMap(p=>p.accounts||[]).find(x=>x.id===id);
+const acctName=id=>{const a=acctOf(id);return a?a.name:id};
+// One stable colour per provider so a long table can be scanned by subscription.
+// Categorical, not decorative: the same key always gets the same swatch.
+const PCOLORS=['#5aa8ff','#00dd8a','#f6b53d','#c08bff','#ff8b6a','#39d3d3'];
+const provColor=k=>{let h=0;for(const c of String(k||''))h=(h*31+c.charCodeAt(0))>>>0;
+  return PCOLORS[h%PCOLORS.length]};
+const provKeyOf=r=>r.vendor||String(r.provider||'custom');
+// Which subscription this port runs on. Shown for every row: without it a 86-row table
+// cannot answer "whose quota is this burning?".
+function provCell(r){
+  const k=provKeyOf(r), name=provLabel(k)||k, a=r.account?acctOf(r.account):null;
+  const gone=r.account&&!a&&PROVS.length;   // no list yet != a deleted account
+  const sub=r.account
+    ? (a?`Tài khoản ${a.n}`:(gone?'tài khoản đã xoá':'…'))
+    : (r.protocol==='ikev2-eap'?'tài khoản thủ công':'file cấu hình');
+  return `<span class="pvc" style="--pc:${provColor(k)}" title="${esc(name+' · '+sub+' · '+(r.protocol||''))}">
+    <span class="sw"></span><span class="tx"><span class="pn">${esc(name)}</span>
+    <span class="an${gone?' warn':''}">${esc(sub)}</span></span></span>`;
+}
 const locCell=r=>`<b>${esc(r.name)}</b> <span>${esc(r.city)}</span>`+
-  (r.provider&&r.provider!=='hma'?`<span class="badge prov" title="${esc(r.protocol||'')}">${esc(r.provider)}</span>`:'')+
-  (r.account&&manyAccounts(r.vendor||r.provider)
-    ? `<span class="badge" title="Tài khoản đang chạy cổng này">${esc(acctName(r.account))}</span>`:'')+
   (r.orphan?`<span class="badge" style="color:var(--warn);background:var(--warn-soft)" title="`+
     `Nhà cung cấp đã đổi tên hoặc bỏ máy chủ này. Cổng vẫn chạy được nhưng không nằm trong `+
     `danh sách nữa — nên xoá và chọn vị trí khác.">máy chủ cũ</span>`:'')+
@@ -1427,6 +1569,7 @@ function patchRows(show,tb){
     if(!tr) continue;
     setHTML(tr.querySelector('.c-st'), stCell(r));
     setHTML(tr.querySelector('.locbd'), locCell(r));
+    setHTML(tr.querySelector('.c-prov'), provCell(r));
     setHTML(tr.querySelector('.c-ip'), ipCell(r));
     setHTML(tr.querySelector('.c-lat'), latCell(r));
     setHTML(tr.querySelector('.c-rs'), String(r.restarts??'—'));
@@ -1448,7 +1591,9 @@ function syncSel(show){
 function render(rows){
   const f=$('#filter').value.toLowerCase();
   const inView=r=>VIEW==='all'||(VIEW==='on')===isOn(r);
-  const show=rows.filter(r=>inView(r)&&(!f||(r.name+' '+r.city+' '+r.country+' '+(r.ip||'')).toLowerCase().includes(f)));
+  const inProv=r=>PROV_FILTER==='all'||provKeyOf(r)===PROV_FILTER;
+  const show=rows.filter(r=>inView(r)&&inProv(r)&&
+    (!f||(r.name+' '+r.city+' '+r.country+' '+(r.ip||'')).toLowerCase().includes(f)));
   const wrap=$('#tablewrap');
   if(!rows.length){
     wrap.innerHTML=`<div class="empty"><div class="glyph"><svg class="i"><use href="#ic-globe"/></svg></div>
@@ -1472,7 +1617,7 @@ function render(rows){
 
   let h=`<table><thead><tr>
     <th class="c-sel"><span class="ck2" id="selAll" role="checkbox" aria-checked="false" tabindex="0"><svg class="i"><use href="#ic-check"/></svg></span></th>
-    <th>Trạng thái</th><th>Vị trí</th><th>Điểm cuối</th>
+    <th>Trạng thái</th><th>Vị trí</th><th>Nhà cung cấp</th><th>Điểm cuối</th>
     <th class="hide-m">IP lối ra</th><th class="num hide-m">Độ trễ</th><th class="num hide-m">Restart</th><th></th></tr></thead><tbody>`;
   show.forEach((r,i)=>{
     h+=`<tr data-k="${r.key}" style="animation-delay:${Math.min(i*22,300)}ms">
@@ -1480,6 +1625,7 @@ function render(rows){
       <td class="c-st">${stCell(r)}</td>
       <td class="c-loc"><div class="loc"><img class="flag" src="${flag(r.country)}" alt="${esc(r.country)}" loading="lazy">
         <div class="locbd">${locCell(r)}</div></div></td>
+      <td class="c-prov">${provCell(r)}</td>
       <td class="c-end"><span class="endpoint" onclick="copyEndpoint(${r.port})" title="Copy host:port">
         <span class="mono">${esc(location.hostname)}:${r.port}</span><span class="proto">S5·HTTP</span>
         <svg class="i"><use href="#ic-copy"/></svg></span></td>
@@ -1502,7 +1648,7 @@ function render(rows){
   if(sa) sa.onclick=()=>{ const cur=show.filter(r=>SEL.has(r.key)).length===show.length;
     show.forEach(r=>cur?SEL.delete(r.key):SEL.add(r.key)); renderSel(); syncSel(show); };
   syncSel(show);
-  $('#count').textContent=f?`${show.length} cổng khớp`:'';   // the view switch already counts
+  $('#count').textContent=(f||PROV_FILTER!=='all')?`${show.length} cổng khớp`:'';  // the view switch already counts
 }
 $('#filter').addEventListener('input',()=>render(LAST));
 
@@ -1613,13 +1759,29 @@ $('#testRun').onclick=runTest;
 $('#copyTestCurl').onclick=()=>copyText($('#testCurlCmd').textContent,'Đã chép lệnh curl');
 
 /* poll */
-let LAST=[], HOOK=null, VIEW=null;
+let LAST=[], HOOK=null, VIEW=null, PROV_FILTER='all';
+// The dropdown lists only providers that actually own a port, with live counts.
+function renderProvFilter(rows){
+  const n={}; for(const r of rows){const k=provKeyOf(r);n[k]=(n[k]||0)+1}
+  const keys=Object.keys(n).sort((a,b)=>provLabel(a).localeCompare(provLabel(b)));
+  $('#provFilterWrap').hidden=keys.length<2;
+  if(PROV_FILTER!=='all'&&!keys.includes(PROV_FILTER))PROV_FILTER='all';
+  const sig=keys.map(k=>k+n[k]).join('|');
+  const el=$('#provFilter');
+  if(el.dataset.sig!==sig){
+    el.dataset.sig=sig;
+    el.innerHTML=`<option value="all">Tất cả · ${rows.length}</option>`+
+      keys.map(k=>`<option value="${esc(k)}">${esc(provLabel(k))} · ${n[k]}</option>`).join('');
+  }
+  el.value=PROV_FILTER;
+}
+$('#provFilter').onchange=e=>{PROV_FILTER=e.target.value;RENDER_SIG=null;render(LAST)};
 function setView(v){
   VIEW=v; for(const b of $$('#viewSeg button'))b.setAttribute('aria-pressed',b.dataset.view===v);
   RENDER_SIG=null; if(LAST.length)render(LAST);
 }
 $('#viewSeg').onclick=e=>{const b=e.target.closest('button');if(b)setView(b.dataset.view)};
-async function tick(){ loadProvs(); return await _tick() }
+async function tick(){ await loadProvs(); return await _tick() }
 async function _tick(){
   const d=await j('/api/status');LAST=d.rows;
   RUNNING=new Set(d.rows.filter(r=>r.state==='running').map(r=>r.key));
@@ -1632,6 +1794,7 @@ async function _tick(){
   $('#sCountries').textContent=new Set(lit.map(r=>r.country)).size;
   $('#vOn').textContent=lit.length; $('#vOff').textContent=d.rows.length-lit.length;
   $('#vAll').textContent=d.rows.length;
+  renderProvFilter(d.rows);
   // First load lands on what is running; with nothing on, show everything instead.
   if(VIEW===null)setView(lit.length?'on':'all');
   // median, not mean: one slow tunnel shouldn't misrepresent the whole farm

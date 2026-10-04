@@ -707,6 +707,8 @@ def providers_list():
                    "broken": astate.get(a["id"], {}).get("broken")}
             if vid == "hma":
                 row.update(note="", **cert_info(os.path.join(hma_secrets_dir(a["id"]), "client.pem")))
+                if a.get("code"): row["code_tail"] = a["code"][-4:]   # never the full code
+                if a.get("license"): row["license"] = a["license"]
             accs.append(row)
         out.append({"id": vid, "kind": v["protocol"], "name": v["name"], "vendor": vid,
                     "pool": True, "ready": True, "accounts": accs,
@@ -832,7 +834,9 @@ def resolve_targets(args):
             if l["key"] not in seen: seen.add(l["key"]); out.append(l)
     return out
 
-def up(keys):
+def up(keys, pin_account=None):
+    """`pin_account` (optional) pins every port of that account's vendor to it; other
+    vendors in the same batch are still spread automatically."""
     targets, refused = over_quota(resolve_targets(keys))
     for r in refused:
         print(f"skip {r['key']}: {r['provider']} đã đủ {r['limit']} cổng", flush=True)
@@ -852,8 +856,13 @@ def up(keys):
     bound, nofree = {}, []
     for l in targets:
         if not l.get("vendor"): continue
-        a = pick_account(l["vendor"], load, prefer=state.get(l["key"], {}).get("account"),
-                         key=l["key"])
+        pin = account(pin_account) if pin_account else None
+        if pin and pin["vendor"] == l["vendor"] and acct_usable(pin) \
+                and l["key"] not in refused_by(pin["id"]):
+            a = pin; load[a["id"]] = load.get(a["id"], 0) + 1
+        else:
+            a = pick_account(l["vendor"], load, prefer=state.get(l["key"], {}).get("account"),
+                             key=l["key"])
         if a: bound[l["key"]] = a
         else: nofree.append(l)
     for l in nofree:
@@ -1389,7 +1398,7 @@ class H(http.server.BaseHTTPRequestHandler):
         keys = data.get("keys", [])
         if keys == "*": keys = list(load_state().keys())
         if p == "/api/up":
-            return self._send(200, json.dumps({"ok": True, **up(keys)}))
+            return self._send(200, json.dumps({"ok": True, **up(keys, data.get("account"))}))
         elif p == "/api/down": down(keys if keys else [])
         elif p == "/api/rotate": rotate(keys)
         elif p == "/api/stop": stop(keys)
