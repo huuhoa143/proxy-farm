@@ -27,6 +27,7 @@ giao diện web.
 - [Đóng góp](#đóng-góp)
 - [Lưu ý pháp lý](#lưu-ý-pháp-lý)
 - [Giấy phép](#giấy-phép)
+- [Miễn trừ trách nhiệm](#miễn-trừ-trách-nhiệm)
 
 ## Tính năng
 
@@ -36,10 +37,14 @@ giao diện web.
   *Chờ thử lại* với đồng hồ đếm ngược, lý do thất bại, số lần thử và thời gian đã thử
 - **Kiểm tra proxy ngay trên UI**: IP lối ra, nhà mạng, quốc gia có khớp không, độ trễ,
   thời gian TLS, tốc độ tải; kèm lệnh `curl` để chép
+- **Biết cổng nào thuộc nhà/tài khoản nào**: mỗi dòng gắn nhà cung cấp + tài khoản (có màu
+  nhận diện), kèm bộ lọc theo nhà cung cấp
 - Thao tác hàng loạt: bật / tắt / xoay IP / tự xoay theo lịch / xuất / xoá
 - **Xuất danh sách** 4 định dạng: `host:port:user:pass`, `socks5://user:pass@host:port`,
   `host:port`, lệnh `curl`
 - **Webhook xoay IP** cho hệ thống khác gọi
+- **HMA một-bấm**: nút *Sync* lấy chứng chỉ từ app HMA trên máy (macOS + Windows); nhập
+  activation code để xác thực gói (hạn, số slot thiết bị)
 - Giới hạn số cổng theo từng nhà cung cấp (tuỳ chọn)
 - Xem log từng cổng, dark/light, responsive (trên mobile bảng chuyển thành thẻ)
 - CLI cho mọi thao tác
@@ -49,8 +54,8 @@ giao diện web.
 | Nguồn | Giao thức | Bạn nhập gì | Vị trí | Giới hạn mỗi tài khoản |
 |---|---|---|---|---|
 | **Surfshark** | WireGuard | 1 private key | 180 (100 nước, gồm 38 IP tĩnh) | không — đã chạy 26 cổng trên một key |
-| **ZoogVPN** | IKEv2 + EAP | email + mật khẩu | 165 (75 nước) | không giới hạn số kết nối (đã chạy 6); **gói quyết định máy chủ nào được dùng** — gói thử: 29/165 |
-| **HMA / SurfEasy / Gen Digital** | IKEv2 + chứng chỉ client | tự lấy từ app HMA trên máy | 115 thành phố | không — đã chạy 27+ cổng |
+| **ZoogVPN** | IKEv2 + EAP | email + mật khẩu | 165 (75 nước) | không giới hạn số kết nối (đã chạy 6); **gói quyết định máy chủ nào được dùng** — ví dụ 41/165 |
+| **HMA / SurfEasy / Gen Digital** | IKEv2 + chứng chỉ client | bấm **Sync** lấy từ app HMA trên máy (macOS + Windows) | 115 thành phố | không — đã chạy 27+ cổng |
 | Mullvad, Proton, IVPN, Windscribe, PIA… | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
 | Máy chủ WireGuard của bạn (VPS) | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
 | Nhà cung cấp IKEv2 user/mật khẩu khác (NordVPN…) | IKEv2 + EAP | máy chủ + tài khoản | 1 máy chủ = 1 vị trí | driver đã kiểm chứng qua ZoogVPN |
@@ -76,12 +81,20 @@ Farm tự xử lý khi có sự cố:
 | sai tài khoản | đánh dấu tài khoản lỗi, ngừng gán cổng cho nó |
 | bạn xoá một tài khoản | cổng chuyển sang tài khoản còn chỗ; hết chỗ mới tắt |
 
-### Tối đa bao nhiêu cổng
+### Tối đa bao nhiêu proxy
 
-Hai trần, chạm trần nào trước thì dừng ở đó:
+**Một proxy = một cổng = một máy chủ** (mỗi cổng ra một IP riêng; hai cổng tới cùng một máy
+chủ sẽ ra **cùng IP** nên vô nghĩa). Do đó số proxy tối đa của mỗi nhà = số máy chủ **dùng
+được**, không phải số kết nối:
 
-1. **Máy chủ gói của bạn được dùng** — chỉ ZoogVPN hạn chế (gói thử dùng được 29/165).
-2. **Số máy chủ ở nước đó** — một máy chủ chạy một cổng, nên trần này **phụ thuộc quốc gia**:
+| Nhà cung cấp | Tối đa | Trần nằm ở đâu |
+|---|---|---|
+| **Surfshark** | **180** (100 nước) | Số máy chủ. Không giới hạn kết nối (đã chạy 26 cổng trên một key). Thêm tài khoản **không** tăng trần — mọi tài khoản dùng chung danh sách 180 máy chủ. |
+| **ZoogVPN** | **tới 165** (75 nước) | **Gói của tài khoản.** Gói đang dùng chỉ phủ **41/165**; muốn hơn thì nâng gói hoặc thêm một tài khoản gói khác phủ các máy chủ còn lại. Không giới hạn kết nối (đã chạy 6). |
+| **HMA / SurfEasy** | **115** (74 nước) | Số máy chủ. Không giới hạn kết nối (đã chạy 27+). |
+
+Vì một máy chủ chỉ chạy một cổng, trần **theo từng quốc gia** = tổng máy chủ của các nhà ở
+nước đó:
 
 | Nước | Surfshark | ZoogVPN | HMA | Tối đa |
 |---|---|---|---|---|
@@ -92,13 +105,16 @@ Hai trần, chạm trần nào trước thì dừng ở đó:
 | Singapore | 7 | 3 | 1 | **11** |
 | Việt Nam | 1 | 2 | 1 | **4** |
 
-Cộng cả ba nhà: **460 vị trí / 109 nước**. 23 nước chỉ có đúng một máy chủ.
+Cộng cả ba nhà: tối đa **~460 vị trí / 109 nước** — nhưng ZoogVPN thực tế bị gói giới hạn
+(ví dụ 41/165) nên số dùng được thường thấp hơn. 23 nước chỉ có đúng một máy chủ, tức mỗi
+nhà chỉ cho một IP ở nước đó.
 
 ## Yêu cầu
 
 - **Docker** với Docker Compose v2. Trên macOS/Windows dùng Docker Desktop — kernel
   LinuxKit của nó có sẵn IPsec/xfrm và WireGuard (đã kiểm chứng trên Apple Silicon).
-- Một tài khoản VPN của chính bạn. Với HMA: app HMA đã đăng nhập trên cùng máy (macOS).
+- Một tài khoản VPN của chính bạn. Với HMA: app HMA đã cài & đăng nhập trên cùng máy chạy
+  farm (macOS hoặc Windows) để **Sync** chứng chỉ — xem *HMA: chạy local* bên dưới.
 
 ## Cài đặt nhanh
 
@@ -412,3 +428,24 @@ hay bất kỳ nhà cung cấp VPN nào.
 
 [MIT](LICENSE). Các thành phần đi kèm trong image (libreswan, gost, WireGuard tools,
 OpenVPN) theo giấy phép riêng của chúng.
+
+## Miễn trừ trách nhiệm
+
+Phần mềm được cung cấp **"nguyên trạng" (AS IS), không kèm bất kỳ bảo đảm nào**, dù rõ ràng
+hay ngụ ý, bao gồm nhưng không giới hạn ở khả năng bán được, sự phù hợp cho một mục đích cụ
+thể, hay không vi phạm. Bạn dùng công cụ này **với rủi ro của chính mình**.
+
+- Dự án và tác giả **không chịu trách nhiệm** cho bất kỳ thiệt hại, mất mát dữ liệu, gián
+  đoạn dịch vụ, chi phí, hay hậu quả nào phát sinh từ việc dùng hoặc không dùng được phần
+  mềm — kể cả khi đã được cảnh báo về khả năng đó.
+- Đây là công cụ **kỹ thuật, trung lập**. Mọi hành vi sử dụng là **do bạn quyết định và tự
+  chịu trách nhiệm**: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN, luật pháp và quy
+  định tại nơi bạn ở. Việc chia sẻ/bán lại kết nối, vượt hạn mức, hay dùng sai mục đích có
+  thể khiến tài khoản VPN của bạn bị khoá — đó là trách nhiệm của bạn, không phải của dự án.
+- Dự án **không bảo đảm** tính sẵn sàng, tốc độ, số lượng IP, hay việc tương thích với bất
+  kỳ nhà cung cấp nào; các nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt
+  động bất kỳ lúc nào.
+- Các nhãn hiệu (HMA, SurfEasy, Gen Digital, Surfshark, ZoogVPN, WireGuard, v.v.) thuộc về
+  chủ sở hữu tương ứng; dự án **không được tài trợ, xác nhận hay liên kết** với họ.
+
+Dùng phần mềm này nghĩa là bạn **đồng ý** với các điều khoản miễn trừ trách nhiệm trên.
