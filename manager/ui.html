@@ -230,15 +230,15 @@ td.c-sel,th.c-sel{width:40px;padding-right:0}
 .inline-row input{flex:1;min-width:0}
 
 /* HMA: everyday path is one field; the cert setup is a disclosure for the admin */
-#hmaAdv>summary{cursor:pointer;font-size:12.5px;font-weight:650;color:var(--dim);list-style:none;
+.hma-sum{cursor:pointer;font-size:12.5px;font-weight:650;color:var(--dim);list-style:none;
   padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);
   display:flex;align-items:center;gap:8px;transition:.14s}
-#hmaAdv>summary:hover{border-color:var(--mut);color:var(--tx)}
-#hmaAdv>summary::-webkit-details-marker{display:none}
-#hmaAdv>summary::before{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;
+.hma-sum:hover{border-color:var(--mut);color:var(--tx)}
+.hma-sum::-webkit-details-marker{display:none}
+.hma-sum::before{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;
   border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:.14s;margin-left:2px}
-#hmaAdv[open]>summary::before{transform:rotate(45deg)}
-#hmaAdv[open]>summary{border-color:var(--acc-line);color:var(--tx)}
+details[open]>.hma-sum::before{transform:rotate(45deg)}
+details[open]>.hma-sum{border-color:var(--acc-line);color:var(--tx)}
 .hma-ways{display:flex;flex-direction:column;gap:8px}
 .way{font-size:12.5px;color:var(--dim);line-height:1.55;padding:10px 12px;border:1px solid var(--line);
   border-radius:10px;background:var(--panel-2)}
@@ -639,50 +639,50 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
       </div>
 
       <div id="addHma" hidden>
-        <!-- The only thing a user has to do: enter the activation code. -->
-        <div class="field">
-          <label for="hmaCode">Activation code</label>
-          <div class="inline-row">
-            <input id="hmaCode" placeholder="XXXXXX-XXXXXX-XXXXXX" autocomplete="off"
-              spellcheck="false" style="text-transform:uppercase;font-family:var(--fm)">
-            <button class="btn primary" id="hmaValidate"><svg class="i"><use href="#ic-check"/></svg><span>Kiểm tra</span></button>
-          </div>
-          <span class="hint">Wallet key in trên thẻ hoặc trong email đơn hàng, dạng 3 cụm 6 ký tự.</span>
-          <div id="hmaCodeMsg" style="margin-top:10px" hidden></div>
-        </div>
-
-        <!-- Cert present (the normal case): the user is done, nothing else to do. -->
-        <div id="hmaReady" class="pv on" style="margin:14px 0 0" hidden>
+        <!-- Local, self-serve: each person syncs their OWN HMA certificate from the HMA
+             app on their OWN machine. The one action is Sync; the activation code is an
+             optional licence check. -->
+        <div id="hmaReady" class="pv on" style="margin:0 0 14px" hidden>
           <div class="ic"><svg class="i"><use href="#ic-check"/></svg></div>
           <div class="bd"><div class="t">HMA đã sẵn sàng</div>
             <div class="s" id="hmaOkSub"></div></div>
         </div>
 
-        <!-- Plain-language note aimed at the person typing the code. -->
-        <p class="note" id="hmaUserNote" style="margin:14px 0 0"></p>
+        <div class="step" id="hmaSyncCard">
+          <div class="sh"><span class="num"><svg class="i" style="width:13px;height:13px"><use href="#ic-plug"/></svg></span>
+            <span class="t">Lấy chứng chỉ từ app HMA trên máy này
+              <em>Chạy local — mỗi người dùng chứng chỉ HMA của chính mình. Cài app HMA VPN
+              trên chính máy này và đăng nhập bằng activation code của bạn, rồi bấm Sync.</em></span></div>
+          <div class="sb">
+            <button class="btn primary" id="hmaSync" style="width:100%;justify-content:center">
+              <svg class="i"><use href="#ic-rotate"/></svg><span>Sync từ app HMA trên máy này</span></button>
+            <p class="note" style="margin:10px 0 0">Không mở được giao diện? Bấm đúp
+              <code>tools/sync-hma.command</code> (macOS) hoặc <code>tools\\sync-hma.bat</code> (Windows)
+              trên máy đó — cùng tác dụng.</p>
+          </div>
+        </div>
 
-        <!-- One-time certificate setup. Hidden from the everyday flow; it is the admin's
-             job, done once. Opens by default only when the farm has no certificate yet. -->
-        <details id="hmaAdv" style="margin-top:14px" ontoggle="this.dataset.touched='1'">
-          <summary id="hmaAdvSum">Thiết lập chứng chỉ thiết bị (quản trị · một lần)</summary>
-          <div style="padding:13px 2px 2px">
-            <p class="note" style="margin:0 0 12px">HMA không cấp chứng chỉ thiết bị từ activation code
-              (giới hạn kỹ thuật phía HMA). Nên <b>một người quản trị</b> cần nạp chứng chỉ <b>một lần</b>
-              từ một máy đã cài app HMA. Xong bước này, farm chạy trên mọi nền tảng và người dùng chỉ còn
-              việc nhập activation code.</p>
-            <div class="hma-ways">
-              <div class="way"><span class="wn">Cách 1 — dễ nhất · bấm Sync</span>
-                Cài app HMA trên máy chạy farm &amp; đăng nhập. Chạy helper
-                <code>tools/sync-hma.command</code> (macOS) hoặc <code>tools\\sync-hma.bat</code>
-                (Windows) — bấm đúp là xong — rồi bấm nút dưới đây.
-                <div style="margin-top:9px"><button class="btn primary sm" id="hmaSync">
-                  <svg class="i"><use href="#ic-rotate"/></svg><span>Sync từ app HMA trên máy này</span></button></div></div>
-              <div class="way"><span class="wn">Cách 2 — nạp file</span>
-                Kéo thả <code>tokenCoreSE.json</code> (hoặc <code>.p12</code>) vào ô dưới.</div>
-              <div class="way"><span class="wn">Cách 3 — script</span>
-                Chạy <code>sudo bash tools/hma-bootstrap-cert.sh &lt;CODE&gt;</code> trên máy có app để xuất file portable.</div>
+        <details id="hmaCodeWrap" style="margin-top:12px">
+          <summary class="hma-sum">Kiểm tra activation code (tuỳ chọn)</summary>
+          <div style="padding:12px 2px 2px">
+            <p class="note" style="margin:0 0 10px">Không bắt buộc để chạy. Dùng để xác nhận gói còn hạn
+              và còn bao nhiêu slot thiết bị.</p>
+            <div class="inline-row">
+              <input id="hmaCode" placeholder="XXXXXX-XXXXXX-XXXXXX" autocomplete="off"
+                spellcheck="false" style="text-transform:uppercase;font-family:var(--fm)">
+              <button class="btn" id="hmaValidate"><svg class="i"><use href="#ic-check"/></svg><span>Kiểm tra</span></button>
             </div>
-            <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:14px 0 0">
+            <div id="hmaCodeMsg" style="margin-top:10px" hidden></div>
+          </div>
+        </details>
+
+        <details id="hmaAdv" style="margin-top:12px" ontoggle="this.dataset.touched='1'">
+          <summary class="hma-sum" id="hmaAdvSum">Cách khác: nạp file chứng chỉ thủ công</summary>
+          <div style="padding:12px 2px 2px">
+            <p class="note" style="margin:0 0 12px">Dùng khi app HMA ở <b>máy khác</b>: lấy file chứng chỉ
+              từ máy đó rồi nạp vào đây. (HMA không cấp chứng chỉ chỉ từ activation code — đây là giới hạn
+              kỹ thuật phía HMA.)</p>
+            <div class="drop" id="dropHma" role="button" tabindex="0" style="margin:0">
               <svg class="i"><use href="#ic-export"/></svg>
               <b>Kéo thả <code>tokenCoreSE.json</code></b>
               <span>Hoặc bấm để chọn file. Nhận cả <code>.p12</code> nếu bạn đã tự trích.</span>
@@ -705,6 +705,8 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
               <button class="btn ghost sm" id="copyHmaBoot"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
           </div>
         </details>
+
+        <p class="note" id="hmaUserNote" style="margin:14px 0 0"></p>
       </div>
 
       <div id="addFile" hidden>
@@ -1085,7 +1087,7 @@ async function loadProviders(){
   const d=await j('/api/providers'); PROVS=d.providers;
   const hma=d.providers.find(p=>p.id==='hma');
   const n=hma?.accounts?.length||0;
-  const ready=$('#hmaReady'), adv=$('#hmaAdv');
+  const ready=$('#hmaReady'), card=$('#hmaSyncCard');
   if(ready){
     ready.hidden=!n;
     if(n){
@@ -1094,14 +1096,12 @@ async function loadProviders(){
         a.license?`${a.license.product}`:'', a.license?`hạn ${a.license.expires_date}`:'']
         .filter(Boolean).join(' · ');
     }
-    // One job for the user. The cert setup folds away once it is done; when the farm has
-    // no cert yet it opens, framed as the admin's one-time step.
+    // Once a certificate is synced the Sync card becomes a quieter "re-sync", and the
+    // note tells the user they are done.
+    if(card)card.style.opacity=n?'.72':'';
     $('#hmaUserNote').innerHTML=n
-      ? 'Bạn chỉ cần nhập activation code rồi bấm <b>Kiểm tra</b> — chứng chỉ đã được thiết lập sẵn, không phải làm gì thêm.'
-      : 'Bạn chỉ cần nhập activation code. Nếu đây là lần thiết lập đầu tiên, nhờ người quản trị farm nạp chứng chỉ thiết bị một lần ở phần bên dưới.';
-    if(adv && adv.dataset.touched!=='1'){ adv.open=!n;
-      $('#hmaAdvSum').firstChild && ($('#hmaAdvSum').childNodes[0].nodeValue=
-        n?'Cấp chứng chỉ cho máy/tài khoản khác (nâng cao)':'Thiết lập chứng chỉ thiết bị (quản trị · một lần)'); }
+      ? 'Đã có chứng chỉ của máy này — mở <b>Thêm vị trí</b> để bật cổng. Chỉ bấm Sync lại khi bạn đổi tài khoản HMA.'
+      : 'Mỗi máy dùng chứng chỉ HMA của chính mình. Cài app HMA trên máy này, đăng nhập bằng activation code của bạn, rồi bấm <b>Sync</b>.';
   }
   const t=d.summary||{};
   $('#ptotal').hidden=!d.providers.length;

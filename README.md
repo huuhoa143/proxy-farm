@@ -138,7 +138,7 @@ Mở **Nhà cung cấp** ở thanh bên trái. Phần *Thêm tài khoản* liệ
 |---|---|
 | **Surfshark** | Dán private key WireGuard. Farm tự tải danh sách máy chủ và sinh cấu hình cho từng vị trí. |
 | **ZoogVPN** | Nhập email và mật khẩu của app. |
-| **HMA** | Nhập **activation code** (wallet key) để xác thực gói off-device, rồi nạp chứng chỉ thiết bị **một lần** (`tokenCoreSE.json` — macOS: `/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json`, hoặc `.p12` kèm mật khẩu). Sau đó chạy đa nền tảng, không cần app. |
+| **HMA** | Chạy local: cài app HMA trên máy này + đăng nhập, rồi **Sync** (nút trong UI, hoặc bấm đúp `tools/sync-hma.command` / `tools\sync-hma.bat`). Activation code chỉ để kiểm tra gói (tuỳ chọn). |
 | **WireGuard / OpenVPN** | Kéo thả `.conf` / `.ovpn`. Nhà cung cấp và quốc gia đoán từ tên file. |
 | **IKEv2 user/mật khẩu** | Điền máy chủ + tài khoản. Mỗi máy chủ thành một vị trí. |
 
@@ -296,38 +296,38 @@ Thêm `-legacy` nếu OpenSSL 3 báo lỗi thuật toán cũ. Hai CA trung gian 
 không gửi kèm đã nằm sẵn trong image (`node/ca/`).
 </details>
 
-### Onboarding bằng activation code (đa nền tảng)
+### HMA: chạy local, mỗi máy tự sync chứng chỉ
 
-Mục tiêu: người dùng chỉ **nhập activation code**, không cài app HMA. Luồng hai bước:
+HMA **không** cấp chứng chỉ thiết bị chỉ từ activation code (cert phát qua luồng *connect
+token* riêng của Avast, ký AWS SigV4 — không tái tạo off-device được). Nên mô hình là
+**local, tự phục vụ**: mỗi người cài app HMA trên chính máy chạy farm, đăng nhập bằng
+activation code của mình, rồi **sync** chứng chỉ của máy đó vào farm.
 
-```bash
-# 1) Xác thực code — hoàn toàn off-device, mọi nền tảng, chỉ cần stdlib Python.
-python3 manager/farm.py validate-code XXXXXX-XXXXXX-XXXXXX
-#   ✓ HMA Pro VPN - 1 user, 3 years · hết hạn 2026-12-05 · thiết bị 0/5 · license <license-id>…
+Chứng chỉ client là thứ xác thực tunnel (activation code không gửi tới máy chủ). Một
+chứng chỉ chạy được hàng chục cổng cùng lúc.
 
-# 2a) Trích chứng chỉ thiết bị MỘT lần, trên một máy macOS có app HMA:
-sudo bash tools/hma-bootstrap-cert.sh XXXXXX-XXXXXX-XXXXXX ./hma-bootstrap
+**Sync — bấm một lần:**
 
-# 2b) Nạp vào farm (chạy được trên Linux/minipc, không cần app nữa):
-python3 manager/farm.py onboard-code XXXXXX-XXXXXX-XXXXXX ./hma-bootstrap/tokenCoreSE.json
-# hoặc: ... onboard-code <CODE> ./hma-bootstrap/device.p12 <p12-password>
-```
+- Trong giao diện: **Nhà cung cấp → HMA → Sync từ app HMA trên máy này**.
+- Hoặc bấm đúp `tools/sync-hma.command` (macOS) / `tools\sync-hma.bat` (Windows) — không
+  cần mở giao diện. Helper tự tìm chứng chỉ của app HMA và đưa vào farm (farm tự nạp trong
+  vòng một phút).
+- Hoặc chỉ cần chạy lại `./run.sh` nếu app HMA có trên máy — nó cũng tự copy.
 
-Code được lưu cùng tài khoản (`providers.json`), nên farm luôn biết gói nào, hạn khi nào,
-còn mấy slot thiết bị — và tài khoản được nhận diện bằng đúng chuỗi người dùng đã gõ.
-Trong UI: **Nhà cung cấp → HMA**, nhập code, bấm **Kiểm tra**, rồi thả chứng chỉ.
+Chứng chỉ của app nằm ngoài vùng Docker Desktop chia sẻ, nên bắt buộc có bước copy phía
+host (helper/`run.sh`) — nút trong giao diện chỉ *nạp ngay* thứ đã được copy.
 
-#### Bức tường activation-code → chứng chỉ
+**Tuỳ chọn:** nhập activation code ở mục *Kiểm tra* để xác nhận gói còn hạn và số slot
+thiết bị — không bắt buộc để chạy.
 
-Việc xác thực code chạy off-device (Avast licensing API). Nhưng **cấp chứng chỉ thiết bị
-từ code thì không** làm off-device thuần được: HMA phát hành PKCS#12 qua luồng *connect
-token* (CCT) riêng của Avast — một bus message protobuf tới `*.ff.avast.com` cộng một POST
-**ký AWS SigV4** tới `api.se-platform.com/passage/v6/devices`. Không cái nào có schema công
-khai, và app desktop cache chứng chỉ ở ba nơi (system keychain, login keychain, token
-files) nên không thể ép onboard lại để bắt gói nếu không reset sạch toàn bộ app. Vì vậy
-chứng chỉ được trích **một lần** (bước 2a); sau đó nó dùng được tới khi gói hết hạn, trên
-mọi nền tảng. Phá bức tường này (onboard bất kỳ code nào, không cần máy có app) cần hoặc
-một lần capture phá hoại, hoặc dựng lại schema protobuf CCT — ghi chú để làm sau.
+<details>
+<summary>Máy chạy farm không có app HMA?</summary>
+
+Lấy chứng chỉ từ một máy **có** app rồi nạp thủ công (Nhà cung cấp → HMA → *Cách khác*):
+kéo thả `tokenCoreSE.json` (macOS: `/Library/Application Support/HMA VPN/state/vpn/`) hoặc
+file `.p12`. Hoặc chạy `sudo bash tools/hma-bootstrap-cert.sh <CODE>` trên máy có app để
+xuất ra `.p12` portable.
+</details>
 
 ## Giới hạn đã biết
 
