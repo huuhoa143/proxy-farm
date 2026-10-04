@@ -671,9 +671,12 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
               từ một máy đã cài app HMA. Xong bước này, farm chạy trên mọi nền tảng và người dùng chỉ còn
               việc nhập activation code.</p>
             <div class="hma-ways">
-              <div class="way"><span class="wn">Cách 1 — dễ nhất</span>
-                Cài app HMA trên máy chạy farm, đăng nhập, rồi chạy lại <code>./run.sh</code>.
-                Chứng chỉ được nạp tự động, không cần làm gì thêm.</div>
+              <div class="way"><span class="wn">Cách 1 — dễ nhất · bấm Sync</span>
+                Cài app HMA trên máy chạy farm &amp; đăng nhập. Chạy helper
+                <code>tools/sync-hma.command</code> (macOS) hoặc <code>tools\\sync-hma.bat</code>
+                (Windows) — bấm đúp là xong — rồi bấm nút dưới đây.
+                <div style="margin-top:9px"><button class="btn primary sm" id="hmaSync">
+                  <svg class="i"><use href="#ic-rotate"/></svg><span>Sync từ app HMA trên máy này</span></button></div></div>
               <div class="way"><span class="wn">Cách 2 — nạp file</span>
                 Kéo thả <code>tokenCoreSE.json</code> (hoặc <code>.p12</code>) vào ô dưới.</div>
               <div class="way"><span class="wn">Cách 3 — script</span>
@@ -1319,6 +1322,18 @@ function showLic(L){
     };
   }
 }
+$('#hmaSync') && ($('#hmaSync').onclick=async()=>{
+  const b=$('#hmaSync'); b.disabled=true; const span=b.querySelector('span'); const t0=span.textContent;
+  span.textContent='Đang sync…';
+  try{
+    const r=await fetch('/api/provider/hma-sync',{method:'POST',body:'{}'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.error){toast(d.error||('Lỗi '+r.status));return}
+    if(d.imported){ await loadLocs(); await loadProviders();
+      toast(`Đã sync chứng chỉ · ${d.status?.locations||''} vị trí — mở “Thêm vị trí” để bật cổng`); }
+    else toast(`Chưa thấy chứng chỉ trong inbox. Bấm đúp tools/sync-hma (.command/.bat) trên máy có app HMA trước.`);
+  }finally{ b.disabled=false; span.textContent=t0 }
+});
 $('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');
 $('#copyHmaBoot').onclick=()=>copyText(
   $('#hmaBoot').textContent.replace('<ACTIVATION-CODE>',$('#hmaCode').value.trim()||'<ACTIVATION-CODE>'),

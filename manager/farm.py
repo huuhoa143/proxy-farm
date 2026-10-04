@@ -1451,6 +1451,23 @@ class H(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "status": st}))
+        elif p == "/api/provider/hma-sync":
+            # Import the HMA certificate a host-side helper dropped in the inbox (the app
+            # keeps it outside anything Docker Desktop shares, so the container cannot read
+            # it directly). Force-imports even an unchanged token so the button is reliable.
+            tok = os.path.join(INBOX, "tokenCoreSE.json") if INBOX else ""
+            found = bool(tok and os.path.isfile(tok))
+            imported = False
+            if found:
+                try:
+                    st = import_hma(token_text=open(tok, encoding="utf-8").read())
+                    imported = True
+                except Exception as e:
+                    return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, "found": found,
+                "imported": imported, "has_cert": bool(accounts("hma")),
+                "inbox": os.environ.get("PF_INBOX_HOST", INBOX),
+                "status": (st if imported else None)}))
         elif p == "/api/provider/hma-tag":
             # Attach a validated activation code to the HMA account that already has a
             # certificate. No shell, no background work — just records the code + licence.
