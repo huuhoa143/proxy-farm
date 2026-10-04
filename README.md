@@ -8,8 +8,8 @@ giao diện web.
 
 - **Chạy local.** Không cần VPS, không mở cổng ra internet; UI và proxy mặc định chỉ
   nghe trên `127.0.0.1`.
-- **Nhiều nhà cung cấp.** HMA (IKEv2 + chứng chỉ), WireGuard, OpenVPN, IKEv2 user/mật khẩu
-  — trộn trong cùng một farm.
+- **Nhiều nhà cung cấp.** Surfshark và ZoogVPN chỉ cần nhập key / tài khoản, HMA lấy từ
+  app, cộng với mọi file WireGuard / OpenVPN — trộn trong cùng một farm.
 - **Tự phục hồi.** Mỗi cổng có kill-switch, watchdog và tự thử lại cho tới khi kết nối
   được; UI cho thấy từng bước đang làm.
 
@@ -46,15 +46,53 @@ giao diện web.
 
 ## Nhà cung cấp hỗ trợ
 
-| Nguồn | Giao thức | Nạp thế nào | Trạng thái |
-|---|---|---|---|
-| **HMA / SurfEasy / Gen Digital** | IKEv2 + chứng chỉ client | tự lấy từ app HMA trên máy, rồi chọn trong 115 thành phố | đã kiểm chứng |
-| **Mullvad, Proton, Surfshark, IVPN, Windscribe, PIA…** | WireGuard | kéo thả file `.conf` | đã kiểm chứng |
-| Máy chủ WireGuard của bạn (VPS) | WireGuard | kéo thả file `.conf` | đã kiểm chứng |
-| Nhà cung cấp OpenVPN | OpenVPN | kéo thả file `.ovpn` | chưa kiểm chứng |
-| Nhà cung cấp IKEv2 user/mật khẩu (NordVPN, Proton…) | IKEv2 + EAP-MSCHAPv2 | form trong UI | chưa kiểm chứng |
+| Nguồn | Giao thức | Bạn nhập gì | Vị trí | Giới hạn mỗi tài khoản |
+|---|---|---|---|---|
+| **Surfshark** | WireGuard | 1 private key | 180 (100 nước, gồm 38 IP tĩnh) | không — đã chạy 26 cổng trên một key |
+| **ZoogVPN** | IKEv2 + EAP | email + mật khẩu | 165 (75 nước) | không giới hạn số kết nối (đã chạy 6); **gói quyết định máy chủ nào được dùng** — gói thử: 29/165 |
+| **HMA / SurfEasy / Gen Digital** | IKEv2 + chứng chỉ client | tự lấy từ app HMA trên máy | 115 thành phố | không — đã chạy 27+ cổng |
+| Mullvad, Proton, IVPN, Windscribe, PIA… | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
+| Máy chủ WireGuard của bạn (VPS) | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
+| Nhà cung cấp IKEv2 user/mật khẩu khác (NordVPN…) | IKEv2 + EAP | máy chủ + tài khoản | 1 máy chủ = 1 vị trí | driver đã kiểm chứng qua ZoogVPN |
+| Nhà cung cấp OpenVPN | OpenVPN | kéo thả file `.ovpn` | 1 file = 1 vị trí | chưa kiểm chứng |
 
-Một file cấu hình = một vị trí = một cổng proxy.
+Vị trí **ảo** (Surfshark và ZoogVPN đều có) mang IP của quốc gia đó nhưng máy chủ đặt ở
+nước khác; UI gắn nhãn *ảo* để bạn biết.
+
+### Nhiều tài khoản cho cùng một nhà
+
+Mỗi nhà có sẵn là một **pool**: thêm bao nhiêu tài khoản cũng được, danh sách vị trí vẫn
+hiện **một lần**. Khi bạn bật một cổng, farm tự gán nó vào tài khoản đang rảnh nhất.
+
+Thêm tài khoản là thêm **sức chứa** và **độ phủ**, không phải thêm vị trí. Cả ba nhà có
+sẵn đều không giới hạn số kết nối, nên thường một tài khoản đã đủ. Tài khoản thứ hai có
+ích khi gói của tài khoản đầu không phủ hết máy chủ (ZoogVPN), hoặc để tách luồng.
+
+Farm tự xử lý khi có sự cố:
+
+| Nhà cung cấp báo | Farm làm gì |
+|---|---|
+| đúng mật khẩu nhưng từ chối máy chủ này | ghi nhớ *(tài khoản, máy chủ)* trong 7 ngày, chuyển cổng sang tài khoản khác; không tài khoản nào dùng được thì máy chủ mang nhãn *gói không hỗ trợ* |
+| sai tài khoản | đánh dấu tài khoản lỗi, ngừng gán cổng cho nó |
+| bạn xoá một tài khoản | cổng chuyển sang tài khoản còn chỗ; hết chỗ mới tắt |
+
+### Tối đa bao nhiêu cổng
+
+Hai trần, chạm trần nào trước thì dừng ở đó:
+
+1. **Máy chủ gói của bạn được dùng** — chỉ ZoogVPN hạn chế (gói thử dùng được 29/165).
+2. **Số máy chủ ở nước đó** — một máy chủ chạy một cổng, nên trần này **phụ thuộc quốc gia**:
+
+| Nước | Surfshark | ZoogVPN | HMA | Tối đa |
+|---|---|---|---|---|
+| Mỹ | 29 | 10 | 25 | **64** |
+| Nhật | 13 | 9 | 1 | **23** |
+| Đức | 9 | 7 | 4 | **20** |
+| Anh | 9 | 3 | 5 | **17** |
+| Singapore | 7 | 3 | 1 | **11** |
+| Việt Nam | 1 | 2 | 1 | **4** |
+
+Cộng cả ba nhà: **460 vị trí / 109 nước**. 23 nước chỉ có đúng một máy chủ.
 
 ## Yêu cầu
 
@@ -93,11 +131,14 @@ docker compose build node manager     # build lại image sau khi sửa code
 - **Gợi ý** — thư mục `~/Downloads` được mount **chỉ-đọc**; UI liệt kê các `.conf`/`.ovpn`
   chưa nạp để bạn bấm *Nạp*, không bao giờ tự nạp.
 
-Không tự động được thì mở **Nhà cung cấp** ở thanh bên trái:
+Mở **Nhà cung cấp** ở thanh bên trái. Phần *Thêm tài khoản* liệt kê từng nền tảng kèm
+**cần gì** và **các bước lấy thông tin đó**, nên không phải tra tài liệu ở đâu khác:
 
 | Nhà cung cấp | Làm gì |
 |---|---|
-| **HMA** | Kéo thả `tokenCoreSE.json` (macOS: `/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json`), hoặc file `.p12` kèm mật khẩu. |
+| **Surfshark** | Dán private key WireGuard. Farm tự tải danh sách máy chủ và sinh cấu hình cho từng vị trí. |
+| **ZoogVPN** | Nhập email và mật khẩu của app. |
+| **HMA** | Chạy local: cài app HMA trên máy này + đăng nhập, rồi **Sync** (nút trong UI, hoặc bấm đúp `tools/sync-hma.command` / `tools\sync-hma.bat`). Activation code chỉ để kiểm tra gói (tuỳ chọn). |
 | **WireGuard / OpenVPN** | Kéo thả `.conf` / `.ovpn`. Nhà cung cấp và quốc gia đoán từ tên file. |
 | **IKEv2 user/mật khẩu** | Điền máy chủ + tài khoản. Mỗi máy chủ thành một vị trí. |
 
@@ -121,8 +162,8 @@ user/mật khẩu hiện ở đầu trang.
 
 ### Giới hạn số cổng
 
-Mặc định HMA **không giới hạn** (đã chạy 27+ cổng cùng lúc). Với nhà cung cấp chỉ cho một
-số kết nối cùng lúc, bật công tắc *Giới hạn* trong thẻ nhà cung cấp và nhập số tối đa;
+Giới hạn đặt theo **từng tài khoản**, trong thẻ nhà cung cấp, và chỉ bạn đặt — farm không
+tự đoán: một lần bị từ chối chưa đủ chứng minh có trần (xem ZoogVPN bên dưới). Với nhà cung cấp chỉ cho một số kết nối cùng lúc, bật công tắc *Giới hạn* trong thẻ nhà cung cấp và nhập số tối đa;
 farm sẽ từ chối bật quá số đó. Giá trị gợi ý: ProtonVPN/NordVPN 10, ExpressVPN 8,
 CyberGhost 7, Mullvad 5.
 
@@ -192,6 +233,36 @@ Trong mỗi container:
 - **cổng nguồn ngẫu nhiên** — mỗi lần kết nối, cổng IKE 500/4500 được đổi sang một cặp
   cổng mới, để không bao giờ dính lại một luồng mạng đã hỏng.
 
+Nhà cung cấp có sẵn (Surfshark, ZoogVPN) là plugin trong `manager/vendors.py`: mỗi plugin
+khai báo form cần nhập, cách kiểm tra, và cách biến một tài khoản thành danh sách vị trí.
+
+### Surfshark: một key, mọi máy chủ
+
+Surfshark công khai danh sách máy chủ kèm public key WireGuard của từng máy
+(`api.surfshark.com/v4/server/clusters`). Private key của bạn được đăng ký với tài khoản,
+không gắn với máy chủ nào, nên farm ghép nó với public key của từng máy để sinh cấu hình
+ngay lúc bật cổng (`$FARM/configs/.gen/`). Danh sách tự làm mới mỗi 12 giờ.
+
+### ZoogVPN: IKEv2 bằng tài khoản
+
+ZoogVPN không công khai danh sách máy chủ; `manager/catalogs/zoogvpn.json` được dựng bằng
+`tools/zoogvpn-catalog.py` (dò tên `<nước><số>.zoogvpn.com` / `.webunlim.com` trong DNS
+rồi hỏi từng máy chứng chỉ của nó — không dùng tài khoản nào). Kết nối dùng **strongSwan**
+vì libreswan không có EAP-MSCHAPv2. Nhiều máy `*.webunlim.com` chạy chứng chỉ **đã hết
+hạn**: farm chỉ chấp nhận khi chuỗi chứng chỉ vẫn hợp lệ ngoài ngày tháng và đúng tên máy,
+rồi **ghim khoá công khai** (`$FARM/status/pins/`) — lần sau khoá khác là từ chối.
+
+**Không giới hạn số kết nối, nhưng gói chọn máy chủ.** Đã chạy 6 cổng cùng lúc trên một
+tài khoản. Máy chủ ngoài gói luôn từ chối, bất kể đang chạy mấy cổng, theo một trong hai
+cách: `EAP_FAILURE` (mật khẩu đúng, không cho vào) hoặc `AUTHENTICATION_FAILED` ngay trước
+EAP. Quét đủ 165 máy bằng tài khoản thử: 29 dùng được, 124 ngoài gói, 12 không trả lời.
+
+**MTU theo cả hai chiều.** IPsec theo policy đi qua `eth0` (MTU 1500), nên kernel cắt
+gói gửi đi theo 1500 và mỗi gói đầy thành một gói ESP bị phân mảnh. Nhiều máy chủ (HK, DE,
+ES, MY…) bỏ mảnh: bắt tay xong, request nhỏ chạy, còn upload hay TLS ClientHello thì treo.
+Kẹp MSS trên SYN chỉ lo chiều về; chiều đi do `kernel-netlink { mtu, mss }` đặt trên route
+mà charon cài.
+
 `node/entrypoint.sh` lo phần dùng chung; phần riêng của từng giao thức nằm trong
 `node/drivers/<protocol>.sh`. Xem [Đóng góp](#đóng-góp) để thêm giao thức.
 
@@ -225,6 +296,48 @@ Thêm `-legacy` nếu OpenSSL 3 báo lỗi thuật toán cũ. Hai CA trung gian 
 không gửi kèm đã nằm sẵn trong image (`node/ca/`).
 </details>
 
+### HMA: chạy local, mỗi máy tự sync chứng chỉ
+
+HMA **không** cấp chứng chỉ thiết bị chỉ từ activation code (cert phát qua luồng *connect
+token* riêng của Avast, ký AWS SigV4 — không tái tạo off-device được). Nên mô hình là
+**local, tự phục vụ**: mỗi người cài app HMA trên chính máy chạy farm, đăng nhập bằng
+activation code của mình, rồi **sync** chứng chỉ của máy đó vào farm.
+
+Chứng chỉ client là thứ xác thực tunnel (activation code không gửi tới máy chủ). Một
+chứng chỉ chạy được hàng chục cổng cùng lúc.
+
+**Sync — bấm một lần:**
+
+- Trong giao diện: **Nhà cung cấp → HMA → Sync từ app HMA trên máy này**.
+- Hoặc bấm đúp `tools/sync-hma.command` (macOS) / `tools\sync-hma.bat` (Windows) — không
+  cần mở giao diện. Helper tự tìm chứng chỉ của app HMA và đưa vào farm (farm tự nạp trong
+  vòng một phút).
+- Hoặc chỉ cần chạy lại `./run.sh` nếu app HMA có trên máy — nó cũng tự copy.
+
+Chứng chỉ của app nằm ngoài vùng Docker Desktop chia sẻ, nên bắt buộc có bước copy phía
+host (helper/`run.sh`) — nút trong giao diện chỉ *nạp ngay* thứ đã được copy.
+
+**Tuỳ chọn:** nhập activation code ở mục *Kiểm tra* để xác nhận gói còn hạn và số slot
+thiết bị — không bắt buộc để chạy.
+
+<details>
+<summary>Máy chạy farm không có app HMA?</summary>
+
+Lấy chứng chỉ từ một máy **có** app rồi nạp thủ công (Nhà cung cấp → HMA → *Cách khác*):
+kéo thả `tokenCoreSE.json` (macOS: `/Library/Application Support/HMA VPN/state/vpn/`) hoặc
+file `.p12`. Hoặc chạy `bash tools/hma-bootstrap-cert.sh <CODE>` trên máy có app: nó xuất
+`device.p12` + `device.p12.pass` (mode 600) và ghi lệnh cần chạy vào `onboard.txt`. Chép hai
+file đó vào thư mục inbox của farm kia (`$FARM/inbox`, mặc định `~/proxy-farm/inbox`) rồi:
+
+```sh
+docker exec pf-manager python3 farm.py onboard-code <CODE> /inbox/device.p12
+```
+
+Lệnh `farm.py` luôn chạy **qua container** (`docker exec pf-manager …`): chạy thẳng trên
+host, nó sẽ ghi vào thư mục repo chứ không phải dữ liệu của farm đang chạy, nên farm.py từ
+chối và in ra lệnh đúng.
+</details>
+
 ## Giới hạn đã biết
 
 - **Bắt tay xong nhưng không có dữ liệu** — hành vi của chính HMA (app chính chủ cũng báo
@@ -238,13 +351,18 @@ không gửi kèm đã nằm sẵn trong image (`node/ca/`).
 - **Đừng bật app HMA trên máy đang chạy farm** — app đưa toàn bộ mạng của máy vào VPN và
   các tunnel của farm rớt theo.
 - Không chạy farm trên hai máy cùng lúc với cùng một chứng chỉ.
-- Driver `openvpn` và `ikev2-eap` viết theo tài liệu nhưng chưa được kiểm chứng.
+- Driver `openvpn` viết theo tài liệu nhưng chưa được kiểm chứng.
+- Danh sách máy chủ ZoogVPN là ảnh chụp; chạy lại `tools/zoogvpn-catalog.py` khi họ đổi máy chủ.
+- Nhãn *gói không hỗ trợ* hết hạn sau 7 ngày; khi đó farm thử lại máy chủ đó một lần.
 
 ## Xử lý sự cố
 
 | Triệu chứng | Làm gì |
 |---|---|
 | Cổng *Chờ thử lại · không có dữ liệu* | Lỗi phía nhà cung cấp; cứ để farm tự thử, hoặc bấm *Đổi IP* để thử ngay. |
+| Vị trí mang nhãn *gói không hỗ trợ* | Gói của mọi tài khoản bạn đã thêm đều không cho dùng máy chủ đó; thêm tài khoản gói cao hơn hoặc chọn máy khác cùng nước. |
+| Cổng *Chờ thử lại · không bắt tay* (WireGuard) | Key sai, đã bị thu hồi, hoặc tài khoản hết gói. |
+| Cổng *Chờ thử lại · sai tài khoản* | Kiểm tra lại email / mật khẩu. |
 | Cổng *Chờ thử lại · không trả lời* | Máy chủ điều phối không trả lời; farm tự thử lại và đổi sang IP khác của vị trí. |
 | Tất cả cổng rớt cùng lúc | Máy vừa ngủ hoặc Docker vừa khởi động lại; các cổng tự lên lại trong vài phút. |
 | Docker Desktop báo `Internal Server Error` | Máy ảo Docker bị treo: thoát và mở lại Docker Desktop. |
@@ -267,8 +385,19 @@ Pull request và issue đều được chào đón.
 
 Rồi thêm nhận dạng file cấu hình trong `manager/farm.py` (`detect_protocol`) nếu cần.
 
+**Thêm một nhà cung cấp có sẵn** (người dùng chỉ nhập tài khoản) = thêm một mục vào
+`VENDORS` trong `manager/vendors.py`. Không phải sửa `farm.py` hay UI.
+
+| Khoá | Việc |
+|---|---|
+| `setup` | `needs` (một dòng), `steps` (các bước lấy thông tin), `link` — UI tự vẽ phần hướng dẫn |
+| `fields` | các ô cần nhập — UI tự vẽ form |
+| `check` | kiểm tra dữ liệu nhập → `(dữ liệu lưu, nhãn hiển thị)` |
+| `targets` | danh sách vị trí của nhà đó, **không phụ thuộc tài khoản** |
+| `bind` | cổng này cần gì từ tài khoản: `env`, `config_text`, hoặc `secrets` |
+
 Trước khi gửi PR: chạy `sh -n node/entrypoint.sh node/drivers/*.sh` và
-`python3 -m py_compile manager/farm.py`, rồi thử thật bằng `./run.sh`.
+`python3 -m py_compile manager/farm.py manager/vendors.py`, rồi thử thật bằng `./run.sh`.
 **Không bao giờ commit** chứng chỉ, file cấu hình VPN, `.env` hay thư mục dữ liệu.
 
 ## Lưu ý pháp lý
@@ -276,8 +405,8 @@ Trước khi gửi PR: chạy `sh -n node/entrypoint.sh node/drivers/*.sh` và
 Công cụ này dùng **tài khoản VPN của chính bạn** trên **máy của chính bạn**. Nhà cung cấp
 VPN thường **cấm chia sẻ hoặc bán lại** kết nối — đừng mở proxy ra internet hay chia cho
 người khác. Bạn tự chịu trách nhiệm tuân thủ điều khoản dịch vụ của nhà cung cấp và luật
-pháp nơi bạn sống. Dự án không liên quan tới HMA, SurfEasy, Gen Digital hay bất kỳ nhà cung
-cấp VPN nào.
+pháp nơi bạn sống. Dự án không liên quan tới HMA, SurfEasy, Gen Digital, Surfshark, ZoogVPN
+hay bất kỳ nhà cung cấp VPN nào.
 
 ## Giấy phép
 

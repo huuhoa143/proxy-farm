@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-HMA Proxy Farm manager — turns one HMA (SurfEasy/Gen) subscription into many
-per-location SOCKS5/HTTP proxy ports, each a Docker container running an IKEv2
-tunnel + gost (see ../node). Host-side: shells out to `docker`.
+Proxy Farm manager — turns VPN subscriptions (HMA, Surfshark, ZoogVPN, or any
+WireGuard/OpenVPN/IKEv2 config) into many per-location SOCKS5/HTTP proxy ports, each a
+Docker container running one tunnel + gost (see ../node). Shells out to `docker`.
 
   python3 farm.py serve                 # web UI on :8080 (default)
   python3 farm.py up <KEY|CC> ...        # start tunnels for locations/countries
@@ -12,10 +12,11 @@ tunnel + gost (see ../node). Host-side: shells out to `docker`.
 
 State: farm-state.json (chosen locations -> assigned port). Ports from BASE_PORT.
 """
-import json, os, re, base64, subprocess, sys, time, threading, http.server, urllib.parse, socket
+import json, os, re, base64, hashlib, subprocess, sys, time, threading, http.server, urllib.parse, socket
+import vendors
+import hma_activation
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOCS = json.load(open(os.path.join(HERE, "locations.json")))
 STATE_FILE = os.environ.get("PF_STATE", os.path.join(HERE, "farm-state.json"))
 IMAGE = os.environ.get("PF_IMAGE", "proxy-farm-node")
 SECRETS = os.environ.get("PF_SECRETS", os.path.expanduser("~/proxy-farm/secrets"))  # host path for -v
@@ -45,15 +46,16 @@ SCAN_DIR = os.environ.get("PF_SCAN", "")
 CONFIG_DIR = os.environ.get("PF_CONFIG_DIR", os.path.join(HERE, "configs"))
 CONFIG_DIR_HOST = os.environ.get("PF_CONFIG_HOST", CONFIG_DIR)
 os.makedirs(CONFIG_DIR, exist_ok=True)
+# Configs the farm writes itself (one per Surfshark location), next to the uploaded ones
+# so the same read-only mount serves both. Hidden from the upload list.
+GEN_DIR = os.path.join(CONFIG_DIR, ".gen")
+DATA_DIR = os.path.dirname(os.path.abspath(STATE_FILE))
 
 # ---- targets -----------------------------------------------------------------
 # A "target" is anything that can become a proxy port. Two sources:
-#   catalog  — a provider with a server list we ship (HMA/SurfEasy), auth by certificate
+#   vendor   — a built-in provider (vendors.py): its server list, one entry per location,
+#              shown once no matter how many accounts the pool holds
 #   config   — a .conf/.ovpn the user uploaded; one file = one location
-CATALOG = []
-for l in LOCS["locations"]:
-    CATALOG.append({**l, "provider": "hma", "protocol": "ikev2-cert",
-                    "label": l["countryName"] + " " + l["city"]})
 
 def detect_protocol(text):
     if "[Interface]" in text and "PrivateKey" in text: return "wireguard"
@@ -62,7 +64,8 @@ def detect_protocol(text):
 
 _CC = {f[:-4].upper() for f in os.listdir(FLAGS_DIR) if f.endswith(".png")} \
       if os.path.isdir(FLAGS_DIR) else set()
-CC_NAME = {l["country"]: l["countryName"] for l in CATALOG}
+CC_NAME = {**vendors.COUNTRY_NAMES,
+           **{l["country"]: l["countryName"] for l in vendors.HMA_LOCATIONS}}
 
 def guess_provider(name):
     """Best-effort provider from a filename like 'mullvad-se-got.conf' -> 'mullvad'."""
@@ -111,16 +114,20 @@ def save_providers(p):
 
 def slug(t): return re.sub(r"[^A-Za-z0-9]+", "-", t).strip("-").upper() or "X"
 
-def hma_status():
-    """What the UI shows for the HMA/SurfEasy card: is the device certificate present,
-    whose is it, and when does it expire."""
-    pem = os.path.join(SECRETS_DIR, "client.pem")
-    if not os.path.exists(pem): return {"ready": False}
-    out = {"ready": True, "locations": len(CATALOG)}
+# Each HMA account owns one folder of certificate files, mounted read-only into the
+# ports it runs. The node always reads /secrets/client.pem, so the folder name is the
+# only thing that differs between accounts.
+def hma_secrets_dir(aid): return os.path.join(SECRETS_DIR, aid)
+def hma_secrets_host(aid): return os.path.join(SECRETS, aid)
+
+def cert_info(pem=None, text=None):
+    """Subject CN (the device UDID) and expiry of a certificate on disk (`pem`) or in
+    memory (`text`)."""
+    out = {}
     try:
-        r = subprocess.run(["openssl", "x509", "-in", pem, "-noout", "-subject",
-                            "-enddate", "-nameopt", "multiline"],
-                           text=True, capture_output=True, timeout=10)
+        r = subprocess.run(["openssl", "x509", "-noout", "-subject", "-enddate",
+                            "-nameopt", "multiline"] + (["-in", pem] if pem else []),
+                           input=text, text=True, capture_output=True, timeout=10)
         cn = re.search(r"commonName\s*=\s*(.+)", r.stdout)
         end = re.search(r"notAfter=(.+)", r.stdout)
         if cn: out["udid"] = cn.group(1).strip()
@@ -128,6 +135,14 @@ def hma_status():
     except Exception as e:
         out["error"] = str(e)
     return out
+
+def remove_hma_secrets(aid):
+    d = hma_secrets_dir(aid)
+    for f in os.listdir(d) if os.path.isdir(d) else []:
+        try: os.remove(os.path.join(d, f))
+        except OSError: pass
+    try: os.rmdir(d)
+    except OSError: pass
 
 _PEM_CERT = re.compile(r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----", re.S)
 _PEM_KEY = re.compile(r"-----BEGIN (?:ENCRYPTED )?PRIVATE KEY-----.*?"
@@ -144,18 +159,35 @@ def _openssl_p12(p12_path, password, *args):
     raise ValueError("Không mở được chứng chỉ — sai mật khẩu hoặc file hỏng"
                      + (f" ({r.stderr.strip().splitlines()[-1]})" if r.stderr.strip() else ""))
 
-def import_hma(token_text=None, p12_b64=None, password=None):
-    """Install the HMA device certificate. Accepts either the macOS app's
-    tokenCoreSE.json (which carries the PKCS#12 *and* its password) or a raw .p12."""
+def token_sha(token_text):
+    """Fingerprint of an app token, so the inbox re-imports it only when it changed."""
+    return hashlib.sha256(token_text.encode()).hexdigest()
+
+def import_hma(token_text=None, p12_b64=None, password=None, code=None, license_meta=None):
+    """Install an HMA device certificate as an account. Accepts either the macOS app's
+    tokenCoreSE.json (which carries the PKCS#12 *and* its password) or a raw .p12.
+    Re-importing the same device refreshes that account instead of adding another: the
+    device is the certificate's CN (its UDID), so a bare .p12 is recognised as well.
+
+    `code` (activation code) and `license_meta` (validate_code() result) are stored on
+    the account when supplied, so the account is identified by the code the user typed
+    and the farm can re-check expiry/slots later."""
     meta = {}
+    if code:
+        meta["code"] = hma_activation.normalize_code(code)
+    if license_meta:
+        meta["license"] = {k: license_meta.get(k) for k in
+                           ("license_id", "product", "schema", "mode",
+                            "expires_date", "devices_used", "devices_max")}
     if token_text:
         try:
             outer = json.loads(token_text)
             dev = json.loads(base64.b64decode(outer["DeviceManager.device"]))
             p12_b64 = dev["credentials"]["certificate"]
             password = dev["credentials"]["certificatePassword"]
-            meta = {"udid": dev.get("udid", ""),
-                    "dns_format": (dev.get("dnsFormat") or [""])[0]}
+            meta.update(udid=dev.get("udid", ""),
+                        dns_format=(dev.get("dnsFormat") or [""])[0],
+                        token_sha=token_sha(token_text))
         except Exception as e:
             raise ValueError(f"Không đọc được tokenCoreSE.json: {e}")
     if not p12_b64:
@@ -165,6 +197,7 @@ def import_hma(token_text=None, p12_b64=None, password=None):
 
     os.makedirs(SECRETS_DIR, exist_ok=True)
     tmp = os.path.join(SECRETS_DIR, ".import.p12")
+    staged = {}
     with open(tmp, "wb") as f: f.write(raw)
     os.chmod(tmp, 0o600)
     try:
@@ -173,33 +206,113 @@ def import_hma(token_text=None, p12_b64=None, password=None):
         chain = _PEM_CERT.findall(_openssl_p12(tmp, password or "", "-nokeys", "-cacerts"))
         if not leaf or not key:
             raise ValueError("Chứng chỉ thiếu phần client hoặc khoá riêng")
-        # Write only after every part parsed, so a bad import can't half-replace a
-        # working certificate and take the whole farm down.
-        for name, body in (("client.pem", leaf.group(0) + "\n"),
-                           ("client.key", key.group(0) + "\n"),
-                           ("ca-int.pem", "\n".join(chain) + "\n" if chain else "")):
-            if not body.strip(): continue
-            path = os.path.join(SECRETS_DIR, name)
-            with open(path, "w") as f: f.write(body)
-            os.chmod(path, 0o600)
+        # Keep everything in memory until every part parsed, so a bad import can't
+        # half-replace a working certificate and take the whole farm down.
+        staged = {"client.pem": leaf.group(0) + "\n", "client.key": key.group(0) + "\n",
+                  "ca-int.pem": "\n".join(chain) + "\n" if chain else ""}
     finally:
         try: os.remove(tmp)
         except OSError: pass
 
+    # The certificate's CN is the device: the token's udid when there is one, else (a
+    # bare .p12) the CN alone. Either identifies an account imported either way before.
+    cn = cert_info(text=staged["client.pem"]).get("udid") or ""
+    ids = {x for x in (meta.get("udid"), cn) if x}
+    if not ids:
+        raise ValueError("Chứng chỉ không có CN (UDID thiết bị) — không phải chứng chỉ HMA?")
+    meta["udid"] = udid = meta.get("udid") or cn
+    # The same device re-imported (run.sh does this on every start) updates its account.
+    # Accounts stored before the CN was recorded are matched by their certificate on disk.
+    a = next((x for x in accounts("hma") if x.get("udid") in ids), None) or next(
+        (x for x in accounts("hma") if not x.get("udid") and cert_info(
+            os.path.join(hma_secrets_dir(x["id"]), "client.pem")).get("udid") in ids), None)
+    if not a:
+        a = add_account("hma", {"udid": udid}, udid[:18] + "…" if len(udid) > 19 else udid)
+    d = hma_secrets_dir(a["id"])
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    for name, body in staged.items():
+        if not body.strip(): continue
+        path = os.path.join(d, name)
+        with open(path, "w") as f: f.write(body)
+        os.chmod(path, 0o600)
     prov = load_providers()
-    prov["hma"] = {**meta, "imported": int(time.time())}
+    for x in prov["accounts"]:
+        if x["id"] == a["id"]: x.update(imported=int(time.time()), **meta)
     save_providers(prov)
-    return hma_status()
+    clear_acct_state(a["id"], "broken")
+    info = cert_info(os.path.join(d, "client.pem"))
+    return {"id": a["id"], "name": account_name(a), "locations": len(vendors.HMA_LOCATIONS),
+            "accounts": len(accounts("hma")), **info}
+
+def onboard_by_code(code, token_text=None, p12_b64=None, password=None, require_hma=True):
+    """Onboard an HMA subscription by its activation code.
+
+    Step 1 (always, off-device): validate the code against Avast's licensing backend.
+    Step 2 (if a cert is supplied): install the device certificate and tag the account
+    with the code + licence info, so from then on the farm runs it on any platform.
+
+    When no cert is supplied we still validate and return the licence info, plus a
+    `needs_cert` flag and instructions — the device certificate cannot be minted from
+    the code alone (see hma_activation docstring / README: the Avast CCT wall)."""
+    v = hma_activation.validate_code(code)          # raises ActivationError if bad
+    if require_hma and not v.get("is_hma"):
+        raise ValueError("Code hợp lệ nhưng không phải license HMA")
+    v = {k: val for k, val in v.items() if k != "raw"}   # keep responses lean
+    if not (token_text or p12_b64):
+        return {"validated": True, "needs_cert": True, "license": v,
+                "message": ("Code hợp lệ. Cần nạp chứng chỉ thiết bị MỘT lần "
+                            "(tokenCoreSE.json hoặc .p12) — xem tools/hma-bootstrap-cert.sh. "
+                            "Sau đó farm chạy đa nền tảng, không cần app HMA.")}
+    st = import_hma(token_text=token_text, p12_b64=p12_b64, password=password,
+                    code=v["code"], license_meta=v)
+    return {"validated": True, "needs_cert": False, "license": v, "status": st}
+
+
+def migrate_layout():
+    """Bring a farm created before accounts existed up to date, once:
+      secrets/client.pem            -> secrets/hma-1/client.pem + an 'hma-1' account
+      ports with no account         -> bound to the only account of their vendor
+    Re-running is harmless: each step is skipped when its result is already there."""
+    prov = load_providers()
+    changed = False
+    root_pem = os.path.join(SECRETS_DIR, "client.pem")
+    if os.path.exists(root_pem) and not [a for a in prov.get("accounts", []) if a["vendor"] == "hma"]:
+        info = cert_info(root_pem)
+        udid = info.get("udid") or prov.get("hma", {}).get("udid", "")
+        a = {"id": "hma-1", "vendor": "hma", "n": 1, "udid": udid,
+             "note": (udid[:18] + "…") if len(udid) > 19 else udid,
+             "added": prov.get("hma", {}).get("imported") or int(time.time())}
+        prov.setdefault("accounts", []).append(a)
+        prov.pop("hma", None)
+        d = hma_secrets_dir("hma-1")
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        for f in ("client.pem", "client.key", "ca-int.pem"):
+            src = os.path.join(SECRETS_DIR, f)
+            if os.path.exists(src): os.replace(src, os.path.join(d, f))
+        changed = True
+        print("migrate: chứng chỉ HMA cũ -> tài khoản hma-1", flush=True)
+    if changed: save_providers(prov)
+
+    # Ports created before pooling carry no account; give them the one account their
+    # vendor has. With several, rebalance() spreads them instead.
+    state = load_state(); idx = targets_index(); orphan = []
+    for k, v in state.items():
+        if v.get("account"): continue
+        t = idx.get(k)
+        if t and t.get("vendor"): orphan.append(k)
+    if orphan:
+        done = rebalance(orphan)
+        print(f"migrate: gán tài khoản cho {len(done)}/{len(orphan)} cổng cũ", flush=True)
 
 # ---- automatic discovery ------------------------------------------------------
-def _cert_mtime():
-    try: return os.path.getmtime(os.path.join(SECRETS_DIR, "client.pem"))
-    except OSError: return 0
+_INBOX_FAILED = set()   # token fingerprints that failed to import: say so once, not every minute
 
 def ingest_inbox():
     """Import whatever is sitting in INBOX. Config files are consumed; the HMA token is
-    left in place (run.sh refreshes it) and re-imported only when it is newer than the
-    certificate we already installed."""
+    left in place (run.sh / the sync helpers refresh it) and imported whenever its
+    content is not what an account was last imported from. Content, not mtime: the
+    helpers copy with the app's original timestamp, which can be older than another
+    account's certificate."""
     if not INBOX or not os.path.isdir(INBOX): return []
     done = []
     for fn in sorted(os.listdir(INBOX)):
@@ -207,8 +320,12 @@ def ingest_inbox():
         if not os.path.isfile(path): continue
         try:
             if fn == "tokenCoreSE.json":
-                if os.path.getmtime(path) <= _cert_mtime(): continue
-                import_hma(token_text=open(path, encoding="utf-8").read())
+                text = open(path, encoding="utf-8").read()
+                sha = token_sha(text)
+                if sha in _INBOX_FAILED or any(a.get("token_sha") == sha for a in accounts("hma")):
+                    continue
+                try: import_hma(token_text=text)
+                except Exception: _INBOX_FAILED.add(sha); raise
                 done.append(("hma", fn))
             elif fn.endswith((".conf", ".ovpn")):
                 save_config(fn, open(path, encoding="utf-8").read())
@@ -289,23 +406,242 @@ def add_eap(d):
     save_providers(prov)
     return next(t for t in eap_targets() if t["key"] == "EAP-" + e["id"])
 
-def delete_provider(pid):
-    """Remove a provider and every port it owns. HMA also drops its certificate."""
+# ---- account pools -------------------------------------------------------------
+# A built-in provider is a pool: the user adds one or more accounts, every location is
+# listed once, and a port is bound to an account when it starts. Capacity, not copies.
+def accounts(vendor=None, prov=None):
+    a = (prov if prov is not None else load_providers()).get("accounts", [])
+    return [x for x in a if not vendor or x["vendor"] == vendor]
+
+def account(aid):
+    return next((a for a in accounts() if a["id"] == aid), None)
+
+def account_name(a):
+    v = vendors.VENDORS.get(a["vendor"], {})
+    n = a.get("n", 1)
+    return v.get("name", a["vendor"]) + ("" if n == 1 else f" #{n}")
+
+def vendor_targets():
+    """Every location of every provider the user has at least one account for."""
+    out = []
+    for vid, v in vendors.VENDORS.items():
+        if not accounts(vid): continue
+        out += v["targets"](DATA_DIR)
+    return out
+
+def add_account(vid, clean, note):
+    """Store a validated account. Returns it."""
     prov = load_providers()
-    if pid == "hma":
-        down([k for k, v in load_state().items() if v.get("provider") == "hma"])
-        for f in os.listdir(SECRETS_DIR) if os.path.isdir(SECRETS_DIR) else []:
-            if f.startswith(("client.", "ca-")): os.remove(os.path.join(SECRETS_DIR, f))
-        prov.pop("hma", None)
-    else:
-        gone = [e for e in prov.get("eap", []) if slug(e["name"]) == pid]
-        if gone:
-            down(["EAP-" + e["id"] for e in gone])
-            prov["eap"] = [e for e in prov["eap"] if slug(e["name"]) != pid]
-        else:   # a file-based provider: every config tagged with this name
-            for t in config_targets():
-                if t["provider"] == pid: delete_config(t["key"])
+    accts = prov.setdefault("accounts", [])
+    if any(a["vendor"] == vid and all(a.get(k) == clean[k] for k in clean) for a in accts):
+        raise ValueError(f"Tài khoản {vendors.VENDORS[vid]['name']} này đã có rồi")
+    n = next(i for i in range(1, 1000) if i not in {a.get("n", 1) for a in accts if a["vendor"] == vid})
+    a = {"id": f"{vid}-{n}", "vendor": vid, "n": n, "note": note,
+         "added": int(time.time()), **clean}
+    accts.append(a)
     save_providers(prov)
+    return a
+
+def add_vendor_account(d):
+    vid = d.get("vendor")
+    v = vendors.VENDORS.get(vid)
+    if not v or not v.get("fields"): raise ValueError("Nhà cung cấp không hỗ trợ")
+    clean, note = v["check"](d)
+    first = not accounts(vid)
+    a = add_account(vid, clean, note)
+    if vid == "surfshark": vendors.surfshark_clusters(DATA_DIR, refresh=True)
+    ts = v["targets"](DATA_DIR)
+    if not ts:
+        delete_account(a["id"])
+        raise ValueError("Chưa tải được danh sách máy chủ của nhà cung cấp — thử lại sau")
+    return {"id": a["id"], "name": account_name(a), "first": first,
+            "accounts": len(accounts(vid)),
+            "locations": len(ts), "countries": len({t["country"] for t in ts})}
+
+# ---- which account runs a port --------------------------------------------------
+# The helpers below take an optional `prov` (an already loaded providers.json) so a loop
+# over every port reads the file once instead of once per port and per helper.
+def acct_state(prov=None):
+    """Per-account notes the farm learned at runtime: a measured session cap, or an
+    account the provider rejected. Same file as the accounts, but under its own key so a
+    rewrite of the account list cannot lose it."""
+    return (prov if prov is not None else load_providers()).get("acct_state", {})
+
+def set_acct_state(aid, **kw):
+    prov = load_providers()
+    st = prov.setdefault("acct_state", {}).setdefault(aid, {})
+    st.update({k: v for k, v in kw.items() if v is not None})
+    save_providers(prov)
+
+def clear_acct_state(aid, *keys):
+    prov = load_providers()
+    st = prov.get("acct_state", {}).get(aid)
+    if not st: return
+    for k in (keys or list(st)): st.pop(k, None)
+    save_providers(prov)
+
+def acct_capacity(a, prov=None):
+    """How many ports this account may hold: the user's limit, else what the provider
+    turned out to allow, else the vendor default (0 = no limit)."""
+    prov = prov if prov is not None else load_providers()
+    lim = get_limits(prov)
+    if a["id"] in lim: return int(lim[a["id"]])
+    learned = acct_state(prov).get(a["id"], {}).get("cap")
+    if learned is not None: return int(learned)
+    if a["vendor"] in lim: return int(lim[a["vendor"]])
+    return DEFAULT_LIMITS.get(a["vendor"], 0)
+
+def acct_usable(a, prov=None):
+    return not acct_state(prov).get(a["id"], {}).get("broken")
+
+def acct_load(state=None, run=None, exclude=None):
+    """Ports currently assigned to each account. Only ports that are switched on count:
+    a stopped port holds no session at the provider."""
+    state = state if state is not None else load_state()
+    run = run if run is not None else running_containers()
+    out = {}
+    for k, v in state.items():
+        if k == exclude or not v.get("account"): continue
+        if (run.get(k) or {}).get("state") not in ("running", "restarting"): continue
+        out[v["account"]] = out.get(v["account"], 0) + 1
+    return out
+
+# A provider can accept an account on some servers and refuse it on others (ZoogVPN's
+# cheaper plans cover only part of the network). The refusal is remembered per
+# (account, server) and re-checked after a week, in case the plan changes.
+REFUSAL_TTL = 7 * 86400
+
+def refused_by(aid, prov=None):
+    now = time.time()
+    return {k for k, t in (acct_state(prov).get(aid, {}).get("refused") or {}).items()
+            if now - t < REFUSAL_TTL}
+
+def note_refusal(aid, key, ok):
+    prov = load_providers()
+    st = prov.setdefault("acct_state", {}).setdefault(aid, {})
+    ref = st.setdefault("refused", {})
+    if ok: ref.pop(key, None)
+    else: ref[key] = int(time.time())
+    save_providers(prov)
+
+def blocked_keys(vendor, prov=None):
+    """Servers no usable account of this vendor can use."""
+    prov = prov if prov is not None else load_providers()
+    accs = [a for a in accounts(vendor, prov) if acct_usable(a, prov)]
+    if not accs: return set()
+    out = None
+    for a in accs:
+        r = refused_by(a["id"], prov)
+        out = r if out is None else out & r
+    return out or set()
+
+def pick_account(vendor, load, prefer=None, key=None, exclude=None, prov=None):
+    """The emptiest usable account of this vendor that still has room, counting `load`
+    (mutated as ports are assigned). `prefer` wins ties so a restart keeps its account;
+    accounts the provider refused for `key`, and `exclude`, are skipped."""
+    prov = prov if prov is not None else load_providers()
+    free = []
+    for a in accounts(vendor, prov):
+        if a["id"] == exclude or not acct_usable(a, prov): continue
+        if key and key in refused_by(a["id"], prov): continue
+        cap = acct_capacity(a, prov)
+        used = load.get(a["id"], 0)
+        if cap and used >= cap: continue
+        free.append((used, 0 if prefer == a["id"] else 1, a["n"], a))
+    if not free: return None
+    free.sort(key=lambda x: x[:3])
+    a = free[0][3]
+    load[a["id"]] = load.get(a["id"], 0) + 1
+    return a
+
+def bind_target(t, acct):
+    """Turn (location, account) into the extra docker args that port needs."""
+    v = vendors.VENDORS[t["vendor"]]
+    b = v["bind"](t, acct) or {}
+    if b.get("config_text"):
+        os.makedirs(GEN_DIR, mode=0o700, exist_ok=True)
+        path = os.path.join(CONFIG_DIR, t["config"])
+        with open(path, "w") as f: f.write(b["config_text"])
+        os.chmod(path, 0o600)
+    return b
+
+def delete_account(aid, reassign=True):
+    """Remove one account. Its ports move to another account of the same vendor; ports
+    with nowhere to go are switched off, and the last account of a vendor takes its
+    ports with it."""
+    a = account(aid)
+    if not a: return {}
+    prov = load_providers()
+    prov["accounts"] = [x for x in prov.get("accounts", []) if x["id"] != aid]
+    prov.get("acct_state", {}).pop(aid, None)
+    prov.get("limits", {}).pop(aid, None)
+    save_providers(prov)
+    if a["vendor"] == "hma":
+        remove_hma_secrets(aid)
+        # The token it came from would otherwise bring it straight back on the next scan.
+        tok = os.path.join(INBOX, "tokenCoreSE.json") if INBOX else ""
+        try:
+            if tok and a.get("token_sha") == token_sha(open(tok, encoding="utf-8").read()):
+                os.remove(tok)
+        except OSError: pass
+    mine = [k for k, v in load_state().items() if v.get("account") == aid]
+    if not mine: return {"moved": 0, "stopped": 0, "removed": 0}
+    if not accounts(a["vendor"]):          # vendor gone entirely: its ports go with it
+        down(mine); return {"moved": 0, "stopped": 0, "removed": len(mine)}
+    if not reassign:
+        stop(mine); return {"moved": 0, "stopped": len(mine), "removed": 0}
+    moved = rebalance(mine)
+    left = [k for k in mine if k not in moved]
+    if left: stop(left)
+    return {"moved": len(moved), "stopped": len(left), "removed": 0}
+
+def release_load(load, keys, state, run):
+    """`load` minus the sessions these ports hold now, because they are about to be
+    rebound. Only ports that are switched on hold one: acct_load() never counted the
+    stopped ones, so subtracting for them too would make a full account look free."""
+    for k in keys:
+        aid = state.get(k, {}).get("account")
+        if aid and (run.get(k) or {}).get("state") in ("running", "restarting"):
+            load[aid] = max(0, load.get(aid, 0) - 1)
+    return load
+
+def rebalance(keys):
+    """Give each of these ports a new account and recreate the running ones. Returns the
+    keys that found one."""
+    idx = targets_index(); state = load_state(); run = running_containers()
+    load = release_load(acct_load(state, run), keys, state, run)
+    prov = load_providers()
+    ok, live = [], []
+    for k in keys:
+        t = idx.get(k)
+        if not t or not t.get("vendor"): continue
+        a = pick_account(t["vendor"], load, key=k, prov=prov)
+        if not a: continue
+        state[k]["account"] = a["id"]; ok.append(k)
+        if (run.get(k) or {}).get("state") in ("running", "restarting"): live.append(k)
+    save_state(state)
+    if live: up(live)
+    return ok
+
+def delete_provider(pid, reassign=True):
+    """Remove a whole provider card: a pool (every account), an uploaded-config provider,
+    or a manually added IKEv2 provider. Deleting one account goes through delete_account."""
+    if pid in vendors.VENDORS:
+        res = {"moved": 0, "stopped": 0, "removed": 0}
+        for a in list(accounts(pid)):
+            r = delete_account(a["id"], reassign=reassign)
+            for k in res: res[k] += r.get(k, 0)
+        return res
+    prov = load_providers()
+    gone = [e for e in prov.get("eap", []) if slug(e["name"]) == pid]
+    if gone:
+        down(["EAP-" + e["id"] for e in gone])
+        prov["eap"] = [e for e in prov["eap"] if slug(e["name"]) != pid]
+        save_providers(prov)
+    else:                 # a file-based provider: every config tagged with this name
+        for t in config_targets():
+            if t["provider"] == pid: delete_config(t["key"])
+    return {}
 
 # ---- per-provider port limits --------------------------------------------------
 # Most providers cap simultaneous connections per account, so the farm refuses to start
@@ -313,23 +649,41 @@ def delete_provider(pid):
 # HMA: no limit — 20+ concurrent ran stable; what broke big farms was stuck reconnects,
 # not the count. HMA ends every session after ~4.5 h; the watchdog reconnects in seconds.
 DEFAULT_LIMITS = {"hma": 0, "protonvpn": 10, "proton": 10, "nordvpn": 10, "mullvad": 5,
-                  "expressvpn": 8, "cyberghost": 7, "surfshark": 0, "pia": 0,
+                  "expressvpn": 8, "cyberghost": 7, "surfshark": 0, "zoogvpn": 0, "pia": 0,
                   "ipvanish": 0, "windscribe": 0, "custom": 0}
 
 def limit_key(t):
-    return "hma" if t.get("protocol") == "ikev2-cert" else (t.get("provider") or "custom").lower()
+    """What a target's cap is counted against. Pool providers are capped per *account*,
+    which is only known once a port is bound, so the pool as a whole is the unit here."""
+    if t.get("vendor"): return t["vendor"]
+    return (t.get("provider") or "custom").lower()
 
-def get_limits():
-    return load_providers().get("limits", {})
+def default_limit(key):
+    # "surfshark-2" is an account of the surfshark pool: same default as its vendor.
+    return DEFAULT_LIMITS.get(key, DEFAULT_LIMITS.get(key.rsplit("-", 1)[0], 0))
+
+def pool_capacity(vendor, prov=None):
+    """Total ports a pool can hold: the sum of its usable accounts. 0 = no limit."""
+    prov = prov if prov is not None else load_providers()
+    caps = [acct_capacity(a, prov) for a in accounts(vendor, prov) if acct_usable(a, prov)]
+    return 0 if not caps or any(c == 0 for c in caps) else sum(caps)
+
+def get_limits(prov=None):
+    return (prov if prov is not None else load_providers()).get("limits", {})
 
 def limit_for(key):
     lim = get_limits()
-    return int(lim[key]) if key in lim else DEFAULT_LIMITS.get(key, 0)
+    return int(lim[key]) if key in lim else default_limit(key)
 
 def set_limit(key, n):
     prov = load_providers()
     prov.setdefault("limits", {})[key] = max(0, int(n))
     save_providers(prov)
+
+def min_limit(*xs):
+    """Smallest non-zero limit; 0 (unlimited) only wins when everything is unlimited."""
+    real = [x for x in xs if x]
+    return min(real) if real else 0
 
 def usage(run=None):
     """Ports currently holding a connection, per provider (stopped ones don't count)."""
@@ -348,7 +702,8 @@ def over_quota(targets):
     for t in targets:
         if (run.get(t["key"]) or {}).get("state") in ("running", "restarting"):
             ok.append(t); continue                    # already counted; recreating is free
-        lk = limit_key(t); lim = limit_for(lk)
+        lk = limit_key(t)
+        lim = min_limit(pool_capacity(lk), limit_for(lk)) if t.get("vendor") else limit_for(lk)
         if lim and used.get(lk, 0) >= lim:
             refused.append({"key": t["key"], "provider": lk, "limit": lim})
         else:
@@ -356,8 +711,43 @@ def over_quota(targets):
     return ok, refused
 
 def providers_list():
-    out = [{"id": "hma", "kind": "ikev2-cert", "name": "HMA / SurfEasy",
-            "note": "Chứng chỉ thiết bị từ app", **hma_status()}]
+    """One card per provider. A built-in provider is a pool and carries its accounts."""
+    out = []
+    state = load_state(); run = running_containers()
+    load = acct_load(state, run)
+    prov = load_providers()
+    astate = acct_state(prov)
+    # Countries each account is serving right now, for "9 cổng · 7 nước" on its row.
+    acct_cc = {}
+    for k, v in state.items():
+        if v.get("account") and (run.get(k) or {}).get("state") in ("running", "restarting"):
+            acct_cc.setdefault(v["account"], set()).add(v.get("country"))
+    for vid, v in vendors.VENDORS.items():
+        mine = accounts(vid, prov)
+        if not mine: continue
+        ts = v["targets"](DATA_DIR)
+        accs = []
+        for a in mine:
+            cap = acct_capacity(a, prov)
+            row = {"id": a["id"], "name": account_name(a), "n": a.get("n", 1),
+                   "note": a.get("note", ""),
+                   "used": load.get(a["id"], 0), "limit": cap,
+                   "used_countries": len(acct_cc.get(a["id"], ())),
+                   "refused": len(refused_by(a["id"], prov)),
+                   "limit_default": DEFAULT_LIMITS.get(vid, 0),
+                   "learned": astate.get(a["id"], {}).get("cap") is not None,
+                   "broken": astate.get(a["id"], {}).get("broken")}
+            if vid == "hma":
+                row.update(note="", **cert_info(os.path.join(hma_secrets_dir(a["id"]), "client.pem")))
+                if a.get("code"): row["code_tail"] = a["code"][-4:]   # never the full code
+                if a.get("license"): row["license"] = a["license"]
+            accs.append(row)
+        out.append({"id": vid, "kind": v["protocol"], "name": v["name"], "vendor": vid,
+                    "pool": True, "ready": True, "accounts": accs,
+                    "locations": len(ts), "countries": len({t["country"] for t in ts}),
+                    "country_set": sorted({t["country"] for t in ts}),
+                    "limit_key": vid, "used": sum(a["used"] for a in accs),
+                    "capacity": pool_capacity(vid, prov)})
     by_file = {}
     for t in config_targets():
         p = by_file.setdefault(t["provider"], {"id": t["provider"], "kind": t["protocol"],
@@ -366,33 +756,28 @@ def providers_list():
         p["locations"] += 1
     out += sorted(by_file.values(), key=lambda p: p["name"])
     by_acct = {}
-    for e in load_providers().get("eap", []):
+    for e in prov.get("eap", []):
         p = by_acct.setdefault(slug(e["name"]), {"id": slug(e["name"]), "kind": "ikev2-eap",
                                                  "name": e["name"], "ready": True,
                                                  "note": e["user"], "locations": 0})
         p["locations"] += 1
     out += sorted(by_acct.values(), key=lambda p: p["name"])
-    used = usage()
+    used = usage(run)
     for p in out:
-        lk = "hma" if p["kind"] == "ikev2-cert" else p["name"].lower()
+        lk = p.get("limit_key") or (p["name"].lower())
         p["limit_key"] = lk
         p["limit"] = limit_for(lk)
-        p["limit_default"] = DEFAULT_LIMITS.get(lk, 0)
-        p["used"] = used.get(lk, 0)
+        p.setdefault("limit_default", default_limit(lk))
+        p.setdefault("used", used.get(lk, 0))
     return out
 
 def all_targets():
-    # No certificate installed = no HMA locations, so a fresh install shows an honest
-    # empty farm instead of 115 ports that would all fail to start.
-    hma = CATALOG if os.path.exists(os.path.join(SECRETS_DIR, "client.pem")) else []
-    return hma + config_targets() + eap_targets()
+    # No account = no locations, so a fresh install shows an honest empty farm instead
+    # of hundreds of ports that would all fail to start.
+    return vendor_targets() + config_targets() + eap_targets()
 
 def targets_index():
     return {t["key"]: t for t in all_targets()}
-
-BY_CC = {}
-for l in CATALOG:
-    BY_CC.setdefault(l["country"], []).append(l)
 
 def load_state():
     try: return json.load(open(STATE_FILE))
@@ -461,36 +846,84 @@ def next_port(state):
     return p
 
 def resolve_targets(args):
-    """Expand KEY / country-code / 'all' into a list of target dicts."""
+    """Expand KEY / country-code / 'all' into a list of target dicts.
+
+    A port can outlive its catalog entry (the provider renamed or retired that server).
+    Such a port still has everything it needs in farm-state.json, so fall back to that:
+    otherwise the user could neither stop nor delete what is plainly on their screen."""
     idx = targets_index()
+    state = load_state()
     out, seen = [], set()
     for a in args:
         if a == "all": picks = list(idx.values())
         elif a in idx: picks = [idx[a]]
-        elif a.upper() in BY_CC: picks = BY_CC[a.upper()]
+        elif a in state: picks = [{**state[a], "key": a, "orphan": True}]
+        elif any(t["country"] == a.upper() for t in idx.values()):
+            picks = [t for t in idx.values() if t["country"] == a.upper()]
         else:
             print(f"unknown location/country: {a}", file=sys.stderr); continue
         for l in picks:
             if l["key"] not in seen: seen.add(l["key"]); out.append(l)
     return out
 
-def up(keys):
-    targets, refused = over_quota(resolve_targets(keys))
+def up(keys, pin_account=None):
+    """`pin_account` (optional) pins every port of that account's vendor to it; other
+    vendors in the same batch are still spread automatically."""
+    resolved = resolve_targets(keys)
+    # A port whose server left the provider's list has only its farm-state.json record:
+    # no vendor, no login, no certificate folder. Building a container from that would
+    # start a tunnel bound to no account, so it can be stopped or deleted, not started.
+    gone = [{"key": l["key"], "provider": limit_key(l), "limit": 0, "reason": "gone"}
+            for l in resolved if l.get("orphan")]
+    for r in gone:
+        print(f"skip {r['key']}: máy chủ không còn trong danh sách của nhà cung cấp", flush=True)
+    targets, refused = over_quota([l for l in resolved if not l.get("orphan")])
     for r in refused:
         print(f"skip {r['key']}: {r['provider']} đã đủ {r['limit']} cổng", flush=True)
+    refused += gone
     clear_failed([l["key"] for l in targets])
+    run = running_containers()
     stop_gracefully([cname(l["key"]) for l in targets])
     state = load_state()
     st = load_settings()
     cr = load_creds()
+    # Bind every pool port to an account before starting any, so one call spreads the
+    # batch across the pool instead of filling the first account and failing the rest.
+    # `run` is from before stop_gracefully above: it still says which of these ports were
+    # holding a session, which is what release_load needs.
+    load = release_load(acct_load(state, run), [l["key"] for l in targets], state, run)
+    prov = load_providers()
+    pin = account(pin_account) if pin_account else None
+    bound, nofree = {}, []
+    for l in targets:
+        if not l.get("vendor"): continue
+        if pin and pin["vendor"] == l["vendor"] and acct_usable(pin, prov) \
+                and l["key"] not in refused_by(pin["id"], prov):
+            a = pin; load[a["id"]] = load.get(a["id"], 0) + 1
+        else:
+            a = pick_account(l["vendor"], load, prefer=state.get(l["key"], {}).get("account"),
+                             key=l["key"], prov=prov)
+        if a: bound[l["key"]] = a
+        else: nofree.append(l)
+    for l in nofree:
+        v = vendors.VENDORS[l["vendor"]]
+        plan = l["key"] in blocked_keys(l["vendor"], prov)
+        refused.append({"key": l["key"], "provider": l["vendor"],
+                        "limit": pool_capacity(l["vendor"], prov),
+                        "reason": "plan" if plan else "full"})
+        print(f"skip {l['key']}: " + (f"không tài khoản {v['name']} nào được dùng máy chủ này"
+              if plan else f"{v['name']} không còn tài khoản trống"), flush=True)
+    targets = [l for l in targets if not l.get("vendor") or l["key"] in bound]
     for l in targets:                 # only what the cap allowed, never the raw request
         k = l["key"]
         proto = l.get("protocol", "ikev2-cert")
         port = state.get(k, {}).get("port") or next_port(state)
+        acct = bound.get(k)
         state[k] = {"port": port, "country": l["country"], "city": l["city"],
                     "name": l.get("countryName", l.get("provider", "")),
                     "provider": l.get("provider", "hma"), "protocol": proto,
                     "fqdn": l.get("fqdn"), "config": l.get("config"),
+                    "account": acct["id"] if acct else None,
                     **{x: state.get(k, {})[x] for x in ("rotate_minutes", "last_rotate")
                        if x in state.get(k, {})}}
         args = ["run", "-d", "--name", cname(k), "--restart", "unless-stopped",
@@ -507,21 +940,28 @@ def up(keys):
             args += ["--label", f"com.docker.compose.project={COMPOSE_PROJECT}",
                      "--label", "com.docker.compose.service=port",
                      "--label", "com.docker.compose.oneoff=False"]
+        extra = bind_target(l, acct) if acct else {}
+        for env, val in (extra.get("env") or {}).items():
+            args += ["-e", f"{env}={val}"]
         if proto in ("wireguard", "openvpn"):
             args += ["-e", f"CONFIG=/config/{l['config']}",
                      "-v", f"{CONFIG_DIR_HOST}:/config:ro"]
             for env in ("OVPN_USER", "OVPN_PASS"):
                 if os.environ.get(env): args += ["-e", f"{env}={os.environ[env]}"]
         else:  # ikev2-cert / ikev2-eap
-            args += ["-e", f"SERVER={l['fqdn']}", "-v", f"{SECRETS}:/secrets:ro"]
+            sec = hma_secrets_host(extra["secrets"]) if extra.get("secrets") else SECRETS
+            args += ["-e", f"SERVER={l['fqdn']}", "-v", f"{sec}:/secrets:ro"]
             for env, field in (("EAP_USER", "eap_user"), ("EAP_PASS", "eap_pass"),
-                               ("SERVER_ID", "server_id")):
+                               ("SERVER_ID", "server_id"), ("SERVER_IP", "server_ip")):
                 v = l.get(field) or os.environ.get(env)
-                if v: args += ["-e", f"{env}={v}"]
+                if v and not any(x == f"{env}={v}" for x in args): args += ["-e", f"{env}={v}"]
         docker("rm", "-f", cname(k), check=False)   # already stopped gracefully above
-        docker(*args, IMAGE)
+        # Record the port before its container exists: reap_strays() removes any port
+        # container farm-state.json does not know, and runs on its own thread.
         save_state(state)
-        print(f"up  {k:28} :{port}  ({proto}  {l['country']} / {l['city']})")
+        docker(*args, IMAGE)
+        print(f"up  {k:28} :{port}  ({proto}  {l['country']} / {l['city']}"
+              + (f"  {acct['id']}" if acct else "") + ")")
     return {"started": [l["key"] for l in targets], "refused": refused}
 
 def save_config(filename, content, provider=None):
@@ -583,15 +1023,17 @@ def stop(keys):
         print("stop", k)
 
 def start(keys):
-    allowed, refused = over_quota(resolve_targets(keys) or [])
-    clear_failed([l["key"] for l in allowed])
     run = running_containers()
-    # Stopped ports have no container any more: build them fresh, in one batch.
-    todo = [l["key"] for l in allowed
-            if (run.get(l["key"]) or {}).get("state") not in ("running", "restarting")]
+    live, todo = [], []
+    for l in resolve_targets(keys) or []:
+        on = (run.get(l["key"]) or {}).get("state") in ("running", "restarting")
+        (live if on else todo).append(l["key"])
+    clear_failed(live)
+    # Stopped ports have no container any more: build them fresh, in one batch. up()
+    # applies the caps and refuses what cannot start, so its answer is the real one.
     for k in todo: reset_backoff(k)
-    if todo: up(todo)
-    return {"started": [l["key"] for l in allowed], "refused": refused}
+    r = up(todo) if todo else {"started": [], "refused": []}
+    return {"started": live + r["started"], "refused": r["refused"]}
 
 def rotate(keys):
     clear_failed([l["key"] for l in resolve_targets(keys)])
@@ -719,6 +1161,11 @@ FAIL_REASONS = (
     ("FATAL:",                         "container không khởi động được"),
     ("Handshake did not complete",     "WireGuard không bắt tay được"),
     ("AUTH_FAILED",                    "sai tài khoản"),
+    ("máy chủ từ chối phiên này",      "đăng nhập đúng nhưng nhà cung cấp từ chối phiên"),
+    ("sai email hoặc mật khẩu",        "sai email hoặc mật khẩu"),
+    ("đã đổi so với lần trước",        "khoá máy chủ đã đổi — từ chối kết nối"),
+    ("không do CA hợp lệ cấp",         "chứng chỉ máy chủ không hợp lệ"),
+    ("WireGuard không bắt tay được",   "WireGuard không bắt tay được (key sai hoặc hết gói?)"),
 )
 
 def fail_reason(key):
@@ -728,12 +1175,12 @@ def fail_reason(key):
         if needle in log: return why
     return "tunnel không lên được"
 
-def give_up(key, state=None):
+def give_up(key, state=None, why=None):
     """Stop a port that keeps restarting without ever coming up. Docker would otherwise
     retry for ever, which burns CPU and shows a permanent 'connecting' that never ends."""
     state = state if state is not None else load_state()
     if key not in state: return
-    why = fail_reason(key)
+    why = why or fail_reason(key)
     docker("update", "--restart", "no", cname(key), check=False)
     docker("stop", "-t", "3", cname(key), check=False)
     try: os.remove(os.path.join(STATUS_DIR, key + ".json"))
@@ -763,10 +1210,106 @@ def clear_failed(keys):
         if state.get(k, {}).pop("failed", None): touched = True
     if touched: save_state(state)
 
+# How the node says the provider refused an account on a server (<key>.wait.json "why"):
+#   refused     rejected before EAP even starts — ZoogVPN's answer, every time, on a
+#               server the plan does not cover. One is proof.
+#   eaprefused  password accepted, session refused. Plans do this on some servers too,
+#               but so does a server still holding sessions from earlier attempts, or one
+#               rate-limiting the account — both pass within a few back-off rounds. So
+#               it only counts once the same port has kept getting it that long.
+EAP_REFUSED_ATTEMPTS = 4      # back-off 30+60+120 s: ~3.5 min of nothing but refusals
+
+def plan_refused(wait):
+    why = (wait or {}).get("why")
+    if why == "refused": return True
+    return why == "eaprefused" and int((wait or {}).get("attempt") or 0) >= EAP_REFUSED_ATTEMPTS
+
+def learn_from_failures():
+    """Keep the pool honest about its accounts:
+      badlogin   the provider rejected the password itself -> stop handing ports to it
+      refused    the provider will not let this account use this server (see
+                 plan_refused) -> remember it, move the port to an account that may
+      online     any port of an account works -> whatever was noted against it is wrong
+    Deliberately NOT done: inferring a connection cap from refusals. Refusals also come
+    from sessions the server still holds after a restart, or from rate limits; a cap
+    "learned" that way once turned a working account into "1 connection". Caps are
+    only what the user sets."""
+    state = load_state(); run = running_containers()
+    prov = load_providers()
+    noted = acct_state(prov)
+    running = {k for k in state if (run.get(k) or {}).get("state") == "running"}
+    ok = {k for k in state if read_status(k).get("ok")}
+    online = {state[k]["account"] for k in running & ok if state[k].get("account")}
+    for aid in online:
+        if noted.get(aid, {}).get("broken"):
+            clear_acct_state(aid, "broken")
+            log_line(f"pool: {aid} đang chạy bình thường — xoá ghi chú lỗi cũ")
+    # A server that works for an account is no longer "refused" for it.
+    refused = {a["id"]: refused_by(a["id"], prov) for a in accounts(prov=prov)}
+    for k in ok:
+        aid = state[k].get("account")
+        if aid and k in refused.get(aid, ()):
+            note_refusal(aid, k, ok=True); refused[aid].discard(k)
+    move, dead, full = [], [], []
+    for k in sorted(running - ok):
+        aid = state[k].get("account"); a = account(aid) if aid else None
+        if not a or not plan_refused(read_wait(k)): continue
+        if k not in refused.get(aid, ()):
+            note_refusal(aid, k, ok=False); refused.setdefault(aid, set()).add(k)
+            log_line(f"pool: {aid} không được dùng máy chủ {k}")
+        prov = load_providers()
+        # Which other account could take it, counting what each one really holds now.
+        if pick_account(a["vendor"], acct_load(state, run), key=k, exclude=aid, prov=prov):
+            move.append(k)
+        elif any(acct_usable(x, prov) and k not in refused_by(x["id"], prov)
+                 for x in accounts(a["vendor"], prov) if x["id"] != aid):
+            full.append(k)
+        else:
+            dead.append(k)
+    for k in sorted(running):
+        aid = state[k].get("account")
+        if not aid or aid in online: continue
+        if (read_wait(k) or {}).get("why") == "badlogin" and not noted.get(aid, {}).get("broken"):
+            set_acct_state(aid, broken="badlogin"); noted.setdefault(aid, {})["broken"] = "badlogin"
+            log_line(f"pool: {aid} sai email/mật khẩu — ngừng dùng")
+            move += [x for x, y in state.items() if y.get("account") == aid]
+    if move:
+        moved = rebalance(sorted(set(move)))
+        if moved: log_line(f"pool: chuyển {len(moved)} cổng sang tài khoản khác")
+        # One that found no room after all (an earlier move in this batch took it) waits
+        # like the others below instead of retrying against an account that refuses it.
+        full += [k for k in move if k not in moved and k not in full and k not in dead
+                 and k in refused.get(state[k].get("account"), ())]
+    # No account of yours may use this server: retrying forever would only keep asking
+    # the provider for something your plan does not include. Switch it off and say why.
+    for k in dead:
+        give_up(k, why="gói của bạn không cho dùng máy chủ này — chọn vị trí khác")
+    for k in full:
+        give_up(k, why="tài khoản này không được dùng máy chủ này và các tài khoản khác đã đầy")
+
+def reap_strays():
+    """Remove port containers the farm no longer knows about. One shows up when a request
+    to start a port lands after the port was deleted (a slow client, a retry): nothing in
+    farm-state.json points at it, so nothing would ever stop it — and with an IKEv2/EAP
+    provider it silently holds one of the account's sessions."""
+    # Containers first, state second: up() records a port before creating its container,
+    # so every container listed here is already in the state read after it.
+    out = docker("ps", "-a", "--filter", "label=proxy-farm.port=1",
+                 "--format", "{{.Label \"proxy-farm.key\"}}\t{{.Names}}", check=False)
+    state = load_state()
+    for line in (out.stdout or "").strip().splitlines():
+        key, _, name = line.partition("\t")
+        if key and key not in state:
+            docker("stop", "-t", "6", name, check=False)   # SIGTERM first: IKE DELETE
+            docker("rm", "-f", name, check=False)
+            log_line(f"reap: xoá container lạc {name} (cổng {key} không còn trong danh sách)")
+
 def supervisor_loop():
     while True:
         time.sleep(30)
         try:
+            reap_strays()
+            learn_from_failures()
             limit = load_settings()["give_up_after"]
             if limit <= 0: continue
             state = load_state(); run = running_containers()
@@ -814,6 +1357,11 @@ def ls(as_json=False):
                      "rotate_minutes": v.get("rotate_minutes", 0),
                      "provider": t.get("provider", v.get("provider", "hma")),
                      "protocol": t.get("protocol", v.get("protocol", "ikev2-cert")),
+                     "vendor": t.get("vendor", v.get("provider")),
+                     "account": v.get("account"),
+                     # The catalog no longer lists this server: the port still runs, but
+                     # nothing will recreate it, so the UI must offer a way out.
+                     "orphan": k not in idx,
                      "failed": v.get("failed"),
                      "wait": read_wait(k) if st == "running" and not s.get("ok") else None,
                      "phase": read_phase(k) if st == "running" and not s.get("ok") else None,
@@ -850,7 +1398,13 @@ class H(http.server.BaseHTTPRequestHandler):
         p = urllib.parse.urlparse(self.path).path
         if p in ("/", "/index.html"): return self._send(200, ui_html(), "text/html; charset=utf-8")
         if p == "/api/locations":
-            return self._send(200, json.dumps({"locations": all_targets()}))
+            # Logins stay server-side; the browser only needs to know the location exists.
+            prov = load_providers()
+            blocked = {vid: blocked_keys(vid, prov) for vid in vendors.VENDORS}
+            return self._send(200, json.dumps({"locations": [
+                {**{k: v for k, v in t.items() if k not in ("eap_pass", "eap_user")},
+                 **({"blocked": True} if t["key"] in blocked.get(t.get("vendor"), ()) else {})}
+                for t in all_targets()]}))
         if p == "/api/status":
             c = load_creds()
             return self._send(200, json.dumps({
@@ -862,7 +1416,18 @@ class H(http.server.BaseHTTPRequestHandler):
                 {"found": discover(), "scan": os.environ.get("PF_SCAN_HOST", SCAN_DIR),
                  "inbox": os.environ.get("PF_INBOX_HOST", INBOX)}))
         if p == "/api/providers":
-            return self._send(200, json.dumps({"providers": providers_list()}))
+            pl = providers_list()
+            cc = set()
+            for x in pl: cc.update(x.pop("country_set", []) or [])
+            cc.update(t["country"] for t in config_targets() + eap_targets())
+            summary = {"providers": len(pl),
+                       "accounts": sum(len(x.get("accounts") or [1]) for x in pl),
+                       "servers": sum(x.get("locations") or 0 for x in pl),
+                       "countries": len(cc),
+                       "running": sum(x.get("used") or 0 for x in pl)}
+            return self._send(200, json.dumps({"providers": pl, "summary": summary}))
+        if p == "/api/vendors":
+            return self._send(200, json.dumps({"vendors": vendors.public()}))
         if p == "/api/settings":
             st = load_settings()
             return self._send(200, json.dumps({
@@ -907,7 +1472,7 @@ class H(http.server.BaseHTTPRequestHandler):
         keys = data.get("keys", [])
         if keys == "*": keys = list(load_state().keys())
         if p == "/api/up":
-            return self._send(200, json.dumps({"ok": True, **up(keys)}))
+            return self._send(200, json.dumps({"ok": True, **up(keys, data.get("account"))}))
         elif p == "/api/down": down(keys if keys else [])
         elif p == "/api/rotate": rotate(keys)
         elif p == "/api/stop": stop(keys)
@@ -960,18 +1525,88 @@ class H(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "status": st}))
+        elif p == "/api/provider/hma-sync":
+            # Import the HMA certificate a host-side helper dropped in the inbox (the app
+            # keeps it outside anything Docker Desktop shares, so the container cannot read
+            # it directly). Force-imports even an unchanged token so the button is reliable.
+            tok = os.path.join(INBOX, "tokenCoreSE.json") if INBOX else ""
+            found = bool(tok and os.path.isfile(tok))
+            imported = False
+            if found:
+                try:
+                    st = import_hma(token_text=open(tok, encoding="utf-8").read())
+                    imported = True
+                except Exception as e:
+                    return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, "found": found,
+                "imported": imported, "has_cert": bool(accounts("hma")),
+                "inbox": os.environ.get("PF_INBOX_HOST", INBOX),
+                "status": (st if imported else None)}))
+        elif p == "/api/provider/hma-tag":
+            # Attach a validated activation code to the HMA account that already has a
+            # certificate. No shell, no background work — just records the code + licence.
+            try:
+                v = hma_activation.validate_code(data.get("code", ""))
+            except hma_activation.ActivationError as e:
+                return self._send(400, json.dumps({"error": str(e), "kind": "activation"}))
+            if not v.get("is_hma"):
+                return self._send(400, json.dumps({"error": "Code hợp lệ nhưng không phải license HMA",
+                                                   "kind": "activation"}))
+            accs = accounts("hma")
+            if not accs:
+                return self._send(400, json.dumps({"error": "Chưa có chứng chỉ HMA để gắn code",
+                                                   "needs_cert": True}))
+            # The licence server does not say which device a code belongs to, so with
+            # several HMA accounts the user has to pick one; never guess the first.
+            aid = data.get("id") or (accs[0]["id"] if len(accs) == 1 else None)
+            if not aid:
+                return self._send(400, json.dumps({"error": "Có nhiều tài khoản HMA — chọn tài khoản để gắn code",
+                                                   "choose": True}))
+            prov = load_providers()
+            x = next((x for x in prov.get("accounts", []) if x["id"] == aid and x["vendor"] == "hma"), None)
+            if not x:
+                return self._send(404, json.dumps({"error": f"Không có tài khoản HMA {aid}"}))
+            x["code"] = v["code"]
+            x["license"] = {k: v.get(k) for k in ("license_id", "product", "schema",
+                            "mode", "expires_date", "devices_used", "devices_max")}
+            save_providers(prov)
+            return self._send(200, json.dumps({"ok": True, "license":
+                {k: v[k] for k in v if k != "raw"}, "account": aid}))
+        elif p == "/api/provider/hma-code":
+            try:
+                r = onboard_by_code(data.get("code", ""), token_text=data.get("token"),
+                                    p12_b64=data.get("p12"), password=data.get("password"))
+            except hma_activation.ActivationError as e:
+                return self._send(400, json.dumps({"error": str(e), "kind": "activation"}))
+            except Exception as e:
+                return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, **r}))
         elif p == "/api/discover":
             names = import_found(data.get("paths", []))
             return self._send(200, json.dumps({"ok": True, "imported": names}))
+        elif p == "/api/provider/account":
+            try: r = add_vendor_account(data)
+            except Exception as e:
+                return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, **r}))
         elif p == "/api/provider/eap":
             try: t = add_eap(data)
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "target": t}))
         elif p == "/api/provider/delete":
-            try: delete_provider(data.get("id", ""))
+            try: r = delete_provider(data.get("id", ""))
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, **(r or {})}))
+        elif p == "/api/account/delete":
+            try: r = delete_account(data.get("id", ""))
+            except Exception as e:
+                return self._send(400, json.dumps({"error": str(e)}))
+            return self._send(200, json.dumps({"ok": True, **(r or {})}))
+        elif p == "/api/account/rebalance":
+            keys = keys or [k for k, v in load_state().items() if v.get("account")]
+            return self._send(200, json.dumps({"ok": True, "moved": rebalance(keys)}))
         elif p == "/api/limit":
             try: set_limit(str(data.get("provider", "")).lower(), data.get("limit", 0))
             except (TypeError, ValueError):
@@ -988,6 +1623,8 @@ class H(http.server.BaseHTTPRequestHandler):
         return self._send(200, json.dumps({"ok": True}))
 
 def serve():
+    try: migrate_layout()
+    except Exception as e: print("migrate:", e, flush=True)
     ingest_inbox()
     threading.Thread(target=inbox_loop, daemon=True).start()
     threading.Thread(target=autorotate_loop, daemon=True).start()
@@ -996,12 +1633,70 @@ def serve():
     print(f"Proxy farm UI on http://{UI_BIND}:{UI_PORT}  (proxies bind {BIND}, image {IMAGE})", flush=True)
     httpd.serve_forever()
 
+def _cli_validate_code(a):
+    if not a:
+        print("validate-code <ACTIVATION-CODE>"); return
+    try:
+        v = hma_activation.validate_code(a[0])
+    except hma_activation.ActivationError as e:
+        print("✗", e); sys.exit(2)
+    print("✓ hợp lệ" + ("" if v["is_hma"] else "  (CẢNH BÁO: không phải HMA)"))
+    print(" ", hma_activation.summary_line(v))
+
+
+def _cli_onboard_code(a):
+    """onboard-code <CODE> [tokenCoreSE.json | cert.p12] [p12-password]
+    Without a password, a .p12 is opened with the one in <cert.p12>.pass if present
+    (what tools/hma-bootstrap-cert.sh writes), so it never has to be typed out."""
+    if not a:
+        print("onboard-code <CODE> [tokenCoreSE.json | cert.p12] [p12-password]"); return
+    code = a[0]
+    token_text = p12_b64 = password = None
+    if len(a) > 1:
+        path = a[1]
+        if not os.path.isfile(path):
+            print(f"✗ không thấy file chứng chỉ: {path}"); sys.exit(2)
+        if path.endswith(".json"):
+            token_text = open(path, encoding="utf-8").read()
+        else:
+            p12_b64 = base64.b64encode(open(path, "rb").read()).decode()
+            password = a[2] if len(a) > 2 else ""
+            if len(a) <= 2 and os.path.isfile(path + ".pass"):
+                password = open(path + ".pass").read().strip()
+    try:
+        r = onboard_by_code(code, token_text=token_text, p12_b64=p12_b64, password=password)
+    except hma_activation.ActivationError as e:
+        print("✗ code:", e); sys.exit(2)
+    except Exception as e:
+        print("✗", e); sys.exit(2)
+    print("✓", hma_activation.summary_line(r["license"]))
+    if r.get("needs_cert"):
+        print(" ", r["message"])
+    else:
+        s = r["status"]
+        print(f"  Đã nạp chứng chỉ → account {s['id']} ({s['name']}), "
+              f"{s['accounts']} account HMA, {s['locations']} vị trí sẵn sàng.")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "serve"
     a = sys.argv[2:]
+    # Run from the repo on the host, every path above defaults to the repo, not to the
+    # farm the manager container runs on ($FARM, from .env): a command that changes the
+    # farm would write somewhere the running farm never reads. Send it through the
+    # container instead (a standalone `serve` and read-only checks are fine here).
+    if not os.environ.get("PF_STATE") and cmd not in ("serve", "validate-code", "help", "-h", "--help") \
+            and os.path.isfile(os.path.join(HERE, "..", ".env")):
+        print("Farm này chạy trong Docker — chạy lệnh qua container:\n"
+              f"  docker exec pf-manager python3 farm.py {' '.join([cmd] + a)}\n"
+              "(file cần đọc thì đặt vào thư mục inbox của farm, trong container là /inbox/…)",
+              file=sys.stderr)
+        sys.exit(2)
     {"serve": lambda: serve(), "up": lambda: up(a), "down": lambda: down(a),
      "ls": lambda: ls(), "rotate": lambda: rotate(a),
      "stop": lambda: stop(a), "start": lambda: start(a),
      "logs": lambda: print(container_logs(a[0])) if a else print("logs <KEY>"),
+     "validate-code": lambda: _cli_validate_code(a),
+     "onboard-code": lambda: _cli_onboard_code(a),
      "autorotate": lambda: set_autorotate(a[:-1], a[-1]) if len(a) > 1 else print("autorotate <KEY..> <minutes>"),
      }.get(cmd, lambda: print(__doc__))()

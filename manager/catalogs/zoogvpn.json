@@ -1,0 +1,1160 @@
+{
+ "updated": "2026-10-04",
+ "servers": [
+  {
+   "host": "ae3.webunlim.com",
+   "ip": "185.155.96.133",
+   "country": "AE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "al2.webunlim.com",
+   "ip": "95.174.68.224",
+   "country": "AL",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "am1.webunlim.com",
+   "ip": "185.126.239.37",
+   "country": "AM",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "am2.webunlim.com",
+   "ip": "178.160.211.20",
+   "country": "AM",
+   "city": "Yerevan",
+   "virtual": false
+  },
+  {
+   "host": "ar1.webunlim.com",
+   "ip": "103.106.58.89",
+   "country": "AR",
+   "city": "Buenos Aires",
+   "virtual": false
+  },
+  {
+   "host": "at2.webunlim.com",
+   "ip": "89.39.64.26",
+   "country": "AT",
+   "city": "Vienna",
+   "virtual": false
+  },
+  {
+   "host": "au1.webunlim.com",
+   "ip": "51.161.198.193",
+   "country": "AU",
+   "city": "Sydney",
+   "virtual": false
+  },
+  {
+   "host": "au2.webunlim.com",
+   "ip": "103.106.231.54",
+   "country": "AU",
+   "city": "Sydney",
+   "virtual": false
+  },
+  {
+   "host": "az2.webunlim.com",
+   "ip": "92.223.62.173",
+   "country": "AZ",
+   "city": "Baku",
+   "virtual": false
+  },
+  {
+   "host": "bd1.webunlim.com",
+   "ip": "160.25.226.230",
+   "country": "BD",
+   "city": "Jessore",
+   "virtual": false
+  },
+  {
+   "host": "bd2.webunlim.com",
+   "ip": "45.119.133.111",
+   "country": "BD",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "be1.zoogvpn.com",
+   "ip": "88.119.165.165",
+   "country": "BE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "bg2.webunlim.com",
+   "ip": "82.118.18.156",
+   "country": "BG",
+   "city": "Sofia",
+   "virtual": false
+  },
+  {
+   "host": "bh1.webunlim.com",
+   "ip": "38.54.2.115",
+   "country": "BH",
+   "city": "Manama",
+   "virtual": false
+  },
+  {
+   "host": "bh2.webunlim.com",
+   "ip": "185.253.117.237",
+   "country": "BH",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "bo1.webunlim.com",
+   "ip": "200.25.80.80",
+   "country": "BO",
+   "city": "La Paz",
+   "virtual": false
+  },
+  {
+   "host": "by1.webunlim.com",
+   "ip": "185.93.173.247",
+   "country": "BY",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "by2.webunlim.com",
+   "ip": "185.66.68.174",
+   "country": "BY",
+   "city": "Minsk",
+   "virtual": false
+  },
+  {
+   "host": "by3.webunlim.com",
+   "ip": "95.128.71.88",
+   "country": "BY",
+   "city": "Minsk",
+   "virtual": false
+  },
+  {
+   "host": "by4.webunlim.com",
+   "ip": "87.252.237.169",
+   "country": "BY",
+   "city": "Minsk",
+   "virtual": false
+  },
+  {
+   "host": "ca1.zoogvpn.com",
+   "ip": "54.39.104.179",
+   "country": "CA",
+   "city": "Beauharnois",
+   "virtual": false
+  },
+  {
+   "host": "ca2.webunlim.com",
+   "ip": "71.19.249.50",
+   "country": "CA",
+   "city": "Vancouver",
+   "virtual": false
+  },
+  {
+   "host": "ch1.webunlim.com",
+   "ip": "217.79.184.68",
+   "country": "CH",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ch2.webunlim.com",
+   "ip": "23.166.88.105",
+   "country": "CH",
+   "city": "Zürich",
+   "virtual": false
+  },
+  {
+   "host": "ch3.webunlim.com",
+   "ip": "186.190.215.179",
+   "country": "CH",
+   "city": "Zürich",
+   "virtual": false
+  },
+  {
+   "host": "cl1.webunlim.com",
+   "ip": "64.176.10.44",
+   "country": "CL",
+   "city": "Santiago",
+   "virtual": false
+  },
+  {
+   "host": "co2.webunlim.com",
+   "ip": "38.180.182.16",
+   "country": "CO",
+   "city": "Bogotá",
+   "virtual": false
+  },
+  {
+   "host": "cy1.webunlim.com",
+   "ip": "185.191.206.139",
+   "country": "CY",
+   "city": "Nicosia",
+   "virtual": false
+  },
+  {
+   "host": "cy3.webunlim.com",
+   "ip": "185.233.118.202",
+   "country": "CY",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "cz1.webunlim.com",
+   "ip": "86.54.82.230",
+   "country": "CZ",
+   "city": "Prague",
+   "virtual": false
+  },
+  {
+   "host": "de1.webunlim.com",
+   "ip": "148.113.16.140",
+   "country": "DE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "de2.webunlim.com",
+   "ip": "147.78.1.22",
+   "country": "DE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "de4.webunlim.com",
+   "ip": "146.0.32.194",
+   "country": "DE",
+   "city": "Düsseldorf",
+   "virtual": false
+  },
+  {
+   "host": "de6.webunlim.com",
+   "ip": "23.95.79.97",
+   "country": "DE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "de7.webunlim.com",
+   "ip": "185.177.229.121",
+   "country": "DE",
+   "city": "Frankfurt am Main",
+   "virtual": false
+  },
+  {
+   "host": "de8.webunlim.com",
+   "ip": "170.101.109.141",
+   "country": "DE",
+   "city": "Frankfurt am Main",
+   "virtual": false
+  },
+  {
+   "host": "de9.webunlim.com",
+   "ip": "170.101.109.49",
+   "country": "DE",
+   "city": "Frankfurt am Main",
+   "virtual": false
+  },
+  {
+   "host": "dk1.webunlim.com",
+   "ip": "37.120.194.34",
+   "country": "DK",
+   "city": "Ballerup",
+   "virtual": false
+  },
+  {
+   "host": "ec1.webunlim.com",
+   "ip": "38.165.231.108",
+   "country": "EC",
+   "city": "Quito",
+   "virtual": false
+  },
+  {
+   "host": "ec2.webunlim.com",
+   "ip": "185.77.218.213",
+   "country": "EC",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ee1.webunlim.com",
+   "ip": "185.196.215.108",
+   "country": "EE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ee2.webunlim.com",
+   "ip": "185.155.97.59",
+   "country": "EE",
+   "city": "Tallinn",
+   "virtual": false
+  },
+  {
+   "host": "ee3.webunlim.com",
+   "ip": "185.253.116.197",
+   "country": "EE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ee4.webunlim.com",
+   "ip": "185.215.184.75",
+   "country": "EE",
+   "city": "Tallinn",
+   "virtual": false
+  },
+  {
+   "host": "eg1.webunlim.com",
+   "ip": "38.54.59.24",
+   "country": "EG",
+   "city": "Cairo",
+   "virtual": false
+  },
+  {
+   "host": "eg2.webunlim.com",
+   "ip": "38.54.59.41",
+   "country": "EG",
+   "city": "Cairo",
+   "virtual": false
+  },
+  {
+   "host": "es1.webunlim.com",
+   "ip": "172.81.104.205",
+   "country": "ES",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "es2.webunlim.com",
+   "ip": "45.154.206.246",
+   "country": "ES",
+   "city": "Barcelona",
+   "virtual": false
+  },
+  {
+   "host": "es3.webunlim.com",
+   "ip": "108.181.70.33",
+   "country": "ES",
+   "city": "Barcelona",
+   "virtual": false
+  },
+  {
+   "host": "es4.webunlim.com",
+   "ip": "46.34.44.2",
+   "country": "ES",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "fi1.webunlim.com",
+   "ip": "194.34.134.177",
+   "country": "FI",
+   "city": "Helsinki",
+   "virtual": false
+  },
+  {
+   "host": "fi4.webunlim.com",
+   "ip": "77.83.247.219",
+   "country": "FI",
+   "city": "Helsinki",
+   "virtual": false
+  },
+  {
+   "host": "fi5.webunlim.com",
+   "ip": "91.221.67.28",
+   "country": "FI",
+   "city": "Helsinki",
+   "virtual": false
+  },
+  {
+   "host": "fr1.webunlim.com",
+   "ip": "82.102.19.106",
+   "country": "FR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "fr2.webunlim.com",
+   "ip": "170.80.111.12",
+   "country": "FR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "fr3.webunlim.com",
+   "ip": "62.210.95.58",
+   "country": "FR",
+   "city": "Paris",
+   "virtual": false
+  },
+  {
+   "host": "uk1.webunlim.com",
+   "ip": "37.120.193.146",
+   "country": "GB",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "uk4.webunlim.com",
+   "ip": "95.168.176.100",
+   "country": "GB",
+   "city": "London",
+   "virtual": false
+  },
+  {
+   "host": "uk5.webunlim.com",
+   "ip": "136.243.97.74",
+   "country": "GB",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ge1.webunlim.com",
+   "ip": "195.54.178.85",
+   "country": "GE",
+   "city": "Tbilisi",
+   "virtual": false
+  },
+  {
+   "host": "ge2.webunlim.com",
+   "ip": "185.104.192.18",
+   "country": "GE",
+   "city": "Tbilisi",
+   "virtual": false
+  },
+  {
+   "host": "gr1.webunlim.com",
+   "ip": "192.71.166.146",
+   "country": "GR",
+   "city": "Thessaloníki",
+   "virtual": false
+  },
+  {
+   "host": "gt1.webunlim.com",
+   "ip": "185.9.16.90",
+   "country": "GT",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "gt2.webunlim.com",
+   "ip": "178.175.137.137",
+   "country": "GT",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "hk1.webunlim.com",
+   "ip": "154.3.34.74",
+   "country": "HK",
+   "city": "Kwai Chung",
+   "virtual": false
+  },
+  {
+   "host": "hk2.webunlim.com",
+   "ip": "154.3.37.85",
+   "country": "HK",
+   "city": "Kwai Chung",
+   "virtual": false
+  },
+  {
+   "host": "hk3.webunlim.com",
+   "ip": "181.215.205.165",
+   "country": "HK",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "hk5.webunlim.com",
+   "ip": "154.3.38.49",
+   "country": "HK",
+   "city": "Kwai Chung",
+   "virtual": false
+  },
+  {
+   "host": "hk7.webunlim.com",
+   "ip": "216.106.187.78",
+   "country": "HK",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "hk9.webunlim.com",
+   "ip": "172.81.111.136",
+   "country": "HK",
+   "city": "Mantin Heights",
+   "virtual": false
+  },
+  {
+   "host": "hr2.webunlim.com",
+   "ip": "185.62.75.62",
+   "country": "HR",
+   "city": "Zagreb",
+   "virtual": false
+  },
+  {
+   "host": "hu1.webunlim.com",
+   "ip": "91.219.236.113",
+   "country": "HU",
+   "city": "Budapest",
+   "virtual": false
+  },
+  {
+   "host": "hu2.webunlim.com",
+   "ip": "38.180.108.88",
+   "country": "HU",
+   "city": "Budapest",
+   "virtual": false
+  },
+  {
+   "host": "id2.webunlim.com",
+   "ip": "124.158.117.134",
+   "country": "ID",
+   "city": "Jakarta",
+   "virtual": false
+  },
+  {
+   "host": "ie1.webunlim.com",
+   "ip": "5.255.116.202",
+   "country": "IE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "in1.webunlim.com",
+   "ip": "151.242.189.81",
+   "country": "IN",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "iq1.webunlim.com",
+   "ip": "38.60.190.7",
+   "country": "IQ",
+   "city": "Baghdad",
+   "virtual": false
+  },
+  {
+   "host": "is1.webunlim.com",
+   "ip": "192.71.218.118",
+   "country": "IS",
+   "city": "Hafnarfjörður",
+   "virtual": false
+  },
+  {
+   "host": "it1.webunlim.com",
+   "ip": "185.233.119.112",
+   "country": "IT",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "it2.webunlim.com",
+   "ip": "149.62.186.15",
+   "country": "IT",
+   "city": "Cumiana",
+   "virtual": false
+  },
+  {
+   "host": "it5.webunlim.com",
+   "ip": "185.201.66.227",
+   "country": "IT",
+   "city": "Druento",
+   "virtual": false
+  },
+  {
+   "host": "it6.webunlim.com",
+   "ip": "185.213.20.245",
+   "country": "IT",
+   "city": "Arezzo",
+   "virtual": false
+  },
+  {
+   "host": "jp1.webunlim.com",
+   "ip": "151.248.68.76",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp2.webunlim.com",
+   "ip": "154.90.34.39",
+   "country": "JP",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "jp3.webunlim.com",
+   "ip": "45.11.1.94",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp4.webunlim.com",
+   "ip": "151.248.68.148",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp5.webunlim.com",
+   "ip": "5.180.77.160",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp6.webunlim.com",
+   "ip": "146.70.237.126",
+   "country": "JP",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "jp7.webunlim.com",
+   "ip": "216.238.54.21",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp8.webunlim.com",
+   "ip": "5.180.77.194",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "jp9.webunlim.com",
+   "ip": "5.180.77.190",
+   "country": "JP",
+   "city": "Tokyo",
+   "virtual": false
+  },
+  {
+   "host": "kh2.webunlim.com",
+   "ip": "46.16.131.63",
+   "country": "KH",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "kr1.webunlim.com",
+   "ip": "115.187.18.140",
+   "country": "KR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "kr2.webunlim.com",
+   "ip": "119.59.105.242",
+   "country": "KR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "kr3.webunlim.com",
+   "ip": "79.110.55.146",
+   "country": "KR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "kz2.webunlim.com",
+   "ip": "185.91.126.40",
+   "country": "KZ",
+   "city": "Karagandy",
+   "virtual": false
+  },
+  {
+   "host": "kz3.webunlim.com",
+   "ip": "185.146.0.65",
+   "country": "KZ",
+   "city": "Almaty",
+   "virtual": false
+  },
+  {
+   "host": "lt1.webunlim.com",
+   "ip": "88.119.165.57",
+   "country": "LT",
+   "city": "Šiauliai",
+   "virtual": false
+  },
+  {
+   "host": "lt2.webunlim.com",
+   "ip": "88.119.165.154",
+   "country": "LT",
+   "city": "Šiauliai",
+   "virtual": false
+  },
+  {
+   "host": "lt3.webunlim.com",
+   "ip": "91.132.94.198",
+   "country": "LT",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "lv1.webunlim.com",
+   "ip": "185.28.47.87",
+   "country": "LV",
+   "city": "Riga",
+   "virtual": false
+  },
+  {
+   "host": "lv2.webunlim.com",
+   "ip": "51.15.25.161",
+   "country": "LV",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "lv3.webunlim.com",
+   "ip": "185.72.86.55",
+   "country": "LV",
+   "city": "Riga",
+   "virtual": false
+  },
+  {
+   "host": "ma1.webunlim.com",
+   "ip": "188.214.157.22",
+   "country": "MA",
+   "city": "Fes",
+   "virtual": false
+  },
+  {
+   "host": "md2.webunlim.com",
+   "ip": "80.96.108.221",
+   "country": "MD",
+   "city": "Chisinau",
+   "virtual": false
+  },
+  {
+   "host": "mk1.webunlim.com",
+   "ip": "45.153.126.141",
+   "country": "MK",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "mx1.webunlim.com",
+   "ip": "151.242.189.243",
+   "country": "MX",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "my1.webunlim.com",
+   "ip": "154.90.39.89",
+   "country": "MY",
+   "city": "Kuala Lumpur",
+   "virtual": false
+  },
+  {
+   "host": "my2.webunlim.com",
+   "ip": "103.117.141.253",
+   "country": "MY",
+   "city": "Cyberjaya",
+   "virtual": false
+  },
+  {
+   "host": "my3.webunlim.com",
+   "ip": "103.175.16.119",
+   "country": "MY",
+   "city": "Cyberjaya",
+   "virtual": false
+  },
+  {
+   "host": "ng2.webunlim.com",
+   "ip": "176.97.192.123",
+   "country": "NG",
+   "city": "Lagos",
+   "virtual": false
+  },
+  {
+   "host": "nl1.webunlim.com",
+   "ip": "85.17.73.16",
+   "country": "NL",
+   "city": "Lelystad",
+   "virtual": false
+  },
+  {
+   "host": "nl3.zoogvpn.com",
+   "ip": "213.227.149.249",
+   "country": "NL",
+   "city": "Lelystad",
+   "virtual": false
+  },
+  {
+   "host": "nl5.webunlim.com",
+   "ip": "51.158.204.123",
+   "country": "NL",
+   "city": "Amsterdam",
+   "virtual": false
+  },
+  {
+   "host": "nl7.webunlim.com",
+   "ip": "77.75.230.77",
+   "country": "NL",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "no1.webunlim.com",
+   "ip": "185.90.61.87",
+   "country": "NO",
+   "city": "Sandefjord",
+   "virtual": false
+  },
+  {
+   "host": "no3.webunlim.com",
+   "ip": "195.16.73.163",
+   "country": "NO",
+   "city": "Sandefjord",
+   "virtual": false
+  },
+  {
+   "host": "np1.webunlim.com",
+   "ip": "38.54.71.61",
+   "country": "NP",
+   "city": "Kathmandu",
+   "virtual": false
+  },
+  {
+   "host": "np2.webunlim.com",
+   "ip": "45.154.206.179",
+   "country": "NP",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "nz1.zoogvpn.com",
+   "ip": "103.96.117.213",
+   "country": "NZ",
+   "city": "Auckland",
+   "virtual": false
+  },
+  {
+   "host": "om1.webunlim.com",
+   "ip": "38.60.243.79",
+   "country": "OM",
+   "city": "Muscat",
+   "virtual": false
+  },
+  {
+   "host": "om2.webunlim.com",
+   "ip": "38.54.116.91",
+   "country": "OM",
+   "city": "Muscat",
+   "virtual": false
+  },
+  {
+   "host": "pk2.webunlim.com",
+   "ip": "103.171.122.128",
+   "country": "PK",
+   "city": "Islamabad",
+   "virtual": false
+  },
+  {
+   "host": "pl1.webunlim.com",
+   "ip": "146.59.110.224",
+   "country": "PL",
+   "city": "Warsaw",
+   "virtual": false
+  },
+  {
+   "host": "pl2.webunlim.com",
+   "ip": "37.235.48.142",
+   "country": "PL",
+   "city": "Warsaw",
+   "virtual": false
+  },
+  {
+   "host": "pl3.webunlim.com",
+   "ip": "154.12.177.68",
+   "country": "PL",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "pr2.webunlim.com",
+   "ip": "185.90.61.23",
+   "country": "PR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "pt2.webunlim.com",
+   "ip": "185.231.233.190",
+   "country": "PT",
+   "city": "Lisbon",
+   "virtual": false
+  },
+  {
+   "host": "qa1.webunlim.com",
+   "ip": "156.244.41.251",
+   "country": "QA",
+   "city": "Doha",
+   "virtual": false
+  },
+  {
+   "host": "qa2.webunlim.com",
+   "ip": "151.248.68.61",
+   "country": "QA",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ro1.webunlim.com",
+   "ip": "31.14.41.73",
+   "country": "RO",
+   "city": "Bucharest",
+   "virtual": false
+  },
+  {
+   "host": "ro2.webunlim.com",
+   "ip": "31.14.40.199",
+   "country": "RO",
+   "city": "Bucharest",
+   "virtual": false
+  },
+  {
+   "host": "ru4.webunlim.com",
+   "ip": "151.115.88.188",
+   "country": "RU",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "sa1.webunlim.com",
+   "ip": "141.11.139.247",
+   "country": "SA",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "sa2.webunlim.com",
+   "ip": "156.244.8.56",
+   "country": "SA",
+   "city": "Riyadh",
+   "virtual": false
+  },
+  {
+   "host": "se1.webunlim.com",
+   "ip": "151.242.188.225",
+   "country": "SE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "se2.webunlim.com",
+   "ip": "141.95.72.22",
+   "country": "SE",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "sg2.webunlim.com",
+   "ip": "45.88.42.220",
+   "country": "SG",
+   "city": "Singapore",
+   "virtual": false
+  },
+  {
+   "host": "sg3.webunlim.com",
+   "ip": "45.88.42.225",
+   "country": "SG",
+   "city": "Singapore",
+   "virtual": false
+  },
+  {
+   "host": "sg5.webunlim.com",
+   "ip": "5.255.103.96",
+   "country": "SG",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "si1.webunlim.com",
+   "ip": "95.141.35.11",
+   "country": "SI",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "sk1.webunlim.com",
+   "ip": "198.176.54.243",
+   "country": "SK",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "th1.webunlim.com",
+   "ip": "140.235.39.196",
+   "country": "TH",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "tr2.webunlim.com",
+   "ip": "88.218.3.210",
+   "country": "TR",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "tr3.webunlim.com",
+   "ip": "89.144.10.17",
+   "country": "TR",
+   "city": "Istanbul",
+   "virtual": false
+  },
+  {
+   "host": "ua1.webunlim.com",
+   "ip": "185.149.40.87",
+   "country": "UA",
+   "city": "Kyiv",
+   "virtual": false
+  },
+  {
+   "host": "ua10.webunlim.com",
+   "ip": "206.53.55.53",
+   "country": "UA",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "ua11.webunlim.com",
+   "ip": "80.71.158.3",
+   "country": "UA",
+   "city": "Kremenchuk",
+   "virtual": false
+  },
+  {
+   "host": "ua2.zoogvpn.com",
+   "ip": "195.234.6.171",
+   "country": "UA",
+   "city": "Kyiv",
+   "virtual": false
+  },
+  {
+   "host": "ua3.webunlim.com",
+   "ip": "185.233.116.74",
+   "country": "UA",
+   "city": "Kyiv",
+   "virtual": false
+  },
+  {
+   "host": "ua4.webunlim.com",
+   "ip": "193.169.241.100",
+   "country": "UA",
+   "city": "Kyiv",
+   "virtual": false
+  },
+  {
+   "host": "ua5.webunlim.com",
+   "ip": "194.247.12.129",
+   "country": "UA",
+   "city": "Kyiv",
+   "virtual": false
+  },
+  {
+   "host": "us1-central.webunlim.com",
+   "ip": "178.160.211.148",
+   "country": "US",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "us1-west.webunlim.com",
+   "ip": "169.197.142.53",
+   "country": "US",
+   "city": "Santa Clara",
+   "virtual": false
+  },
+  {
+   "host": "us2-east.webunlim.com",
+   "ip": "104.140.201.82",
+   "country": "US",
+   "city": "New York City",
+   "virtual": false
+  },
+  {
+   "host": "us2-west.webunlim.com",
+   "ip": "216.106.185.76",
+   "country": "US",
+   "city": "Santa Clara",
+   "virtual": false
+  },
+  {
+   "host": "us3-central.webunlim.com",
+   "ip": "167.17.67.46",
+   "country": "US",
+   "city": "Dallas",
+   "virtual": false
+  },
+  {
+   "host": "us3-west.webunlim.com",
+   "ip": "109.169.67.21",
+   "country": "US",
+   "city": "",
+   "virtual": true
+  },
+  {
+   "host": "us4-east.webunlim.com",
+   "ip": "23.229.0.242",
+   "country": "US",
+   "city": "Buffalo",
+   "virtual": false
+  },
+  {
+   "host": "us5-east.webunlim.com",
+   "ip": "167.17.69.42",
+   "country": "US",
+   "city": "New York City",
+   "virtual": false
+  },
+  {
+   "host": "us6-east.webunlim.com",
+   "ip": "108.181.56.67",
+   "country": "US",
+   "city": "Ashburn",
+   "virtual": false
+  },
+  {
+   "host": "us7-east.webunlim.com",
+   "ip": "66.23.202.154",
+   "country": "US",
+   "city": "New York City",
+   "virtual": false
+  },
+  {
+   "host": "uz1.webunlim.com",
+   "ip": "89.31.28.119",
+   "country": "UZ",
+   "city": "Tashkent",
+   "virtual": false
+  },
+  {
+   "host": "vn1.webunlim.com",
+   "ip": "103.163.219.200",
+   "country": "VN",
+   "city": "Hanoi",
+   "virtual": false
+  },
+  {
+   "host": "vn3.webunlim.com",
+   "ip": "103.163.219.166",
+   "country": "VN",
+   "city": "Hanoi",
+   "virtual": false
+  }
+ ]
+}
