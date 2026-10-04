@@ -1451,6 +1451,27 @@ class H(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "status": st}))
+        elif p == "/api/provider/hma-tag":
+            # Attach a validated activation code to the HMA account that already has a
+            # certificate. No shell, no background work — just records the code + licence.
+            try:
+                v = hma_activation.validate_code(data.get("code", ""))
+            except hma_activation.ActivationError as e:
+                return self._send(400, json.dumps({"error": str(e), "kind": "activation"}))
+            accs = accounts("hma")
+            if not accs:
+                return self._send(400, json.dumps({"error": "Chưa có chứng chỉ HMA để gắn code",
+                                                   "needs_cert": True}))
+            aid = data.get("id") or accs[0]["id"]
+            prov = load_providers()
+            for x in prov["accounts"]:
+                if x["id"] == aid:
+                    x["code"] = v["code"]
+                    x["license"] = {k: v.get(k) for k in ("license_id", "product", "schema",
+                                    "mode", "expires_date", "devices_used", "devices_max")}
+            save_providers(prov)
+            return self._send(200, json.dumps({"ok": True, "license":
+                {k: v[k] for k in v if k != "raw"}, "account": aid}))
         elif p == "/api/provider/hma-code":
             try:
                 r = onboard_by_code(data.get("code", ""), token_text=data.get("token"),
