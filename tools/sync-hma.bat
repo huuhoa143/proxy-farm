@@ -21,7 +21,7 @@ for %%P in (
   "%LOCALAPPDATA%\HMA VPN\state\vpn\tokenCoreSE.json"
   "%APPDATA%\HMA VPN\state\vpn\tokenCoreSE.json"
 ) do (
-  if exist %%~P if not defined SRC set "SRC=%%~P"
+  if exist "%%~P" if not defined SRC set "SRC=%%~P"
 )
 
 if not defined SRC (

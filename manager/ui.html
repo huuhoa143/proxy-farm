@@ -701,7 +701,7 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
             <p class="note" style="margin:12px 0 0">Đường dẫn file trên máy macOS đã cài app HMA:</p>
             <div class="cmd" style="margin-top:7px"><code id="hmaPath">/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json</code>
               <button class="btn ghost sm" id="copyHmaPath"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
-            <div class="cmd" style="margin-top:9px"><code id="hmaBoot">sudo bash tools/hma-bootstrap-cert.sh &lt;ACTIVATION-CODE&gt;</code>
+            <div class="cmd" style="margin-top:9px"><code id="hmaBoot">bash tools/hma-bootstrap-cert.sh &lt;ACTIVATION-CODE&gt;</code>
               <button class="btn ghost sm" id="copyHmaBoot"><svg class="i"><use href="#ic-copy"/></svg><span>Chép</span></button></div>
           </div>
         </details>
@@ -896,10 +896,13 @@ function quotaLeft(k){ const p=provByKey(k); const cap=p&&(p.pool?p.capacity:p.l
   if(!cap)return Infinity; return Math.max(0,cap-p.used) }
 function refusedMsg(refused){
   if(!refused||!refused.length)return '';
-  const plan=refused.filter(r=>r.reason==='plan').length;
-  if(plan===refused.length)return `${plan} cổng (gói của bạn không cho dùng các máy chủ đó)`;
-  const by={}; for(const r of refused)(by[r.provider]=by[r.provider]||{n:0,limit:r.limit}).n++;
-  return Object.entries(by).map(([k,v])=>`${v.n} cổng ${k.toUpperCase()} (đã đủ ${v.limit})`).join(', ');
+  const plan=refused.filter(r=>r.reason==='plan').length, gone=refused.filter(r=>r.reason==='gone').length;
+  const by={}; for(const r of refused)if(r.reason!=='plan'&&r.reason!=='gone')
+    (by[r.provider]=by[r.provider]||{n:0,limit:r.limit}).n++;
+  return [plan&&`${plan} cổng (gói của bạn không cho dùng các máy chủ đó)`,
+    gone&&`${gone} cổng (máy chủ không còn trong danh sách của nhà cung cấp — hãy xoá)`,
+    ...Object.entries(by).map(([k,v])=>`${v.n} cổng ${k.toUpperCase()} (đã đủ ${v.limit})`)]
+    .filter(Boolean).join(', ');
 }
 async function loadLocs(){LOCS=await j('/api/locations');HAS_TARGETS=LOCS.locations.length>0;await loadProvs()}
 // Which provider a location belongs to, for the drawer's filter.
@@ -1305,16 +1308,22 @@ function showLic(L){
     HMA_LIC=L; msg.className='lic ok';
     const slots=L.devices_max?`${L.devices_used}/${L.devices_max} thiết bị`:'';
     const hasCert=!$('#hmaReady').hidden;
+    // The licence does not name its device: with several HMA accounts, the user picks.
+    const accs=(PROVS.find(p=>p.id==='hma')||{}).accounts||[];
+    const pick=accs.length>1?`<select id="hmaUseAcc" style="margin-left:auto">`+
+      accs.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}${a.udid?' · '+esc(String(a.udid).slice(0,8)):''}${a.code_tail?' · …'+esc(a.code_tail):''}</option>`).join('')+
+      `</select>`:'';
     msg.innerHTML=`<svg class="i" style="color:var(--acc)"><use href="#ic-check"/></svg>`+
       `<b>${esc(L.product||'HMA')}</b><span class="sep">·</span>`+
       `<span class="mt">hạn ${esc(L.expires_date||'?')}</span>`+
       (slots?`<span class="sep">·</span><span class="mt">${slots}</span>`:'')+
-      (hasCert?`<button class="btn primary sm" id="hmaUse" style="margin-left:auto"><span>Dùng code này</span></button>`
+      (hasCert?pick+`<button class="btn primary sm" id="hmaUse" style="margin-left:${pick?'8px':'auto'}"><span>Dùng code này</span></button>`
               :`<span class="mt" style="margin-left:auto">✓ hợp lệ — nhờ quản trị nạp chứng chỉ (bên dưới)</span>`);
     const use=$('#hmaUse');
     if(use)use.onclick=async()=>{
       use.disabled=true;
-      const r=await fetch('/api/provider/hma-tag',{method:'POST',body:JSON.stringify({code:L.code})});
+      const id=$('#hmaUseAcc')?.value;
+      const r=await fetch('/api/provider/hma-tag',{method:'POST',body:JSON.stringify({code:L.code,id})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok||d.error){use.disabled=false;return toast(d.error||('Lỗi '+r.status))}
       await loadProviders();
@@ -1482,7 +1491,8 @@ async function rowAct(a,k,btn){
   if(busy.has(k))return;busy.add(k);if(btn)btn.classList.add('spin');
   const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({keys:[k]})});
   const miss=refusedMsg(r&&r.refused);
-  toast(miss?`Không bật: ${miss}. Tắt bớt cổng khác hoặc tăng giới hạn.`
+  const cap=(r&&r.refused||[]).some(x=>x.reason!=='plan'&&x.reason!=='gone');
+  toast(miss?`Không bật: ${miss}.`+(cap?' Tắt bớt cổng khác hoặc tăng giới hạn.':'')
             :{rotate:'Đang đổi IP…',start:'Đang bật cổng…',stop:'Đã tắt cổng'}[a]||'Xong');
   busy.delete(k);await loadProvs();tick();
 }
@@ -1550,9 +1560,10 @@ const WHY={
   nohandshake:'WireGuard không bắt tay được — key sai, đã thu hồi, hoặc tài khoản hết gói.',
   badlogin:'Máy chủ từ chối đăng nhập — kiểm tra email và mật khẩu.',
   keychanged:'Chứng chỉ máy chủ đã hết hạn và khoá khác lần trước — từ chối để an toàn.',
-  refused:'Mật khẩu đúng nhưng máy chủ này không nhận tài khoản: thường là gói của bạn không gồm máy chủ đó. Farm ghi nhớ và chuyển cổng sang tài khoản khác nếu có.'};
+  refused:'Máy chủ này không nhận tài khoản: gói của bạn không gồm máy chủ đó. Farm ghi nhớ và chuyển cổng sang tài khoản khác nếu có.',
+  eaprefused:'Mật khẩu đúng nhưng máy chủ từ chối phiên — có thể máy chủ còn giữ phiên cũ, đang giới hạn tạm thời, hoặc gói không gồm máy chủ này. Nếu cứ lặp lại, farm coi là gói không hỗ trợ và chuyển cổng sang tài khoản khác.'};
 const WHY_SHORT={nodata:'không có dữ liệu',silent:'không trả lời',noconnect:'chưa lên',dead:'mất kết nối',
-  nohandshake:'không bắt tay',badlogin:'sai tài khoản',keychanged:'khoá máy chủ đổi',refused:'gói không hỗ trợ'};
+  nohandshake:'không bắt tay',badlogin:'sai tài khoản',keychanged:'khoá máy chủ đổi',refused:'gói không hỗ trợ',eaprefused:'bị từ chối phiên'};
 // What an attempt is doing right now (<key>.phase.json).
 const PHASE={queue:'Chờ lượt',handshake:'Đang bắt tay',verify:'Chờ dữ liệu'};
 const PHASE_WHY={queue:'Chờ vài giây trước khi kết nối để các cổng không bật dồn một lúc.',

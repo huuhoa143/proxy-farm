@@ -18,7 +18,7 @@ without a destructive full app reset. That wall is documented in README + memory
 
 So onboarding is two steps:
   1. validate_code(code)                     — off-device, here.  Proves ownership.
-  2. provide the device cert bundle once      — bootstrap_cert.sh on a machine that
+  2. provide the device cert bundle once      — tools/hma-bootstrap-cert.sh on a machine that
      has the app, OR paste a tokenCoreSE.json / .p12.  The farm then runs it on any
      platform forever (the cert is valid until the subscription expires).
 

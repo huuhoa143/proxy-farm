@@ -325,8 +325,17 @@ thiết bị — không bắt buộc để chạy.
 
 Lấy chứng chỉ từ một máy **có** app rồi nạp thủ công (Nhà cung cấp → HMA → *Cách khác*):
 kéo thả `tokenCoreSE.json` (macOS: `/Library/Application Support/HMA VPN/state/vpn/`) hoặc
-file `.p12`. Hoặc chạy `sudo bash tools/hma-bootstrap-cert.sh <CODE>` trên máy có app để
-xuất ra `.p12` portable.
+file `.p12`. Hoặc chạy `bash tools/hma-bootstrap-cert.sh <CODE>` trên máy có app: nó xuất
+`device.p12` + `device.p12.pass` (mode 600) và ghi lệnh cần chạy vào `onboard.txt`. Chép hai
+file đó vào thư mục inbox của farm kia (`$FARM/inbox`, mặc định `~/proxy-farm/inbox`) rồi:
+
+```sh
+docker exec pf-manager python3 farm.py onboard-code <CODE> /inbox/device.p12
+```
+
+Lệnh `farm.py` luôn chạy **qua container** (`docker exec pf-manager …`): chạy thẳng trên
+host, nó sẽ ghi vào thư mục repo chứ không phải dữ liệu của farm đang chạy, nên farm.py từ
+chối và in ra lệnh đúng.
 </details>
 
 ## Giới hạn đã biết

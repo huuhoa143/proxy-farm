@@ -80,12 +80,16 @@ _pin_expired() {
   swanctl --list-certs --pem 2>/dev/null > /run/certs.pem
   rm -f /run/c*.crt
   awk '/BEGIN CERT/{f=1;c++} f{print > ("/run/c" c ".crt")} /END CERT/{f=0}' /run/certs.pem
+  # Compare the CN as a string: RID is a host name, its dots are not regex wildcards,
+  # and the subject may carry more fields after the CN (O, OU...).
   leaf=""
   for f in /run/c*.crt; do
-    openssl x509 -in "$f" -noout -subject 2>/dev/null | grep -q "CN *= *$RID\$" && { leaf=$f; break; }
+    cn=$(openssl x509 -in "$f" -noout -subject -nameopt multiline 2>/dev/null |
+         sed -n 's/^ *commonName *= *//p' | head -1)
+    [ "$cn" = "$RID" ] && { leaf=$f; break; }
   done
   [ -n "$leaf" ] || { echo "pin: không thấy chứng chỉ của $RID" >&2; return 1; }
-  cat /ca/*.pem > /run/untrusted.pem
+  cat /ca/*.pem /secrets/ca-*.pem > /run/untrusted.pem 2>/dev/null
   openssl verify -no_check_time -CAfile /etc/ssl/certs/ca-certificates.crt \
     -untrusted /run/untrusted.pem "$leaf" >/dev/null 2>&1 ||
     { echo "pin: chứng chỉ $RID không do CA hợp lệ cấp — từ chối" >&2; return 1; }
@@ -110,7 +114,14 @@ driver_up() {
 
   mkdir -p /etc/swanctl/conf.d /etc/swanctl/x509ca /etc/swanctl/pubkey
   rm -f /etc/swanctl/conf.d/* /etc/swanctl/pubkey/*
+  # Public roots, plus the intermediates some gateways leave out of their chain (shipped
+  # in /ca, or dropped next to a provider's login as /secrets/ca-*.pem): without them a
+  # valid certificate cannot be chained and the connection fails outright.
+  rm -f /etc/swanctl/x509ca/*
   cp /usr/share/ca-certificates/mozilla/*.crt /etc/swanctl/x509ca/ 2>/dev/null || true
+  # One certificate per file: swanctl reads only the first of a bundle.
+  cat /ca/*.pem /secrets/ca-*.pem 2>/dev/null |
+    awk '/BEGIN CERT/{f=1;c++} f{print > ("/etc/swanctl/x509ca/farm-" c ".pem")} /END CERT/{f=0}'
   # A random local port each attempt (same reason as OUTER_UDP_PORTS elsewhere); no
   # online revocation checks, the tunnel is not up yet to reach the responders; and keep
   # our own resolv.conf instead of the pushed DNS.
@@ -168,12 +179,13 @@ EOC
       if grep -q "EAP method EAP_MSCHAPV2 failed" /run/charon.log; then
         echo "eap: sai email hoặc mật khẩu" >&2; echo badlogin > /run/why; break
       fi
-      # Password accepted, access refused anyway. That is NOT proof of a connection cap:
-      # the server also does it while it still holds sessions from earlier attempts, or
-      # while it rate-limits the account. Say what happened, guess nothing.
+      # Password accepted, access refused anyway. That is NOT proof of anything on its
+      # own: plans that exclude a server answer this way, but so does a server still
+      # holding sessions from earlier attempts, or one rate-limiting the account. Report
+      # it as its own reason; the farm only treats it as a plan refusal once it repeats.
       if grep -q "received EAP_FAILURE" /run/charon.log; then
         echo "eap: đăng nhập đúng nhưng máy chủ từ chối phiên này" >&2
-        echo refused > /run/why; break
+        echo eaprefused > /run/why; break
       fi
       # Refused before EAP even starts. ZoogVPN answers this way, every time, on servers
       # the account's plan does not cover (the other half answer with EAP_FAILURE). A
@@ -191,7 +203,7 @@ driver_down() { swanctl --terminate --ike vpn --force --timeout 3 >/dev/null 2>&
 driver_established() { swanctl --list-sas 2>/dev/null | grep -q INSTALLED; }
 
 driver_stuck() {
-  [ -s /run/why ] && grep -qE "badlogin|keychanged|refused" /run/why && return 0
+  [ -s /run/why ] && grep -qxE "badlogin|keychanged|refused|eaprefused" /run/why && return 0
   sas=$(swanctl --list-sas 2>/dev/null)
   if ! echo "$sas" | grep -q ESTABLISHED; then
     # Not a word back after ~20 s: give up. A gateway that answers but is still checking
