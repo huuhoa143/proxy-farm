@@ -244,6 +244,53 @@ def import_hma(token_text=None, p12_b64=None, password=None, code=None, license_
     return {"id": a["id"], "name": account_name(a), "locations": len(vendors.HMA_LOCATIONS),
             "accounts": len(accounts("hma")), **info}
 
+def import_hma_ovpn(bundle_text):
+    """Install the HMA Windows OpenVPN login as an account and refresh its server
+    catalog. tools/sync-hma.bat writes the bundle (username/password, the shared CA, and
+    a location->server-IP catalog) to the inbox; one login drives every location as a
+    pool. Re-syncing refreshes the rotating password and the catalog in place."""
+    try:
+        d = json.loads(bundle_text.lstrip("﻿"))   # tolerate a UTF-8 BOM from the helper
+    except Exception as e:
+        raise ValueError(f"Không đọc được bundle HMA-OpenVPN: {e}")
+    user = (d.get("user") or "").strip()
+    pw = d.get("pass") or ""
+    ca = (d.get("ca") or "").strip()
+    if not (user and pw and ca):
+        raise ValueError("Bundle thiếu user/pass/ca")
+    locs = [l for l in ((d.get("catalog") or {}).get("locations") or []) if l.get("ip")]
+    # A credentials-only sync carries no catalog: keep whatever the last full sync wrote
+    # (or the bundled seed) rather than wiping the server list.
+    if locs:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        tmp = os.path.join(DATA_DIR, ".hma-ovpn-catalog.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"fetched": int(time.time()), "locations": locs}, f, ensure_ascii=False)
+        os.replace(tmp, os.path.join(DATA_DIR, "hma-ovpn-catalog.json"))
+    elif not vendors.hmaovpn_targets(DATA_DIR):
+        raise ValueError("Bundle không có danh sách máy chủ và farm cũng chưa có — "
+                         "chạy Sync đầy đủ (dò máy chủ) một lần")
+    # One account per login: re-syncing updates its (rotating) password and CA rather
+    # than adding a second copy of every location.
+    prov = load_providers()
+    clean = {"ovpn_user": user, "ovpn_pass": pw, "ca": ca,
+             "cred_sha": token_sha(user + "\n" + pw + "\n" + ca)}
+    a = next(iter(accounts("hmaovpn", prov)), None)
+    if a:
+        for x in prov["accounts"]:
+            if x["id"] == a["id"]: x.update(imported=int(time.time()), **clean)
+        save_providers(prov)
+    else:
+        a = add_account("hmaovpn", clean, user[:18] + "…" if len(user) > 19 else user)
+        prov = load_providers()
+        for x in prov["accounts"]:
+            if x["id"] == a["id"]: x["imported"] = int(time.time())
+        save_providers(prov)
+    clear_acct_state(a["id"], "broken")
+    return {"id": a["id"], "name": account_name(a),
+            "locations": len(vendors.hmaovpn_targets(DATA_DIR)),
+            "accounts": len(accounts("hmaovpn"))}
+
 def onboard_by_code(code, token_text=None, p12_b64=None, password=None, require_hma=True):
     """Onboard an HMA subscription by its activation code.
 
@@ -327,6 +374,19 @@ def ingest_inbox():
                 try: import_hma(token_text=text)
                 except Exception: _INBOX_FAILED.add(sha); raise
                 done.append(("hma", fn))
+            elif fn == "hma-ovpn.json":
+                # The Windows sync bundle (credentials + optional catalog). Left in place
+                # like the HMA token — the auto-sync task rewrites it and the farm re-imports
+                # only when its content changed, so the UI button always finds something.
+                text = open(path, encoding="utf-8").read()
+                try: d = json.loads(text.lstrip("﻿"))
+                except Exception: d = {}
+                sha = token_sha((d.get("user") or "") + "\n" + (d.get("pass") or "") + "\n" + (d.get("ca") or ""))
+                if sha in _INBOX_FAILED or any(x.get("cred_sha") == sha for x in accounts("hmaovpn")):
+                    continue
+                try: import_hma_ovpn(text)
+                except Exception: _INBOX_FAILED.add(sha); raise
+                done.append(("hmaovpn", fn))
             elif fn.endswith((".conf", ".ovpn")):
                 save_config(fn, open(path, encoding="utf-8").read())
                 os.remove(path)
@@ -648,7 +708,7 @@ def delete_provider(pid, reassign=True):
 # more than the cap rather than let the provider kick sessions. 0 = no limit.
 # HMA: no limit — 20+ concurrent ran stable; what broke big farms was stuck reconnects,
 # not the count. HMA ends every session after ~4.5 h; the watchdog reconnects in seconds.
-DEFAULT_LIMITS = {"hma": 0, "protonvpn": 10, "proton": 10, "nordvpn": 10, "mullvad": 5,
+DEFAULT_LIMITS = {"hma": 0, "hmaovpn": 0, "protonvpn": 10, "proton": 10, "nordvpn": 10, "mullvad": 5,
                   "expressvpn": 8, "cyberghost": 7, "surfshark": 0, "zoogvpn": 0, "pia": 0,
                   "ipvanish": 0, "windscribe": 0, "custom": 0}
 
@@ -946,8 +1006,15 @@ def up(keys, pin_account=None):
         if proto in ("wireguard", "openvpn"):
             args += ["-e", f"CONFIG=/config/{l['config']}",
                      "-v", f"{CONFIG_DIR_HOST}:/config:ro"]
+            # OpenVPN needs a tun device; strongSwan/WireGuard use kernel XFRM/wg and do
+            # not. Without this the tunnel dies at "Cannot open /dev/net/tun".
+            if proto == "openvpn":
+                args += ["--device", "/dev/net/tun"]
+            # A file-based openvpn config may take its login from the host env; a pool
+            # account (e.g. HMA Windows) already supplied it through bind()'s env above.
             for env in ("OVPN_USER", "OVPN_PASS"):
-                if os.environ.get(env): args += ["-e", f"{env}={os.environ[env]}"]
+                if os.environ.get(env) and not any(x.startswith(f"{env}=") for x in args):
+                    args += ["-e", f"{env}={os.environ[env]}"]
         else:  # ikev2-cert / ikev2-eap
             sec = hma_secrets_host(extra["secrets"]) if extra.get("secrets") else SECRETS
             args += ["-e", f"SERVER={l['fqdn']}", "-v", f"{sec}:/secrets:ro"]
@@ -1530,18 +1597,26 @@ class H(http.server.BaseHTTPRequestHandler):
             # keeps it outside anything Docker Desktop shares, so the container cannot read
             # it directly). Force-imports even an unchanged token so the button is reliable.
             tok = os.path.join(INBOX, "tokenCoreSE.json") if INBOX else ""
-            found = bool(tok and os.path.isfile(tok))
+            ovpn = os.path.join(INBOX, "hma-ovpn.json") if INBOX else ""
+            found = bool(tok and os.path.isfile(tok)) or bool(ovpn and os.path.isfile(ovpn))
             imported = False
-            if found:
-                try:
+            kind = st = None
+            try:
+                if ovpn and os.path.isfile(ovpn):      # Windows: OpenVPN login + catalog
+                    # Force-import even an unchanged login so the button is reliable; the
+                    # file is left in place for the auto-sync task to keep refreshing.
+                    st = import_hma_ovpn(open(ovpn, encoding="utf-8").read())
+                    imported = True; kind = "hmaovpn"
+                elif tok and os.path.isfile(tok):      # macOS: IKEv2 device certificate
                     st = import_hma(token_text=open(tok, encoding="utf-8").read())
-                    imported = True
-                except Exception as e:
-                    return self._send(400, json.dumps({"error": str(e)}))
+                    imported = True; kind = "hma"
+            except Exception as e:
+                return self._send(400, json.dumps({"error": str(e)}))
             return self._send(200, json.dumps({"ok": True, "found": found,
-                "imported": imported, "has_cert": bool(accounts("hma")),
+                "imported": imported, "kind": kind,
+                "has_cert": bool(accounts("hma")) or bool(accounts("hmaovpn")),
                 "inbox": os.environ.get("PF_INBOX_HOST", INBOX),
-                "status": (st if imported else None)}))
+                "status": st}))
         elif p == "/api/provider/hma-tag":
             # Attach a validated activation code to the HMA account that already has a
             # certificate. No shell, no background work — just records the code + licence.

@@ -650,15 +650,20 @@ body.flat .drawer,body.flat .scrim,body.flat .modal .box{transition:none}
 
         <div class="step" id="hmaSyncCard">
           <div class="sh"><span class="num"><svg class="i" style="width:13px;height:13px"><use href="#ic-plug"/></svg></span>
-            <span class="t">Lấy chứng chỉ từ app HMA trên máy này
-              <em>Chạy local — mỗi người dùng chứng chỉ HMA của chính mình. Cài app HMA VPN
-              trên chính máy này và đăng nhập bằng activation code của bạn, rồi bấm Sync.</em></span></div>
+            <span class="t">Lấy đăng nhập từ app HMA trên máy này
+              <em>Chạy local — mỗi người dùng tài khoản HMA của chính mình. Cài app HMA VPN
+              trên chính máy này và đăng nhập trước, rồi Sync.</em></span></div>
           <div class="sb">
+            <p class="note" id="hmaWinHint" hidden style="margin:0 0 10px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--warn-bg,rgba(240,180,0,.08))">
+              <b>Trên Windows:</b> app không có chứng chỉ nên giao diện không tự đọc được (cần quyền admin).
+              Khuyến nghị: bấm đúp <code>tools\\sync-hma.bat install</code> <b>một lần</b> và chấp nhận <b>UAC</b> —
+              farm sẽ tự lấy & làm mới đăng nhập định kỳ, sau đó bạn <i>không cần bấm gì nữa</i>.
+              (Chỉ muốn một lần: chạy <code>sync-hma.bat</code>; nút dưới chỉ nạp lại từ inbox.)</p>
             <button class="btn primary" id="hmaSync" style="width:100%;justify-content:center">
-              <svg class="i"><use href="#ic-rotate"/></svg><span>Sync từ app HMA trên máy này</span></button>
-            <p class="note" style="margin:10px 0 0">Không mở được giao diện? Bấm đúp
+              <svg class="i"><use href="#ic-rotate"/></svg><span>Sync / nạp lại từ inbox</span></button>
+            <p class="note" style="margin:10px 0 0">Cách chạy trực tiếp: bấm đúp
               <code>tools/sync-hma.command</code> (macOS) hoặc <code>tools\\sync-hma.bat</code> (Windows)
-              trên máy đó — cùng tác dụng.</p>
+              — đây mới là bước lấy đăng nhập từ app; nút trên chỉ nạp thứ đã có trong inbox.</p>
           </div>
         </div>
 
@@ -1017,7 +1022,8 @@ function tileWhy(vid,n){
                                       :'không giới hạn, không cần thêm');
 }
 function renderChooser(){
-  const tiles=[...ALLV.map(v=>({id:v.id==='hma'?'hma':'v:'+v.id, name:v.name,
+  const tiles=[...ALLV.filter(v=>v.id!=='hmaovpn')   // reached through the HMA Sync card, not its own form
+                     .map(v=>({id:v.id==='hma'?'hma':'v:'+v.id, name:v.name,
                                 kind:PKIND[v.protocol]||v.protocol, setup:v.setup, vid:v.id})),
                ...Object.values(GENERIC).map(g=>({id:g.id, name:g.name,
                                 kind:PKIND[g.protocol]||g.protocol, setup:g.setup}))];
@@ -1088,23 +1094,32 @@ const PKIND={'ikev2-cert':'IKEv2 · chứng chỉ','ikev2-eap':'IKEv2 · user/m�
              wireguard:'WireGuard',openvpn:'OpenVPN','wireguard/openvpn':'WireGuard · OpenVPN'};
 async function loadProviders(){
   const d=await j('/api/providers'); PROVS=d.providers;
+  // HMA is "ready" with either a macOS certificate (hma) or a Windows OpenVPN login (hmaovpn).
   const hma=d.providers.find(p=>p.id==='hma');
-  const n=hma?.accounts?.length||0;
+  const hmaov=d.providers.find(p=>p.id==='hmaovpn');
+  const acctP=(hma?.accounts?.length?hma:(hmaov?.accounts?.length?hmaov:null));
+  const n=acctP?.accounts?.length||0;
   const ready=$('#hmaReady'), card=$('#hmaSyncCard');
+  const winHint=$('#hmaWinHint'); if(winHint) winHint.hidden=!/Windows/i.test(navigator.userAgent);
   if(ready){
     ready.hidden=!n;
     if(n){
-      const a=hma.accounts[0]||{};
-      $('#hmaOkSub').textContent=[`${hma.locations} vị trí sẵn sàng`,
+      const a=acctP.accounts[0]||{};
+      $('#hmaOkSub').textContent=[`${acctP.locations} vị trí sẵn sàng`,
+        acctP.id==='hmaovpn'?'Windows · OpenVPN':'',
         a.license?`${a.license.product}`:'', a.license?`hạn ${a.license.expires_date}`:'']
         .filter(Boolean).join(' · ');
     }
     // Once a certificate is synced the Sync card becomes a quieter "re-sync", and the
     // note tells the user they are done.
     if(card)card.style.opacity=n?'.72':'';
+    const win=/Windows/i.test(navigator.userAgent);
     $('#hmaUserNote').innerHTML=n
-      ? 'Đã có chứng chỉ của máy này — mở <b>Thêm vị trí</b> để bật cổng. Chỉ bấm Sync lại khi bạn đổi tài khoản HMA.'
-      : 'Mỗi máy dùng chứng chỉ HMA của chính mình. Cài app HMA trên máy này, đăng nhập bằng activation code của bạn, rồi bấm <b>Sync</b>.';
+      ? 'Đã có đăng nhập HMA của máy này — mở <b>Thêm vị trí</b> để bật cổng.'
+        +(acctP.id==='hmaovpn'?' Mật khẩu HMA tự đổi theo chu kỳ; chạy lại <code>sync-hma.bat</code> khi một vị trí ngừng kết nối.':' Chỉ Sync lại khi bạn đổi tài khoản HMA.')
+      : (win
+          ? 'Trên Windows: bấm đúp <code>tools\\sync-hma.bat</code> và chấp nhận <b>UAC</b> để lấy đăng nhập từ app HMA. Giao diện không tự đọc được app vì cần quyền admin.'
+          : 'Cài app HMA trên máy này và đăng nhập, rồi bấm <b>Sync</b> (hoặc bấm đúp <code>tools/sync-hma.command</code>).');
   }
   const t=d.summary||{};
   $('#ptotal').hidden=!d.providers.length;
@@ -1193,7 +1208,7 @@ $('#provlist').addEventListener('click',async e=>{
   const add=e.target.closest('[data-addacct]');
   if(add){
     await loadVendors();
-    showAdd(add.dataset.addacct==='hma'?'hma':'v:'+add.dataset.addacct);
+    showAdd(['hma','hmaovpn'].includes(add.dataset.addacct)?'hma':'v:'+add.dataset.addacct);
     $('#howto').scrollIntoView({behavior:'smooth',block:'nearest'});
     setTimeout(()=>($('#vFields input')||$('#dropHma'))?.focus(),320);
     return;
@@ -1339,8 +1354,11 @@ $('#hmaSync') && ($('#hmaSync').onclick=async()=>{
     const d=await r.json().catch(()=>({}));
     if(!r.ok||d.error){toast(d.error||('Lỗi '+r.status));return}
     if(d.imported){ await loadLocs(); await loadProviders();
-      toast(`Đã sync chứng chỉ · ${d.status?.locations||''} vị trí — mở “Thêm vị trí” để bật cổng`); }
-    else toast(`Chưa thấy chứng chỉ trong inbox. Bấm đúp tools/sync-hma (.command/.bat) trên máy có app HMA trước.`);
+      const what=d.kind==='hmaovpn'?'thông tin HMA (Windows)':'chứng chỉ';
+      toast(`Đã sync ${what} · ${d.status?.locations||''} vị trí — mở “Thêm vị trí” để bật cổng`); }
+    else toast(/Windows/i.test(navigator.userAgent)
+      ? `Inbox trống. Trên Windows hãy bấm đúp tools\\sync-hma.bat và chấp nhận UAC trước — nút này chỉ nạp lại thứ .bat đã lấy.`
+      : `Inbox trống. Bấm đúp tools/sync-hma.command (macOS) trên máy có app HMA trước.`);
   }finally{ b.disabled=false; span.textContent=t0 }
 });
 $('#copyHmaPath').onclick=()=>copyText($('#hmaPath').textContent,'Đã chép đường dẫn');

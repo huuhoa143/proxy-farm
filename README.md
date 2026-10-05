@@ -43,7 +43,8 @@ giao diện web.
 - **Xuất danh sách** 4 định dạng: `host:port:user:pass`, `socks5://user:pass@host:port`,
   `host:port`, lệnh `curl`
 - **Webhook xoay IP** cho hệ thống khác gọi
-- **HMA một-bấm**: nút *Sync* lấy chứng chỉ từ app HMA trên máy (macOS + Windows); nhập
+- **HMA một-bấm**: nút *Sync* lấy đăng nhập HMA từ app trên máy — macOS dùng chứng chỉ
+  IKEv2, Windows dùng tài khoản OpenVPN (app Windows không có chứng chỉ IKEv2); nhập
   activation code để xác thực gói (hạn, số slot thiết bị)
 - Giới hạn số cổng theo từng nhà cung cấp (tuỳ chọn)
 - Xem log từng cổng, dark/light, responsive (trên mobile bảng chuyển thành thẻ)
@@ -55,7 +56,7 @@ giao diện web.
 |---|---|---|---|---|
 | **Surfshark** | WireGuard | 1 private key | 180 (100 nước, gồm 38 IP tĩnh) | không — đã chạy 26 cổng trên một key |
 | **ZoogVPN** | IKEv2 + EAP | email + mật khẩu | 165 (75 nước) | không giới hạn số kết nối (đã chạy 6); **gói quyết định máy chủ nào được dùng** — ví dụ 41/165 |
-| **HMA / SurfEasy / Gen Digital** | IKEv2 + chứng chỉ client | bấm **Sync** lấy từ app HMA trên máy (macOS + Windows) | 115 thành phố | không — đã chạy 27+ cổng |
+| **HMA / SurfEasy / Gen Digital** | macOS: IKEv2 + chứng chỉ · Windows: OpenVPN user/pass | bấm **Sync** lấy từ app HMA trên máy | 115 thành phố (macOS) · ~120 (Windows) | không — đã chạy 27+ cổng |
 | Mullvad, Proton, IVPN, Windscribe, PIA… | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
 | Máy chủ WireGuard của bạn (VPS) | WireGuard | kéo thả file `.conf` | 1 file = 1 vị trí | đã kiểm chứng |
 | Nhà cung cấp IKEv2 user/mật khẩu khác (NordVPN…) | IKEv2 + EAP | máy chủ + tài khoản | 1 máy chủ = 1 vị trí | driver đã kiểm chứng qua ZoogVPN |
@@ -154,7 +155,7 @@ Mở **Nhà cung cấp** ở thanh bên trái. Phần *Thêm tài khoản* liệ
 |---|---|
 | **Surfshark** | Dán private key WireGuard. Farm tự tải danh sách máy chủ và sinh cấu hình cho từng vị trí. |
 | **ZoogVPN** | Nhập email và mật khẩu của app. |
-| **HMA** | Chạy local: cài app HMA trên máy này + đăng nhập, rồi **Sync** (nút trong UI, hoặc bấm đúp `tools/sync-hma.command` / `tools\sync-hma.bat`). Activation code chỉ để kiểm tra gói (tuỳ chọn). |
+| **HMA** | Chạy local: cài app HMA trên máy này + đăng nhập, rồi **Sync**. macOS: bấm đúp `tools/sync-hma.command`. Windows: bấm đúp `tools\sync-hma.bat` (sẽ hỏi quyền admin để đọc đăng nhập OpenVPN từ app; thêm `full` để dò lại toàn bộ máy chủ). Activation code chỉ để kiểm tra gói (tuỳ chọn). |
 | **WireGuard / OpenVPN** | Kéo thả `.conf` / `.ovpn`. Nhà cung cấp và quốc gia đoán từ tên file. |
 | **IKEv2 user/mật khẩu** | Điền máy chủ + tài khoản. Mỗi máy chủ thành một vị trí. |
 
@@ -335,6 +336,26 @@ host (helper/`run.sh`) — nút trong giao diện chỉ *nạp ngay* thứ đã 
 
 **Tuỳ chọn:** nhập activation code ở mục *Kiểm tra* để xác nhận gói còn hạn và số slot
 thiết bị — không bắt buộc để chạy.
+
+### HMA trên Windows (OpenVPN)
+
+App HMA bản Windows **không** giữ chứng chỉ IKEv2 như bản macOS — nó đăng nhập **OpenVPN**
+bằng một cặp **user/password** và một CA dùng chung, nằm trong
+`%ProgramData%\Privax\HMA VPN\HmaProVpn\` (chỉ Administrators đọc được). Farm hỗ trợ đúng
+con đường đó: một tài khoản OpenVPN kéo nhiều cổng song song (đã đo 6 kết nối đồng thời,
+không bị đá session).
+
+- **`tools\sync-hma.bat`** — bấm đúp. Nó xin quyền admin (hộp thoại UAC), đọc user/pass +
+  CA từ app và đẩy vào farm. Mặc định farm dùng **danh sách máy chủ kèm sẵn** nên chạy được
+  ngay. Mật khẩu HMA tự xoay vòng theo chu kỳ, nên **Sync lại** khi một vị trí ngừng kết nối.
+- **`tools\sync-hma.bat full`** — như trên, nhưng dò lại IP máy chủ hiện thời của *từng*
+  vị trí qua chính app HMA. Việc này mất vài phút và **tạm ngắt VPN của bạn** trong lúc chạy
+  (app lần lượt kết nối từng nơi để lấy IP), nên chỉ dùng khi muốn làm mới toàn bộ danh sách.
+
+Vì sao cần dò: hạ tầng OpenVPN của HMA (Avast/Gen Digital) cấp IP máy chủ **động** theo mỗi
+lần kết nối và không công bố qua DNS cố định, nên farm giữ một **catalog vị trí → IP** do
+helper sinh ra. Một IP chết được xử lý bằng cơ chế *bad-IP back-off* của node như mọi nhà
+cung cấp khác; khi cả danh sách cũ, chạy `sync-hma.bat full` để làm mới.
 
 <details>
 <summary>Máy chạy farm không có app HMA?</summary>

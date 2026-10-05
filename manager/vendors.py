@@ -44,6 +44,54 @@ def hma_targets(data_dir):
 def hma_bind(t, acct):
     return {"secrets": acct["id"]}           # its own certificate folder under SECRETS
 
+# ---- HMA on Windows (OpenVPN) ---------------------------------------------------
+# The HMA Windows app has no IKEv2 device certificate: it logs in over OpenVPN with a
+# username/password and a shared CA, against servers it is handed per connection. The
+# credentials drive many concurrent sessions on one account (measured: 6 in parallel,
+# no session kicking), exactly the pool model the farm wants. tools/sync-hma.bat reads
+# the credentials from the app (admin) and enumerates each location's server IP, then
+# drops the bundle in the inbox; farm.import_hma_ovpn stores the account and writes the
+# server catalog here. Server IPs are assigned from a pool and drift over time, so the
+# catalog is refreshed by re-running the sync; a dead IP is handled by the node's own
+# bad-IP back-off like any other provider.
+def _hmaovpn_catalog(data_dir):
+    # The live catalog a sync wrote wins; a bundled seed lets the first sync (credentials
+    # only) light up the common locations before a full enumeration has ever run.
+    live = _load(os.path.join(data_dir, "hma-ovpn-catalog.json")).get("locations")
+    if live: return live
+    return _load(os.path.join(CATALOGS, "hma-ovpn-seed.json")).get("locations", [])
+
+def hmaovpn_targets(data_dir):
+    out = []
+    for l in _hmaovpn_catalog(data_dir):
+        if not l.get("ip"): continue
+        key = "HMAOV-" + l["key"]
+        cc = l.get("country", "")
+        out.append({
+            "key": key, "vendor": "hmaovpn", "provider": "hmaovpn",
+            "protocol": "openvpn", "config": f".gen/{key}.conf",
+            "country": cc,
+            "countryName": l.get("countryName") or COUNTRY_NAMES.get(cc, cc),
+            "city": l.get("city", ""),
+            "label": (l.get("countryName", "") + " " + l.get("city", "")).strip(),
+            "ovpn_ip": l["ip"], "ovpn_port": int(l.get("port") or 1194),
+            "ovpn_proto": l.get("proto") or "udp",
+        })
+    return out
+
+def hmaovpn_bind(t, acct):
+    # One .ovpn per location: the server IP is pinned here, the CA is inlined, and the
+    # username/password reach the node as env (OVPN_USER/OVPN_PASS) so they never touch
+    # the config file. openvpn.sh adds its own routing, kill-switch and auth-user-pass.
+    ca = (acct.get("ca") or "").strip()
+    cfg = ("client\ndev tun\n"
+           f"proto {t.get('ovpn_proto', 'udp')}\n"
+           f"remote {t['ovpn_ip']} {t.get('ovpn_port', 1194)}\n"
+           "remote-cert-tls server\nreneg-sec 0\nauth-nocache\nnobind\n"
+           f"<ca>\n{ca}\n</ca>\n")
+    return {"config_text": cfg,
+            "env": {"OVPN_USER": acct["ovpn_user"], "OVPN_PASS": acct["ovpn_pass"]}}
+
 # ---- Surfshark ------------------------------------------------------------------
 SURFSHARK_API = "https://api.surfshark.com/v4/server/clusters/all"
 SURFSHARK_TTL = 12 * 3600          # servers come and go; keys rarely change
@@ -190,6 +238,22 @@ VENDORS = {
         },
         "fields": None,                       # imported from the app, see farm.import_hma
         "targets": hma_targets, "bind": hma_bind,
+    },
+    "hmaovpn": {
+        "name": "HMA (Windows)", "protocol": "openvpn",
+        "blurb": "Dành cho máy Windows: app HMA không có chứng chỉ IKEv2, nên farm đăng nhập "
+                 "OpenVPN bằng thông tin lấy từ app. Một tài khoản chạy nhiều cổng song song.",
+        "setup": {
+            "needs": "app HMA trên máy Windows này (đã đăng nhập)",
+            "note": "Bấm Sync — tool sẽ xin quyền admin, đọc thông tin đăng nhập từ app và "
+                    "dò địa chỉ máy chủ từng vị trí. Danh sách máy chủ HMA đổi theo thời gian; "
+                    "Sync lại để làm mới.",
+            "steps": ["Cài **app HMA VPN** trên chính máy Windows này và đăng nhập.",
+                      "Bấm **Sync** (hoặc bấm đúp `tools\\sync-hma.bat`) và đồng ý hộp thoại admin.",
+                      "Đợi dò xong các vị trí — farm tự nạp."],
+        },
+        "fields": None,                       # synced from the app, see farm.import_hma_ovpn
+        "targets": hmaovpn_targets, "bind": hmaovpn_bind,
     },
 }
 
