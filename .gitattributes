@@ -1,0 +1,14 @@
+# Shell scripts and configs that run inside the Linux node container, or under bash on
+# the host, MUST stay LF: a CRLF checkout on Windows turns the shebang into `#!/bin/sh\r`
+# and the kernel reports "no such file or directory", so the farm image never starts.
+*.sh            text eol=lf
+*.command       text eol=lf
+run.sh          text eol=lf
+node/entrypoint.sh text eol=lf
+node/drivers/*  text eol=lf
+*.ovpn          text eol=lf
+*.conf          text eol=lf
+
+# Windows helpers stay CRLF so Notepad and cmd.exe read them correctly.
+*.bat           text eol=crlf
+*.ps1           text eol=crlf
