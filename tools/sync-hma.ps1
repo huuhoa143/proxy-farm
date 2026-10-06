@@ -66,7 +66,23 @@ $dirs = @(
   "$env:ProgramData\Privax\HMA! Pro VPN\HmaProVpn"
 )
 $hd = $dirs | Where-Object { Test-Path (Join-Path $_ 'auth') } | Select-Object -First 1
-if (-not $hd) { Fail "Không tìm thấy đăng nhập HMA trên máy này.`n    Hãy cài app HMA VPN, đăng nhập và kết nối thử một lần, rồi chạy lại." }
+if (-not $hd) {
+  # Installed somewhere non-standard? Search the Privax/HMA trees for the auth + CA pair.
+  foreach ($root in @("$env:ProgramData\Privax", "$env:ProgramData")) {
+    if (-not (Test-Path $root)) { continue }
+    $f = Get-ChildItem -Path $root -Recurse -Depth 4 -Filter 'auth' -File -ErrorAction SilentlyContinue |
+         Where-Object { Test-Path (Join-Path $_.DirectoryName 'ca.crt.pem') } | Select-Object -First 1
+    if ($f) { $hd = $f.DirectoryName; break }
+  }
+}
+if (-not $hd) {
+  Fail ("Không tìm thấy đăng nhập OpenVPN của HMA trên máy này.`n" +
+        "    Đã tìm trong: $env:ProgramData\Privax\HMA VPN\HmaProVpn (và các vị trí khác).`n" +
+        "    Hãy thử:`n" +
+        "      1) Mở app HMA VPN, đăng nhập, rồi bấm Connect MỘT LẦN (app chỉ tạo thông tin`n" +
+        "         đăng nhập OpenVPN sau khi đã kết nối ít nhất một lần), rồi chạy lại.`n" +
+        "      2) Đảm bảo bạn dùng bản proxy-farm mới nhất (tải lại ZIP/clone nhánh mới nhất).")
+}
 $authLines = Get-Content (Join-Path $hd 'auth')
 $user = ($authLines[0]).Trim(); $pass = ($authLines[1]).Trim()
 $ca   = (Get-Content (Join-Path $hd 'ca.crt.pem') -Raw).Trim()
