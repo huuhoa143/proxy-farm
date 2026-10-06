@@ -67,8 +67,9 @@ $dirs = @(
 )
 $hd = $dirs | Where-Object { Test-Path (Join-Path $_ 'auth') } | Select-Object -First 1
 if (-not $hd) {
-  # Installed somewhere non-standard? Search the Privax/HMA trees for the auth + CA pair.
-  foreach ($root in @("$env:ProgramData\Privax", "$env:ProgramData")) {
+  # Installed somewhere non-standard? Search only the HMA vendor folders (created by the
+  # installer, not arbitrary ProgramData a non-admin could plant files in) for the pair.
+  foreach ($root in @("$env:ProgramData\Privax", "$env:ProgramData\HMA VPN")) {
     if (-not (Test-Path $root)) { continue }
     $f = Get-ChildItem -Path $root -Recurse -Depth 4 -Filter 'auth' -File -ErrorAction SilentlyContinue |
          Where-Object { Test-Path (Join-Path $_.DirectoryName 'ca.crt.pem') } | Select-Object -First 1
