@@ -168,27 +168,11 @@ driver_up
 # Block YAML only — an inline flow map with an optional section silently produces invalid
 # YAML when that section is empty, and gost then exits leaving no proxy at all.
 {
-  # 2 s per server (some gateways — HMA — silently drop 1.1.1.1:443, and gost waited its full
-  # default timeout on every lookup: 4–6 s per new connection), plain DNS as the last resort,
-  # answers cached 5 min.
   echo "resolvers:"
   echo "- name: doh"
   echo "  nameservers:"
   echo "  - addr: https://1.1.1.1/dns-query"
-  echo "    timeout: 2s"
-  echo "    ttl: 300s"
   echo "  - addr: https://8.8.8.8/dns-query"
-  echo "    timeout: 2s"
-  echo "    ttl: 300s"
-  echo "  - addr: https://9.9.9.9/dns-query"
-  echo "    timeout: 2s"
-  echo "    ttl: 300s"
-  echo "  - addr: udp://8.8.8.8:53"
-  echo "    timeout: 2s"
-  echo "    ttl: 300s"
-  echo "  - addr: tcp://1.1.1.1:53"
-  echo "    timeout: 2s"
-  echo "    ttl: 300s"
   echo "services:"
   echo "- name: socks"
   echo "  addr: \":1080\""
