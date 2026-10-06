@@ -1150,13 +1150,6 @@
    "virtual": false
   },
   {
-   "host": "vn2.webunlim.com",
-   "ip": "146.196.64.108",
-   "country": "VN",
-   "city": "Ho Chi Minh City",
-   "virtual": false
-  },
-  {
    "host": "vn3.webunlim.com",
    "ip": "103.163.219.166",
    "country": "VN",
