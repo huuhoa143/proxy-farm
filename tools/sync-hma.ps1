@@ -28,6 +28,15 @@ $INSTDIR = Join-Path $env:ProgramFiles 'ProxyFarm'          # admin-only writabl
 function Pause-IfNeeded { if (-not $Quiet) { Write-Host; Read-Host 'Xong. Nhấn Enter để đóng' | Out-Null } }
 function Fail($m) { Write-Host "[X] $m" -ForegroundColor Red; Pause-IfNeeded; exit 1 }
 
+# Any unhandled error would otherwise close the (often self-elevated) window before the
+# user can read it — "hiện lên rồi biến mất". Trap it, show it, and hold the window.
+trap {
+  Write-Host ""
+  Write-Host "[LỖI] $($_.Exception.Message)" -ForegroundColor Red
+  if (-not $Quiet) { Read-Host 'Có lỗi — nhấn Enter để đóng' | Out-Null }
+  exit 1
+}
+
 # ---- must be Administrator to read the credential files (and to register the task) ---
 $me = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
