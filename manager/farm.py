@@ -250,7 +250,7 @@ def import_hma_ovpn(bundle_text):
     a location->server-IP catalog) to the inbox; one login drives every location as a
     pool. Re-syncing refreshes the rotating password and the catalog in place."""
     try:
-        d = json.loads(bundle_text.lstrip("﻿"))   # tolerate a UTF-8 BOM from the helper
+        d = json.loads(bundle_text.lstrip("\ufeff"))   # tolerate a UTF-8 BOM from the helper
     except Exception as e:
         raise ValueError(f"Không đọc được bundle HMA-OpenVPN: {e}")
     user = (d.get("user") or "").strip()
@@ -379,7 +379,7 @@ def ingest_inbox():
                 # like the HMA token — the auto-sync task rewrites it and the farm re-imports
                 # only when its content changed, so the UI button always finds something.
                 text = open(path, encoding="utf-8").read()
-                try: d = json.loads(text.lstrip("﻿"))
+                try: d = json.loads(text.lstrip("\ufeff"))
                 except Exception: d = {}
                 sha = token_sha((d.get("user") or "") + "\n" + (d.get("pass") or "") + "\n" + (d.get("ca") or ""))
                 if sha in _INBOX_FAILED or any(x.get("cred_sha") == sha for x in accounts("hmaovpn")):
