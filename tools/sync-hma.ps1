@@ -1,4 +1,4 @@
-<#
+﻿<#
   Sync HMA into Proxy Farm — Windows.
 
   The HMA Windows app has no IKEv2 device certificate (that is a macOS-only thing). It

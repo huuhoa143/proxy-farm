@@ -1,4 +1,4 @@
-<#
+﻿<#
   Enumerate each HMA location's current OpenVPN server IP, by driving the HMA app's own
   local UI API over the Chrome DevTools Protocol (the app is a CEF/Chromium shell). The
   app hands out a server IP per connection and persists it nowhere, so the only way to
