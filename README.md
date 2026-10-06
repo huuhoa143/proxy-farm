@@ -124,8 +124,14 @@ git clone <repo-url> proxy-farm && cd proxy-farm
 ./run.sh
 ```
 
+**Windows — không cần terminal:** sau khi tải mã nguồn về, chỉ cần **bấm đúp `run.bat`**.
+Nó tự mở Docker Desktop nếu chưa chạy, tạo thư mục dữ liệu, build và khởi động, rồi mở sẵn
+giao diện. Dừng thì bấm đúp `stop.bat`. (Cần đã cài **Docker Desktop** và **Git** trước.)
+
 Mở **http://127.0.0.1:8090**. Nếu app HMA có trên máy, chứng chỉ được nạp tự động; vào
-**Thêm vị trí**, chọn nơi muốn chạy rồi bấm **Bật**.
+**Thêm vị trí**, chọn nơi muốn chạy rồi bấm **Bật**. Trên Windows, lấy đăng nhập HMA bằng
+cách bấm đúp **`tools\sync-hma.bat install`** (một lần, bấm *Yes* ở UAC) — xem *HMA trên
+Windows* bên dưới.
 
 `./run.sh` tạo thư mục dữ liệu (mặc định `~/proxy-farm`), ghi `.env`, build hai image và
 chạy manager bằng Docker Compose. Lần sau có thể dùng Compose trực tiếp:
