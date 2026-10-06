@@ -10,8 +10,13 @@
   Intended to be dot-sourced / called by sync-hma.ps1 -Full; its stdout is the catalog.
 #>
 $ErrorActionPreference = 'Stop'
-$exe = 'C:\Program Files\Privax\HMA VPN\Vpn.exe'
-if (-not (Test-Path $exe)) { throw "Không tìm thấy app HMA ($exe)" }
+$exe = @(
+  "$env:ProgramFiles\Privax\HMA VPN\Vpn.exe",
+  "${env:ProgramFiles(x86)}\Privax\HMA VPN\Vpn.exe",
+  "$env:ProgramFiles\HMA VPN\Vpn.exe",
+  "$env:ProgramFiles\Privax\HMA! Pro VPN\Vpn.exe"
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $exe) { throw "Không tìm thấy app HMA (Vpn.exe) trong Program Files" }
 
 # ---- minimal Chrome DevTools Protocol client (pure PowerShell) -------------------
 function Connect-Cdp {

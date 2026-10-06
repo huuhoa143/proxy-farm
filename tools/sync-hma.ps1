@@ -83,9 +83,17 @@ function FromEnv($key, $default) {
     if ($m) { return $m.Matches[0].Groups[1].Value.Trim().Trim('"') } }
   return $default
 }
+# run.sh runs under Git Bash on Windows and writes FARM as a POSIX path (/c/Users/..),
+# which is not a valid native path — turn it back into C:\Users\.. before using it.
+function To-WinPath($p) {
+  if (-not $p) { return $p }
+  if ($p -match '^/([A-Za-z])/(.*)$') { return ($matches[1].ToUpper() + ':\' + ($matches[2] -replace '/','\')) }
+  return ($p -replace '/','\')
+}
+if ($Inbox) { $Inbox = To-WinPath $Inbox }
 if (-not $Inbox) {
   $FARM = if ($env:FARM) { $env:FARM } else { FromEnv 'FARM' (Join-Path $env:USERPROFILE 'proxy-farm') }
-  $Inbox = Join-Path $FARM 'inbox'
+  $Inbox = Join-Path (To-WinPath $FARM) 'inbox'
 }
 if (-not $Port) { $Port = if ($env:PORT) { $env:PORT } else { FromEnv 'PORT' '8090' } }
 New-Item -ItemType Directory -Force $Inbox | Out-Null
