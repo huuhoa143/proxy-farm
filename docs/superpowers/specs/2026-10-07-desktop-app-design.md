@@ -118,7 +118,7 @@ Multi-select + bulk actions, export in 4 formats, auto-rotate every N minutes, r
   - Rule: warn when the host default route goes through a tunnel interface: macOS `ipsec*`/`utun*`, Windows a VPN/TAP/Wintun adapter. This also catches other VPN apps.
   - Banner: "A VPN on this computer (e.g. the HMA app) is connected — disconnect it; keep HMA installed and signed in." Re-checked every 10 s and after network changes.
   - ⚠️ Not yet observed: HMA's Mimic/WireGuard modes (expected `utun*` default route) and Windows.
-- **Device lifetime** ⚠️ (not tested, testing would sign out the owner's device): the credentials belong to an HMA device slot. If the user signs out, uninstalls HMA or removes the device from their account, tunnels fail with `AUTH_FAILED`. Surface that specific reason ("HMA device signed out — open the HMA app and sign in") rather than a generic retry.
+- **Auth refused** (`AUTH_FAILED`): show a specific reason ("HMA rejected the device credentials — open the HMA app and check you're signed in") instead of a generic retry; keep backing off.
 - Obsolete: the old Privax "hidemyass.com" CA and shared client cert shipped by gluetun (expired 2026-09-12) are not used by current servers.
 - **Account email/password does NOT work** for tunnels: ✅ OpenVPN `AUTH_FAILED`, IKEv2 silent. Don't offer it. Device credentials only.
 - **Catalog**:
@@ -270,7 +270,6 @@ proxy-farm/
 | Item | Plan |
 |---|---|
 | HMA server IPs change; Mac can't enumerate them like the Windows app | Daily catalog feed + bad-IP failover (§5.1); discovery API not usable (Invalid API Key) |
-| HMA device signed out / slot removed | Specific error + guidance in UI (§5.1) |
 | HMA app VPN connected on the same machine | Detect and warn (§5.1) |
 | Windows HMA `auth` format unverified | First task of the Windows track, on a real machine |
 | sing-box OpenVPN client is young (Aug 2026) | Pin the version; live smoke gates upgrades |
