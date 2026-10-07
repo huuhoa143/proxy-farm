@@ -14,6 +14,9 @@ importers:
       react-dom:
         specifier: ^19.3.0
         version: 19.3.0(react@19.3.0)
+      socks-proxy-agent:
+        specifier: ^7.0.0
+        version: 7.0.0
     devDependencies:
       '@electron-addons/electron-forge-maker-nsis':
         specifier: ^7.0.2
