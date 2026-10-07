@@ -1,7 +1,10 @@
-import { contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
+import { createProxyFarmApi } from './api';
 
-// Empty bridge for now. The renderer talks to main only through this typed
-// surface — no HTTP, no nodeIntegration. Later tasks grow this object into
-// the full IPC API (providers, ports, health, settings, …) per the design
-// spec's §3 "No local HTTP API for the UI" decision.
-contextBridge.exposeInMainWorld('proxyFarm', {});
+/**
+ * The renderer talks to main only through this typed surface (spec §3: "No local HTTP
+ * API for the UI"). `contextIsolation` is on and `nodeIntegration` is off, so this is
+ * the only bridge; `createProxyFarmApi` (unit-tested in api.test.ts) builds exactly the
+ * `ProxyFarmApi` shape, nothing else is exposed.
+ */
+contextBridge.exposeInMainWorld('proxyFarm', createProxyFarmApi(ipcRenderer));

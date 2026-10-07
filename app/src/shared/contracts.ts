@@ -177,7 +177,8 @@ export interface ProxyFarmApi {
   removeAccount(accountId: string): Promise<void>;
   /** HMA: (re)import device credentials from the local HMA install. */
   connectHma(): Promise<CheckResult & { account?: Account }>;
-  /** Windows only: runs the elevated helper installer (spec §7, one UAC). Shown when `detected.hintKey` says the helper is missing. */
+  /** Windows only: runs the elevated helper installer (spec §7, one UAC). Shown when `detected.hintKey`
+   * says the helper is missing. Stubbed until the Windows track: returns `{ok:false, reasonKey:'hma.windowsLater'}`. */
   enableHmaSupport(): Promise<CheckResult>;
   importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
   listTargets(providerId?: ProviderId): Promise<Target[]>;
