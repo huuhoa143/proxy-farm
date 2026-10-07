@@ -143,6 +143,11 @@ export interface Settings {
   giveUpAfter: number; // 0 = never (default)
   webhook: { enabled: boolean; port: number; bearer: string }; // off by default (§6.6)
   language: 'en' | 'vi' | 'system';
+  /** Check for app updates on start and once a day while running (default true). When
+   * off, no automatic/periodic check runs; the user can still check + install manually
+   * from the Settings screen. Download+install is always user-initiated (autoDownload is
+   * off), so there is no separate auto-INSTALL toggle. */
+  autoCheckUpdates: boolean;
 }
 
 export interface PortRow {
@@ -175,6 +180,31 @@ export interface AppStatus {
   engineError?: string;
   /** A one-time human-readable notice (e.g. the proxy password had to be reset). */
   notice?: string;
+}
+
+// ───────────────────────── auto-update (electron-updater) ─────────────────────────
+
+/**
+ * Updater state pushed to the renderer (and returned by `checkForUpdate`). A single flat
+ * shape keeps it trivial to serialise across IPC and to assert on in tests:
+ *   idle        — no check has completed yet this session
+ *   checking    — a check is in flight
+ *   up-to-date  — the running build is the latest (also the "no published channel file
+ *                 yet" case: that is not an error, it means there is nothing newer)
+ *   available   — a newer version exists; `availableVersion` is set, download not started
+ *   downloading — `percent` is the download progress 0..100
+ *   downloaded  — fully downloaded; a restart will install `availableVersion`
+ *   error       — `message` + `releasesUrl` (manual-download fallback to GitHub Releases)
+ * `currentVersion` is always the running app's version.
+ */
+export interface UpdateStatus {
+  phase: 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error';
+  currentVersion: string;
+  availableVersion?: string;
+  notes?: string;
+  percent?: number;
+  message?: string;
+  releasesUrl?: string;
 }
 
 // ───────────────────────── IPC surface exposed as `window.proxyFarm` (spec §3) ─────────────────────────
@@ -215,9 +245,17 @@ export interface ProxyFarmApi {
    * screen), secrets kept in memory only (safeStorage unavailable), one-time notices. */
   getAppStatus(): Promise<AppStatus>;
 
+  // auto-update (electron-updater; download+install is always user-initiated)
+  /** Trigger a check now and resolve with the resulting status. */
+  checkForUpdate(): Promise<UpdateStatus>;
+  /** Download the available update, stop every running engine, then quit & install.
+   * Resolves (`{success:true}`) once the download finished and install was scheduled. */
+  downloadAndInstallUpdate(): Promise<{ success: boolean; error?: string }>;
+
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
   onHostVpnChanged(cb: (active: boolean) => void): () => void;
+  onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
 }
 
 /** Channel names used by preload ↔ main. Preload exposes exactly these, nothing else. */
@@ -226,8 +264,9 @@ export const IPC = {
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
+    'checkForUpdate', 'downloadAndInstallUpdate',
   ] as const,
-  events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged' } as const,
+  events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
 } as const;
 
 declare global {

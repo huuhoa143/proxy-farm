@@ -54,6 +54,7 @@ export function defaultSettings(randomPass: () => string = defaultRandomPass): S
     giveUpAfter: 0,
     webhook: { enabled: false, port: 0, bearer: '' },
     language: 'system',
+    autoCheckUpdates: true,
   };
 }
 
