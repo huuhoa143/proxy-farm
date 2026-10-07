@@ -79,6 +79,7 @@ describe('zoogvpn provider: bind', () => {
     expect(endpoint.tls.remote_certificate_tls).toBe('server');
     expect(endpoint.tls.control_wrap).toEqual({ type: 'tls_auth', key: FAKE_TA_LINES, direction: 'client' });
     expect(endpoint.route_no_pull).toBe(true);
+    expect(JSON.stringify(endpoint)).not.toMatch(/_path/);
   });
 });
 

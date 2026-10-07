@@ -65,7 +65,19 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
         country: loc.country,
         city: loc.city,
         label: loc.city,
-        servers: loc.ips.map((ip) => ip.ip),
+        // Target.servers is "best first" (contracts.ts): most recently
+        // confirmed-ok IP first (nulls — never confirmed — last), then the
+        // longest-known IP first as a tiebreak.
+        servers: [...loc.ips]
+          .sort((a, b) => {
+            if (a.lastOk !== b.lastOk) {
+              if (a.lastOk === null) return 1;
+              if (b.lastOk === null) return -1;
+              return b.lastOk - a.lastOk;
+            }
+            return b.firstSeen - a.firstSeen;
+          })
+          .map((ip) => ip.ip),
       }));
     },
 

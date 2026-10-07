@@ -8,6 +8,7 @@
  * WireGuard endpoint and isn't in scope here.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const CLUSTERS_URL = 'https://api.surfshark.com/v4/server/clusters/all';
@@ -22,7 +23,7 @@ export interface SurfsharkCluster {
   pubKey: string;
 }
 
-interface CacheFile {
+export interface CacheFile {
   fetchedAt: number;
   clusters: SurfsharkCluster[];
 }
@@ -75,6 +76,25 @@ async function readCache(cachePath: string): Promise<CacheFile | undefined> {
 async function writeCache(cachePath: string, cache: CacheFile): Promise<void> {
   await mkdir(path.dirname(cachePath), { recursive: true });
   await writeFile(cachePath, JSON.stringify(cache), 'utf8');
+}
+
+/**
+ * Synchronous, no-network read of whatever is currently on disk — used by
+ * `surfshark/index.ts#bind()`, which must be deterministic (same precedent
+ * as the hma/zoogvpn CA files being read with `readFileSync`). Returns
+ * whatever is cached regardless of its age: staleness is a health-module
+ * display concern ("the catalog shows its age"), not a reason for a pure
+ * `bind()` call to fail. Returns `undefined` if there is no cache yet or it
+ * can't be parsed.
+ */
+export function readClustersCacheSync(cachePath: string): SurfsharkCluster[] | undefined {
+  try {
+    const text = readFileSync(cachePath, 'utf8');
+    const cache = JSON.parse(text) as CacheFile;
+    return cache.clusters;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Returns a fresh (within 12h) cluster list, fetching and caching as needed. */

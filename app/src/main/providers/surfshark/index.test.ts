@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createSurfsharkProvider } from './index';
 import type { Account, AccountSecret } from '../types';
 import type { SurfsharkCluster } from './clusters';
@@ -20,8 +23,26 @@ function fakeClusters(): SurfsharkCluster[] {
   ];
 }
 
+let cacheDir: string;
+let cachePath: string;
+
+beforeEach(() => {
+  cacheDir = mkdtempSync(path.join(tmpdir(), 'pf-surfshark-index-'));
+  cachePath = path.join(cacheDir, 'clusters.json');
+});
+
+afterEach(() => {
+  rmSync(cacheDir, { recursive: true, force: true });
+});
+
+/** Writes the on-disk cache file directly — simulates a prior fetch, possibly by another process/instance. */
+function writeCacheFile(clusters: SurfsharkCluster[], fetchedAt = 1_000_000) {
+  mkdirSync(path.dirname(cachePath), { recursive: true });
+  writeFileSync(cachePath, JSON.stringify({ fetchedAt, clusters }), 'utf8');
+}
+
 function makeProvider() {
-  return createSurfsharkProvider({ loadClusters: async () => fakeClusters() });
+  return createSurfsharkProvider({ cachePath, loadClusters: async () => fakeClusters() });
 }
 
 describe('surfshark provider: check', () => {
@@ -43,7 +64,7 @@ describe('surfshark provider: check', () => {
   });
 });
 
-describe('surfshark provider: targets + bind', () => {
+describe('surfshark provider: targets', () => {
   it('targets() reflects the cached cluster list', async () => {
     const provider = makeProvider();
     const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
@@ -55,13 +76,24 @@ describe('surfshark provider: targets + bind', () => {
       servers: ['jp-tok.prod.surfshark.com'],
     });
   });
+});
 
-  it('bind() builds a WireguardEndpoint using the peer pubKey resolved via targets()', async () => {
-    const provider = makeProvider();
+describe('surfshark provider: bind (deterministic, reads the on-disk cache directly)', () => {
+  it('a FRESH provider instance — no targets() call ever made on it — binds successfully from an existing cache file', () => {
+    // Simulates a persisted port rebound after an app restart: a new
+    // provider instance, cache file already on disk from a previous run.
+    writeCacheFile(fakeClusters());
+    const provider = createSurfsharkProvider({ cachePath }); // no loadClusters injected either
     const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
-    const targets = await provider.targets(account);
-    const target = targets[0];
     const secret: AccountSecret = { kind: 'wgkey', privateKey: DUMMY_PRIVATE_KEY };
+    const target = {
+      key: 'surfshark:jp-tok',
+      providerId: 'surfshark' as const,
+      country: 'JP',
+      city: 'Tokyo',
+      label: 'Japan — Tokyo',
+      servers: ['jp-tok.prod.surfshark.com'],
+    };
 
     const endpoint = provider.bind(target, '203.0.113.50', account, secret);
 
@@ -78,13 +110,31 @@ describe('surfshark provider: targets + bind', () => {
       allowed_ips: ['0.0.0.0/0'],
       persistent_keepalive_interval: 25,
     });
+    const json = JSON.stringify(endpoint);
+    expect(json).not.toMatch(/_path/);
   });
 
-  it('bind() throws a clear error for a target whose cluster was never loaded', () => {
-    const provider = makeProvider();
+  it('throws a clear error when the cache file does not exist at all', () => {
+    const provider = createSurfsharkProvider({ cachePath }); // cachePath never written to
     const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
     const secret: AccountSecret = { kind: 'wgkey', privateKey: DUMMY_PRIVATE_KEY };
-    const unknownTarget = { key: 'surfshark:unknown', providerId: 'surfshark' as const, country: 'XX', city: '', label: '', servers: ['nope'] };
-    expect(() => provider.bind(unknownTarget, '1.2.3.4', account, secret)).toThrow(/unknown target/);
+    const target = { key: 'surfshark:jp-tok', providerId: 'surfshark' as const, country: 'JP', city: '', label: '', servers: ['nope'] };
+    expect(() => provider.bind(target, '1.2.3.4', account, secret)).toThrow(/no cached cluster/);
+  });
+
+  it('throws a clear error when the cache exists but has no matching location', () => {
+    writeCacheFile(fakeClusters()); // only has jp-tok
+    const provider = createSurfsharkProvider({ cachePath });
+    const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
+    const secret: AccountSecret = { kind: 'wgkey', privateKey: DUMMY_PRIVATE_KEY };
+    const unknownTarget = {
+      key: 'surfshark:unknown',
+      providerId: 'surfshark' as const,
+      country: 'XX',
+      city: '',
+      label: '',
+      servers: ['nope'],
+    };
+    expect(() => provider.bind(unknownTarget, '1.2.3.4', account, secret)).toThrow(/no cached cluster/);
   });
 });

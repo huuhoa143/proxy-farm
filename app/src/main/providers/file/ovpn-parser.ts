@@ -24,6 +24,8 @@ export interface ParsedOvpn {
   tlsCryptLines?: string[];
   controlWrapDirection?: 'client';
   needsAuthUserPass: boolean;
+  /** Raw `tun-mtu <n>` value, if present and numeric. Clamping/defaulting happens in endpoint-builder.ts. */
+  tunMtu?: number;
 }
 
 const IGNORABLE_DIRECTIVES = new Set([
@@ -41,7 +43,6 @@ const IGNORABLE_DIRECTIVES = new Set([
   'auth-nocache',
   'explicit-exit-notify',
   'remote-cert-tls',
-  'tun-mtu',
   'mssfix',
   'comp-lzo',
   'compress',
@@ -72,6 +73,7 @@ export function parseOvpn(content: string): ParsedOvpn {
   let tlsCryptLines: string[] | undefined;
   let keyDirection: string | undefined;
   let needsAuthUserPass = false;
+  let tunMtu: number | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -132,6 +134,13 @@ export function parseOvpn(content: string): ParsedOvpn {
       case 'key-direction':
         keyDirection = arg;
         break;
+      case 'tun-mtu': {
+        const n = Number(arg);
+        // An invalid value isn't fatal — endpoint-builder falls back to the
+        // default MTU exactly as if `tun-mtu` had been absent.
+        if (Number.isFinite(n)) tunMtu = n;
+        break;
+      }
       case 'ca':
       case 'tls-auth':
       case 'tls-crypt':
@@ -172,6 +181,7 @@ export function parseOvpn(content: string): ParsedOvpn {
     tlsCryptLines,
     controlWrapDirection: tlsAuthLines || tlsCryptLines ? 'client' : undefined,
     needsAuthUserPass,
+    tunMtu,
   };
 }
 

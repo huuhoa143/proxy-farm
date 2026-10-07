@@ -58,4 +58,18 @@ describe('parseOvpn', () => {
   it('throws when remote is missing', () => {
     expect(() => parseOvpn('client\ndev tun\nproto udp\n')).toThrow(/remote/);
   });
+
+  it('extracts a numeric tun-mtu directive', () => {
+    const withTunMtu = GOOD.replace('fast-io', 'tun-mtu 1350\nfast-io');
+    expect(parseOvpn(withTunMtu).tunMtu).toBe(1350);
+  });
+
+  it('leaves tunMtu undefined when the directive is absent', () => {
+    expect(parseOvpn(GOOD).tunMtu).toBeUndefined();
+  });
+
+  it('ignores a non-numeric tun-mtu value rather than throwing', () => {
+    const withBogusMtu = GOOD.replace('fast-io', 'tun-mtu not-a-number\nfast-io');
+    expect(parseOvpn(withBogusMtu).tunMtu).toBeUndefined();
+  });
 });

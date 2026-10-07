@@ -2,42 +2,46 @@
  * Surfshark provider — WireGuard, keyed on the account's private key
  * (spec §5.3).
  *
- * `targets()` resolves the current (≤12h cached) cluster list and also
- * populates an in-memory `key → cluster` cache so `bind()` can find the
- * peer's public key for a given target without re-fetching or threading
- * extra fields through the `Target` shape from contracts.ts. The controller
- * always calls `listTargets()` (→ `targets()`) before `startPorts()` (→
- * `bind()`), so the cache is warm by the time `bind()` runs; a target whose
- * cluster was never resolved throws a clear error rather than silently
- * binding to nothing.
+ * `bind()` must be deterministic even for a persisted port rebound after an
+ * app restart (i.e. with no prior `targets()` call on this instance), so it
+ * never relies on in-memory state warmed by `targets()`. Instead it reads
+ * the peer's public key straight off the on-disk cluster cache
+ * (`readClustersCacheSync`, spec's 12h-cached cluster list) by target key —
+ * a synchronous, no-network read, the same precedent as the hma/zoogvpn CA
+ * files being read with `readFileSync`. If the cache has no matching
+ * cluster (never fetched, or the location vanished from a refresh), it
+ * throws a clear, catchable error rather than binding to nothing.
+ *
+ * The cache path is NOT defaulted to `process.cwd()` — the factory requires
+ * it, so the controller must pass something durable, e.g.
+ * `path.join(app.getPath('userData'), 'cache', 'surfshark-clusters.json')`.
  *
  * Re-resolving the host and switching the peer IP when a probe fails
  * (spec §5.3, "IPs went stale within minutes") is a health-module concern:
  * `bind()` just takes whatever `serverIp` it's given.
  */
-import path from 'node:path';
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
-import { getClusters, type SurfsharkCluster } from './clusters';
+import { getClusters, readClustersCacheSync, type SurfsharkCluster } from './clusters';
 
 const WG_PORT = 51820;
 const WG_KEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 
-const DEFAULT_CACHE_PATH = path.join(process.cwd(), '.cache', 'proxy-farm', 'surfshark-clusters.json');
-
 export interface SurfsharkProviderDeps {
+  /** Required: where the 12h cluster cache lives. No cwd-based default. */
+  cachePath: string;
   loadClusters?: () => Promise<SurfsharkCluster[]>;
 }
 
-export function createSurfsharkProvider(deps: SurfsharkProviderDeps = {}): Provider {
-  const loadClusters = deps.loadClusters ?? (() => getClusters({ cachePath: DEFAULT_CACHE_PATH }));
-  const clusterByKey = new Map<string, SurfsharkCluster>();
+function targetKeyFor(cluster: SurfsharkCluster): string {
+  // connectionName looks like "jp-tok.prod.surfshark.com" — the first
+  // label is Surfshark's own short location code, stable across refreshes.
+  const shortCode = cluster.connectionName.split('.')[0];
+  return `surfshark:${shortCode}`;
+}
 
-  function targetKeyFor(cluster: SurfsharkCluster): string {
-    // connectionName looks like "jp-tok.prod.surfshark.com" — the first
-    // label is Surfshark's own short location code, stable across refreshes.
-    const shortCode = cluster.connectionName.split('.')[0];
-    return `surfshark:${shortCode}`;
-  }
+export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
+  const cachePath = deps.cachePath;
+  const loadClusters = deps.loadClusters ?? (() => getClusters({ cachePath }));
 
   return {
     id: 'surfshark',
@@ -56,30 +60,25 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps = {}): Provi
 
     async targets(_account: Account): Promise<Target[]> {
       const clusters = await loadClusters();
-      const out: Target[] = [];
-      for (const cluster of clusters) {
-        const key = targetKeyFor(cluster);
-        clusterByKey.set(key, cluster);
-        out.push({
-          key,
-          providerId: 'surfshark',
-          country: cluster.countryCode,
-          city: cluster.location,
-          label: `${cluster.country} — ${cluster.location}`,
-          servers: [cluster.connectionName],
-        });
-      }
-      return out;
+      return clusters.map((cluster) => ({
+        key: targetKeyFor(cluster),
+        providerId: 'surfshark',
+        country: cluster.countryCode,
+        city: cluster.location,
+        label: `${cluster.country} — ${cluster.location}`,
+        servers: [cluster.connectionName],
+      }));
     },
 
     bind(target: Target, serverIp: string, _account: Account, secret: AccountSecret) {
       if (secret.kind !== 'wgkey') {
         throw new Error('surfshark: bind() requires a wgkey secret');
       }
-      const cluster = clusterByKey.get(target.key);
+      const clusters = readClustersCacheSync(cachePath);
+      const cluster = clusters?.find((c) => targetKeyFor(c) === target.key);
       if (!cluster) {
         throw new Error(
-          `surfshark: unknown target "${target.key}" — call targets() to (re)warm the cluster cache before bind()`,
+          `surfshark: no cached cluster for target "${target.key}" — refresh the cluster cache (call targets()) first`,
         );
       }
       return {
@@ -100,5 +99,3 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps = {}): Provi
     },
   };
 }
-
-export const surfsharkProvider = createSurfsharkProvider();

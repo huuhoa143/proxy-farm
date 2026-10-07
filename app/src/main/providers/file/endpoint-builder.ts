@@ -4,6 +4,14 @@ import type { ParsedWireguard } from './wg-parser';
 
 const DEFAULT_OVPN_MTU = 1400;
 const DEFAULT_WG_MTU = 1280;
+const MIN_OVPN_MTU = 1280;
+const MAX_OVPN_MTU = 1500;
+
+/** Honours a `tun-mtu` from the .ovpn, clamped to [1280, 1500]; falls back to 1400 if absent. */
+function resolveOvpnMtu(tunMtu: number | undefined): number {
+  if (tunMtu === undefined) return DEFAULT_OVPN_MTU;
+  return Math.min(MAX_OVPN_MTU, Math.max(MIN_OVPN_MTU, tunMtu));
+}
 
 export function buildOvpnEndpoint(
   parsed: ParsedOvpn,
@@ -32,7 +40,7 @@ export function buildOvpnEndpoint(
     data_ciphers: parsed.cipher ? [parsed.cipher] : ['AES-256-GCM'],
     auth: parsed.auth,
     route_no_pull: true,
-    mtu: DEFAULT_OVPN_MTU,
+    mtu: resolveOvpnMtu(parsed.tunMtu),
   };
 }
 
