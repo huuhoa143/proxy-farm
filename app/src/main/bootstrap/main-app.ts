@@ -47,9 +47,18 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 const DEFAULT_WEBHOOK_PORT = 29000;
 
 function log(msg: string, err?: unknown): void {
-  // eslint-disable-next-line no-console
-  console.log(`[proxy-farm] ${msg}`, err instanceof Error ? err.message : (err ?? ''));
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[proxy-farm] ${msg}`, err instanceof Error ? err.message : (err ?? ''));
+  } catch {
+    // stdout gone (launcher exited): logging must never take the app down
+  }
 }
+
+// When whoever launched us goes away, writes to stdout/stderr fail with EPIPE. Those
+// surface as async 'error' events; unhandled, they became uncaught exceptions and left
+// the main process in a state where the first SIGTERM/quit was swallowed (found in e2e).
+for (const stream of [process.stdout, process.stderr]) stream?.on?.('error', () => undefined);
 
 function firstLanIPv4(): string | undefined {
   for (const addrs of Object.values(networkInterfaces())) {
@@ -106,14 +115,31 @@ export function runApp(): void {
     event.preventDefault();
     if (quitting) return;
     quitting = true;
+    log('quitting: stopping all engines');
     void shutdown()
       .catch((err) => log('shutdown failed', err))
       .finally(() => {
+        log('engines stopped; exiting');
         cleanedUp = true;
-        app.quit();
+        // app.exit, not app.quit: when the quit came from Electron's own SIGTERM
+        // handling, a second app.quit() after the deferred cleanup was ignored and the
+        // process lingered (found in e2e). Everything that needed a graceful stop is done.
+        app.exit(0);
       });
   });
-  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(sig, () => app.quit());
+  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const)
+    process.on(sig, () => {
+      log(`${sig}: quitting`);
+      app.quit();
+    });
+  // A tray app that runs proxies unattended must never freeze behind Electron's modal
+  // "JavaScript error in the main process" dialog (it blocks the event loop, so every
+  // port and IPC call stalls). Log instead; the failing port's own state handles retry.
+  process.on('uncaughtException', (err) => {
+    if ((err as NodeJS.ErrnoException)?.code === 'EPIPE') return;
+    log('uncaught exception', err);
+  });
+  process.on('unhandledRejection', (err) => log('unhandled rejection', err));
 
   // Ports keep running with the window closed; quit from the tray or the app menu.
   app.on('window-all-closed', () => undefined);
