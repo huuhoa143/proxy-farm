@@ -11,11 +11,12 @@
 # here is the fix for that class of bug, not a feature of this product).
 #
 # Requires, set by the caller before sourcing/calling:
-#   ROOT               repo app/ root (absolute)
-#   SIGN_IDENTITY       "Developer ID Application: …"
-#   NOTARIZE_PROFILE    notarytool keychain profile name
-#   ENTITLEMENTS        path to entitlements.plist
-#   PRODUCT_SLUG        filename-safe product name, e.g. "ProxyFarm"
+#   ROOT                 repo app/ root (absolute)
+#   SIGN_IDENTITY         "Developer ID Application: …"
+#   NOTARIZE_PROFILE      notarytool keychain profile name
+#   ENTITLEMENTS          path to entitlements.plist (Proxy Farm + Electron helpers)
+#   SINGBOX_ENTITLEMENTS  path to entitlements.singbox.plist (sing-box binary only)
+#   PRODUCT_SLUG          filename-safe product name, e.g. "ProxyFarm"
 # and sources scripts/lib/state-helpers.sh itself (state_*, notarize_resilient,
 # bold/green/red/warn) and calls scripts/sign-proxyfarm-bundle.sh +
 # scripts/smoke-launch (a function, not a file — see below).
@@ -138,6 +139,111 @@ verify_min_macos() {
   green "  LSMinimumSystemVersion = $promised (>= 12.0 OK)"
 }
 
+# verify_singbox_bundled <app-path> <arch: arm64|x64>
+#
+# Hard gate (spec §9/§6, §2): confirms the packaged app actually contains
+# the sing-box binary for THIS build's architecture, at the exact sha256
+# pinned in scripts/singbox.pins.json — and that it's the RIGHT arch (an
+# x64 Mac build must get the amd64 binary, never arm64, since Rosetta-under-
+# notarized-hardened-runtime is not a thing worth relying on here).
+#
+# Runs BEFORE signing, not after: codesign rewrites the binary's bytes (it
+# embeds a signature), so this is the last point at which the bundled file
+# is still byte-identical to what prebuild-singbox.mjs fetched and verified.
+# forge.config.ts's packageAfterCopy hook performs the actual per-arch copy
+# and already hard-fails if the source is missing — this re-verifies the
+# RESULT independently, so a stale/tampered Resources/ tree (e.g. a leftover
+# arm64 binary under a darwin-amd64 directory from a bad manual copy) is
+# still caught here rather than shipped.
+verify_singbox_bundled() {
+  local APP="$1" ARCH="$2"
+  local platform_key
+  case "$ARCH" in
+    arm64) platform_key="darwin-arm64" ;;
+    x64)   platform_key="darwin-amd64" ;;
+    *) red "verify_singbox_bundled: unknown arch '$ARCH'"; return 1 ;;
+  esac
+
+  local pins_path="$ROOT/scripts/singbox.pins.json"
+  local binary_name expected_sha
+  binary_name="$(jq -r --arg k "$platform_key" '.assets[$k].binaryName' "$pins_path")"
+  expected_sha="$(jq -r --arg k "$platform_key" '.assets[$k].binarySha256' "$pins_path")"
+  if [[ -z "$binary_name" || "$binary_name" == "null" || -z "$expected_sha" || "$expected_sha" == "null" ]]; then
+    red "No sing-box pin for platform \"$platform_key\" in $pins_path"
+    return 1
+  fi
+
+  local bundled="$APP/Contents/Resources/sing-box/$platform_key/$binary_name"
+  if [[ ! -f "$bundled" ]]; then
+    red "No sing-box binary bundled at $bundled"
+    red "forge.config.ts's packageAfterCopy hook should have put it there during 'make' — packaging is broken."
+    return 1
+  fi
+
+  local actual_sha
+  actual_sha="$(shasum -a 256 "$bundled" | awk '{print $1}')"
+  if [[ "$actual_sha" != "$expected_sha" ]]; then
+    red "Bundled sing-box sha256 mismatch for $platform_key:"
+    red "  expected: $expected_sha"
+    red "  actual:   $actual_sha"
+    red "  at:       $bundled"
+    return 1
+  fi
+  green "  sing-box ($platform_key) bundled + sha256 verified: $bundled"
+}
+
+# _verify_zip_spctl <zip-path>
+#
+# Extracts via `ditto -x -k` (matches Squirrel.Mac/electron-updater's own
+# extract — plain `unzip` strips resource forks and gives false "sealed
+# resource missing" errors on a perfectly valid ZIP) into a scratch dir and
+# spctl-verifies the .app inside. `trap … RETURN` guarantees the scratch dir
+# is removed even if spctl rejects it (under `set -e`, a failing command
+# inside this function still "returns" from it — triggering the RETURN
+# trap — before the failure propagates to the caller; same pattern as
+# smoke_launch_app's _smoke_cleanup above).
+_verify_zip_spctl() {
+  local zip_path="$1"
+  local zip_tmp
+  zip_tmp="$(mktemp -d -t proxyfarm-verify-zip)"
+  # shellcheck disable=SC2329 # invoked indirectly via `trap ... RETURN` below
+  _zip_tmp_cleanup() { rm -rf "$zip_tmp"; }
+  trap _zip_tmp_cleanup RETURN
+
+  ditto -x -k "$zip_path" "$zip_tmp"
+  local extracted_app
+  extracted_app="$(find "$zip_tmp" -name "*.app" -maxdepth 1 | head -1)"
+  spctl -a -vv --type execute "$extracted_app"
+}
+
+# _verify_dmg_spctl <dmg-path>
+#
+# Mounts read-only, spctl-verifies the .app inside, then ALWAYS detaches
+# and removes the mountpoint — even if spctl rejects it — via the same
+# `trap … RETURN` pattern as _verify_zip_spctl. Before this fix, a failing
+# `spctl` here would abort the function under `set -e` and skip straight
+# past `hdiutil detach`, leaking a mounted DMG that would make every
+# subsequent run's `hdiutil attach` to the same path fail ("already
+# attached") or leave an orphaned Finder-visible volume.
+_verify_dmg_spctl() {
+  local dmg_path="$1"
+  local dmg_mnt
+  dmg_mnt="$(mktemp -d -t proxyfarm-verify-mnt)"
+  # shellcheck disable=SC2329 # invoked indirectly via `trap ... RETURN` below
+  _dmg_mnt_cleanup() {
+    if hdiutil info 2>/dev/null | grep -qF "$dmg_mnt"; then
+      hdiutil detach "$dmg_mnt" -quiet || true
+    fi
+    rmdir "$dmg_mnt" 2>/dev/null || true
+  }
+  trap _dmg_mnt_cleanup RETURN
+
+  hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$dmg_mnt" >/dev/null
+  local mounted_app
+  mounted_app="$(find "$dmg_mnt" -name "*.app" -maxdepth 1 | head -1)"
+  spctl -a -vv --type execute "$mounted_app"
+}
+
 # build_sign_notarize_dist <arch: arm64|x64> <version> <dry_run: 0|1>
 #
 # On success sets (global) BSN_APP, BSN_ZIP, BSN_DMG to the final artifact
@@ -151,7 +257,17 @@ build_sign_notarize_dist() {
   if ! state_is_done "make${SUFFIX}"; then
     bold "make ($ARCH)  — pnpm run make"
     rm -rf "$ROOT/out"
-    ( cd "$ROOT" && pnpm run make -- --platform darwin --arch "$ARCH" )
+    # NOTE: no literal `--` before the flags. Unlike npm, pnpm does not
+    # strip a `--` separator from `pnpm run <script> -- <args>` — it passes
+    # it straight through as a literal argument to the underlying command,
+    # which silently breaks electron-forge's (Commander-based) flag parsing
+    # and makes it fall back to the HOST architecture. Confirmed by testing:
+    # `pnpm run package -- --arch x64 --platform darwin` built arm64 (wrong,
+    # silently); `pnpm run package --arch x64 --platform darwin` (no `--`)
+    # built x64 (right). This is exactly the bug that would have made the
+    # x64 leg of release-with-x64.sh silently re-sign and upload an arm64
+    # binary labeled x64.
+    ( cd "$ROOT" && pnpm run make --platform darwin --arch "$ARCH" )
     local app
     app="$(find "$ROOT/out" -name "*.app" -not -path "*/make/*" | head -1)"
     [[ -d "$app" ]] || { red "make ($ARCH) finished but no .app found"; return 1; }
@@ -166,6 +282,9 @@ build_sign_notarize_dist() {
   bold "verify-min-macos ($ARCH)"
   verify_min_macos "$BSN_APP" || return 1
 
+  bold "verify-singbox-bundled ($ARCH)"
+  verify_singbox_bundled "$BSN_APP" "$ARCH" || return 1
+
   if (( DRY_RUN == 1 )); then
     warn "[dry-run] stopping before codesign/notarize/dist for $ARCH (needs Apple identity + gh credentials)"
     return 0
@@ -174,7 +293,7 @@ build_sign_notarize_dist() {
   # ── sign ──
   if ! state_is_done "sign${SUFFIX}"; then
     bold "codesign ($ARCH) — inside-out, hardened runtime, RFC3161 timestamp"
-    bash "$ROOT/scripts/sign-proxyfarm-bundle.sh" "$BSN_APP" "$ENTITLEMENTS" "$SIGN_IDENTITY"
+    bash "$ROOT/scripts/sign-proxyfarm-bundle.sh" "$BSN_APP" "$ENTITLEMENTS" "$SIGN_IDENTITY" "$SINGBOX_ENTITLEMENTS"
     state_mark_done "sign${SUFFIX}"
   else
     green "codesign ($ARCH) — skipped"
@@ -232,9 +351,16 @@ build_sign_notarize_dist() {
 
     rm -f "$dmg_path"
     ( cd "$dmg_dir" && create-dmg "$BSN_APP" . )
-    # create-dmg names its output "<AppName> <version>.dmg" — glob rather
-    # than hardcode the product name's exact casing/spacing.
-    mv "$dmg_dir"/*.dmg "$dmg_path"
+    # create-dmg names its output "<app bundle name> <version>.dmg". Glob
+    # prefixed by the app bundle's own basename (lingoreup pattern: it
+    # globbed "LingoReup*.dmg", not bare "*.dmg") rather than a bare
+    # "*.dmg" — dmg_dir is normally freshly mkdir'd and empty, but a bare
+    # glob would silently (mis)match any stray .dmg left behind by a prior
+    # failed/partial run in the same dir, either clobbering the wrong file
+    # into $dmg_path or grabbing it instead of the one just built.
+    local app_base
+    app_base="$(basename "$BSN_APP" .app)"
+    mv "$dmg_dir/$app_base"*.dmg "$dmg_path"
     echo "  DMG: $(basename "$dmg_path") ($(du -h "$dmg_path" | cut -f1))"
 
     state_set "zip_path${SUFFIX}" "$zip_path"
@@ -271,21 +397,8 @@ build_sign_notarize_dist() {
   # ── final verify (ZIP via ditto extract, DMG mounted) ──
   if ! state_is_done "verify${SUFFIX}"; then
     bold "final verify ($ARCH) — ZIP (ditto extract) + DMG (mounted)"
-    local zip_tmp dmg_mnt
-    zip_tmp="$(mktemp -d -t proxyfarm-verify-zip)"
-    ditto -x -k "$zip_path" "$zip_tmp"
-    local extracted_app
-    extracted_app="$(find "$zip_tmp" -name "*.app" -maxdepth 1 | head -1)"
-    spctl -a -vv --type execute "$extracted_app"
-    rm -rf "$zip_tmp"
-
-    dmg_mnt="$(mktemp -d -t proxyfarm-verify-mnt)"
-    hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$dmg_mnt" >/dev/null
-    local mounted_app
-    mounted_app="$(find "$dmg_mnt" -name "*.app" -maxdepth 1 | head -1)"
-    spctl -a -vv --type execute "$mounted_app"
-    hdiutil detach "$dmg_mnt" -quiet || true
-    rmdir "$dmg_mnt" 2>/dev/null || true
+    _verify_zip_spctl "$zip_path"
+    _verify_dmg_spctl "$dmg_path"
     state_mark_done "verify${SUFFIX}"
   else
     green "final verify ($ARCH) — skipped"

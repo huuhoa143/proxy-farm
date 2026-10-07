@@ -46,6 +46,7 @@ source "$ROOT/scripts/lib/build-sign-notarize.sh"
 SIGN_IDENTITY="Developer ID Application: Chien Bui Minh (CCQUC3AGRH)"
 NOTARIZE_PROFILE="PROXYFARM_NOTARIZE"
 ENTITLEMENTS="$ROOT/entitlements.plist"
+SINGBOX_ENTITLEMENTS="$ROOT/entitlements.singbox.plist"
 PRODUCT_SLUG="ProxyFarm"
 GH_REPO="huuhoa143/proxy-farm"
 

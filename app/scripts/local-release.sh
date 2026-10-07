@@ -88,6 +88,7 @@ source "$ROOT/scripts/lib/build-sign-notarize.sh"
 SIGN_IDENTITY="Developer ID Application: Chien Bui Minh (CCQUC3AGRH)"
 NOTARIZE_PROFILE="PROXYFARM_NOTARIZE"
 ENTITLEMENTS="$ROOT/entitlements.plist"
+SINGBOX_ENTITLEMENTS="$ROOT/entitlements.singbox.plist"
 PRODUCT_SLUG="ProxyFarm"
 GH_REPO="huuhoa143/proxy-farm"
 
@@ -128,6 +129,7 @@ CREATE_DMG_VERSION="$(create-dmg --version 2>/dev/null || echo 0)"
 }
 
 [[ -f "$ENTITLEMENTS" ]] || { red "Missing entitlements: $ENTITLEMENTS"; exit 1; }
+[[ -f "$SINGBOX_ENTITLEMENTS" ]] || { red "Missing sing-box entitlements: $SINGBOX_ENTITLEMENTS"; exit 1; }
 
 # Signing identity + notarize profile: hard requirement for a real release,
 # but a --dry-run exists precisely to be runnable on a box that doesn't have

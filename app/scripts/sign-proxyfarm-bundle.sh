@@ -9,7 +9,15 @@
 # extraResource puts them.
 #
 # Usage:
-#   scripts/sign-proxyfarm-bundle.sh <app-path> <entitlements> <identity>
+#   scripts/sign-proxyfarm-bundle.sh <app-path> <entitlements> <identity> <singbox-entitlements>
+#
+# Two entitlements files, not one: <entitlements> (allow-jit,
+# allow-unsigned-executable-memory, network.client) goes on Proxy Farm's own
+# executable and its Electron helper .apps — all of which run V8 and need
+# JIT. <singbox-entitlements> is deliberately narrower (hardened-runtime
+# defaults + network.client only, no JIT/unsigned-exec-memory) and goes ONLY
+# on the bundled sing-box binary, since it's Go, never JITs, and has no
+# reason to carry entitlements an Electron process needs.
 #
 # Inside-out order (Apple-required):
 #   1. Sign every Mach-O object file in the bundle (leaf nodes first).
@@ -26,16 +34,18 @@
 
 set -euo pipefail
 
-[[ $# -eq 3 ]] || {
-  echo "usage: $0 <app-path> <entitlements> <identity>" >&2
+[[ $# -eq 4 ]] || {
+  echo "usage: $0 <app-path> <entitlements> <identity> <singbox-entitlements>" >&2
   exit 2
 }
 APP="$1"
 ENT="$2"
 IDENTITY="$3"
+SINGBOX_ENT="$4"
 
 [[ -d "$APP" ]] || { echo "error: app not found: $APP" >&2; exit 1; }
 [[ -f "$ENT" ]] || { echo "error: entitlements not found: $ENT" >&2; exit 1; }
+[[ -f "$SINGBOX_ENT" ]] || { echo "error: sing-box entitlements not found: $SINGBOX_ENT" >&2; exit 1; }
 
 COMMON=(--force --options runtime --timestamp --sign "$IDENTITY")
 
@@ -100,12 +110,23 @@ echo "▶ Scanning bundle for Mach-O object files…"
 mach_count=0
 ent_count=0
 sign_failed=0
-while IFS= read -r -d '' f; do
+# Deepest paths FIRST — children must be signed before any bundle MAIN
+# EXECUTABLE above them. Depth is `NF` from splitting each path on "/"; the
+# exact number doesn't matter, only that it sorts consistently (every path
+# shares the $APP prefix). This used to shell out to /usr/bin/python3 for
+# the same sort (NUL-safe, since sed/awk/grep can't carry an embedded NUL
+# byte in a C string) — switched to newline-delimited `find` + awk/sort
+# instead, on the documented assumption that no file in an Electron/Vite/
+# node_modules build output ever has a literal newline in its name (unlike
+# spaces, which ARE common — "Proxy Farm Helper (Renderer).app" — and are
+# handled fine by `IFS= read -r`, since the whole line, not word-split, is
+# the path). This drops python3 as a prerequisite entirely.
+while IFS= read -r f; do
   [[ -L "$f" ]] && continue
   if is_macho "$f"; then
     case "$(basename "$f")" in
       sing-box|sing-box.exe)
-        codesign_retry "${COMMON[@]}" --entitlements "$ENT" "$f" || {
+        codesign_retry "${COMMON[@]}" --entitlements "$SINGBOX_ENT" "$f" || {
           echo "  WARN: ent sign failed: $f" >&2
           sign_failed=$((sign_failed + 1))
         }
@@ -120,22 +141,21 @@ while IFS= read -r -d '' f; do
     esac
     mach_count=$((mach_count + 1))
   fi
-done < <(find "$APP" -type f -print0 | /usr/bin/python3 -c '
-import sys
-files = [f for f in sys.stdin.buffer.read().split(b"\0") if f]
-# Deepest paths FIRST — children must be signed before any bundle MAIN
-# EXECUTABLE above them. SIBLING subtree order is readdir (arbitrary) —
-# sort by depth explicitly.
-files.sort(key=lambda p: p.count(b"/"), reverse=True)
-sys.stdout.buffer.write(b"\0".join(files) + b"\0")
-')
+done < <(find "$APP" -type f -print | awk -F'/' '{ printf "%d\t%s\n", NF, $0 }' | sort -t $'\t' -k1,1rn | cut -f2-)
 echo "  Signed $mach_count Mach-O object files ($ent_count with entitlements, $sign_failed failures)"
 (( sign_failed == 0 )) || { echo "error: $sign_failed Mach-O signs failed" >&2; exit 1; }
+# Hard gate (spec §9/§6): a packaged app with zero sing-box binaries is a
+# build that cannot run any VPN endpoint. forge.config.ts's packageAfterCopy
+# hook is supposed to guarantee one is bundled per-arch (and itself hard-
+# fails if the pinned binary is missing from app/resources/) — this is the
+# second, independent check, in case this script is ever invoked against a
+# bundle produced some other way (e.g. a manual `electron-packager` run).
 if (( ent_count == 0 )); then
-  echo "  NOTE: no sing-box binary found to sign with --entitlements." >&2
-  echo "        Expected if forge.config.ts has no packagerConfig.extraResource" >&2
-  echo "        for app/resources/sing-box yet (pre-integration build). If this" >&2
-  echo "        app is meant to actually run sing-box, that wiring is missing." >&2
+  echo "error: no sing-box binary found to sign with --entitlements." >&2
+  echo "       Expected under $APP/Contents/Resources/sing-box/<platform>/." >&2
+  echo "       forge.config.ts's packageAfterCopy hook should have bundled one —" >&2
+  echo "       packaging is broken, or this .app was built without it." >&2
+  exit 1
 fi
 
 # ─── 2. Sign nested frameworks ─────────────────────────────────────────

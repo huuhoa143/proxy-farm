@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { readFile, writeFile, mkdir, copyFile, chmod } from 'node:fs/promises';
 import path from 'node:path';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -31,17 +32,35 @@ const APP_UPDATE_YML = [
 
 const APP_UPDATE_REQUIRED_KEYS = ['provider:', 'owner:', 'repo:', 'updaterCacheDirName:'] as const;
 
+// Maps an electron-packager (platform, arch) pair to the asset key used in
+// scripts/singbox.pins.json / app/resources/sing-box/<key>/. This is what
+// makes packaging per-arch-correct: a darwin/x64 build bundles the amd64
+// binary, a darwin/arm64 build bundles the arm64 one, never both — unlike a
+// static `packagerConfig.extraResource` array (which can't vary per build,
+// since forge.config.ts is evaluated once regardless of --platform/--arch).
+const SINGBOX_PLATFORM_KEYS: Record<string, string> = {
+  'darwin-arm64': 'darwin-arm64',
+  'darwin-x64': 'darwin-amd64',
+  'win32-x64': 'windows-amd64',
+};
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // Go 1.26 (sing-box's toolchain) floors at macOS 12. Set explicitly so
+    // the release pipeline's min-macOS check (spec §9) verifies a value this
+    // config controls, rather than one Electron happened to default to.
+    extendInfo: { LSMinimumSystemVersion: '12.0' },
   },
   rebuildConfig: {},
   hooks: {
     // packageAfterCopy fires before electron-packager copies any
     // extraResource, but the Resources dir already exists at this point, so
-    // it's safe to write app-update.yml here.
-    packageAfterCopy: async (_forgeConfig, buildPath) => {
+    // it's safe to write files directly under it here.
+    packageAfterCopy: async (_forgeConfig, buildPath, _electronVersion, platform, arch) => {
       const resourcesDir = path.resolve(buildPath, '..');
+
+      // ── app-update.yml (electron-updater feed, read by the packaged app) ──
       const ymlPath = path.join(resourcesDir, 'app-update.yml');
       await writeFile(ymlPath, APP_UPDATE_YML, 'utf8');
       const written = await readFile(ymlPath, 'utf8');
@@ -49,6 +68,42 @@ const config: ForgeConfig = {
         if (!written.includes(key)) {
           throw new Error(`app-update.yml is missing required field "${key.slice(0, -1)}" at ${ymlPath}`);
         }
+      }
+
+      // ── sing-box binary for THIS build's platform/arch only (spec §6, §9) ──
+      // Hard-fails rather than silently shipping an app with no VPN engine:
+      // a packaged app missing sing-box is a worse failure mode than a build
+      // that refuses to proceed, and it would otherwise only be caught much
+      // later by sign-proxyfarm-bundle.sh's own hard gate (defense in depth,
+      // not a replacement for it — that gate stays, in case this hook is
+      // ever bypassed, e.g. a manual `electron-packager` invocation).
+      const platformKey = SINGBOX_PLATFORM_KEYS[`${platform}-${arch}`];
+      if (!platformKey) {
+        throw new Error(
+          `No sing-box platform mapping for ${platform}/${arch}. ` +
+            `Supported: darwin/arm64, darwin/x64, win32/x64 (see SINGBOX_PLATFORM_KEYS).`,
+        );
+      }
+      const pinsPath = path.resolve(process.cwd(), 'scripts', 'singbox.pins.json');
+      const pins = JSON.parse(await readFile(pinsPath, 'utf8'));
+      const pin = pins.assets?.[platformKey];
+      if (!pin) {
+        throw new Error(`No sing-box pin for platform "${platformKey}" in ${pinsPath}`);
+      }
+      const srcBinary = path.resolve(process.cwd(), 'resources', 'sing-box', platformKey, pin.binaryName);
+      if (!existsSync(srcBinary)) {
+        throw new Error(
+          `sing-box binary missing: ${srcBinary}\n` +
+            `Run: node scripts/prebuild-singbox.mjs${platform === process.platform && arch === process.arch ? '' : ' --all'}` +
+            ` (fetches the pinned binary for ${platformKey})`,
+        );
+      }
+      const destDir = path.join(resourcesDir, 'sing-box', platformKey);
+      await mkdir(destDir, { recursive: true });
+      const destBinary = path.join(destDir, pin.binaryName);
+      await copyFile(srcBinary, destBinary);
+      if (platform !== 'win32') {
+        await chmod(destBinary, 0o755);
       }
     },
   },
