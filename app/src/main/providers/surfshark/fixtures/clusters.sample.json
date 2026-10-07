@@ -1,0 +1,90 @@
+[
+  {
+    "country": "Albania",
+    "countryCode": "AL",
+    "region": "Europe",
+    "regionCode": "EU",
+    "id": "4c333aa2-d08b-4d11-9073-61c351ce1c1e",
+    "type": "generic",
+    "location": "Tirana",
+    "connectionName": "al-tia.prod.surfshark.com",
+    "pubKey": "l8EOWPyzt/njrb74CADY4VOhns/TbUN6KFTbytHcFQw=",
+    "tags": [
+      "virtual",
+      "p2p"
+    ]
+  },
+  {
+    "country": "Algeria",
+    "countryCode": "DZ",
+    "region": "Middle East and Africa",
+    "regionCode": "EA",
+    "id": "f8aa8d00-b011-4fd6-9e3b-22ab65ef23fb",
+    "type": "generic",
+    "location": "Algiers",
+    "connectionName": "dz-alg.prod.surfshark.com",
+    "pubKey": "KyFFiO8bY3wZGpxJf7aqEH3TrG+Jj4ZfNOyh2oS7ICU=",
+    "tags": [
+      "virtual",
+      "p2p"
+    ]
+  },
+  {
+    "country": "Canada",
+    "countryCode": "CA",
+    "region": "The Americas",
+    "regionCode": "AM",
+    "id": "1e46390f-f40e-4c43-8d42-bee95666fb4e",
+    "type": "obfuscated",
+    "location": "Toronto",
+    "connectionName": "ca-tor-mp001.prod.surfshark.com",
+    "pubKey": null,
+    "tags": [
+      "p2p",
+      "physical"
+    ]
+  },
+  {
+    "country": "Germany",
+    "countryCode": "DE",
+    "region": "Europe",
+    "regionCode": "EU",
+    "id": "486cdb66-0e4e-409c-9e4d-3bd1cbad21cd",
+    "type": "obfuscated",
+    "location": "Frankfurt am Main",
+    "connectionName": "de-fra-mp001.prod.surfshark.com",
+    "pubKey": null,
+    "tags": [
+      "p2p",
+      "physical"
+    ]
+  },
+  {
+    "country": "Germany",
+    "countryCode": "DE",
+    "region": "Europe",
+    "regionCode": "EU",
+    "id": "9f34e50f-a0b0-46be-b27e-898e11d4da5b",
+    "type": "static",
+    "location": "Frankfurt am Main",
+    "connectionName": "de-fra-st007.prod.surfshark.com",
+    "pubKey": "cyiOxJryKyqB3cdwXjL7ILCUy3KVBPrOXSbFtasEeF8=",
+    "tags": [
+      "p2p"
+    ]
+  },
+  {
+    "country": "Germany",
+    "countryCode": "DE",
+    "region": "Europe",
+    "regionCode": "EU",
+    "id": "01918f12-c28e-7228-98ae-e1d5281a9a23",
+    "type": "static",
+    "location": "Frankfurt am Main",
+    "connectionName": "de-fra-st001.prod.surfshark.com",
+    "pubKey": "kj90Cy2gkEYrHn487636hOfto2EBWEddUngRdrziylM=",
+    "tags": [
+      "p2p"
+    ]
+  }
+]

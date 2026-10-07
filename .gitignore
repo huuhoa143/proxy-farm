@@ -8,8 +8,16 @@ secrets/
 *.key
 *.pem
 !node/ca/*.pem
+# v2 providers module: public root/shared CA material and tls-auth key,
+# bundled for HMA/ZoogVPN OpenVPN (spec §5.1/§5.2) — not secrets.
+!app/resources/ca/*.pem
+!app/resources/ca/*.key
 *.conf
 *.ovpn
+# v2 providers module: synthetic (non-real) .ovpn/.conf fixtures for the
+# file-import provider's unit tests (spec §5.4).
+!app/src/main/providers/file/fixtures/*.ovpn
+!app/src/main/providers/file/fixtures/*.conf
 tokenCoreSE.json
 device.json
 p12pass
