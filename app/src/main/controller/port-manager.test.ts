@@ -6,7 +6,7 @@ import type { Account, EndpointSpec, ExitIpResult, PortRow, PortState, Provider,
 import type { SecretStore } from '../store/secrets';
 import { createStateStore } from '../store/state';
 import { createPortManager, type PortManagerDeps } from './port-manager';
-import type { Engine, ExitIpProber, PortAllocator } from './ports';
+import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator } from './ports';
 
 function fakeSecretStore(): SecretStore {
   const map = new Map<string, string>();
@@ -897,6 +897,47 @@ describe('port manager', () => {
       });
       await manager.startPort('zoogvpn:nl-ams');
       expect(allocator.allocateAuxCalls).toBe(0);
+    });
+  });
+
+  describe('fix round 3', () => {
+    it('item 2: a city-fallback rotate whose engine.start throws AFTER the rename marks the FINAL key retrying, not the stale original key', async () => {
+      const targets: Target[] = [
+        { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] },
+        { key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] },
+      ];
+      // `stop()` succeeds (the OLD key's process genuinely goes away); `start()` under
+      // the FINAL key then throws — a real-world `PortInUseError` racing the rename.
+      const engine: Engine = {
+        start: async () => {
+          throw new PortInUseError(12345);
+        },
+        stop: async () => undefined,
+        probe: async () => ({ code: 'error', message: 'n/a' }),
+        getLogs: () => [],
+        onStateChange: () => () => undefined,
+      };
+      const { manager, state } = setup({
+        targets,
+        engine,
+        exitIpResults: [],
+        // Don't actually schedule a real backoff timer in this test — just prove the
+        // right row/state gets marked, which is what the real timer would act on.
+        depsOverrides: { scheduleRetry: () => () => undefined },
+      });
+
+      await expect(manager.rotatePort('zoogvpn:nl-ams')).rejects.toThrow();
+
+      const rows = state.getState().ports;
+      expect(rows).toHaveLength(1);
+      // The row WAS renamed to the fallback target before the throw...
+      expect(rows[0].key).toBe('zoogvpn:nl-rot');
+      // ...and it is THIS row — not a (non-existent) 'zoogvpn:nl-ams' row — that ends up
+      // retrying. Before the fix, `failWithRetry` was called with the STALE original
+      // key, matched no row at all, and left this one stuck on its stale pre-rotate
+      // `state` (here: 'online') forever, with no retry timer ever scheduled.
+      expect(rows[0].state.kind).toBe('retrying');
+      expect((rows[0].state as { reasonKey: string }).reasonKey).toBe('rotate-error');
     });
   });
 });

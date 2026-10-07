@@ -420,11 +420,20 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       return { changed: false, noteKey: 'rotate-in-progress' };
     }
     rotatingKeys.add(key);
+    // Reports which key actually owns the row right now (reviewer round 3, item 2): a
+    // city-fallback renames the row to `finalKey` partway through `doRotate`, and if
+    // anything throws AFTER that rename (e.g. `engine.start` rejecting with
+    // `PortInUseError`), the row the user is actually looking at lives under
+    // `finalKey` — retrying the ORIGINAL `key` would silently match nothing (the row
+    // was renamed away from it) and leave `finalKey`'s row stranded with no retry timer
+    // and a stale pre-rotate `state`. `doRotate` updates `effectiveKey.current` the
+    // INSTANT the rename is committed, before doing anything else that could throw.
+    const effectiveKey = { current: key };
     try {
-      const result = await doRotate(key);
+      const result = await doRotate(key, effectiveKey);
       return result;
     } catch (err) {
-      failWithRetry(key, { kind: 'retrying', reasonKey: 'rotate-error' });
+      failWithRetry(effectiveKey.current, { kind: 'retrying', reasonKey: 'rotate-error' });
       throw err;
     } finally {
       rotatingKeys.delete(key);
@@ -432,7 +441,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }
   }
 
-  async function doRotate(key: string): Promise<RotateResult> {
+  async function doRotate(key: string, effectiveKey: { current: string }): Promise<RotateResult> {
     const s = deps.state.getState();
     const port = s.ports.find((p) => p.key === key);
     if (!port) return { changed: false, noteKey: 'no-server' };
@@ -521,6 +530,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       return { changed: false, noteKey: 'no-server' };
     }
     const { nextTarget, nextServer, fellBackToAnotherCity, finalKey } = claim;
+    // The rename already landed in the state store (inside `withFallbackLock` above) —
+    // from this point on, any throw must be attributed to `finalKey`, not the original
+    // `key` (reviewer round 3, item 2).
+    effectiveKey.current = finalKey;
 
     const endpoint = provider.bind(nextTarget, nextServer, account, secret);
     const renderInput = buildRenderInput(port, endpoint);

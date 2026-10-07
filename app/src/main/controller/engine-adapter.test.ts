@@ -319,6 +319,60 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       }
       expect(healths[0].fedExit.length).toBeGreaterThan(0); // eventually handed to PortHealth
     });
+
+    describe('reviewer round 3, item 1: the bind-error regex must not grab a timestamp', () => {
+      it('a real timestamped PROXY-port bind-failure line -> terminal failed(port-in-use)', async () => {
+        const { engine, processes } = setup();
+        const seen: Array<{ key: string; state: PortState }> = [];
+        engine.onStateChange((key, state) => seen.push({ key, state }));
+        await engine.start('k1', sampleInput(29001));
+
+        // Realistic sing-box output: timestamp-prefixed, with an earlier `HH:MM:SS` that
+        // an unanchored regex could mistake for the colliding port (`34` from `12:34:56`).
+        processes[0].emitLog(
+          '+0700 2026-10-08 12:34:56 FATAL[0000] start service: start inbound/mixed[in]: listen tcp4 127.0.0.1:29001: bind: address already in use',
+        );
+        processes[0].emitExit({ code: 1, signal: null });
+        await vi.waitFor(() => expect(seen.some((s) => s.state.kind === 'failed')).toBe(true));
+        expect(seen.find((s) => s.state.kind === 'failed')!.state).toMatchObject({ kind: 'failed', reason: 'port-in-use' });
+      });
+
+      it('a real timestamped CLASH-port bind-failure line -> reallocate+retry branch', async () => {
+        const { engine, processes, healths } = setup();
+        await engine.start('k1', sampleInput(29002));
+
+        // Real clash_api collision message shape, also timestamp-prefixed.
+        processes[0].emitLog(
+          '+0700 2026-10-08 12:34:56 FATAL[0000] finish-start clash server: external controller listen error: listen tcp 127.0.0.1:41501: bind: address already in use',
+        );
+        processes[0].emitExit({ code: 1, signal: null });
+        await vi.waitFor(() => expect(processes[0].startedConfigs).toHaveLength(2));
+        expect(healths[0].fedExit).toEqual([]); // reallocated+retried, not surfaced as a failure
+      });
+    });
+
+    describe('reviewer round 3, item 3: a race during the in-flight reallocation must not resurrect/corrupt the process', () => {
+      it('stop() racing the in-flight reallocation leaves the process NOT respawned', async () => {
+        const { engine, processes } = setup();
+        await engine.start('k1', sampleInput(45250));
+        processes[0].emitLog('FATAL[0000] start: listen tcp4 127.0.0.1:49999: bind: address already in use');
+        processes[0].emitExit({ code: 1, signal: null }); // kicks off the async reallocation (await allocatePort ...)
+        await engine.stop('k1'); // races it: sets entry.stopping = true while the allocation is still in flight
+        await new Promise((r) => setTimeout(r, 50)); // let the in-flight reallocation resolve past the guard
+        expect(processes[0].startedConfigs).toHaveLength(1); // never respawned after the stop
+      });
+
+      it('a fresh start() under the same key racing the in-flight reallocation is never stepped on', async () => {
+        const { engine, processes } = setup();
+        await engine.start('k1', sampleInput(45251));
+        processes[0].emitLog('FATAL[0000] start: listen tcp4 127.0.0.1:49999: bind: address already in use');
+        processes[0].emitExit({ code: 1, signal: null });
+        await engine.start('k1', sampleInput(45252)); // races it: a NEW entry now owns the 'k1' key
+        await new Promise((r) => setTimeout(r, 50));
+        expect(processes[0].startedConfigs).toHaveLength(1); // the OLD process: never got a reallocation respawn
+        expect(processes[1].startedConfigs).toHaveLength(1); // the NEW process: just its own fresh spawn
+      });
+    });
   });
 
   it('the periodic /delay poll feeds PortHealth.feedDelay with the stored clash port/secret', async () => {

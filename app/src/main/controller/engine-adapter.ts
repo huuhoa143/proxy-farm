@@ -20,8 +20,16 @@ const CLASH_AUX_BASE = 40000;
  * `net` bind-failure message (e.g. `listen tcp4 127.0.0.1:29001: bind: address already
  * in use`) and pulls out the colliding port number so the caller can tell whether it was
  * the PROXY port (terminal, spec §6.2) or the auxiliary clash_api port (reallocate and
- * retry) that got stolen out from under us between render time and spawn time. */
-const BIND_ERROR_PORT_RE = /:(\d{2,5})\b[^\n]*address already in use/i;
+ * retry) that got stolen out from under us between render time and spawn time.
+ *
+ * Anchored on sing-box's OWN `listen tcp<N> <host>:<port>: bind: ...` phrasing
+ * (reviewer round 3, item 1): real log lines are timestamp-prefixed (e.g. `+0700
+ * 2026-10-08 12:34:56 FATAL[0000] ...`), and an EARLIER, unanchored version of this
+ * regex (`/:(\d{2,5})\b[^\n]*address already in use/i`) matched leftmost-first, so it
+ * grabbed `34` out of the `12:34:56` timestamp instead of the real colliding port —
+ * requiring the `listen tcp…` prefix and the `: bind:` suffix immediately after the
+ * port rules that out. */
+const BIND_ERROR_PORT_RE = /listen tcp\d?\s+\S*:(\d+):\s*bind:\s*address already in use/i;
 
 function detectBindErrorPort(line: string | undefined): number | undefined {
   if (!line) return undefined;
@@ -212,22 +220,38 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       return;
     }
 
-    const newClashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
-    const newClashSecret = randomBytes(16).toString('hex');
-    const finalInput: RenderInput = { ...entry.callerInput, clash: { port: newClashPort, secret: newClashSecret } };
-    const newConfig = renderConfig(finalInput);
-    assertConfigInvariants(JSON.parse(newConfig));
+    try {
+      const newClashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
 
-    // Mutated in place (not a new PortEntry): the `/delay` poll and `probe()` both read
-    // `entry.clashPort`/`entry.clashSecret` fresh on every call, so this alone redirects
-    // them — no need to recreate the poll or any subscription.
-    entry.clashPort = newClashPort;
-    entry.clashSecret = newClashSecret;
-    entry.lastConfig = newConfig;
+      // `allocatePort` above is async — the port could have been stopped, or even
+      // restarted under the same key (a brand-new `entries.get(key)` entry), while we
+      // were waiting on it (reviewer round 3, item 3). Respawning a STALE entry at this
+      // point would either resurrect a process the caller explicitly stopped, or step
+      // on whatever the fresh start already set up — silently bail instead.
+      if (entry.stopping || entries.get(key) !== entry) return;
 
-    entry.process.start(newConfig);
-    if (entry.process.pid !== undefined) {
-      await doRecordPid(options.registryPath, key, { pid: entry.process.pid, exe: binPath, startedAt: now() });
+      const newClashSecret = randomBytes(16).toString('hex');
+      const finalInput: RenderInput = { ...entry.callerInput, clash: { port: newClashPort, secret: newClashSecret } };
+      const newConfig = renderConfig(finalInput);
+      assertConfigInvariants(JSON.parse(newConfig));
+
+      // Mutated in place (not a new PortEntry): the `/delay` poll and `probe()` both
+      // read `entry.clashPort`/`entry.clashSecret` fresh on every call, so this alone
+      // redirects them — no need to recreate the poll or any subscription.
+      entry.clashPort = newClashPort;
+      entry.clashSecret = newClashSecret;
+      entry.lastConfig = newConfig;
+
+      entry.process.start(newConfig);
+      if (entry.process.pid !== undefined) {
+        await doRecordPid(options.registryPath, key, { pid: entry.process.pid, exe: binPath, startedAt: now() });
+      }
+    } catch {
+      // The reallocation/re-render/respawn itself failed (e.g. no free port at all, or
+      // a render-invariant violation) — this must become a retryable state via
+      // PortHealth's own backoff, never an unhandled rejection out of this
+      // fire-and-forget `void handleBindError(...)` call (reviewer round 3, item 3).
+      entry.health.feedExit(null);
     }
   }
 
