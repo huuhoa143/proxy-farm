@@ -164,11 +164,12 @@ function assertRoute(cfg: Record<string, unknown>): void {
 }
 
 function assertNoApiService(cfg: Record<string, unknown>): void {
-  for (const service of asArray(cfg.services)) {
-    const s = service as Record<string, unknown>;
-    if (s?.type === 'api') {
-      throw new Error(`assertConfigInvariants: a "services" entry of type "api" is not allowed: ${JSON.stringify(service)}`);
-    }
+  // No `services` entry is allowed at all — not just type "api" (which isn't even a real sing-box
+  // service type). Real services like 'derp' or 'ssm-api' are additional listeners/attack surface
+  // this app has no reason to run, so the whole `services` array must be empty or absent.
+  const services = asArray(cfg.services);
+  if (services.length > 0) {
+    throw new Error(`assertConfigInvariants: "services" must be empty or absent, got ${JSON.stringify(services)}`);
   }
   const experimental = cfg.experimental as Record<string, unknown> | undefined;
   if (experimental && 'v2ray_api' in experimental) {

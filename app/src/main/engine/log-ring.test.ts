@@ -69,6 +69,16 @@ describe('redactLine', () => {
     expect(redactLine(line)).toBe(line);
   });
 
+  it('redacts the bracketed proxy username in an inbound/mixed connection log (spec §6.1.7)', () => {
+    const line = 'INFO[0000] inbound/mixed[in]: [alice] inbound connection to 1.2.3.4:443';
+    expect(redactLine(line)).toBe('INFO[0000] inbound/mixed[in]: [***] inbound connection to 1.2.3.4:443');
+  });
+
+  it('redacts the bracketed proxy username regardless of the inbound tag', () => {
+    const line = 'INFO[0012] inbound/mixed[in2]: [svc-acct] inbound connection from 127.0.0.1:55973';
+    expect(redactLine(line)).toBe('INFO[0012] inbound/mixed[in2]: [***] inbound connection from 127.0.0.1:55973');
+  });
+
   it('does not redact an unrelated key that merely contains a sensitive key as a substring', () => {
     const line = 'password_hash_old=deadbeef';
     expect(redactLine(line)).toBe(line);

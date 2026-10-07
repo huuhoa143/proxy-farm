@@ -212,10 +212,28 @@ describe('assertConfigInvariants', () => {
   });
 
   // ── services / v2ray_api ───────────────────────────────────────────────
-  it('throws on a services entry of type "api"', () => {
+  it('throws on a services entry of type "api" (not a real sing-box type, but still rejected)', () => {
     const cfg = baseConfig();
     cfg.services = [{ type: 'api', tag: 'v2ray-api' }];
-    expect(() => assertConfigInvariants(cfg)).toThrow(/services|api/i);
+    expect(() => assertConfigInvariants(cfg)).toThrow(/services/i);
+  });
+
+  it('throws on a services entry of a real sing-box type ("derp")', () => {
+    const cfg = baseConfig();
+    cfg.services = [{ type: 'derp', tag: 'derp-in' }];
+    expect(() => assertConfigInvariants(cfg)).toThrow(/services/i);
+  });
+
+  it('throws on a services entry of a real sing-box type ("ssm-api")', () => {
+    const cfg = baseConfig();
+    cfg.services = [{ type: 'ssm-api', tag: 'ssm' }];
+    expect(() => assertConfigInvariants(cfg)).toThrow(/services/i);
+  });
+
+  it('passes when services is an empty array', () => {
+    const cfg = baseConfig();
+    cfg.services = [];
+    expect(() => assertConfigInvariants(cfg)).not.toThrow();
   });
 
   it('throws on experimental.v2ray_api', () => {
