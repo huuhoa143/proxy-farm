@@ -2,17 +2,19 @@
 // Fetches the pinned sing-box release binary for the host platform (or all
 // three platforms with --all) into app/resources/sing-box/<platform-arch>/,
 // verifying each download against the sha256 pinned in singbox.pins.json
-// before extracting it. Also fetches the matching sing-box source tarball
-// into app/resources/sing-box-src/ (GPLv3 §6 — every release attaches it).
+// before extracting it, and verifying the *extracted* binary against its own
+// pinned sha256 afterwards. Also fetches the matching sing-box source
+// tarball into app/resources/sing-box-src/ (GPLv3 §6 — every release
+// attaches it).
 //
 // Usage:
 //   node scripts/prebuild-singbox.mjs          # host platform only
 //   node scripts/prebuild-singbox.mjs --all     # all three pinned platforms
+//   node scripts/prebuild-singbox.mjs --force   # ignore cache, re-fetch
 
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, mkdtemp, rm, copyFile, readFile, writeFile, readdir, stat, chmod } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, copyFile, readFile, readdir, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,10 +27,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_ROOT = path.resolve(__dirname, '..');
 const RESOURCES_DIR = path.join(APP_ROOT, 'resources');
-const SINGBOX_DIR = path.join(RESOURCES_DIR, 'sing-box');
-const SOURCE_DIR = path.join(RESOURCES_DIR, 'sing-box-src');
 const PINS_PATH = path.join(__dirname, 'singbox.pins.json');
-const CACHE_MARKER_NAME = '.sha256-pin';
+const DOWNLOAD_TIMEOUT_MS = 120_000;
 
 /**
  * Verifies that the file at `filePath` hashes (sha256) to `expectedHex`.
@@ -49,6 +49,17 @@ export async function verifySha256(filePath, expectedHex) {
   return true;
 }
 
+/** Non-throwing variant of verifySha256, used for cache-hit checks: missing
+ * file, read error, or hash mismatch are all just "not cached". */
+async function fileMatchesSha256(filePath, expectedHex) {
+  if (!existsSync(filePath)) return false;
+  try {
+    return await verifySha256(filePath, expectedHex);
+  } catch {
+    return false;
+  }
+}
+
 export async function loadPins() {
   const raw = await readFile(PINS_PATH, 'utf8');
   return JSON.parse(raw);
@@ -67,7 +78,7 @@ export function hostPlatformKey() {
 }
 
 async function downloadFile(url, destPath) {
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
   if (!res.ok || !res.body) {
     throw new Error(`Download failed (HTTP ${res.status}) for ${url}`);
   }
@@ -123,45 +134,51 @@ async function extractZipBinary(archivePath, targetDir, binaryName) {
   }
 }
 
-async function isCached(binaryPath, markerPath, expectedSha256) {
-  if (!existsSync(binaryPath) || !existsSync(markerPath)) return false;
-  try {
-    const marker = (await readFile(markerPath, 'utf8')).trim().toLowerCase();
-    return marker === expectedSha256.toLowerCase();
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Fetches, verifies and extracts the pinned sing-box asset for `platformKey`
- * (e.g. "darwin-arm64") into resources/sing-box/<platformKey>/. Skips the
- * network round-trip entirely when the binary already exists and its
- * recorded provenance hash still matches the pin.
+ * (e.g. "darwin-arm64") into `<resourcesDir>/sing-box/<platformKey>/`.
+ *
+ * Cache behaviour: if a binary already sits at the target path, it is
+ * re-hashed (not merely checked for existence, and not trusted via a
+ * sidecar file) against the pinned `binarySha256` on every call. A match
+ * skips the network round-trip entirely; a mismatch (tampered, corrupted,
+ * or stale from an older pin) deletes it and falls through to a full
+ * re-fetch. `--force` always re-fetches, skipping the cache check.
+ *
+ * `download` is injectable (defaults to the real HTTP fetch) so tests can
+ * exercise the cache/re-fetch branching without hitting the network.
  */
-export async function fetchPlatform(platformKey, { pins, force = false } = {}) {
+export async function fetchPlatform(
+  platformKey,
+  { pins, force = false, resourcesDir = RESOURCES_DIR, download = downloadFile } = {},
+) {
   const resolvedPins = pins ?? (await loadPins());
   const pin = resolvedPins.assets[platformKey];
   if (!pin) {
     throw new Error(`No pin for platform "${platformKey}" in ${PINS_PATH}`);
   }
 
-  const targetDir = path.join(SINGBOX_DIR, platformKey);
+  const targetDir = path.join(resourcesDir, 'sing-box', platformKey);
   const binaryPath = path.join(targetDir, pin.binaryName);
-  const markerPath = path.join(targetDir, CACHE_MARKER_NAME);
 
-  if (!force && (await isCached(binaryPath, markerPath, pin.sha256))) {
-    console.log(`[prebuild-singbox] ${platformKey}: cached, skipping (${binaryPath})`);
-    return binaryPath;
+  if (!force) {
+    if (await fileMatchesSha256(binaryPath, pin.binarySha256)) {
+      console.log(`[prebuild-singbox] ${platformKey}: cached, skipping (${binaryPath})`);
+      return binaryPath;
+    }
+    if (existsSync(binaryPath)) {
+      console.warn(`[prebuild-singbox] ${platformKey}: cached binary failed verification, re-fetching`);
+      await rm(targetDir, { recursive: true, force: true });
+    }
   }
 
   const scratchDir = await mkdtemp(path.join(tmpdir(), 'pf-singbox-dl-'));
   try {
     const archivePath = path.join(scratchDir, path.basename(new URL(pin.url).pathname));
     console.log(`[prebuild-singbox] ${platformKey}: downloading ${pin.url}`);
-    await downloadFile(pin.url, archivePath);
+    await download(pin.url, archivePath);
     await verifySha256(archivePath, pin.sha256);
-    console.log(`[prebuild-singbox] ${platformKey}: sha256 verified`);
+    console.log(`[prebuild-singbox] ${platformKey}: archive sha256 verified`);
 
     let extractedPath;
     if (pin.archiveType === 'tar.gz') {
@@ -172,11 +189,13 @@ export async function fetchPlatform(platformKey, { pins, force = false } = {}) {
       throw new Error(`Unknown archiveType "${pin.archiveType}" for platform "${platformKey}"`);
     }
 
+    await verifySha256(extractedPath, pin.binarySha256);
+    console.log(`[prebuild-singbox] ${platformKey}: extracted binary sha256 verified`);
+
     if (process.platform !== 'win32') {
       await chmod(extractedPath, 0o755);
     }
 
-    await writeFile(markerPath, `${pin.sha256}\n`, 'utf8');
     console.log(`[prebuild-singbox] ${platformKey}: ready at ${extractedPath}`);
     return extractedPath;
   } finally {
@@ -184,23 +203,33 @@ export async function fetchPlatform(platformKey, { pins, force = false } = {}) {
   }
 }
 
-/** Fetches the pinned sing-box source tarball (GPLv3 §6 release attachment). */
-export async function fetchSourceTarball({ pins, force = false } = {}) {
+/**
+ * Fetches the pinned sing-box source tarball (GPLv3 §6 release attachment)
+ * into `<resourcesDir>/sing-box-src/`. Same re-hash-on-cache-hit behaviour
+ * as `fetchPlatform`: an existing file is re-verified against the pin on
+ * every call, not merely assumed valid because it exists.
+ */
+export async function fetchSourceTarball({ pins, force = false, resourcesDir = RESOURCES_DIR, download = downloadFile } = {}) {
   const resolvedPins = pins ?? (await loadPins());
   const { sourceTarball } = resolvedPins;
-  const destPath = path.join(SOURCE_DIR, sourceTarball.fileName);
-  const markerPath = `${destPath}.sha256-pin`;
+  const sourceDir = path.join(resourcesDir, 'sing-box-src');
+  const destPath = path.join(sourceDir, sourceTarball.fileName);
 
-  if (!force && (await isCached(destPath, markerPath, sourceTarball.sha256))) {
-    console.log(`[prebuild-singbox] source tarball: cached, skipping (${destPath})`);
-    return destPath;
+  if (!force) {
+    if (await fileMatchesSha256(destPath, sourceTarball.sha256)) {
+      console.log(`[prebuild-singbox] source tarball: cached, skipping (${destPath})`);
+      return destPath;
+    }
+    if (existsSync(destPath)) {
+      console.warn('[prebuild-singbox] source tarball: cached file failed verification, re-fetching');
+      await rm(destPath, { force: true });
+    }
   }
 
-  await mkdir(SOURCE_DIR, { recursive: true });
+  await mkdir(sourceDir, { recursive: true });
   console.log(`[prebuild-singbox] source tarball: downloading ${sourceTarball.url}`);
-  await downloadFile(sourceTarball.url, destPath);
+  await download(sourceTarball.url, destPath);
   await verifySha256(destPath, sourceTarball.sha256);
-  await writeFile(markerPath, `${sourceTarball.sha256}\n`, 'utf8');
   console.log(`[prebuild-singbox] source tarball: ready at ${destPath}`);
   return destPath;
 }
