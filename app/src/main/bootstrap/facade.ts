@@ -20,9 +20,16 @@ import { applySettingsPatch } from '../controller/settings';
 import type { ControllerFacade } from '../ipc/index';
 import type { SecretStore } from '../store/secrets';
 import type { StateStore } from '../store/state';
+import type { UpdateStatus } from '../../shared/contracts';
 import type { HmaLocalSource } from './hma-local';
 
 export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
+
+/** The slice of the `UpdaterService` the facade drives from IPC (spec §9). */
+export interface FacadeUpdater {
+  checkForUpdates(): Promise<UpdateStatus>;
+  downloadAndInstall(): Promise<{ success: boolean; error?: string }>;
+}
 
 export interface FacadeDeps {
   state: StateStore;
@@ -41,6 +48,9 @@ export interface FacadeDeps {
   /** Called after an accepted settings change was persisted (restart ports/webhook, …). */
   onSettingsChanged?(prev: Settings, next: Settings): void | Promise<void>;
   appStatus(): AppStatus;
+  /** Auto-updater (spec §9). The renderer's "Check for updates" / "Restart & install"
+   * buttons come through here. */
+  updater: FacadeUpdater;
   log?: (msg: string, err?: unknown) => void;
 }
 
@@ -325,5 +335,9 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     async getAppStatus() {
       return deps.appStatus();
     },
+
+    checkForUpdate: () => deps.updater.checkForUpdates(),
+
+    downloadAndInstallUpdate: () => deps.updater.downloadAndInstall(),
   };
 }

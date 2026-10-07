@@ -6,7 +6,8 @@
  *   start queue → facade + IPC → window → tray/power/host-VPN/webhook → restart the
  *   ports that were on → quit handling (stop every engine and wait).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, powerMonitor, powerSaveBlocker, safeStorage, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, powerMonitor, powerSaveBlocker, safeStorage, shell, Tray } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import path from 'node:path';
@@ -21,7 +22,7 @@ import { createRealExitIpProber, createRealPortAllocator } from '../controller/r
 import { createStartQueue } from '../controller/start-queue';
 import { assertSingboxVersion, singboxPath } from '../engine/singbox-path';
 import { PortHealth } from '../health/state-machine';
-import { broadcastHostVpnChanged, broadcastPortsChanged, registerIpcHandlers } from '../ipc/index';
+import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
 import { installPowerHooks, type PowerManager } from '../power/index';
 import { getProvider, registerAllProviders } from '../providers/index';
 import { setResourcesRoot } from '../resources-root';
@@ -37,6 +38,7 @@ import { wireRefusals } from './refusal-wiring';
 import { createSessionSecretStore } from './session-secrets';
 import { settingsEffects } from './settings-effects';
 import { measureDownloadMbps } from './speed-test';
+import { createUpdaterService } from './updater';
 import { isTranslocatedOrOnDmg } from './translocation';
 import { trayIconBitmap } from './tray-icon';
 
@@ -280,6 +282,23 @@ export function runApp(): void {
       return { secretsUnavailable: secrets.unavailable || rawState.secretsUnavailable(), engineError, notice };
     };
 
+    // Auto-updater (spec §9). Created before the facade (which exposes its check/install
+    // over IPC) and before the window (its status pushes go to whatever window is set).
+    // `stopAllEngines` here is the full shutdown path: it stops every sing-box engine (so
+    // no tunnel is orphaned across the update) and marks cleanup done, so the subsequent
+    // quitAndInstall's quit passes straight through `before-quit` instead of being deferred
+    // again — letting electron-updater actually install and relaunch.
+    const updater = createUpdaterService({
+      autoUpdater,
+      getAppVersion: () => app.getVersion(),
+      broadcast: broadcastUpdateStatus,
+      stopAllEngines: async () => {
+        await shutdown();
+        cleanedUp = true;
+      },
+      log,
+    });
+
     const facade = createControllerFacade({
       state,
       secrets,
@@ -294,6 +313,7 @@ export function runApp(): void {
       platform: process.platform,
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
       appStatus,
+      updater,
       log,
       onSettingsChanged: async (prev, next) => {
         const fx = settingsEffects(prev, next);
@@ -304,6 +324,10 @@ export function runApp(): void {
         if (fx.language) {
           language = resolveMainLanguage(next.language, app.getLocale());
           rebuildTray();
+        }
+        if (prev.autoCheckUpdates !== next.autoCheckUpdates) {
+          if (next.autoCheckUpdates) updater.startPeriodicCheck(24);
+          else updater.stopPeriodicCheck();
         }
       },
     });
@@ -326,13 +350,21 @@ export function runApp(): void {
           sandbox: false,
         },
       });
+      // External links (e.g. the updater's "Open releases page" fallback) open in the
+      // user's browser, never as a new in-app window.
+      mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+        return { action: 'deny' };
+      });
       if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
         void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
       } else {
         void mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
       }
+      updater.setMainWindow(mainWindow);
       mainWindow.on('closed', () => {
         mainWindow = null;
+        updater.setMainWindow(null);
       });
     }
     showWindow = () => {
@@ -398,8 +430,12 @@ export function runApp(): void {
     portManager.syncAutoRotate();
     if (!engineError) for (const p of state.getState().ports.filter((r) => r.enabled)) restartPort(p.key);
 
+    // Auto-update: check on start + daily, only while the user leaves it enabled (spec §9).
+    if (settingsNow().autoCheckUpdates) updater.startPeriodicCheck(24);
+
     shutdown = async () => {
       shuttingDown = true;
+      updater.stopPeriodicCheck();
       hmaSync.dispose();
       hostVpn.stop();
       power?.dispose();

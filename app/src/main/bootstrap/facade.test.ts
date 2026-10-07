@@ -132,6 +132,10 @@ describe('controller facade', () => {
     const allocated: number[] = [];
     const speedTest = vi.fn(async () => 42.5);
     const onSettingsChanged = vi.fn();
+    const updater = {
+      checkForUpdates: vi.fn(async () => ({ phase: 'up-to-date', currentVersion: '1.2.3' }) as const),
+      downloadAndInstall: vi.fn(async () => ({ success: true })),
+    };
     const deps: FacadeDeps = {
       state,
       secrets,
@@ -156,10 +160,11 @@ describe('controller facade', () => {
       speedTest,
       onSettingsChanged,
       appStatus: () => ({ secretsUnavailable: true }),
+      updater,
       log: () => undefined,
       ...overrides,
     };
-    return { facade: createControllerFacade(deps), state, secrets, portManager, queue, allocated, speedTest, onSettingsChanged };
+    return { facade: createControllerFacade(deps), state, secrets, portManager, queue, allocated, speedTest, onSettingsChanged, updater };
   }
 
   it('listProviders reports HMA detection and each provider limit (Ruling C)', async () => {
@@ -322,6 +327,14 @@ describe('controller facade', () => {
     expect(await facade.getLogs('k')).toEqual(['log for k']);
     expect(await facade.getHostVpnActive()).toBe(true);
     expect(await facade.getAppStatus()).toEqual({ secretsUnavailable: true });
+  });
+
+  it('checkForUpdate / downloadAndInstallUpdate delegate to the updater service', async () => {
+    const { facade, updater } = setup();
+    expect(await facade.checkForUpdate()).toEqual({ phase: 'up-to-date', currentVersion: '1.2.3' });
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(await facade.downloadAndInstallUpdate()).toEqual({ success: true });
+    expect(updater.downloadAndInstall).toHaveBeenCalledTimes(1);
   });
 
   it('guessCountry takes the first 2-letter token of the file name', () => {

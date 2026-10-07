@@ -21,7 +21,7 @@ function fakeIpcRenderer(): IpcRendererLike & { listeners: Map<string, Set<(...a
 describe('preload API surface (spec §3)', () => {
   it('exposes exactly the IPC.invoke methods plus the two event subscriptions — no more, no less', () => {
     const api = createProxyFarmApi(fakeIpcRenderer());
-    const expected = new Set([...IPC.invoke, 'onPortsChanged', 'onHostVpnChanged']);
+    const expected = new Set([...IPC.invoke, 'onPortsChanged', 'onHostVpnChanged', 'onUpdateStatus']);
     expect(new Set(Object.keys(api))).toEqual(expected);
   });
 

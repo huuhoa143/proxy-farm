@@ -42,6 +42,9 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     setSettings: (patch) => ipcRenderer.invoke('setSettings', patch) as ReturnType<ProxyFarmApi['setSettings']>,
     getHostVpnActive: () => ipcRenderer.invoke('getHostVpnActive') as ReturnType<ProxyFarmApi['getHostVpnActive']>,
     getAppStatus: () => ipcRenderer.invoke('getAppStatus') as ReturnType<ProxyFarmApi['getAppStatus']>,
+    checkForUpdate: () => ipcRenderer.invoke('checkForUpdate') as ReturnType<ProxyFarmApi['checkForUpdate']>,
+    downloadAndInstallUpdate: () =>
+      ipcRenderer.invoke('downloadAndInstallUpdate') as ReturnType<ProxyFarmApi['downloadAndInstallUpdate']>,
 
     onPortsChanged: (cb) => {
       const listener = (_event: unknown, rows: unknown) => cb(rows as Parameters<typeof cb>[0]);
@@ -52,6 +55,11 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
       const listener = (_event: unknown, active: unknown) => cb(active as Parameters<typeof cb>[0]);
       ipcRenderer.on(IPC.events.hostVpnChanged, listener);
       return () => ipcRenderer.removeListener(IPC.events.hostVpnChanged, listener);
+    },
+    onUpdateStatus: (cb) => {
+      const listener = (_event: unknown, status: unknown) => cb(status as Parameters<typeof cb>[0]);
+      ipcRenderer.on(IPC.events.updateStatus, listener);
+      return () => ipcRenderer.removeListener(IPC.events.updateStatus, listener);
     },
   };
 }

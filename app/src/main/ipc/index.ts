@@ -1,4 +1,4 @@
-import { IPC, type PortRow, type ProxyFarmApi } from '../../shared/contracts';
+import { IPC, type PortRow, type ProxyFarmApi, type UpdateStatus } from '../../shared/contracts';
 
 /** The shape of the `event` Electron's `ipcMain.handle` listener is called with. Trust
  * decisions use `senderFrame` (Electron's `WebFrameMain`), not `sender.id`/`sender`:
@@ -24,10 +24,10 @@ export interface WebContentsLike {
   send(channel: string, ...args: unknown[]): void;
 }
 
-/** Every invokable method, with the two push-only event methods removed: those are
- * not `ipcMain.handle` calls, they are broadcast via `broadcastPortsChanged` /
- * `broadcastHostVpnChanged` instead (see below). */
-export type ControllerFacade = Omit<ProxyFarmApi, 'onPortsChanged' | 'onHostVpnChanged'>;
+/** Every invokable method, with the push-only event methods removed: those are not
+ * `ipcMain.handle` calls, they are broadcast via `broadcastPortsChanged` /
+ * `broadcastHostVpnChanged` / `broadcastUpdateStatus` instead (see below). */
+export type ControllerFacade = Omit<ProxyFarmApi, 'onPortsChanged' | 'onHostVpnChanged' | 'onUpdateStatus'>;
 
 /**
  * Registers one `ipcMain.handle` per name in `IPC.invoke`, each forwarding to the
@@ -71,4 +71,10 @@ export function broadcastPortsChanged(windows: Iterable<WebContentsLike>, rows: 
 /** Push a host-VPN-detector transition to every open window (spec §4.3). */
 export function broadcastHostVpnChanged(windows: Iterable<WebContentsLike>, active: boolean): void {
   for (const w of windows) w.send(IPC.events.hostVpnChanged, active);
+}
+
+/** Push an auto-update status to every open window (spec §9). Called by the
+ * `UpdaterService` on every state transition (check/available/progress/installed/error). */
+export function broadcastUpdateStatus(windows: Iterable<WebContentsLike>, status: UpdateStatus): void {
+  for (const w of windows) w.send(IPC.events.updateStatus, status);
 }
