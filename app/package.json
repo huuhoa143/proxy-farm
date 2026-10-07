@@ -7,8 +7,12 @@
   "private": true,
   "scripts": {
     "dev": "electron-forge start",
+    "prebuild": "node scripts/prebuild-singbox.mjs",
+    "prestart": "node scripts/prebuild-singbox.mjs",
     "start": "electron-forge start",
+    "prepackage": "node scripts/prebuild-singbox.mjs",
     "package": "electron-forge package",
+    "premake": "node scripts/prebuild-singbox.mjs",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "test": "vitest run"
@@ -33,6 +37,8 @@
     "@vitejs/plugin-react": "^4.7.0",
     "electron": "42.0.1",
     "electron-updater": "^6.8.3",
+    "extract-zip": "^2.0.1",
+    "tar": "^6.2.1",
     "typescript": "~5.4.5",
     "vite": "^5.4.21",
     "vitest": "^2.1.9"

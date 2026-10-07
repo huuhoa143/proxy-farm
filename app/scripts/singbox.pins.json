@@ -1,0 +1,28 @@
+{
+  "version": "1.14.2",
+  "assets": {
+    "darwin-arm64": {
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-darwin-arm64.tar.gz",
+      "sha256": "925c5382eca8492b0150f868a6db20b18290a38700e621724b3703fd453e032d",
+      "archiveType": "tar.gz",
+      "binaryName": "sing-box"
+    },
+    "darwin-amd64": {
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-darwin-amd64.tar.gz",
+      "sha256": "b0bfb0dc70a5fc708710b9f5ea98b9ee76d40fa4169928d25d73edc4331df2fe",
+      "archiveType": "tar.gz",
+      "binaryName": "sing-box"
+    },
+    "windows-amd64": {
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip",
+      "sha256": "c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32",
+      "archiveType": "zip",
+      "binaryName": "sing-box.exe"
+    }
+  },
+  "sourceTarball": {
+    "url": "https://github.com/SagerNet/sing-box/archive/refs/tags/v1.14.2.tar.gz",
+    "sha256": "67dd8f8c37ecaaadcfcafad1f0827eed4b034c963b86fd3aa5c0d7a36876845d",
+    "fileName": "sing-box-1.14.2-src.tar.gz"
+  }
+}
