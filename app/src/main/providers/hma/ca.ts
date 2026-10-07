@@ -10,16 +10,15 @@
  * and committed verbatim at app/resources/ca/sectigo-r46.pem.
  */
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resourcePath } from '../../resources-root';
 
-export const DEFAULT_CA_PATH = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../../../resources/ca/sectigo-r46.pem',
-);
+/** Resolved lazily: the resources root is set by the composition root at startup. */
+export function defaultCaPath(): string {
+  return resourcePath('ca', 'sectigo-r46.pem');
+}
 
 /** Returns the PEM as an array of lines (no trailing blank line), never a path. */
-export function loadCaLines(caPath: string = DEFAULT_CA_PATH): string[] {
+export function loadCaLines(caPath: string = defaultCaPath()): string[] {
   const text = readFileSync(caPath, 'utf8');
   return text.split(/\r?\n/).filter((line) => line.length > 0);
 }

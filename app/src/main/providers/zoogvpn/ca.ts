@@ -10,13 +10,7 @@
  * https://github.com/haugene/vpn-configs-contrib (openvpn/zoogvpn/).
  */
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-
-export const DEFAULT_CA_PATH = path.join(MODULE_DIR, '../../../../resources/ca/zoogvpn-ca.pem');
-export const DEFAULT_TLS_AUTH_PATH = path.join(MODULE_DIR, '../../../../resources/ca/zoogvpn-tls-auth.key');
+import { resourcePath } from '../../resources-root';
 
 function linesOfPemBlock(text: string): string[] {
   const lines = text.split(/\r?\n/);
@@ -28,11 +22,11 @@ function linesOfPemBlock(text: string): string[] {
   return lines.slice(start, end + 1);
 }
 
-export function loadCaLines(caPath: string = DEFAULT_CA_PATH): string[] {
+export function loadCaLines(caPath: string = resourcePath('ca', 'zoogvpn-ca.pem')): string[] {
   return linesOfPemBlock(readFileSync(caPath, 'utf8'));
 }
 
 /** tls-auth key lines, with the leading `#` comment lines stripped. */
-export function loadTlsAuthLines(keyPath: string = DEFAULT_TLS_AUTH_PATH): string[] {
+export function loadTlsAuthLines(keyPath: string = resourcePath('ca', 'zoogvpn-tls-auth.key')): string[] {
   return linesOfPemBlock(readFileSync(keyPath, 'utf8'));
 }

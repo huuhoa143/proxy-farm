@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile, writeFile, mkdir, copyFile, chmod } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, chmod, cp } from 'node:fs/promises';
 import path from 'node:path';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -104,6 +104,16 @@ const config: ForgeConfig = {
       await copyFile(srcBinary, destBinary);
       if (platform !== 'win32') {
         await chmod(destBinary, 0o755);
+      }
+
+      // ── provider resources: public CA files + bundled catalogs (spec §5) ──
+      // Read at runtime from <Resources>/{ca,catalogs} (src/main/resources-root.ts);
+      // they can't live inside app.asar's Vite bundle because providers read them
+      // with fs at runtime. Hard-fail if absent, same reasoning as sing-box above.
+      for (const dir of ['ca', 'catalogs']) {
+        const src = path.resolve(process.cwd(), 'resources', dir);
+        if (!existsSync(src)) throw new Error(`provider resources missing: ${src}`);
+        await cp(src, path.join(resourcesDir, dir), { recursive: true });
       }
     },
   },

@@ -11,14 +11,8 @@
  * never overwritten by a feed's stub entry for the same IP.
  */
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resourcePath } from '../../resources-root';
 import type { Catalog, CatalogLocation } from '../types';
-
-const DEFAULT_SEED_PATH = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../../../resources/catalogs/hma-ovpn-seed.json',
-);
 
 interface SeedLocation {
   key: string;
@@ -35,7 +29,7 @@ interface SeedFile {
   locations: SeedLocation[];
 }
 
-export async function loadSeed(seedPath: string = DEFAULT_SEED_PATH): Promise<Catalog> {
+export async function loadSeed(seedPath: string = resourcePath('catalogs', 'hma-ovpn-seed.json')): Promise<Catalog> {
   const text = await readFile(seedPath, 'utf8');
   const seed = JSON.parse(text) as SeedFile;
   return {
