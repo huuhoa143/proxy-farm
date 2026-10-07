@@ -1,0 +1,223 @@
+{
+  "common": {
+    "appName": "Proxy Farm",
+    "language": "Ngôn ngữ",
+    "languageEnglish": "Tiếng Anh",
+    "languageVietnamese": "Tiếng Việt",
+    "languageSystem": "Theo hệ điều hành",
+    "cancel": "Huỷ",
+    "save": "Lưu",
+    "saved": "Đã lưu",
+    "close": "Đóng",
+    "back": "Quay lại",
+    "continue": "Tiếp tục",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "loading": "Đang tải…",
+    "yes": "Có",
+    "no": "Không",
+    "theme": {
+      "light": "Sáng",
+      "dark": "Tối",
+      "toggle": "Đổi sáng / tối"
+    },
+    "nav": {
+      "main": "Cổng",
+      "providers": "Nhà cung cấp",
+      "settings": "Cài đặt"
+    }
+  },
+  "onboarding": {
+    "title": "Thêm nhà cung cấp",
+    "subtitle": "Kết nối một gói VPN để bắt đầu chạy các cổng proxy cục bộ.",
+    "addAnother": "Thêm nhà cung cấp khác",
+    "continueToApp": "Tiếp tục",
+    "providers": {
+      "hma": {
+        "name": "HMA",
+        "description": "Dùng thông tin đăng nhập thiết bị HMA VPN có sẵn — không cần mật khẩu.",
+        "detectedTitle": "Đã tìm thấy HMA trên máy này",
+        "detectedSubtitle": "Thông tin đăng nhập thiết bị đã sẵn sàng sử dụng.",
+        "notDetectedTitle": "Chưa tìm thấy HMA",
+        "step1": "Cài đặt HMA VPN",
+        "step2": "Đăng nhập và kết nối một lần",
+        "step3": "Quay lại đây — ứng dụng sẽ tự nhận ra",
+        "connect": "Kết nối",
+        "connecting": "Đang kết nối…",
+        "enableSupport": "Bật hỗ trợ HMA",
+        "windowsHelperNote": "Thao tác này cài một dịch vụ hỗ trợ nhỏ và cần xác nhận quản trị viên một lần. Các lần cập nhật sau không cần xác nhận lại.",
+        "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…"
+      },
+      "zoogvpn": {
+        "name": "ZoogVPN",
+        "description": "Đăng nhập bằng email và mật khẩu tài khoản ZoogVPN của bạn.",
+        "email": "Email",
+        "emailPlaceholder": "ban@vidu.com",
+        "password": "Mật khẩu",
+        "passwordPlaceholder": "Mật khẩu",
+        "check": "Kiểm tra",
+        "checking": "Đang kiểm tra…"
+      },
+      "surfshark": {
+        "name": "Surfshark",
+        "description": "Dán khoá riêng WireGuard từ tài khoản Surfshark của bạn.",
+        "keyLabel": "Khoá riêng WireGuard",
+        "keyPlaceholder": "Dán khoá riêng vào đây",
+        "hint": "Tìm tại my.surfshark.com → VPN → Manual setup → WireGuard.",
+        "add": "Thêm"
+      },
+      "file": {
+        "name": "Tệp cấu hình",
+        "description": "Nhập tệp .ovpn hoặc .conf (WireGuard).",
+        "dragHint": "Kéo thả tệp .ovpn hoặc .conf vào đây, hoặc",
+        "browse": "chọn tệp",
+        "countryLabel": "Quốc gia",
+        "countryGuessedNote": "Đoán từ tên tệp — sửa lại nếu sai.",
+        "import": "Nhập"
+      }
+    }
+  },
+  "checkResult": {
+    "ok": "Hợp lệ.",
+    "reason": {
+      "auth": "Đăng nhập bị từ chối. Kiểm tra lại thông tin của bạn.",
+      "not-in-plan": "Gói của bạn không bao gồm máy chủ này.",
+      "port-in-use": "Cổng này đang được dùng.",
+      "no-server": "Hiện không có máy chủ khả dụng.",
+      "invalid-format": "Thông tin chưa đúng định dạng — kiểm tra lại và thử lại."
+    }
+  },
+  "main": {
+    "title": "Cổng",
+    "pickLocation": "Chọn vị trí",
+    "country": "Quốc gia",
+    "city": "Thành phố",
+    "allCountries": "Tất cả quốc gia",
+    "start": "Bật",
+    "noTargetsSelected": "Chọn ít nhất một vị trí để bắt đầu.",
+    "selectedCount": "Đã chọn {{count}}",
+    "emptyState": "Chưa có cổng nào — chọn vị trí ở trên rồi bấm Bật.",
+    "table": {
+      "status": "Trạng thái",
+      "location": "Vị trí",
+      "port": "Cổng",
+      "exitIp": "IP thoát",
+      "latency": "Độ trễ",
+      "actions": "Thao tác",
+      "provider": "Nhà cung cấp",
+      "account": "Tài khoản"
+    },
+    "copyPort": "Sao chép địa chỉ",
+    "copied": "Đã sao chép",
+    "rotate": "Xoay IP",
+    "rotating": "Đang xoay…",
+    "details": "Chi tiết",
+    "selectAll": "Chọn tất cả",
+    "bulk": {
+      "selectedCount": "Đã chọn {{count}} cổng",
+      "start": "Bật",
+      "stop": "Tắt",
+      "rotate": "Xoay IP",
+      "remove": "Xoá",
+      "export": "Xuất",
+      "clear": "Bỏ chọn",
+      "autoRotate": "Tự xoay…"
+    },
+    "export": {
+      "title": "Xuất danh sách cổng",
+      "format": {
+        "hostPortUserPass": "host:port:user:pass",
+        "socks5Url": "socks5://…",
+        "hostPort": "host:port",
+        "curl": "lệnh curl"
+      },
+      "copyAll": "Sao chép tất cả",
+      "close": "Đóng"
+    },
+    "rotateResult": {
+      "sameCityNote": "Không còn máy chủ khác ở thành phố này — đã chuyển sang thành phố khác cùng quốc gia.",
+      "unchangedNote": "Không có máy chủ khác khả dụng cho vị trí này."
+    }
+  },
+  "vpnNote": {
+    "message": "Một VPN khác đang hoạt động trên máy này — Proxy Farm vẫn hoạt động bình thường."
+  },
+  "portState": {
+    "queued": "Đang chờ",
+    "connecting": "Đang kết nối…",
+    "verifying": "Đang xác minh…",
+    "online": "Đang hoạt động",
+    "retrying": "Thử lại sau {{seconds}}s",
+    "stopped": "Đã dừng",
+    "failed": {
+      "auth": {
+        "label": "Đăng nhập bị từ chối",
+        "guidance": {
+          "hma": "HMA từ chối thông tin đăng nhập thiết bị — mở ứng dụng HMA và kiểm tra bạn đã đăng nhập chưa.",
+          "zoogvpn": "ZoogVPN từ chối mật khẩu tài khoản này — kiểm tra lại trong ứng dụng hoặc trang web ZoogVPN.",
+          "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập."
+        }
+      },
+      "not-in-plan": {
+        "label": "Không thuộc gói",
+        "guidance": "Gói hiện tại của bạn không bao gồm máy chủ này. Hãy thử vị trí khác."
+      },
+      "port-in-use": {
+        "label": "Cổng đang bị dùng",
+        "guidance": "Một ứng dụng khác đang dùng cổng này.",
+        "action": "Chuyển sang cổng khác"
+      },
+      "no-server": {
+        "label": "Không có máy chủ khả dụng",
+        "guidance": "Chưa kết nối được máy chủ nào hoạt động cho vị trí này. Hệ thống sẽ tiếp tục thử lại."
+      }
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "proxyAuth": {
+      "title": "Thông tin đăng nhập proxy",
+      "username": "Tên đăng nhập",
+      "password": "Mật khẩu",
+      "note": "Áp dụng cho mọi cổng proxy cục bộ."
+    },
+    "basePort": {
+      "label": "Cổng gốc",
+      "note": "Cổng proxy đầu tiên. Mỗi vị trí mới sẽ nhận cổng trống kế tiếp."
+    },
+    "lanSharing": {
+      "label": "Chia sẻ trong mạng nội bộ",
+      "warning": "Bất kỳ ai trong mạng của bạn cũng có thể truy cập các cổng proxy này. Thông tin đăng nhập proxy trở thành bắt buộc khi bật mục này.",
+      "firewallNote": "Windows có thể hỏi bạn cho phép một lần."
+    },
+    "keepAwake": {
+      "label": "Giữ máy không ngủ khi còn cổng đang bật"
+    },
+    "launchAtLogin": {
+      "label": "Khởi chạy cùng lúc đăng nhập"
+    },
+    "giveUpAfter": {
+      "label": "Ngừng thử lại sau",
+      "never": "Không bao giờ",
+      "minutes": "{{count}} phút"
+    },
+    "webhook": {
+      "title": "Webhook xoay IP",
+      "enable": "Bật webhook xoay IP",
+      "offByDefaultNote": "Mặc định tắt. Chỉ mở một cổng lắng nghe cục bộ riêng khi được bật.",
+      "port": "Cổng",
+      "bearer": "Mã bearer"
+    },
+    "language": {
+      "label": "Ngôn ngữ"
+    }
+  },
+  "tray": {
+    "onlineCount_zero": "Không có cổng nào đang bật",
+    "onlineCount_one": "{{count}} cổng đang bật",
+    "onlineCount_other": "{{count}} cổng đang bật",
+    "show": "Hiện Proxy Farm",
+    "stopAll": "Tắt tất cả cổng",
+    "quit": "Thoát Proxy Farm"
+  }
+}

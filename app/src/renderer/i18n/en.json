@@ -1,0 +1,223 @@
+{
+  "common": {
+    "appName": "Proxy Farm",
+    "language": "Language",
+    "languageEnglish": "English",
+    "languageVietnamese": "Vietnamese",
+    "languageSystem": "System default",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saved": "Saved",
+    "close": "Close",
+    "back": "Back",
+    "continue": "Continue",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loading": "Loading…",
+    "yes": "Yes",
+    "no": "No",
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "toggle": "Switch light / dark"
+    },
+    "nav": {
+      "main": "Ports",
+      "providers": "Providers",
+      "settings": "Settings"
+    }
+  },
+  "onboarding": {
+    "title": "Add a provider",
+    "subtitle": "Connect one VPN subscription to start running local proxy ports.",
+    "addAnother": "Add another provider",
+    "continueToApp": "Continue",
+    "providers": {
+      "hma": {
+        "name": "HMA",
+        "description": "Use your existing HMA VPN device credentials — no password needed.",
+        "detectedTitle": "HMA found on this computer",
+        "detectedSubtitle": "Device credentials are ready to use.",
+        "notDetectedTitle": "HMA not found",
+        "step1": "Install HMA VPN",
+        "step2": "Sign in and connect once",
+        "step3": "Come back here — the app will pick it up automatically",
+        "connect": "Connect",
+        "connecting": "Connecting…",
+        "enableSupport": "Enable HMA support",
+        "windowsHelperNote": "This installs a small helper service and needs administrator approval once. Updates afterwards need no approval.",
+        "waiting": "Waiting for HMA — watching for credentials…"
+      },
+      "zoogvpn": {
+        "name": "ZoogVPN",
+        "description": "Sign in with your ZoogVPN account email and password.",
+        "email": "Email",
+        "emailPlaceholder": "you@example.com",
+        "password": "Password",
+        "passwordPlaceholder": "Password",
+        "check": "Check",
+        "checking": "Checking…"
+      },
+      "surfshark": {
+        "name": "Surfshark",
+        "description": "Paste the WireGuard private key from your Surfshark account.",
+        "keyLabel": "WireGuard private key",
+        "keyPlaceholder": "Paste the private key here",
+        "hint": "Find it at my.surfshark.com → VPN → Manual setup → WireGuard.",
+        "add": "Add"
+      },
+      "file": {
+        "name": "Config file",
+        "description": "Import an .ovpn or .conf (WireGuard) file.",
+        "dragHint": "Drag and drop a .ovpn or .conf file here, or",
+        "browse": "choose a file",
+        "countryLabel": "Country",
+        "countryGuessedNote": "Guessed from the file name — edit if wrong.",
+        "import": "Import"
+      }
+    }
+  },
+  "checkResult": {
+    "ok": "Looks good.",
+    "reason": {
+      "auth": "That sign-in was rejected. Double-check your details.",
+      "not-in-plan": "Your plan doesn't include this server.",
+      "port-in-use": "That port is already in use.",
+      "no-server": "No server is available right now.",
+      "invalid-format": "That doesn't look right — check the format and try again."
+    }
+  },
+  "main": {
+    "title": "Ports",
+    "pickLocation": "Pick a location",
+    "country": "Country",
+    "city": "City",
+    "allCountries": "All countries",
+    "start": "Start",
+    "noTargetsSelected": "Select at least one location to start.",
+    "selectedCount": "{{count}} selected",
+    "emptyState": "No ports yet — pick a location above and press Start.",
+    "table": {
+      "status": "Status",
+      "location": "Location",
+      "port": "Port",
+      "exitIp": "Exit IP",
+      "latency": "Latency",
+      "actions": "Actions",
+      "provider": "Provider",
+      "account": "Account"
+    },
+    "copyPort": "Copy address",
+    "copied": "Copied",
+    "rotate": "Rotate IP",
+    "rotating": "Rotating…",
+    "details": "Details",
+    "selectAll": "Select all",
+    "bulk": {
+      "selectedCount": "{{count}} ports selected",
+      "start": "Start",
+      "stop": "Stop",
+      "rotate": "Rotate IP",
+      "remove": "Remove",
+      "export": "Export",
+      "clear": "Clear selection",
+      "autoRotate": "Auto-rotate…"
+    },
+    "export": {
+      "title": "Export ports",
+      "format": {
+        "hostPortUserPass": "host:port:user:pass",
+        "socks5Url": "socks5://…",
+        "hostPort": "host:port",
+        "curl": "curl command"
+      },
+      "copyAll": "Copy all",
+      "close": "Close"
+    },
+    "rotateResult": {
+      "sameCityNote": "No other server in this city — moved to another city in the same country.",
+      "unchangedNote": "No other server is available for this location."
+    }
+  },
+  "vpnNote": {
+    "message": "Another VPN is active on this computer — Proxy Farm keeps working normally."
+  },
+  "portState": {
+    "queued": "Queued",
+    "connecting": "Connecting…",
+    "verifying": "Verifying…",
+    "online": "Online",
+    "retrying": "Retrying in {{seconds}}s",
+    "stopped": "Stopped",
+    "failed": {
+      "auth": {
+        "label": "Sign-in rejected",
+        "guidance": {
+          "hma": "HMA rejected the device credentials — open the HMA app and check you're signed in.",
+          "zoogvpn": "ZoogVPN rejected this account's password — check it in the ZoogVPN app or website.",
+          "generic": "The provider rejected these credentials — check your sign-in details."
+        }
+      },
+      "not-in-plan": {
+        "label": "Not in plan",
+        "guidance": "Your current plan doesn't include this server. Try another location."
+      },
+      "port-in-use": {
+        "label": "Port in use",
+        "guidance": "Another app is already using this port.",
+        "action": "Move to another port"
+      },
+      "no-server": {
+        "label": "No server available",
+        "guidance": "No working server could be reached for this location yet. It will keep retrying."
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "proxyAuth": {
+      "title": "Proxy credentials",
+      "username": "Username",
+      "password": "Password",
+      "note": "Used by every local proxy port."
+    },
+    "basePort": {
+      "label": "Base port",
+      "note": "First proxy port. Each new location gets the next free port after this one."
+    },
+    "lanSharing": {
+      "label": "Share on the local network",
+      "warning": "Anyone on your network could reach these proxy ports. Proxy credentials become mandatory when this is on.",
+      "firewallNote": "Windows may ask you to allow this once."
+    },
+    "keepAwake": {
+      "label": "Keep this computer awake while ports are on"
+    },
+    "launchAtLogin": {
+      "label": "Launch at login"
+    },
+    "giveUpAfter": {
+      "label": "Give up retrying after",
+      "never": "Never",
+      "minutes": "{{count}} minutes"
+    },
+    "webhook": {
+      "title": "Rotate webhook",
+      "enable": "Enable rotate webhook",
+      "offByDefaultNote": "Off by default. Opens a separate local listener only when enabled.",
+      "port": "Port",
+      "bearer": "Bearer token"
+    },
+    "language": {
+      "label": "Language"
+    }
+  },
+  "tray": {
+    "onlineCount_zero": "No ports online",
+    "onlineCount_one": "{{count}} port online",
+    "onlineCount_other": "{{count}} ports online",
+    "show": "Show Proxy Farm",
+    "stopAll": "Stop all ports",
+    "quit": "Quit Proxy Farm"
+  }
+}
