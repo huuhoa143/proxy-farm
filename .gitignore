@@ -28,3 +28,8 @@ __pycache__/
 .DS_Store
 .playwright-mcp/
 .codegraph/
+
+# Desktop app (app/, electron-forge + Vite) build artifacts
+app/node_modules/
+app/out/
+app/.vite/
