@@ -115,6 +115,23 @@ describe('UpdaterService status transitions', () => {
     expect(svc.getStatus()).toMatchObject({ phase: 'downloaded', availableVersion: '2.0.0' });
   });
 
+  it('a status found before any subscriber is still retrievable via getStatus', () => {
+    // The startup/periodic check can resolve before the renderer mounts and subscribes;
+    // Electron does not buffer webContents.send, so the renderer seeds via getStatus().
+    const au = fakeAutoUpdater();
+    const svc = createUpdaterService({
+      autoUpdater: au,
+      getAppVersion: () => '1.0.0',
+      broadcast: () => undefined,
+      stopAllEngines: vi.fn(async () => undefined),
+      scheduleInstall: () => undefined,
+      log: () => undefined,
+    });
+    // No setMainWindow(), no onUpdateStatus subscriber — i.e. nothing is listening yet.
+    au.emit('update-available', { version: '2.0.0' });
+    expect(svc.getStatus()).toMatchObject({ phase: 'available', availableVersion: '2.0.0', currentVersion: '1.0.0' });
+  });
+
   it('a no-published-release error is treated as up-to-date, not an error', () => {
     const { svc, au } = setup();
     au.emit('error', { code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' });

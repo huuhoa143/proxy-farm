@@ -27,6 +27,7 @@ export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'
 
 /** The slice of the `UpdaterService` the facade drives from IPC (spec §9). */
 export interface FacadeUpdater {
+  getStatus(): UpdateStatus;
   checkForUpdates(): Promise<UpdateStatus>;
   downloadAndInstall(): Promise<{ success: boolean; error?: string }>;
 }
@@ -334,6 +335,10 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
 
     async getAppStatus() {
       return deps.appStatus();
+    },
+
+    async getUpdateStatus() {
+      return deps.updater.getStatus();
     },
 
     checkForUpdate: () => deps.updater.checkForUpdates(),

@@ -405,6 +405,10 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return { secretsUnavailable: false };
     },
 
+    async getUpdateStatus() {
+      return updateStatus;
+    },
+
     async checkForUpdate() {
       // The dev/standalone fake has no real feed: simulate a quick "up to date" check.
       emitUpdateStatus({ phase: 'checking', currentVersion: appVersion });

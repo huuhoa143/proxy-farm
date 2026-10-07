@@ -90,8 +90,20 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
     void api.getSettings().then(setSettingsState);
   }, [api]);
 
-  // Status is pushed from main on every updater transition (check/available/progress/…).
-  useEffect(() => api.onUpdateStatus(setUpdate), [api]);
+  // Seed from the last-known status on mount (the startup/periodic check can complete
+  // before React mounts, and Electron does not buffer webContents.send), then keep the
+  // live subscription for subsequent transitions.
+  useEffect(() => {
+    let cancelled = false;
+    void api.getUpdateStatus().then((s) => {
+      if (!cancelled) setUpdate((prev) => prev ?? s);
+    });
+    const unsubscribe = api.onUpdateStatus(setUpdate);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [api]);
 
   async function checkForUpdate() {
     setUpdate({ phase: 'checking', currentVersion: APP_VERSION });
@@ -283,6 +295,11 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
           </Row>
           <Row label={t('settings.update.check')} note={updateStatusNote(update, t as TranslateFn)}>
             <div className="btns">
+              {/* The 'downloaded' branch is a fallback: our flow auto-fires install right
+                  after the download completes (download → stop engines → quitAndInstall),
+                  so the app is normally already quitting by the time this would render. It
+                  stays as a safety net in case a 'downloaded' status is ever observed
+                  without install firing (e.g. a future autoDownload path). */}
               {update?.phase === 'downloaded' ? (
                 <button className="btn primary" onClick={() => void api.downloadAndInstallUpdate()}>
                   {t('settings.update.restartInstall')}

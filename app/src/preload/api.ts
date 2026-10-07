@@ -42,6 +42,7 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     setSettings: (patch) => ipcRenderer.invoke('setSettings', patch) as ReturnType<ProxyFarmApi['setSettings']>,
     getHostVpnActive: () => ipcRenderer.invoke('getHostVpnActive') as ReturnType<ProxyFarmApi['getHostVpnActive']>,
     getAppStatus: () => ipcRenderer.invoke('getAppStatus') as ReturnType<ProxyFarmApi['getAppStatus']>,
+    getUpdateStatus: () => ipcRenderer.invoke('getUpdateStatus') as ReturnType<ProxyFarmApi['getUpdateStatus']>,
     checkForUpdate: () => ipcRenderer.invoke('checkForUpdate') as ReturnType<ProxyFarmApi['checkForUpdate']>,
     downloadAndInstallUpdate: () =>
       ipcRenderer.invoke('downloadAndInstallUpdate') as ReturnType<ProxyFarmApi['downloadAndInstallUpdate']>,

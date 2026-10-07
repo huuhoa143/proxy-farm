@@ -246,6 +246,11 @@ export interface ProxyFarmApi {
   getAppStatus(): Promise<AppStatus>;
 
   // auto-update (electron-updater; download+install is always user-initiated)
+  /** The latest updater status WITHOUT triggering a check. The renderer calls this on
+   * mount to seed its UI: the startup/periodic check fires before React mounts and
+   * Electron does not buffer `webContents.send`, so a result found at startup would
+   * otherwise be invisible until a manual check or the next daily tick. */
+  getUpdateStatus(): Promise<UpdateStatus>;
   /** Trigger a check now and resolve with the resulting status. */
   checkForUpdate(): Promise<UpdateStatus>;
   /** Download the available update, stop every running engine, then quit & install.
@@ -264,7 +269,7 @@ export const IPC = {
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
-    'checkForUpdate', 'downloadAndInstallUpdate',
+    'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate',
   ] as const,
   events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
 } as const;

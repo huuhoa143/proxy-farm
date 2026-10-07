@@ -133,6 +133,7 @@ describe('controller facade', () => {
     const speedTest = vi.fn(async () => 42.5);
     const onSettingsChanged = vi.fn();
     const updater = {
+      getStatus: vi.fn(() => ({ phase: 'available', currentVersion: '1.2.3', availableVersion: '2.0.0' }) as const),
       checkForUpdates: vi.fn(async () => ({ phase: 'up-to-date', currentVersion: '1.2.3' }) as const),
       downloadAndInstall: vi.fn(async () => ({ success: true })),
     };
@@ -329,8 +330,13 @@ describe('controller facade', () => {
     expect(await facade.getAppStatus()).toEqual({ secretsUnavailable: true });
   });
 
-  it('checkForUpdate / downloadAndInstallUpdate delegate to the updater service', async () => {
+  it('getUpdateStatus / checkForUpdate / downloadAndInstallUpdate delegate to the updater service', async () => {
     const { facade, updater } = setup();
+    // getUpdateStatus must NOT trigger a check — it returns the last-known status so the
+    // renderer can seed its UI on mount without missing a startup-time result.
+    expect(await facade.getUpdateStatus()).toEqual({ phase: 'available', currentVersion: '1.2.3', availableVersion: '2.0.0' });
+    expect(updater.getStatus).toHaveBeenCalledTimes(1);
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
     expect(await facade.checkForUpdate()).toEqual({ phase: 'up-to-date', currentVersion: '1.2.3' });
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
     expect(await facade.downloadAndInstallUpdate()).toEqual({ success: true });

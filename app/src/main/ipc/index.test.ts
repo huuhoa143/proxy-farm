@@ -25,6 +25,7 @@ function fakeController(): ControllerFacade {
     setSettings: vi.fn(async () => ({}) as any),
     getHostVpnActive: vi.fn(async () => false),
     getAppStatus: vi.fn(async () => ({ secretsUnavailable: false })),
+    getUpdateStatus: vi.fn(async () => ({ phase: 'idle', currentVersion: '1.0.0' }) as any),
     checkForUpdate: vi.fn(async () => ({ phase: 'idle', currentVersion: '1.0.0' }) as any),
     downloadAndInstallUpdate: vi.fn(async () => ({ success: true })),
   };
