@@ -512,6 +512,46 @@ describe('port manager', () => {
     });
   });
 
+  it('integration fix: a file port rotates onto ANOTHER imported file of the same country, switching account', async () => {
+    const secrets = fakeSecretStore();
+    secrets.saveSecret('f1', JSON.stringify({ kind: 'file', content: 'a' }));
+    secrets.saveSecret('f2', JSON.stringify({ kind: 'file', content: 'b' }));
+    const state = createStateStore(join(dir, 'state.json'), secrets);
+    const files: Account[] = [
+      { id: 'file-1', providerId: 'file', label: 'a', meta: { country: 'VN' }, secretRef: 'f1' },
+      { id: 'file-2', providerId: 'file', label: 'b', meta: { country: 'VN' }, secretRef: 'f2' },
+    ];
+    state.setState((s) => ({
+      ...s,
+      accounts: files,
+      ports: [{ ...basePort(), key: 'file:file-1', providerId: 'file', accountId: 'file-1', country: 'VN', enabled: true, state: { kind: 'online', since: 1, exitIp: '1.1.1.1', country: 'VN' } }],
+      portServers: { 'file:file-1': '127.0.0.1' },
+    }));
+    const bound: string[] = [];
+    const provider: Provider = {
+      id: 'file',
+      check: () => ({ ok: true }),
+      targets: async (a) => [{ key: `file:${a.id}`, providerId: 'file', country: 'VN', city: a.id, label: a.id, servers: ['127.0.0.1'] }],
+      bind: (_t, ip, a): EndpointSpec => {
+        bound.push(a.id);
+        return { type: 'wireguard', address: ['10.0.0.2/32'], private_key: 'k', mtu: 1280, peers: [{ address: ip, port: 1, public_key: 'p', allowed_ips: ['0.0.0.0/0'] }] };
+      },
+    };
+    const manager = createPortManager({
+      state,
+      secrets,
+      engine: fakeEngine(),
+      providers: { get: () => provider },
+      exitIp: fakeExitIpProber([{ ip: '2.2.2.2', country: 'VN' }]),
+      allocator: fakeAllocator(),
+      resolveServer: async (server: string) => server,
+    });
+    const result = await manager.rotatePort('file:file-1');
+    expect(result).toMatchObject({ changed: true, noteKey: 'rotated-to-another-city' });
+    expect(bound).toEqual(['file-2']);
+    expect(state.getState().ports[0]).toMatchObject({ key: 'file:file-2', accountId: 'file-2' });
+  });
+
   describe('reviewer findings — important', () => {
     it("item 3: rotatePort's exit-IP probes are called with the configured proxy credentials (startPort's own verifying-probe moved into the real engine adapter — see engine-adapter.test.ts)", async () => {
       const { manager, state, exitIp } = setup({

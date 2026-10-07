@@ -150,6 +150,9 @@ interface PortEntry {
   /** True once `stop()` has been called for this key, so a resulting process exit is
    * not mistaken for an unexpected crash and re-fed into `PortHealth` as a failure. */
   stopping: boolean;
+  /** True while a retry is stopping the old child before respawning it: that exit is
+   * ours, not a crash, and must not be fed to PortHealth. */
+  respawning?: boolean;
 }
 
 /**
@@ -319,18 +322,34 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     entry.unsubscribe.push(
       health.onRetryDue(() => {
-        // Re-spawn with the MOST RECENT rendered config (reviewer item 6: a value closed
-        // over from the original `start()` call would go stale the instant a bind-error
-        // reallocation — or any future respawn path — updates `entry.lastConfig`). A
-        // genuinely different server is a `rotatePort` (a fresh `start()` call under
-        // this or another key), not a retry.
-        engineProcess.start(entry.lastConfig);
-        // Re-record the pid on EVERY respawn, not just the first spawn (reviewer item
-        // 6): the pid registry (spec §6.3, used to reap orphans after a crash) must
-        // always reflect the CURRENT child, which gets a new pid each time.
-        if (engineProcess.pid !== undefined) {
-          void doRecordPid(options.registryPath, key, { pid: engineProcess.pid, exe: binPath, startedAt: now() }).catch(() => undefined);
-        }
+        void (async () => {
+          // Integration fix: sing-box never exits by itself on a 504 / connect timeout
+          // (spec §6.3), so the old child is usually STILL RUNNING when a retry is due.
+          // Calling start() on it threw "EngineProcess.start: already started" from a
+          // timer — an uncaught exception that froze the whole main process behind
+          // Electron's modal error dialog. Stop it first (its exit is ours, not a crash).
+          if (engineProcess.pid !== undefined) {
+            entry.respawning = true;
+            try {
+              await engineProcess.stop();
+            } finally {
+              entry.respawning = false;
+            }
+          }
+          if (entry.stopping || entries.get(key) !== entry) return;
+          // Re-spawn with the MOST RECENT rendered config (reviewer item 6). A genuinely
+          // different server is a `rotatePort`, not a retry.
+          try {
+            engineProcess.start(entry.lastConfig);
+          } catch {
+            health.feedExit(null);
+            return;
+          }
+          // Re-record the pid on EVERY respawn (reviewer item 6).
+          if (engineProcess.pid !== undefined) {
+            await doRecordPid(options.registryPath, key, { pid: engineProcess.pid, exe: binPath, startedAt: now() }).catch(() => undefined);
+          }
+        })();
       }),
     );
 
@@ -344,7 +363,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     entry.unsubscribe.push(
       engineProcess.onExit((info: ExitInfo) => {
-        if (entry.stopping) return; // our own stop(), not a crash
+        if (entry.stopping || entry.respawning) return; // our own stop(), not a crash
         const collidedPort = detectBindErrorPort(entry.lastLogLine);
         if (collidedPort !== undefined) {
           void handleBindError(key, entry, collidedPort);

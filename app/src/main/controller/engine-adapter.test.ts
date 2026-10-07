@@ -255,8 +255,28 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     await engine.start('k1', sampleInput(45209));
     expect(processes[0].startedConfigs).toHaveLength(1);
     healths[0].fireRetryDue();
-    expect(processes[0].startedConfigs).toHaveLength(2);
+    await vi.waitFor(() => expect(processes[0].startedConfigs).toHaveLength(2));
     expect(processes[0].startedConfigs[0]).toBe(processes[0].startedConfigs[1]);
+  });
+
+  it('integration fix: onRetryDue stops a still-running child before respawning, and that exit is not fed as a crash', async () => {
+    const { engine, processes, healths } = setup();
+    await engine.start('k1', sampleInput(45208));
+    const p = processes[0];
+    let running = true;
+    p.start = (config: string) => {
+      if (running) throw new Error('EngineProcess.start: already started');
+      running = true;
+      p.startedConfigs.push(config);
+    };
+    p.stop.mockImplementation(async () => {
+      running = false;
+      p.emitExit({ code: 0, signal: null });
+    });
+    healths[0].fireRetryDue();
+    await vi.waitFor(() => expect(p.startedConfigs).toHaveLength(2));
+    expect(p.stop).toHaveBeenCalledTimes(1);
+    expect(healths[0].fedExit).toEqual([]);
   });
 
   it('reviewer item 6: onRetryDue re-records the pid on every respawn, not just the first spawn', async () => {

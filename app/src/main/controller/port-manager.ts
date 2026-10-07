@@ -495,7 +495,22 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       }
     }
 
-    const targets = await provider.targets(account);
+    // Which account owns each candidate target. For catalog providers every account
+    // sees the same locations, so rotating stays on the port's account. An imported
+    // file, though, IS one location per account — so a same-country fallback for a file
+    // port has to look across every imported file (integration fix: otherwise rotating a
+    // file port could never move anywhere).
+    const ownerByKey = new Map<string, typeof account>();
+    const candidateAccounts =
+      port.providerId === 'file' ? [account, ...s.accounts.filter((a) => a.providerId === 'file' && a.id !== account.id)] : [account];
+    const targets: Target[] = [];
+    for (const acc of candidateAccounts) {
+      for (const t of await provider.targets(acc)) {
+        if (ownerByKey.has(t.key)) continue;
+        ownerByKey.set(t.key, acc);
+        targets.push(t);
+      }
+    }
     const currentTarget = targets.find((t) => t.key === port.key);
 
     // From here to the state-rename: controller-WIDE lock, re-reading state fresh
@@ -543,7 +558,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           ports: st.ports.map((p) => {
             if (p.key !== key) return p;
             const identity =
-              finalKey !== p.key ? { key: finalKey, country: nextTarget!.country, city: nextTarget!.city, label: nextTarget!.label } : {};
+              finalKey !== p.key
+                ? {
+                    key: finalKey,
+                    country: nextTarget!.country,
+                    city: nextTarget!.city,
+                    label: nextTarget!.label,
+                    accountId: ownerByKey.get(finalKey)?.id ?? p.accountId,
+                  }
+                : {};
             return { ...p, ...identity };
           }),
         };
@@ -561,7 +584,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     // `key` (reviewer round 3, item 2).
     effectiveKey.current = finalKey;
 
-    const endpoint = provider.bind(nextTarget, await resolveServer(nextServer), account, secret);
+    const nextAccount = ownerByKey.get(finalKey) ?? account;
+    const nextSecret = nextAccount === account ? secret : loadAccountSecret(deps.secrets, nextAccount.secretRef);
+    if (!nextSecret) throw new Error(`rotate: credentials for ${nextAccount.id} unreadable`);
+    const endpoint = provider.bind(nextTarget, await resolveServer(nextServer), nextAccount, nextSecret);
     const renderInput = buildRenderInput(port, endpoint);
 
     // Stop the OLD key's engine process first, then start under the FINAL key (the row
