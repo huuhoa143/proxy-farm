@@ -93,11 +93,19 @@ export class EngineProcess {
     };
 
     // A missing binary (or any other spawn-time failure) surfaces here, NOT
-    // via 'exit' — the OS process never existed, so code/signal are both
-    // null and the error is attached instead. Without this handler an ENOENT
-    // here is an unhandled 'error' event, which crashes the whole main process.
+    // via 'exit'/'close' — the OS process never existed, so code/signal are
+    // both null and the error is attached instead. Without this handler an
+    // ENOENT here is an unhandled 'error' event, which crashes the whole
+    // main process. (On some platforms 'close' still fires afterwards too —
+    // reportExit's `reported` guard makes that a no-op.)
     child.on('error', (err) => reportExit({ code: null, signal: null, error: err }));
-    child.once('exit', (code, signal) => reportExit({ code, signal }));
+    // 'close' (not 'exit'): 'exit' can fire while stdout/stderr still have
+    // buffered, unread data (e.g. a last log line with no trailing newline
+    // written right before the process dies) — reporting the exit and
+    // closing the readline interfaces at that point can drop it. 'close'
+    // fires only once stdio is fully drained, by which point readline has
+    // already emitted every 'line' event, including a trailing unterminated one.
+    child.once('close', (code, signal) => reportExit({ code, signal }));
 
     // Writing to stdin after the other end is already gone (crashed, or a
     // spawn that never really started) can raise EPIPE/ECONNRESET on the

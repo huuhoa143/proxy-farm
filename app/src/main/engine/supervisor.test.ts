@@ -119,6 +119,27 @@ describe('EngineProcess', () => {
     await engine.stop();
   });
 
+  it('delivers the final log line before onExit fires, even when the child exits immediately after writing it (reports on "close", not "exit")', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    let logsAtExitTime: string[] | null = null;
+    engine.onExit(() => {
+      // Captured synchronously inside the onExit callback itself — if
+      // EngineProcess still reported on 'exit' (which can fire before stdio
+      // is drained) rather than 'close', this could observe the ring buffer
+      // without the last-written line(s).
+      logsAtExitTime = engine.logs;
+    });
+
+    const lastLine = 'FATAL[0000] bind error: address already in use';
+    const manyLines = Array.from({ length: 50 }, (_, i) => `INFO[0000] line ${i}`).concat(lastLine);
+    engine.start(JSON.stringify({ __fakeLogLines: manyLines, __fakeExitCode: 1 }));
+
+    await waitFor(() => logsAtExitTime !== null);
+    expect(logsAtExitTime).not.toBeNull();
+    expect((logsAtExitTime as unknown as string[]).at(-1)).toBe(lastLine);
+    expect(logsAtExitTime).toEqual(manyLines);
+  });
+
   it('stop() sends SIGINT on non-win32 and resolves once the child exits', async () => {
     const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
     const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
