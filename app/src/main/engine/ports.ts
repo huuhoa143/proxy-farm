@@ -2,6 +2,7 @@ import net from 'node:net';
 
 const DEFAULT_BASE = 10000;
 const MAX_SCAN_ATTEMPTS = 2000;
+const MAX_PORT = 65535;
 
 /** Resolves true iff a bare TCP listener can bind `host:port`, closing it immediately after. */
 function tryBind(host: string, port: number): Promise<boolean> {
@@ -47,12 +48,14 @@ export async function allocatePort(opts: AllocatePortOptions = {}): Promise<numb
   }
 
   let candidate = opts.base ?? DEFAULT_BASE;
-  for (let attempt = 0; attempt < MAX_SCAN_ATTEMPTS; attempt += 1, candidate += 1) {
+  for (let attempt = 0; attempt < MAX_SCAN_ATTEMPTS && candidate <= MAX_PORT; attempt += 1, candidate += 1) {
     if (taken.has(candidate)) continue;
     // eslint-disable-next-line no-await-in-loop
     if (await isPortFree(candidate)) {
       return candidate;
     }
   }
-  throw new Error(`allocatePort: no free port found after scanning ${MAX_SCAN_ATTEMPTS} ports from ${opts.base ?? DEFAULT_BASE}`);
+  throw new Error(
+    `allocatePort: no free port found after scanning from ${opts.base ?? DEFAULT_BASE} up to ${Math.min(candidate, MAX_PORT)} (port numbers never go past ${MAX_PORT})`,
+  );
 }

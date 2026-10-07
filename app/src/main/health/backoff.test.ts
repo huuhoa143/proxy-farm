@@ -33,6 +33,11 @@ describe('nextBackoffMs', () => {
     expect(nextBackoffMs(0, () => 0)).toBeGreaterThanOrEqual(0);
   });
 
+  it('clamps after jitter: max positive jitter on an already-capped delay never exceeds the 30min cap', () => {
+    expect(nextBackoffMs(10, () => 1)).toBe(30 * 60_000);
+    expect(nextBackoffMs(50, () => 1)).toBe(30 * 60_000);
+  });
+
   it('treats a negative attempt as attempt 0', () => {
     expect(nextBackoffMs(-5, noJitter)).toBe(30_000);
   });

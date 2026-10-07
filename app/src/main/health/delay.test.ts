@@ -85,4 +85,14 @@ describe('delayProbe', () => {
     const result = await delayProbe(port, 'x', 'ep');
     expect(result.code).toBe('error');
   });
+
+  it('aborts and maps to {code:"error"} if the server never responds at all (client-side AbortSignal.timeout)', async () => {
+    const { port, close } = await startServer(() => {
+      // never calls res.end() — simulates a wedged clash_api server
+    });
+    cleanup = close;
+    const result = await delayProbe(port, 'x', 'ep', { fetchTimeoutMs: 50 });
+    expect(result.code).toBe('error');
+    expect((result as { message: string }).message.toLowerCase()).toMatch(/abort|timeout/);
+  });
 });

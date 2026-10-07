@@ -12,6 +12,10 @@ const DNS_SERVER_TAG = 'dns-ep';
 export function renderConfig(input: RenderInput): string {
   const { endpoint, listen, clash } = input;
 
+  if (listen.host === '0.0.0.0' && !listen.proxyAuth) {
+    throw new Error('renderConfig: listen.proxyAuth is required when listen.host is "0.0.0.0" (LAN sharing requires proxy auth, spec §6.1.3)');
+  }
+
   const inbound: Record<string, unknown> = {
     type: 'mixed',
     tag: INBOUND_TAG,
@@ -23,7 +27,7 @@ export function renderConfig(input: RenderInput): string {
   }
 
   const config = {
-    log: { level: 'info' },
+    log: { level: 'info', timestamp: true },
     dns: {
       servers: [{ type: 'https', server: '1.1.1.1', tag: DNS_SERVER_TAG, detour: ENDPOINT_TAG }],
       final: DNS_SERVER_TAG,

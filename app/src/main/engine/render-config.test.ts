@@ -65,9 +65,10 @@ describe('renderConfig', () => {
     expect(parsed.services).toBeUndefined();
   });
 
-  it('sets log.level to info', () => {
+  it('sets log.level to info with timestamps on', () => {
     const parsed = JSON.parse(renderConfig(baseInput(sampleWireguardEndpoint)));
     expect(parsed.log.level).toBe('info');
+    expect(parsed.log.timestamp).toBe(true);
   });
 
   it('inlines the endpoint with tag ep and system:false, embedding CA/keys inline (no paths)', () => {
@@ -88,5 +89,17 @@ describe('renderConfig', () => {
     expect(ep.private_key).toBe(sampleWireguardEndpoint.private_key);
     expect(ep.peers[0].public_key).toBe(sampleWireguardEndpoint.peers[0].public_key);
     expect(ep.system).toBe(false);
+  });
+
+  it('throws when listen.host is 0.0.0.0 without proxyAuth (LAN sharing requires proxy auth)', () => {
+    const input = baseInput(sampleWireguardEndpoint);
+    input.listen = { host: '0.0.0.0', port: 29002 };
+    expect(() => renderConfig(input)).toThrow(/proxyAuth/);
+  });
+
+  it('does not throw when listen.host is 0.0.0.0 with proxyAuth', () => {
+    const input = baseInput(sampleWireguardEndpoint);
+    input.listen = { host: '0.0.0.0', port: 29002, proxyAuth: { username: 'u', password: 'p' } };
+    expect(() => renderConfig(input)).not.toThrow();
   });
 });

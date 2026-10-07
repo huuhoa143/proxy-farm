@@ -1,5 +1,6 @@
 import { spawn, execFile, type ChildProcessByStdio } from 'node:child_process';
 import { promisify } from 'node:util';
+import readline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { singboxPath } from './singbox-path';
 import { LogRing, redactLine } from './log-ring';
@@ -9,7 +10,12 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_RING_CAPACITY = 2000;
 const DEFAULT_HARD_KILL_TIMEOUT_MS = 6000;
 
-export type ExitInfo = { code: number | null; signal: NodeJS.Signals | null };
+/**
+ * `error` is set when the process never (successfully) ran at all — e.g. a
+ * missing binary (`ENOENT`) — in which case `code`/`signal` are both null,
+ * since the OS process never existed to report either.
+ */
+export type ExitInfo = { code: number | null; signal: NodeJS.Signals | null; error?: Error };
 
 export interface EngineProcessOptions {
   /** Path to the sing-box binary. @default singboxPath() */
@@ -58,6 +64,11 @@ export class EngineProcess {
     this.ring = new LogRing(opts.ringCapacity ?? DEFAULT_RING_CAPACITY);
   }
 
+  /** The child's OS pid, or undefined if not currently running. */
+  get pid(): number | undefined {
+    return this.child?.pid;
+  }
+
   /** Spawns `<bin> run -c stdin`, writes `configJson` to the child's stdin, then closes it. */
   start(configJson: string): void {
     if (this.child) {
@@ -71,21 +82,44 @@ export class EngineProcess {
     >;
     this.child = child;
 
-    const handleChunk = (chunk: Buffer) => {
-      const text = chunk.toString('utf8');
-      for (const rawLine of text.split(/\r?\n/)) {
-        if (rawLine.length === 0) continue;
-        this.ring.push(rawLine);
-        const redacted = redactLine(rawLine);
-        for (const cb of this.logCbs) cb(redacted);
-      }
+    let reported = false;
+    const reportExit = (info: ExitInfo) => {
+      if (reported) return;
+      reported = true;
+      if (this.child === child) this.child = null;
+      stdoutRl.close();
+      stderrRl.close();
+      for (const cb of this.exitCbs) cb(info);
     };
-    child.stdout.on('data', handleChunk);
-    child.stderr.on('data', handleChunk);
 
-    child.once('exit', (code, signal) => {
-      for (const cb of this.exitCbs) cb({ code, signal });
-    });
+    // A missing binary (or any other spawn-time failure) surfaces here, NOT
+    // via 'exit' — the OS process never existed, so code/signal are both
+    // null and the error is attached instead. Without this handler an ENOENT
+    // here is an unhandled 'error' event, which crashes the whole main process.
+    child.on('error', (err) => reportExit({ code: null, signal: null, error: err }));
+    child.once('exit', (code, signal) => reportExit({ code, signal }));
+
+    // Writing to stdin after the other end is already gone (crashed, or a
+    // spawn that never really started) can raise EPIPE/ECONNRESET on the
+    // stream; swallow it here (the 'error'/'exit' handlers above are what
+    // actually reports the failure) so it never becomes an unhandled error.
+    child.stdin.on('error', () => {});
+
+    const handleLine = (rawLine: string) => {
+      if (rawLine.length === 0) return;
+      this.ring.push(rawLine);
+      const redacted = redactLine(rawLine);
+      for (const cb of this.logCbs) cb(redacted);
+    };
+    // readline (not a manual `data`+split) buffers partial lines across
+    // chunk boundaries itself, and line endings vary (\n / \r\n). The casts
+    // work around a tsconfig "DOM" lib / @types/node ReadableStream clash
+    // (Node's Readable vs. the WHATWG ReadableStream global) — at runtime
+    // these are plain Node Readables, exactly what readline expects.
+    const stdoutRl = readline.createInterface({ input: child.stdout as unknown as NodeJS.ReadableStream });
+    stdoutRl.on('line', handleLine);
+    const stderrRl = readline.createInterface({ input: child.stderr as unknown as NodeJS.ReadableStream });
+    stderrRl.on('line', handleLine);
 
     child.stdin.write(configJson);
     child.stdin.end();
@@ -98,28 +132,24 @@ export class EngineProcess {
    */
   async stop(): Promise<void> {
     const child = this.child;
-    if (!child || child.exitCode !== null || child.signalCode !== null) {
-      this.child = null;
-      return;
-    }
+    if (!child) return; // not running (never started, or already reported exited/errored)
 
     await new Promise<void>((resolve) => {
       let settled = false;
-      const hardKillTimer = setTimeout(() => {
+      const unsubscribe = this.onExit(() => {
         if (settled) return;
+        settled = true;
+        clearTimeout(hardKillTimer);
+        unsubscribe();
+        resolve();
+      });
+      const hardKillTimer = setTimeout(() => {
         try {
           child.kill('SIGKILL');
         } catch {
           // already gone
         }
       }, this.hardKillTimeoutMs);
-
-      child.once('exit', () => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(hardKillTimer);
-        resolve();
-      });
 
       if (this.platform === 'win32') {
         if (child.pid) {
@@ -135,8 +165,6 @@ export class EngineProcess {
         }
       }
     });
-
-    this.child = null;
   }
 
   /** Subscribes to redacted log lines as they arrive. Returns an unsubscribe function. */
@@ -145,7 +173,7 @@ export class EngineProcess {
     return () => this.logCbs.delete(cb);
   }
 
-  /** Subscribes to the child's exit. Returns an unsubscribe function. */
+  /** Subscribes to the child's exit (or spawn failure). Returns an unsubscribe function. */
   onExit(cb: (info: ExitInfo) => void): () => void {
     this.exitCbs.add(cb);
     return () => this.exitCbs.delete(cb);
