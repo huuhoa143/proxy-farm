@@ -41,3 +41,4 @@ __pycache__/
 app/node_modules/
 app/out/
 app/.vite/
+app/test-results/

@@ -15,7 +15,8 @@
     "premake": "node scripts/prebuild-singbox.mjs",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts"
   },
   "keywords": [],
   "author": {
@@ -32,6 +33,7 @@
     "@electron-forge/publisher-github": "^7.11.1",
     "@electron-forge/shared-types": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

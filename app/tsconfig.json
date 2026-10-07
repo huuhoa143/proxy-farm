@@ -17,6 +17,6 @@
     "isolatedModules": true,
     "moduleDetection": "force"
   },
-  "include": ["src/**/*", "vite.*.config.ts", "forge.config.ts", "forge.env.d.ts"],
+  "include": ["src/**/*", "tests/**/*", "vite.*.config.ts", "forge.config.ts", "forge.env.d.ts"],
   "exclude": ["node_modules", "dist", ".vite", "out"]
 }
