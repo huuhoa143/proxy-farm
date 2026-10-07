@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderId, ProxyFarmApi } from '../../shared/contracts';
 import { FileCard, HmaCard, SurfsharkCard, ZoogVpnCard, type HmaDetected } from './OnboardingCards';
+import { ProviderLimitField } from './ProviderLimitField';
+import { Icon } from '../ui/Icon';
 
 export interface OnboardingProps {
   api: ProxyFarmApi;
@@ -9,79 +11,71 @@ export interface OnboardingProps {
 }
 
 const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
-
-function ProviderLimitField({ api, providerId }: { api: ProxyFarmApi; providerId: ProviderId }) {
-  const { t } = useTranslation();
-  const [value, setValue] = useState(0);
-  const [saved, setSaved] = useState(false);
-
-  async function save() {
-    await api.setLimit(providerId, value);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  }
-
-  return (
-    <div data-testid={`provider-limit-${providerId}`}>
-      <label>
-        {t('onboarding.portLimit.label')} — {providerId}
-        <input
-          type="number"
-          min={0}
-          aria-label={`${t('onboarding.portLimit.label')} ${providerId}`}
-          value={value}
-          onChange={(e) => setValue(Math.max(0, Number(e.target.value) || 0))}
-        />
-      </label>
-      <span className="guidance">{t('onboarding.portLimit.unlimited')}</span>
-      <button className="btn ghost" onClick={() => void save()}>
-        {t('onboarding.portLimit.save')}
-      </button>
-      {saved && <span data-testid={`provider-limit-saved-${providerId}`}>{t('common.saved')}</span>}
-    </div>
-  );
-}
+type Counts = Record<ProviderId, number>;
+const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, file: 0 };
 
 export function Onboarding({ api, onDone }: OnboardingProps) {
   const { t } = useTranslation();
   const [hmaDetected, setHmaDetected] = useState<HmaDetected | undefined>(undefined);
-  const [hasAnyAccount, setHasAnyAccount] = useState(false);
+  const [counts, setCounts] = useState<Counts>(NO_ACCOUNTS);
+
+  async function refresh(cancelled: () => boolean = () => false) {
+    const providers = await api.listProviders();
+    if (cancelled()) return;
+    const hma = providers.find((p) => p.id === 'hma');
+    setHmaDetected(hma?.detected);
+    const next = { ...NO_ACCOUNTS };
+    for (const p of providers) next[p.id] = p.accounts.length;
+    setCounts(next);
+  }
 
   useEffect(() => {
     let cancelled = false;
-    void api.listProviders().then((providers) => {
-      if (cancelled) return;
-      const hma = providers.find((p) => p.id === 'hma');
-      setHmaDetected(hma?.detected);
-      setHasAnyAccount(providers.some((p) => p.accounts.length > 0));
-    });
+    void refresh(() => cancelled);
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
   function markAdded() {
-    setHasAnyAccount(true);
+    void refresh();
   }
 
+  const total = PROVIDER_IDS.reduce((sum, id) => sum + counts[id], 0);
+  const hasAnyAccount = total > 0;
+
   return (
-    <div data-testid="onboarding">
-      <h1>{t('onboarding.title')}</h1>
-      <p>{t('onboarding.subtitle')}</p>
+    <div className="screen" data-testid="onboarding">
       <div className="provider-cards">
-        <HmaCard api={api} detected={hmaDetected} onAdded={markAdded} />
-        <ZoogVpnCard api={api} onAdded={markAdded} />
-        <SurfsharkCard api={api} onAdded={markAdded} />
-        <FileCard api={api} onAdded={markAdded} />
+        <HmaCard api={api} detected={hmaDetected} onAdded={markAdded} accountCount={counts.hma} />
+        <ZoogVpnCard api={api} onAdded={markAdded} accountCount={counts.zoogvpn} />
+        <SurfsharkCard api={api} onAdded={markAdded} accountCount={counts.surfshark} />
+        <FileCard api={api} onAdded={markAdded} accountCount={counts.file} />
       </div>
-      <section data-testid="provider-limits">
-        {PROVIDER_IDS.map((id) => (
-          <ProviderLimitField key={id} api={api} providerId={id} />
-        ))}
+      <section className="panel" data-testid="provider-limits" aria-labelledby="limits-title">
+        <div className="panel-h">
+          <h2 id="limits-title">
+            <Icon name="network" />
+            {t('onboarding.portLimit.title')}
+          </h2>
+          <p>{t('onboarding.portLimit.note')}</p>
+        </div>
+        <div className="limit-list">
+          {PROVIDER_IDS.map((id) => (
+            <ProviderLimitField key={id} api={api} providerId={id} />
+          ))}
+        </div>
       </section>
-      <button className="btn primary" disabled={!hasAnyAccount} onClick={onDone} data-testid="onboarding-continue">
-        {t('onboarding.continueToApp')}
-      </button>
+      <div className={`onb-footer${hasAnyAccount ? ' ready' : ''}`}>
+        <span className="sum">
+          {hasAnyAccount ? t('onboarding.status.total', { count: total }) : t('onboarding.continueHint')}
+        </span>
+        <button className="btn primary" disabled={!hasAnyAccount} onClick={onDone} data-testid="onboarding-continue">
+          {t('onboarding.continueToApp')}
+          <Icon name="chevron" />
+        </button>
+      </div>
     </div>
   );
 }

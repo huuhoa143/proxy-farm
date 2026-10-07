@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProxyFarmApi, Settings } from '../../shared/contracts';
 import { changeLanguage } from '../i18n';
+import { Icon } from '../ui/Icon';
 
 export interface LanguageSwitchProps {
   api: ProxyFarmApi;
@@ -34,14 +35,17 @@ export function LanguageSwitch({ api }: LanguageSwitchProps) {
   }
 
   return (
-    <select
-      aria-label={t('settings.language.label') as string}
-      value={language}
-      onChange={(e) => void handleChange(e.target.value as Settings['language'])}
-    >
-      <option value="system">{t('common.languageSystem')}</option>
-      <option value="en">{t('common.languageEnglish')}</option>
-      <option value="vi">{t('common.languageVietnamese')}</option>
-    </select>
+    <div className="lang">
+      <Icon name="globe" />
+      <select
+        aria-label={t('settings.language.label') as string}
+        value={language}
+        onChange={(e) => void handleChange(e.target.value as Settings['language'])}
+      >
+        <option value="system">{t('common.languageSystem')}</option>
+        <option value="en">{t('common.languageEnglish')}</option>
+        <option value="vi">{t('common.languageVietnamese')}</option>
+      </select>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Icon } from '../ui/Icon';
 
 export type Theme = 'light' | 'dark';
 
@@ -32,13 +33,15 @@ export function ThemeToggle() {
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
+  const label = `${t('common.theme.toggle')} (${theme === 'dark' ? t('common.theme.dark') : t('common.theme.light')})`;
   return (
     <button
-      className="btn ghost"
-      title={t('common.theme.toggle') as string}
+      className="rail-icon"
+      title={label}
+      aria-label={label}
       onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
     >
-      {theme === 'dark' ? t('common.theme.dark') : t('common.theme.light')}
+      <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
     </button>
   );
 }

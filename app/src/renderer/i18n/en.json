@@ -25,7 +25,9 @@
       "main": "Ports",
       "providers": "Providers",
       "settings": "Settings"
-    }
+    },
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "onboarding": {
     "title": "Add a provider",
@@ -48,7 +50,8 @@
         "enableSupport": "Enable HMA support",
         "enablingSupport": "Enabling…",
         "windowsHelperNote": "This installs a small helper service and needs administrator approval once. Updates afterwards need no approval.",
-        "waiting": "Waiting for HMA — watching for credentials…"
+        "waiting": "Waiting for HMA — watching for credentials…",
+        "initials": "H"
       },
       "zoogvpn": {
         "name": "ZoogVPN",
@@ -58,30 +61,47 @@
         "password": "Password",
         "passwordPlaceholder": "Password",
         "check": "Check",
-        "checking": "Checking…"
+        "checking": "Checking…",
+        "initials": "Z"
       },
       "surfshark": {
         "name": "Surfshark",
         "description": "Paste the WireGuard private key from your Surfshark account.",
         "keyLabel": "WireGuard private key",
         "keyPlaceholder": "Paste the private key here",
-        "hint": "Find it at my.surfshark.com → VPN → Manual setup → WireGuard.",
-        "add": "Add"
+        "add": "Add",
+        "initials": "S",
+        "hintLead": "Find it at",
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard"
       },
       "file": {
         "name": "Config file",
         "description": "Import an .ovpn or .conf (WireGuard) file.",
-        "dragHint": "Drag and drop a .ovpn or .conf file here, or",
-        "browse": "choose a file",
+        "dragHint": "Drop a .ovpn or .conf file here",
+        "browse": "Choose a file…",
         "countryLabel": "Country",
         "countryGuessedNote": "Guessed from the file name — edit if wrong.",
-        "import": "Import"
+        "import": "Import",
+        "initials": "F",
+        "chooseAnother": "Choose another"
       }
     },
     "portLimit": {
       "label": "Port limit",
       "unlimited": "0 = unlimited",
-      "save": "Save"
+      "save": "Save",
+      "title": "Port limits",
+      "note": "Cap how many ports each provider may run at the same time.",
+      "fieldLabel": "Port limit — {{provider}}",
+      "ports_one": "at most {{count}} port",
+      "ports_other": "at most {{count}} ports"
+    },
+    "continueHint": "Connect at least one provider to continue.",
+    "status": {
+      "connected_one": "{{count}} account",
+      "connected_other": "{{count}} accounts",
+      "total_one": "{{count}} account connected — you can add more any time.",
+      "total_other": "{{count}} accounts connected — you can add more any time."
     }
   },
   "checkResult": {
@@ -103,7 +123,7 @@
     "start": "Start",
     "noTargetsSelected": "Select at least one location to start.",
     "selectedCount": "{{count}} selected",
-    "emptyState": "No ports yet — pick a location above and press Start.",
+    "emptyState": "Pick one or more locations and press Start — each one gets its own local proxy port.",
     "table": {
       "status": "Status",
       "location": "Location",
@@ -133,12 +153,16 @@
       "speedRunning": "Testing speed…",
       "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
       "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
-      "failed": "Test failed — this port is not online."
+      "failed": "Test failed — this port is not online.",
+      "title": "Connection check"
     },
     "autoRotate": {
       "label": "Auto-rotate every",
       "off": "Off",
-      "minutesSuffix": "min"
+      "minutesSuffix": "min",
+      "title": "Auto-rotate",
+      "every_one": "Rotates every minute.",
+      "every_other": "Rotates every {{count}} minutes."
     },
     "bulk": {
       "selectedCount": "{{count}} ports selected",
@@ -160,12 +184,40 @@
         "curl": "curl command"
       },
       "copyAll": "Copy all",
-      "close": "Close"
+      "close": "Close",
+      "count_one": "{{count}} port",
+      "count_other": "{{count}} ports"
     },
     "rotateResult": {
       "changedNote": "Exit IP changed: {{from}} → {{to}}",
       "sameCityNote": "No other server in this city — moved to another city in the same country.",
       "unchangedNote": "No other server is available for this location."
+    },
+    "emptyTitle": "No ports yet",
+    "addLocations": "Add locations",
+    "exportAll": "Export all",
+    "credentials": "Proxy login",
+    "stats": {
+      "label": "Port summary",
+      "online": "Online",
+      "ofTotal": "of {{total}}",
+      "locations": "Locations",
+      "countries": "Countries",
+      "avgLatency": "Avg latency"
+    },
+    "picker": {
+      "title": "Add locations",
+      "subtitle": "Each location becomes one local proxy port.",
+      "searchPlaceholder": "Search country or city",
+      "allProviders": "All",
+      "running": "Running",
+      "noResults": "No locations match “{{query}}”.",
+      "clear": "Clear",
+      "selectCountry": "Select every city in {{country}}",
+      "cities_one": "{{count}} city",
+      "cities_other": "{{count}} cities",
+      "startN_one": "Start {{count}} port",
+      "startN_other": "Start {{count}} ports"
     }
   },
   "vpnNote": {
@@ -200,7 +252,9 @@
         "label": "No server available",
         "guidance": "No working server could be reached for this location yet. It will keep retrying."
       }
-    }
+    },
+    "attempt": "attempt {{n}}",
+    "nextTry": "Next try in {{time}}"
   },
   "settings": {
     "title": "Settings",
@@ -217,10 +271,12 @@
     "lanSharing": {
       "label": "Share on the local network",
       "warning": "Anyone on your network could reach these proxy ports. Proxy credentials become mandatory when this is on.",
-      "firewallNote": "Windows may ask you to allow this once."
+      "firewallNote": "Windows may ask you to allow this once.",
+      "offNote": "Off: ports only accept connections from this computer (127.0.0.1)."
     },
     "keepAwake": {
-      "label": "Keep this computer awake while ports are on"
+      "label": "Keep this computer awake while ports are on",
+      "note": "Only while at least one port is on."
     },
     "launchAtLogin": {
       "label": "Launch at login"
@@ -228,7 +284,9 @@
     "giveUpAfter": {
       "label": "Give up retrying after",
       "never": "Never",
-      "minutes": "{{count}} minutes"
+      "minutes": "{{count}} minutes",
+      "neverNote": "0 = never give up; keeps retrying.",
+      "unit": "min"
     },
     "webhook": {
       "title": "Rotate webhook",
@@ -238,7 +296,13 @@
       "bearer": "Bearer token"
     },
     "language": {
-      "label": "Language"
+      "label": "Language",
+      "appLanguage": "App language"
+    },
+    "subtitle": "Changes are saved as you make them.",
+    "sections": {
+      "network": "Network",
+      "system": "This computer"
     }
   },
   "tray": {

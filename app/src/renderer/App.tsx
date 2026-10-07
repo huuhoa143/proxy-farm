@@ -7,6 +7,7 @@ import { MainScreen } from './components/MainScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ThemeToggle } from './components/ThemeToggle';
 import { LanguageSwitch } from './components/LanguageSwitch';
+import { Icon, type IconName } from './ui/Icon';
 
 type Screen = 'onboarding' | 'main' | 'settings';
 
@@ -15,6 +16,18 @@ const api = getProxyFarmApi();
 // including this loading screen — already has a working `t()`. The real
 // persisted language preference is applied once settings load, below.
 initI18n();
+
+const NAV: Array<{ screen: Screen; icon: IconName; labelKey: string }> = [
+  { screen: 'main', icon: 'globe', labelKey: 'common.nav.main' },
+  { screen: 'onboarding', icon: 'plug', labelKey: 'common.nav.providers' },
+  { screen: 'settings', icon: 'gear', labelKey: 'common.nav.settings' },
+];
+
+const TITLE: Record<Screen, { title: string; subtitle?: string }> = {
+  main: { title: 'main.title' },
+  onboarding: { title: 'onboarding.title', subtitle: 'onboarding.subtitle' },
+  settings: { title: 'settings.title', subtitle: 'settings.subtitle' },
+};
 
 export function App() {
   const { t } = useTranslation();
@@ -34,27 +47,41 @@ export function App() {
   }, []);
 
   if (screen === null) {
-    return <p>{t('common.loading')}</p>;
+    return <p className="boot">{t('common.loading')}</p>;
   }
+
+  const heading = TITLE[screen];
 
   return (
     <div className="app-shell">
-      <nav className="nav">
-        <div className="nav-brand">{t('common.appName')}</div>
-        <button className={`nav-item${screen === 'main' ? ' active' : ''}`} onClick={() => setScreen('main')}>
-          {t('common.nav.main')}
-        </button>
-        <button className={`nav-item${screen === 'onboarding' ? ' active' : ''}`} onClick={() => setScreen('onboarding')}>
-          {t('common.nav.providers')}
-        </button>
-        <button className={`nav-item${screen === 'settings' ? ' active' : ''}`} onClick={() => setScreen('settings')}>
-          {t('common.nav.settings')}
-        </button>
-        <div style={{ flex: 1 }} />
-        <LanguageSwitch api={api} />
+      <nav className="rail" aria-label={t('common.appName') as string}>
+        <div className="brand" title={t('common.appName') as string}>
+          <Icon name="relay" />
+        </div>
+        {NAV.map((item) => (
+          <button
+            key={item.screen}
+            className={`rail-btn${screen === item.screen ? ' active' : ''}`}
+            aria-current={screen === item.screen ? 'page' : undefined}
+            onClick={() => setScreen(item.screen)}
+          >
+            <Icon name={item.icon} />
+            <span>{t(item.labelKey)}</span>
+          </button>
+        ))}
+        <div className="rail-sp" />
         <ThemeToggle />
       </nav>
       <div className="main-area">
+        <header className="topbar">
+          <div className="topbar-title">
+            <h1>{t(heading.title)}</h1>
+            {heading.subtitle && <p>{t(heading.subtitle)}</p>}
+          </div>
+          <div className="topbar-tools">
+            <LanguageSwitch api={api} />
+          </div>
+        </header>
         {screen === 'onboarding' && <Onboarding api={api} onDone={() => setScreen('main')} />}
         {screen === 'main' && <MainScreen api={api} />}
         {screen === 'settings' && <SettingsScreen api={api} />}

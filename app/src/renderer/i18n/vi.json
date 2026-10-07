@@ -25,7 +25,9 @@
       "main": "Cổng",
       "providers": "Nhà cung cấp",
       "settings": "Cài đặt"
-    }
+    },
+    "showPassword": "Hiện mật khẩu",
+    "hidePassword": "Ẩn mật khẩu"
   },
   "onboarding": {
     "title": "Thêm nhà cung cấp",
@@ -48,7 +50,8 @@
         "enableSupport": "Bật hỗ trợ HMA",
         "enablingSupport": "Đang bật…",
         "windowsHelperNote": "Thao tác này cài một dịch vụ hỗ trợ nhỏ và cần xác nhận quản trị viên một lần. Các lần cập nhật sau không cần xác nhận lại.",
-        "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…"
+        "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…",
+        "initials": "H"
       },
       "zoogvpn": {
         "name": "ZoogVPN",
@@ -58,30 +61,47 @@
         "password": "Mật khẩu",
         "passwordPlaceholder": "Mật khẩu",
         "check": "Kiểm tra",
-        "checking": "Đang kiểm tra…"
+        "checking": "Đang kiểm tra…",
+        "initials": "Z"
       },
       "surfshark": {
         "name": "Surfshark",
         "description": "Dán khoá riêng WireGuard từ tài khoản Surfshark của bạn.",
         "keyLabel": "Khoá riêng WireGuard",
         "keyPlaceholder": "Dán khoá riêng vào đây",
-        "hint": "Tìm tại my.surfshark.com → VPN → Manual setup → WireGuard.",
-        "add": "Thêm"
+        "add": "Thêm",
+        "initials": "S",
+        "hintLead": "Tìm tại",
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard"
       },
       "file": {
         "name": "Tệp cấu hình",
         "description": "Nhập tệp .ovpn hoặc .conf (WireGuard).",
-        "dragHint": "Kéo thả tệp .ovpn hoặc .conf vào đây, hoặc",
-        "browse": "chọn tệp",
+        "dragHint": "Thả tệp .ovpn hoặc .conf vào đây",
+        "browse": "Chọn tệp…",
         "countryLabel": "Quốc gia",
         "countryGuessedNote": "Đoán từ tên tệp — sửa lại nếu sai.",
-        "import": "Nhập"
+        "import": "Nhập",
+        "initials": "T",
+        "chooseAnother": "Chọn tệp khác"
       }
     },
     "portLimit": {
       "label": "Giới hạn số cổng",
       "unlimited": "0 = không giới hạn",
-      "save": "Lưu"
+      "save": "Lưu",
+      "title": "Giới hạn cổng",
+      "note": "Giới hạn số cổng mỗi nhà cung cấp được chạy cùng lúc.",
+      "fieldLabel": "Giới hạn cổng — {{provider}}",
+      "ports_one": "tối đa {{count}} cổng",
+      "ports_other": "tối đa {{count}} cổng"
+    },
+    "continueHint": "Kết nối ít nhất một nhà cung cấp để tiếp tục.",
+    "status": {
+      "connected_one": "{{count}} tài khoản",
+      "connected_other": "{{count}} tài khoản",
+      "total_one": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào.",
+      "total_other": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào."
     }
   },
   "checkResult": {
@@ -103,7 +123,7 @@
     "start": "Bật",
     "noTargetsSelected": "Chọn ít nhất một vị trí để bắt đầu.",
     "selectedCount": "Đã chọn {{count}}",
-    "emptyState": "Chưa có cổng nào — chọn vị trí ở trên rồi bấm Bật.",
+    "emptyState": "Chọn một hoặc nhiều vị trí rồi bấm Bật — mỗi vị trí có một cổng proxy cục bộ riêng.",
     "table": {
       "status": "Trạng thái",
       "location": "Vị trí",
@@ -133,12 +153,16 @@
       "speedRunning": "Đang đo tốc độ…",
       "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
       "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
-      "failed": "Kiểm tra thất bại — cổng này chưa hoạt động."
+      "failed": "Kiểm tra thất bại — cổng này chưa hoạt động.",
+      "title": "Kiểm tra kết nối"
     },
     "autoRotate": {
       "label": "Tự xoay mỗi",
       "off": "Tắt",
-      "minutesSuffix": "phút"
+      "minutesSuffix": "phút",
+      "title": "Tự xoay IP",
+      "every_one": "Xoay mỗi phút.",
+      "every_other": "Xoay mỗi {{count}} phút."
     },
     "bulk": {
       "selectedCount": "Đã chọn {{count}} cổng",
@@ -160,12 +184,40 @@
         "curl": "lệnh curl"
       },
       "copyAll": "Sao chép tất cả",
-      "close": "Đóng"
+      "close": "Đóng",
+      "count_one": "{{count}} cổng",
+      "count_other": "{{count}} cổng"
     },
     "rotateResult": {
       "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
       "sameCityNote": "Không còn máy chủ khác ở thành phố này — đã chuyển sang thành phố khác cùng quốc gia.",
       "unchangedNote": "Không có máy chủ khác khả dụng cho vị trí này."
+    },
+    "emptyTitle": "Chưa có cổng nào",
+    "addLocations": "Thêm vị trí",
+    "exportAll": "Xuất tất cả",
+    "credentials": "Đăng nhập proxy",
+    "stats": {
+      "label": "Tóm tắt cổng",
+      "online": "Đang chạy",
+      "ofTotal": "trên {{total}}",
+      "locations": "Vị trí",
+      "countries": "Quốc gia",
+      "avgLatency": "Độ trễ TB"
+    },
+    "picker": {
+      "title": "Thêm vị trí",
+      "subtitle": "Mỗi vị trí trở thành một cổng proxy cục bộ.",
+      "searchPlaceholder": "Tìm quốc gia hoặc thành phố",
+      "allProviders": "Tất cả",
+      "running": "Đang chạy",
+      "noResults": "Không có vị trí nào khớp “{{query}}”.",
+      "clear": "Bỏ chọn",
+      "selectCountry": "Chọn mọi thành phố ở {{country}}",
+      "cities_one": "{{count}} thành phố",
+      "cities_other": "{{count}} thành phố",
+      "startN_one": "Bật {{count}} cổng",
+      "startN_other": "Bật {{count}} cổng"
     }
   },
   "vpnNote": {
@@ -200,7 +252,9 @@
         "label": "Không có máy chủ khả dụng",
         "guidance": "Chưa kết nối được máy chủ nào hoạt động cho vị trí này. Hệ thống sẽ tiếp tục thử lại."
       }
-    }
+    },
+    "attempt": "lần {{n}}",
+    "nextTry": "Thử lại sau {{time}}"
   },
   "settings": {
     "title": "Cài đặt",
@@ -217,10 +271,12 @@
     "lanSharing": {
       "label": "Chia sẻ trong mạng nội bộ",
       "warning": "Bất kỳ ai trong mạng của bạn cũng có thể truy cập các cổng proxy này. Thông tin đăng nhập proxy trở thành bắt buộc khi bật mục này.",
-      "firewallNote": "Windows có thể hỏi bạn cho phép một lần."
+      "firewallNote": "Windows có thể hỏi bạn cho phép một lần.",
+      "offNote": "Tắt: cổng chỉ nhận kết nối từ chính máy này (127.0.0.1)."
     },
     "keepAwake": {
-      "label": "Giữ máy không ngủ khi còn cổng đang bật"
+      "label": "Giữ máy không ngủ khi còn cổng đang bật",
+      "note": "Chỉ khi có ít nhất một cổng đang bật."
     },
     "launchAtLogin": {
       "label": "Khởi chạy cùng lúc đăng nhập"
@@ -228,7 +284,9 @@
     "giveUpAfter": {
       "label": "Ngừng thử lại sau",
       "never": "Không bao giờ",
-      "minutes": "{{count}} phút"
+      "minutes": "{{count}} phút",
+      "neverNote": "0 = không bao giờ bỏ cuộc; luôn thử lại.",
+      "unit": "phút"
     },
     "webhook": {
       "title": "Webhook xoay IP",
@@ -238,7 +296,13 @@
       "bearer": "Mã bearer"
     },
     "language": {
-      "label": "Ngôn ngữ"
+      "label": "Ngôn ngữ",
+      "appLanguage": "Ngôn ngữ ứng dụng"
+    },
+    "subtitle": "Thay đổi được lưu ngay khi bạn chỉnh.",
+    "sections": {
+      "network": "Mạng",
+      "system": "Máy tính này"
     }
   },
   "tray": {

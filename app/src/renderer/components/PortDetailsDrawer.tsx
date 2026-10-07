@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi } from '../../shared/contracts';
+import { Icon } from '../ui/Icon';
 
 export interface PortDetailsDrawerProps {
   row: PortRow;
   api: ProxyFarmApi;
+  colSpan?: number;
 }
 
 interface TestOutcome {
@@ -19,7 +21,7 @@ interface TestOutcome {
  * and an auto-rotate-every-N-minutes control. Rendered as an extra <tr> by
  * PortTable, expanded only while this row's Details button is toggled on.
  */
-export function PortDetailsDrawer({ row, api }: PortDetailsDrawerProps) {
+export function PortDetailsDrawer({ row, api, colSpan = 7 }: PortDetailsDrawerProps) {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<string[] | null>(null);
   const [testResult, setTestResult] = useState<TestOutcome | null>(null);
@@ -45,53 +47,79 @@ export function PortDetailsDrawer({ row, api }: PortDetailsDrawerProps) {
     }
   }
 
+  const autoRotateId = `autorotate-${row.key}`;
   return (
-    <tr data-testid={`details-${row.key}`}>
-      <td colSpan={7}>
-        <section>
-          <h4>{t('main.logs.title')}</h4>
-          <button className="btn ghost" onClick={() => void refreshLogs()}>
-            {t('main.logs.refresh')}
-          </button>
-          <pre data-testid={`logs-${row.key}`}>
-            {logs === null ? t('common.loading') : logs.length ? logs.join('\n') : t('main.logs.empty')}
-          </pre>
-        </section>
-        <section>
-          <button className="btn ghost" disabled={testing !== 'none'} onClick={() => void runTest(false)}>
-            {testing === 'basic' ? t('main.test.running') : t('main.test.run')}
-          </button>
-          <button className="btn ghost" disabled={testing !== 'none'} onClick={() => void runTest(true)}>
-            {testing === 'speed' ? t('main.test.speedRunning') : t('main.test.speedRun')}
-          </button>
-          {testResult && (
-            <span data-testid={`test-result-${row.key}`}>
-              {!testResult.ok
-                ? t('main.test.failed')
-                : testResult.mbps != null
-                  ? t('main.test.resultSpeed', {
-                      exitIp: testResult.exitIp,
-                      latencyMs: testResult.latencyMs,
-                      mbps: testResult.mbps,
-                    })
-                  : t('main.test.resultOnline', { exitIp: testResult.exitIp, latencyMs: testResult.latencyMs })}
+    <tr className="details-row" data-testid={`details-${row.key}`}>
+      <td colSpan={colSpan}>
+        <div className="details">
+          <section>
+            <h4>
+              <Icon name="logs" />
+              {t('main.logs.title')}
+              <button className="btn ghost sm" onClick={() => void refreshLogs()}>
+                <Icon name="rotate" />
+                {t('main.logs.refresh')}
+              </button>
+            </h4>
+            <pre data-testid={`logs-${row.key}`}>
+              {logs === null ? t('common.loading') : logs.length ? logs.join('\n') : t('main.logs.empty')}
+            </pre>
+          </section>
+          <section>
+            <h4>
+              <Icon name="activity" />
+              {t('main.test.title')}
+            </h4>
+            <div className="btns">
+              <button className="btn sm" disabled={testing !== 'none'} onClick={() => void runTest(false)}>
+                {testing === 'basic' ? t('main.test.running') : t('main.test.run')}
+              </button>
+              <button className="btn sm" disabled={testing !== 'none'} onClick={() => void runTest(true)}>
+                {testing === 'speed' ? t('main.test.speedRunning') : t('main.test.speedRun')}
+              </button>
+            </div>
+            {testResult && (
+              <div className={`test-result ${testResult.ok ? 'ok' : 'bad'}`} data-testid={`test-result-${row.key}`}>
+                <Icon name={testResult.ok ? 'check' : 'x'} />
+                <span>
+                  {!testResult.ok
+                    ? t('main.test.failed')
+                    : testResult.mbps != null
+                      ? t('main.test.resultSpeed', {
+                          exitIp: testResult.exitIp,
+                          latencyMs: testResult.latencyMs,
+                          mbps: testResult.mbps,
+                        })
+                      : t('main.test.resultOnline', { exitIp: testResult.exitIp, latencyMs: testResult.latencyMs })}
+                </span>
+              </div>
+            )}
+          </section>
+          <section>
+            <h4>
+              <Icon name="clock" />
+              {t('main.autoRotate.title')}
+            </h4>
+            <div className="inline-field">
+              <label htmlFor={autoRotateId}>{t('main.autoRotate.label')}</label>
+              <input
+                id={autoRotateId}
+                className="num-input"
+                type="number"
+                min={0}
+                defaultValue={row.autoRotateMin}
+                aria-label={t('main.autoRotate.label') as string}
+                onBlur={(e) => void api.setAutoRotate(row.key, Math.max(0, Number(e.target.value) || 0))}
+              />
+              <span>{t('main.autoRotate.minutesSuffix')}</span>
+            </div>
+            <span className="hint">
+              {row.autoRotateMin === 0
+                ? t('main.autoRotate.off')
+                : t('main.autoRotate.every', { count: row.autoRotateMin })}
             </span>
-          )}
-        </section>
-        <section>
-          <label>
-            {t('main.autoRotate.label')}
-            <input
-              type="number"
-              min={0}
-              defaultValue={row.autoRotateMin}
-              aria-label={t('main.autoRotate.label') as string}
-              onBlur={(e) => void api.setAutoRotate(row.key, Math.max(0, Number(e.target.value) || 0))}
-            />
-            {t('main.autoRotate.minutesSuffix')}
-          </label>
-          <span>{row.autoRotateMin === 0 ? t('main.autoRotate.off') : null}</span>
-        </section>
+          </section>
+        </div>
       </td>
     </tr>
   );

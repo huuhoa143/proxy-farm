@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Icon } from '../ui/Icon';
 
 export interface BulkActionBarProps {
   count: number;
@@ -14,24 +15,36 @@ export function BulkActionBar({ count, onStart, onStop, onRotate, onRemove, onEx
   const { t } = useTranslation();
   if (count === 0) return null;
   return (
-    <div data-testid="bulk-action-bar">
-      <span>{t('main.bulk.selectedCount', { count })}</span>
-      <button className="btn ghost" onClick={onStart}>
+    <div
+      className="bulk"
+      data-testid="bulk-action-bar"
+      role="toolbar"
+      aria-label={t('main.bulk.selectedCount', { count }) as string}
+    >
+      <span className="n">{t('main.bulk.selectedCount', { count })}</span>
+      <button className="btn ghost sm" onClick={onStart}>
+        <Icon name="power" />
         {t('main.bulk.start')}
       </button>
-      <button className="btn ghost" onClick={onStop}>
+      <button className="btn ghost sm" onClick={onStop}>
+        <Icon name="power" />
         {t('main.bulk.stop')}
       </button>
-      <button className="btn ghost" onClick={onRotate}>
+      <button className="btn ghost sm" onClick={onRotate}>
+        <Icon name="rotate" />
         {t('main.bulk.rotate')}
       </button>
-      <button className="btn ghost" onClick={onExport}>
+      <button className="btn ghost sm" onClick={onExport}>
+        <Icon name="export" />
         {t('main.bulk.export')}
       </button>
-      <button className="btn danger ghost" onClick={onRemove}>
+      <button className="btn ghost sm danger" onClick={onRemove}>
+        <Icon name="trash" />
         {t('main.bulk.remove')}
       </button>
-      <button className="btn ghost" onClick={onClear}>
+      <span className="sp" />
+      <button className="btn ghost sm" onClick={onClear}>
+        <Icon name="x" />
         {t('main.bulk.clear')}
       </button>
     </div>

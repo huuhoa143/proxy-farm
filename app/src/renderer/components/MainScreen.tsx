@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi, RotateResult, Target } from '../../shared/contracts';
 import { HostVpnNote } from './HostVpnNote';
@@ -6,10 +6,17 @@ import { LocationPicker } from './LocationPicker';
 import { PortTable } from './PortTable';
 import { BulkActionBar } from './BulkActionBar';
 import { ExportModal } from './ExportModal';
+import { StatRail } from './StatRail';
+import { CredentialsChip } from './CredentialsChip';
+import { Icon } from '../ui/Icon';
+import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 
 export interface MainScreenProps {
   api: ProxyFarmApi;
 }
+
+const NOTE_MS = 6000;
+const COPIED_MS = 1500;
 
 function removeKey(record: Record<string, string>, key: string): Record<string, string> {
   const { [key]: _removed, ...rest } = record;
@@ -20,16 +27,22 @@ export function MainScreen({ api }: MainScreenProps) {
   const { t } = useTranslation();
   const [targets, setTargets] = useState<Target[]>([]);
   const [ports, setPorts] = useState<PortRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [hostVpnActive, setHostVpnActive] = useState(false);
   const [exporting, setExporting] = useState<string[] | null>(null);
+  const [picking, setPicking] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [rotateNotes, setRotateNotes] = useState<Record<string, string>>({});
   const [bulkRotateSummary, setBulkRotateSummary] = useState<string | null>(null);
+  const schedule = useKeyedTimeouts();
 
   useEffect(() => {
     void api.listTargets().then(setTargets);
-    void api.listPorts().then(setPorts);
+    void api.listPorts().then((rows) => {
+      setPorts(rows);
+      setLoaded(true);
+    });
     void api.getHostVpnActive().then(setHostVpnActive);
     const offPorts = api.onPortsChanged(setPorts);
     const offVpn = api.onHostVpnChanged(setHostVpnActive);
@@ -39,7 +52,7 @@ export function MainScreen({ api }: MainScreenProps) {
     };
   }, [api]);
 
-  const untargetedCountries = useMemo(() => targets, [targets]);
+  const runningKeys = useMemo(() => new Set(ports.map((p) => p.key)), [ports]);
 
   function toggleSelect(key: string) {
     setSelected((prev) => {
@@ -63,7 +76,7 @@ export function MainScreen({ api }: MainScreenProps) {
     const text = await api.exportPorts([row.key], 'hostPort');
     await navigator.clipboard?.writeText(text);
     setCopiedKey(row.key);
-    setTimeout(() => setCopiedKey((k) => (k === row.key ? null : k)), 1500);
+    schedule('copied', () => setCopiedKey(null), COPIED_MS);
   }
 
   function describeRotateResult(result: RotateResult): string | undefined {
@@ -85,8 +98,18 @@ export function MainScreen({ api }: MainScreenProps) {
     const note = describeRotateResult(result);
     if (note) {
       setRotateNotes((prev) => ({ ...prev, [row.key]: note }));
-      setTimeout(() => setRotateNotes((prev) => removeKey(prev, row.key)), 6000);
+      schedule(`rotate:${row.key}`, () => setRotateNotes((prev) => removeKey(prev, row.key)), NOTE_MS);
     }
+  }
+
+  async function handleBulkRotate(keys: string[]) {
+    const results = await Promise.all(keys.map((k) => api.rotatePort(k)));
+    setPorts(await api.listPorts());
+    const changed = results.filter((r) => r.changed && r.noteKey !== 'main.rotateResult.sameCityNote').length;
+    const moved = results.filter((r) => r.changed && r.noteKey === 'main.rotateResult.sameCityNote').length;
+    const unavailable = results.filter((r) => !r.changed).length;
+    setBulkRotateSummary(t('main.bulk.rotateSummary', { changed, moved, unavailable }));
+    schedule('bulk-rotate', () => setBulkRotateSummary(null), NOTE_MS);
   }
 
   async function handleMovePort(row: PortRow) {
@@ -95,14 +118,62 @@ export function MainScreen({ api }: MainScreenProps) {
     setPorts(await api.listPorts());
   }
 
+  const closePicker = useCallback(() => setPicking(false), []);
+  const closeExport = useCallback(() => setExporting(null), []);
   const selectedKeys = Array.from(selected);
 
   return (
-    <div data-testid="main-screen">
+    <div className="screen" data-testid="main-screen">
       <HostVpnNote active={hostVpnActive} />
-      <LocationPicker targets={untargetedCountries} onStart={handleStart} />
+      <StatRail rows={ports} />
+      <div className="toolbar">
+        <CredentialsChip api={api} />
+        <span className="sp" />
+        {ports.length > 0 && (
+          <button className="btn ghost" onClick={() => setExporting(ports.map((p) => p.key))}>
+            <Icon name="export" />
+            {t('main.exportAll')}
+          </button>
+        )}
+        <button className="btn primary" onClick={() => setPicking(true)}>
+          <Icon name="plus" />
+          {t('main.addLocations')}
+        </button>
+      </div>
+      <BulkActionBar
+        count={selected.size}
+        onStart={() => void handleStart(selectedKeys).then(() => setSelected(new Set()))}
+        onStop={() => void api.stopPorts(selectedKeys).then(async () => setPorts(await api.listPorts()))}
+        onRotate={() => void handleBulkRotate(selectedKeys)}
+        onRemove={() =>
+          void api
+            .removePorts(selectedKeys)
+            .then(async () => setPorts(await api.listPorts()))
+            .then(() => setSelected(new Set()))
+        }
+        onExport={() => setExporting(selectedKeys)}
+        onClear={() => setSelected(new Set())}
+      />
+      {bulkRotateSummary && (
+        <div className="banner" data-testid="bulk-rotate-summary" role="status">
+          <Icon name="rotate" />
+          {bulkRotateSummary}
+        </div>
+      )}
       {ports.length === 0 ? (
-        <p>{t('main.emptyState')}</p>
+        loaded && (
+          <div className="empty">
+            <div className="glyph">
+              <Icon name="globe" />
+            </div>
+            <h2>{t('main.emptyTitle')}</h2>
+            <p>{t('main.emptyState')}</p>
+            <button className="btn primary" onClick={() => setPicking(true)}>
+              <Icon name="plus" />
+              {t('main.addLocations')}
+            </button>
+          </div>
+        )
       ) : (
         <PortTable
           rows={ports}
@@ -114,34 +185,27 @@ export function MainScreen({ api }: MainScreenProps) {
           onMovePort={handleMovePort}
           api={api}
           notes={rotateNotes}
+          copiedKey={copiedKey}
         />
       )}
-      {copiedKey && <span data-testid="copied-toast">{t('main.copied')}</span>}
-      {bulkRotateSummary && <div data-testid="bulk-rotate-summary">{bulkRotateSummary}</div>}
-      <BulkActionBar
-        count={selected.size}
-        onStart={() => void handleStart(selectedKeys).then(() => setSelected(new Set()))}
-        onStop={() => void api.stopPorts(selectedKeys).then(async () => setPorts(await api.listPorts()))}
-        onRotate={() =>
-          void Promise.all(selectedKeys.map((k) => api.rotatePort(k))).then(async (results) => {
-            setPorts(await api.listPorts());
-            const changed = results.filter((r) => r.changed && r.noteKey !== 'main.rotateResult.sameCityNote').length;
-            const moved = results.filter((r) => r.changed && r.noteKey === 'main.rotateResult.sameCityNote').length;
-            const unavailable = results.filter((r) => !r.changed).length;
-            setBulkRotateSummary(t('main.bulk.rotateSummary', { changed, moved, unavailable }));
-            setTimeout(() => setBulkRotateSummary(null), 6000);
-          })
-        }
-        onRemove={() =>
-          void api
-            .removePorts(selectedKeys)
-            .then(async () => setPorts(await api.listPorts()))
-            .then(() => setSelected(new Set()))
-        }
-        onExport={() => setExporting(selectedKeys)}
-        onClear={() => setSelected(new Set())}
-      />
-      {exporting && <ExportModal api={api} targetKeys={exporting} onClose={() => setExporting(null)} />}
+      {copiedKey && (
+        <div className="toast" data-testid="copied-toast" role="status">
+          <Icon name="check" />
+          {t('main.copied')}
+        </div>
+      )}
+      {picking && (
+        <LocationPicker
+          targets={targets}
+          runningKeys={runningKeys}
+          onClose={closePicker}
+          onStart={(keys) => {
+            setPicking(false);
+            void handleStart(keys);
+          }}
+        />
+      )}
+      {exporting && <ExportModal api={api} targetKeys={exporting} onClose={closeExport} />}
     </div>
   );
 }

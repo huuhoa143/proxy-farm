@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
 import { MainScreen } from './MainScreen';
 import { createFakeProxyFarmApi } from '../api';
@@ -32,7 +32,9 @@ describe('MainScreen', () => {
     expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('1 ports selected');
     fireEvent.click(screen.getByText('Export'));
 
-    await waitFor(() => expect(screen.getByTestId('export-text')).toHaveValue('127.0.0.1:29001:proxyfarm:demo-pass-1234'));
+    await waitFor(() =>
+      expect(screen.getByTestId('export-text')).toHaveValue('127.0.0.1:29001:proxyfarm:demo-pass-1234'),
+    );
 
     fireEvent.click(screen.getByText('socks5://…'));
     await waitFor(() =>
@@ -92,5 +94,68 @@ describe('MainScreen', () => {
         '1 rotated, 1 moved to another city, 1 had no other server available',
       ),
     );
+  });
+
+  describe('note timeouts', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('a second rotate restarts the note timer instead of being cleared by the first one', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const api = createFakeProxyFarmApi();
+      render(<MainScreen api={api} />);
+      await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+      fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Rotate IP'));
+      await waitFor(() =>
+        expect(screen.getByTestId('rotate-note-hma:JP-TOKYO')).toHaveTextContent('203.0.113.10 → 203.0.113.11'),
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(4000);
+      });
+      fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Rotate IP'));
+      await waitFor(() =>
+        expect(screen.getByTestId('rotate-note-hma:JP-TOKYO')).toHaveTextContent('203.0.113.11 → 203.0.113.10'),
+      );
+
+      // 7 s after the first rotate, 3 s after the second: the first timer must
+      // not have removed the second note.
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByTestId('rotate-note-hma:JP-TOKYO')).toHaveTextContent('203.0.113.11 → 203.0.113.10');
+
+      await act(async () => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.queryByTestId('rotate-note-hma:JP-TOKYO')).toBeNull();
+    });
+
+    it('a second bulk rotate restarts the summary timer', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const api = createFakeProxyFarmApi();
+      render(<MainScreen api={api} />);
+      await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+      fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByRole('checkbox'));
+
+      fireEvent.click(within(screen.getByTestId('bulk-action-bar')).getByText('Rotate IP'));
+      await waitFor(() => expect(screen.getByTestId('bulk-rotate-summary')).toBeInTheDocument());
+      await act(async () => {
+        vi.advanceTimersByTime(4000);
+      });
+      fireEvent.click(within(screen.getByTestId('bulk-action-bar')).getByText('Rotate IP'));
+      // The summary is set in the same tick as the refreshed rows.
+      await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toHaveTextContent('203.0.113.10'));
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByTestId('bulk-rotate-summary')).toBeInTheDocument();
+      await act(async () => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(screen.queryByTestId('bulk-rotate-summary')).toBeNull();
+    });
   });
 });
