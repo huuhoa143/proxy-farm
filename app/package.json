@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "socks-proxy-agent": "^7.0.0"
   }
 }
