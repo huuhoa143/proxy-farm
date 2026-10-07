@@ -115,6 +115,30 @@ describe('account pool (spec §4.2)', () => {
     expect(pool.atLimit('zoogvpn')).toBe(true);
   });
 
+  it('the limit is a provider-wide TOTAL, not a per-account cap (reviewer item: one consistent semantics)', () => {
+    // 2 accounts, 2 ports total, limit=2: the provider as a whole is full even though
+    // neither single account individually holds more than 1 port.
+    const { deps } = fakeDeps({
+      accounts: [acct('z1'), acct('z2')],
+      ports: [port('a', 'z1'), port('b', 'z2')],
+      limits: { zoogvpn: 2 },
+    });
+    const pool = createAccountPool(deps);
+    expect(pool.atLimit('zoogvpn')).toBe(true);
+    expect(pool.pickAccount('zoogvpn')).toBeUndefined();
+  });
+
+  it('under the provider-wide total limit, the least-loaded account is still picked', () => {
+    const { deps } = fakeDeps({
+      accounts: [acct('z1'), acct('z2')],
+      ports: [port('a', 'z1')],
+      limits: { zoogvpn: 3 },
+    });
+    const pool = createAccountPool(deps);
+    expect(pool.atLimit('zoogvpn')).toBe(false);
+    expect(pool.pickAccount('zoogvpn')?.id).toBe('z2');
+  });
+
   it('ports of other providers do not affect this provider pick or load', () => {
     const { deps } = fakeDeps({
       accounts: [acct('z1', 'zoogvpn'), acct('h1', 'hma')],

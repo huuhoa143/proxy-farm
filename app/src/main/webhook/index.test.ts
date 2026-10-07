@@ -2,7 +2,7 @@ import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RotateResult } from '../../shared/contracts';
-import { startWebhook, type Webhook } from './index';
+import { generateBearer, MIN_BEARER_LENGTH, startWebhook, type Webhook } from './index';
 
 function call(
   port: number,
@@ -51,16 +51,19 @@ describe('rotate webhook (spec §6.6)', () => {
     return { port, rotate };
   }
 
-  it('GET is rejected with 405', async () => {
+  it('GET to a valid rotate path is rejected with 405', async () => {
     const { port } = await start();
     const res = await call(port, { method: 'GET' });
     expect(res.status).toBe(405);
   });
 
-  it('a non-rotate path is rejected with 405 even for POST', async () => {
-    const { port } = await start();
-    const res = await call(port, { path: '/status', authorization: 'Bearer sekret-token' });
-    expect(res.status).toBe(405);
+  it('an unknown (non-rotate) path is rejected with 404, for any method', async () => {
+    const { port, rotate } = await start();
+    const getRes = await call(port, { method: 'GET', path: '/status' });
+    expect(getRes.status).toBe(404);
+    const postRes = await call(port, { path: '/status', authorization: 'Bearer sekret-token' });
+    expect(postRes.status).toBe(404);
+    expect(rotate).not.toHaveBeenCalled();
   });
 
   it('a missing/bad bearer is rejected with 401', async () => {
@@ -80,11 +83,12 @@ describe('rotate webhook (spec §6.6)', () => {
     expect(rotate).not.toHaveBeenCalled();
   });
 
-  it('a well-formed request calls rotate with the decoded key and returns its result', async () => {
+  it('a well-formed request calls rotate with the decoded key and returns its result as JSON', async () => {
     const { port, rotate } = await start();
     const res = await call(port, { path: '/rotate/hma%3Ajp-tok', authorization: 'Bearer sekret-token' });
     expect(res.status).toBe(200);
     expect(rotate).toHaveBeenCalledWith('hma:jp-tok');
+    expect(res.headers['content-type']).toMatch(/^application\/json/);
     expect(JSON.parse(res.body)).toEqual({ changed: true, from: '1.1.1.1', to: '2.2.2.2' });
   });
 
@@ -103,5 +107,27 @@ describe('rotate webhook (spec §6.6)', () => {
     const res = await call(port, { host: `127.0.0.1:${port}`, authorization: 'Bearer sekret-token' });
     expect(res.status).toBe(200);
     expect(rotate).toHaveBeenCalled();
+  });
+
+  it('an IPv6 Host header is parsed correctly (brackets stripped, not split on every colon)', async () => {
+    webhook = await startWebhook({
+      host: '127.0.0.1',
+      port: 0,
+      bearer: 'sekret-token',
+      hostAllowlist: ['::1'],
+      rotate: vi.fn(async (): Promise<RotateResult> => ({ changed: false, noteKey: 'no-server' })),
+    });
+    const port = (webhook.server.address() as AddressInfo).port;
+    const res = await call(port, { host: `[::1]:${port}`, authorization: 'Bearer sekret-token' });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('generateBearer / MIN_BEARER_LENGTH', () => {
+  it('generates a bearer meeting the minimum length, different each time', () => {
+    const a = generateBearer();
+    const b = generateBearer();
+    expect(a).not.toBe(b);
+    expect(a.length).toBeGreaterThanOrEqual(MIN_BEARER_LENGTH);
   });
 });

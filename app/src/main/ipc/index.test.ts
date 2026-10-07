@@ -8,6 +8,7 @@ function fakeController(): ControllerFacade {
     addAccount: vi.fn(async () => ({ ok: true })),
     removeAccount: vi.fn(async () => undefined),
     connectHma: vi.fn(async () => ({ ok: true })),
+    enableHmaSupport: vi.fn(async () => ({ ok: false, reasonKey: 'hma.windowsLater' })),
     importConfigFile: vi.fn(async () => ({ ok: true })),
     listTargets: vi.fn(async () => []),
     listPorts: vi.fn(async () => []),
@@ -27,15 +28,20 @@ function fakeController(): ControllerFacade {
 }
 
 function fakeIpcMain() {
-  const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
+  const handlers = new Map<string, (event: { sender: { id: number } }, ...args: unknown[]) => unknown>();
   return {
-    handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown) {
+    handle(channel: string, listener: (event: { sender: { id: number } }, ...args: unknown[]) => unknown) {
       handlers.set(channel, listener);
     },
     invoke(channel: string, ...args: unknown[]) {
       const h = handlers.get(channel);
       if (!h) throw new Error(`no handler registered for ${channel}`);
-      return h({ sender: 'fake' }, ...args);
+      return h({ sender: { id: 1 } }, ...args);
+    },
+    invokeFromSender(channel: string, senderId: number, ...args: unknown[]) {
+      const h = handlers.get(channel);
+      if (!h) throw new Error(`no handler registered for ${channel}`);
+      return h({ sender: { id: senderId } }, ...args);
     },
     channels: () => [...handlers.keys()],
   };
@@ -71,6 +77,22 @@ describe('ipc registration (spec §3)', () => {
     registerIpcHandlers(ipcMain, controller);
     const result = await ipcMain.invoke('testPort', 'key', false);
     expect(result).toEqual({ ok: true, exitIp: '1.2.3.4' });
+  });
+
+  it('rejects a call from an untrusted sender and never reaches the controller', async () => {
+    const ipcMain = fakeIpcMain();
+    const controller = fakeController();
+    registerIpcHandlers(ipcMain, controller, (id) => id === 1);
+    await expect(ipcMain.invokeFromSender('rotatePort', 2, 'hma:jp-tok')).rejects.toThrow(/untrusted sender/);
+    expect(controller.rotatePort).not.toHaveBeenCalled();
+  });
+
+  it('allows a call from a trusted sender', async () => {
+    const ipcMain = fakeIpcMain();
+    const controller = fakeController();
+    registerIpcHandlers(ipcMain, controller, (id) => id === 1);
+    await ipcMain.invokeFromSender('rotatePort', 1, 'hma:jp-tok');
+    expect(controller.rotatePort).toHaveBeenCalledWith('hma:jp-tok');
   });
 });
 

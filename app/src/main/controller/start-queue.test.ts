@@ -70,4 +70,29 @@ describe('start queue (spec §6.4/§6.7 staggered starts)', () => {
     await vi.advanceTimersByTimeAsync(20_000);
     expect(ran).toEqual(['a']);
   });
+
+  it('a rejected task is surfaced via onTaskError, not swallowed silently (reviewer item 7)', async () => {
+    const onTaskError = vi.fn();
+    const q = createStartQueue({ maxConcurrent: 1, random: () => 0, onTaskError });
+    q.enqueue('a', async () => {
+      throw new Error('boom');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onTaskError).toHaveBeenCalledTimes(1);
+    expect(onTaskError.mock.calls[0][0]).toBe('a');
+    expect(onTaskError.mock.calls[0][1]).toBeInstanceOf(Error);
+  });
+
+  it('a rejected task still frees its slot for the next queued task', async () => {
+    const q = createStartQueue({ maxConcurrent: 1, random: () => 0, onTaskError: () => undefined });
+    const ran: string[] = [];
+    q.enqueue('a', async () => {
+      throw new Error('boom');
+    });
+    q.enqueue('b', async () => {
+      ran.push('b');
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(ran).toEqual(['b']);
+  });
 });

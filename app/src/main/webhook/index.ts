@@ -34,10 +34,30 @@ function constantTimeEquals(a: string, b: string): boolean {
   return timingSafeEqual(macA, macB);
 }
 
-function send(res: ServerResponse, status: number, body: string): void {
-  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
+function send(res: ServerResponse, status: number, body: string, contentType = 'text/plain; charset=utf-8'): void {
+  res.writeHead(status, { 'Content-Type': contentType, 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
 }
+
+/** Strips the `:port` suffix from a `Host` header, correctly for an IPv6 literal
+ * (`[::1]:3000` -> `::1`) as well as a plain hostname/IPv4 (`example.com:3000` ->
+ * `example.com`). A bare IPv6 literal with no brackets (no port possible) is passed
+ * through unchanged. */
+function hostWithoutPort(hostHeader: string): string {
+  if (hostHeader.startsWith('[')) {
+    const end = hostHeader.indexOf(']');
+    return end === -1 ? hostHeader : hostHeader.slice(1, end);
+  }
+  return hostHeader.split(':')[0];
+}
+
+/** A bearer with real entropy, for auto-generating one when the webhook is enabled
+ * with an empty bearer (reviewer minor) — also exported for `controller/settings.ts`. */
+export function generateBearer(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+export const MIN_BEARER_LENGTH = 16;
 
 export function startWebhook(options: WebhookOptions): Promise<Webhook> {
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -46,7 +66,7 @@ export function startWebhook(options: WebhookOptions): Promise<Webhook> {
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // No CORS headers are ever sent, on any response (success or error).
-    const hostHeader = (req.headers.host ?? '').split(':')[0].toLowerCase();
+    const hostHeader = hostWithoutPort(req.headers.host ?? '').toLowerCase();
     if (!options.hostAllowlist.map((h) => h.toLowerCase()).includes(hostHeader)) {
       send(res, 403, 'forbidden host');
       return;
@@ -56,7 +76,11 @@ export function startWebhook(options: WebhookOptions): Promise<Webhook> {
     const path = url.split('?')[0];
     const match = path.match(ROTATE_PATH_RE);
 
-    if (req.method !== 'POST' || !match) {
+    if (!match) {
+      send(res, 404, 'not found');
+      return;
+    }
+    if (req.method !== 'POST') {
       send(res, 405, 'method not allowed');
       return;
     }
@@ -70,7 +94,7 @@ export function startWebhook(options: WebhookOptions): Promise<Webhook> {
 
     const key = decodeURIComponent(match[1]);
     const result = await options.rotate(key);
-    send(res, 200, JSON.stringify(result));
+    send(res, 200, JSON.stringify(result), 'application/json; charset=utf-8');
   }
 
   return new Promise((resolve, reject) => {

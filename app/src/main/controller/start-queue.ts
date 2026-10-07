@@ -7,6 +7,14 @@ export interface StartQueueOptions {
   maxGapMs?: number;
   /** Injectable for deterministic tests. Defaults to `Math.random`. */
   random?: () => number;
+  /**
+   * Called whenever a queued task's promise rejects (reviewer item 7: errors must not
+   * be swallowed silently). The task itself (`startPort`, typically) is expected to
+   * have already turned the failure into port state (`retrying`/`failed`) before
+   * rejecting — this hook is for surfacing/logging the error itself, not for state.
+   * @default a no-op
+   */
+  onTaskError?: (key: string, err: unknown) => void;
 }
 
 type Task = () => Promise<void>;
@@ -34,6 +42,7 @@ export function createStartQueue(options: StartQueueOptions = {}): StartQueue {
   const minGap = options.minGapMs ?? 2000;
   const maxGap = options.maxGapMs ?? 5000;
   const random = options.random ?? Math.random;
+  const onTaskError = options.onTaskError ?? (() => undefined);
 
   let pending: Array<{ key: string; task: Task }> = [];
   const running = new Set<string>();
@@ -60,7 +69,7 @@ export function createStartQueue(options: StartQueueOptions = {}): StartQueue {
     nextAllowedAt = Date.now() + minGap + Math.floor(random() * (maxGap - minGap));
     void next
       .task()
-      .catch(() => undefined)
+      .catch((err) => onTaskError(next.key, err))
       .finally(() => {
         running.delete(next.key);
         pump();

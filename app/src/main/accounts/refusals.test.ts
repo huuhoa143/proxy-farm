@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRefusalTracker, REFUSAL_TTL_MS } from './refusals';
+import { createRefusalTracker, ONLINE_TTL_MS, REFUSAL_TTL_MS } from './refusals';
 
 describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
   it('not-in-plan: auth failure on one server while another on the account is online', () => {
@@ -69,5 +69,58 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     expect(t.classifyAuthFailure('z1')).toBe('bad-login');
     expect(t.classifyAuthFailure('z2')).toBe('undecided');
     expect(t.isRefused('z2', 'a')).toBe(false);
+  });
+
+  describe('clearOnline (reviewer item 9: a stopped/failed port is no longer evidence)', () => {
+    it('clearing the only online marker drops back out of not-in-plan', () => {
+      const t = createRefusalTracker();
+      t.recordOnline('z1', 'nl');
+      t.recordAuthFailure('z1', 'us');
+      expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+      t.clearOnline('z1', 'nl');
+      expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    });
+
+    it('an online marker expires on its own after ONLINE_TTL_MS even without an explicit clear', () => {
+      let now = 0;
+      const t = createRefusalTracker({ clock: () => now });
+      t.recordOnline('z1', 'nl');
+      t.recordAuthFailure('z1', 'us');
+      expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+      now += ONLINE_TTL_MS + 1;
+      expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    });
+  });
+
+  describe('serialize / initial (reviewer item 9: persist across restarts)', () => {
+    it('serialize() reflects recorded failures and online markers as plain objects', () => {
+      const t = createRefusalTracker({ clock: () => 42 });
+      t.recordAuthFailure('z1', 'us');
+      t.recordOnline('z1', 'nl');
+      expect(t.serialize()).toEqual({ failures: { z1: { us: 42 } }, online: { z1: { nl: 42 } } });
+    });
+
+    it('a new tracker seeded with `initial` picks up where the old one left off', () => {
+      const first = createRefusalTracker({ clock: () => 1000 });
+      first.recordAuthFailure('z1', 'a');
+      first.recordAuthFailure('z1', 'b');
+      first.recordAuthFailure('z1', 'c');
+      const snapshot = first.serialize();
+
+      const second = createRefusalTracker({ initial: snapshot, clock: () => 1000 });
+      expect(second.classifyAuthFailure('z1')).toBe('bad-login');
+      expect(second.isRefused('z1', 'a')).toBe(true);
+    });
+
+    it('a seeded tracker still honours the original clock-relative TTLs', () => {
+      let now = 1000;
+      const first = createRefusalTracker({ clock: () => now });
+      first.recordAuthFailure('z1', 'us');
+      const snapshot = first.serialize();
+
+      now = 1000 + REFUSAL_TTL_MS + 1;
+      const second = createRefusalTracker({ initial: snapshot, clock: () => now });
+      expect(second.isRefused('z1', 'us')).toBe(false);
+    });
   });
 });

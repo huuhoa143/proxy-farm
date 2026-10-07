@@ -22,6 +22,22 @@ destination: default
   interface: utun4
 `;
 
+// A "split" route (0.0.0.0/1 + 128.0.0.0/1) never touches the literal default route, so
+// `route -n get 1.1.1.1` (not `get default`) is what reveals it: 1.1.1.1 falls under the
+// first half, 0.0.0.0/1, which these VPN clients install pointing at the tunnel.
+const ROUTE_1_1_1_1_VIA_SPLIT_TUN2 = `   route to: 1.1.1.1
+destination: 0.0.0.0
+       mask: 128.0.0.0
+    gateway: 10.9.0.1
+  interface: tun2
+      flags: <UP,GATEWAY,DONE,STATIC,PRCLONING>
+`;
+
+const ROUTE_VIA_PPP0 = `   route to: default
+destination: default
+  interface: ppp0
+`;
+
 describe('isDefaultRouteViaTunnel (spec §4.3 macOS detection)', () => {
   it('a default route via ipsec0 (HMA) is active', () => {
     expect(isDefaultRouteViaTunnel(ROUTE_VIA_IPSEC0)).toBe(true);
@@ -29,6 +45,14 @@ describe('isDefaultRouteViaTunnel (spec §4.3 macOS detection)', () => {
 
   it('a default route via utunN (WireGuard-style) is active', () => {
     expect(isDefaultRouteViaTunnel(ROUTE_VIA_UTUN4)).toBe(true);
+  });
+
+  it('a split-route pair (0.0.0.0/1 + 128.0.0.0/1) via tunN is active', () => {
+    expect(isDefaultRouteViaTunnel(ROUTE_1_1_1_1_VIA_SPLIT_TUN2)).toBe(true);
+  });
+
+  it('a default route via pppN (PPP-based client) is active', () => {
+    expect(isDefaultRouteViaTunnel(ROUTE_VIA_PPP0)).toBe(true);
   });
 
   it('a default route via a normal interface (en0) is not active', () => {
@@ -93,6 +117,29 @@ describe('createHostVpnMonitor', () => {
       await vi.advanceTimersByTimeAsync(10_000);
       expect(seen).toEqual([false, true, false]);
 
+      monitor.stop();
+    });
+
+    it('never overlaps a poll that is still in flight (a slow check does not pile up)', async () => {
+      let concurrentRunners = 0;
+      let maxConcurrent = 0;
+      let calls = 0;
+      const monitor = createHostVpnMonitor({
+        platform: 'darwin',
+        pollMs: 1000,
+        runDefaultRouteCheck: async () => {
+          calls++;
+          concurrentRunners++;
+          maxConcurrent = Math.max(maxConcurrent, concurrentRunners);
+          await new Promise((r) => setTimeout(r, 5000)); // slower than the 1s poll interval
+          concurrentRunners--;
+          return ROUTE_VIA_EN0;
+        },
+      });
+      monitor.start();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(maxConcurrent).toBe(1);
+      expect(calls).toBeLessThan(10); // ticks that land while one is still in flight are skipped
       monitor.stop();
     });
 

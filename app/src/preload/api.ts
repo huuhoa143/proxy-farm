@@ -20,8 +20,9 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     addAccount: (providerId, input) => ipcRenderer.invoke('addAccount', providerId, input) as ReturnType<ProxyFarmApi['addAccount']>,
     removeAccount: (accountId) => ipcRenderer.invoke('removeAccount', accountId) as ReturnType<ProxyFarmApi['removeAccount']>,
     connectHma: () => ipcRenderer.invoke('connectHma') as ReturnType<ProxyFarmApi['connectHma']>,
-    importConfigFile: (name, content) =>
-      ipcRenderer.invoke('importConfigFile', name, content) as ReturnType<ProxyFarmApi['importConfigFile']>,
+    enableHmaSupport: () => ipcRenderer.invoke('enableHmaSupport') as ReturnType<ProxyFarmApi['enableHmaSupport']>,
+    importConfigFile: (name, content, country) =>
+      ipcRenderer.invoke('importConfigFile', name, content, country) as ReturnType<ProxyFarmApi['importConfigFile']>,
     listTargets: (providerId) => ipcRenderer.invoke('listTargets', providerId) as ReturnType<ProxyFarmApi['listTargets']>,
 
     listPorts: () => ipcRenderer.invoke('listPorts') as ReturnType<ProxyFarmApi['listPorts']>,

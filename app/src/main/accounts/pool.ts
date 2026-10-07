@@ -72,29 +72,33 @@ export function createAccountPool(deps: AccountPoolDeps): AccountPool {
     const limit = deps.getLimit(providerId);
     const order = new Map(list.map((a, i) => [a.id, i]));
 
-    const free = list
-      .filter(ok)
-      .filter((a) => limit === 0 || (loadMap[a.id] ?? 0) < limit)
-      .sort((a, b) => {
-        const used = (loadMap[a.id] ?? 0) - (loadMap[b.id] ?? 0);
-        if (used) return used;
-        const pa = a.id === opts.prefer ? 0 : 1;
-        const pb = b.id === opts.prefer ? 0 : 1;
-        if (pa !== pb) return pa - pb;
-        return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
-      });
+    // `setLimit`'s one consistent meaning (spec §4.2) is the provider's TOTAL running
+    // ports, the same thing `atLimit` checks — not a per-account cap. So once that total
+    // is reached, no account of this provider can take one more port at all; below it,
+    // every usable/non-refused account is still a candidate, picked by least-loaded.
+    const totalUsed = Object.values(loadMap).reduce((sum, n) => sum + n, 0);
+    const providerHasRoom = limit === 0 || totalUsed < limit;
+
+    const free = providerHasRoom
+      ? list.filter(ok).sort((a, b) => {
+          const used = (loadMap[a.id] ?? 0) - (loadMap[b.id] ?? 0);
+          if (used) return used;
+          const pa = a.id === opts.prefer ? 0 : 1;
+          const pb = b.id === opts.prefer ? 0 : 1;
+          if (pa !== pb) return pa - pb;
+          return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
+        })
+      : [];
 
     return free[0];
   }
 
   function rebalance(providerId: ProviderId): string[] {
     const moved: string[] = [];
-    const loadMap: Record<string, number> = {};
     const ports = deps.listPorts().filter((p) => p.providerId === providerId && p.enabled);
     for (const p of ports) {
       const acc = pickAccount(providerId, { prefer: p.accountId, key: p.key, forPortKey: p.key });
       if (!acc) continue;
-      loadMap[acc.id] = (loadMap[acc.id] ?? 0) + 1;
       if (acc.id !== p.accountId) {
         deps.setPortAccount(p.key, acc.id);
         moved.push(p.key);

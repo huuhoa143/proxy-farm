@@ -177,7 +177,10 @@ export interface ProxyFarmApi {
   removeAccount(accountId: string): Promise<void>;
   /** HMA: (re)import device credentials from the local HMA install. */
   connectHma(): Promise<CheckResult & { account?: Account }>;
-  importConfigFile(name: string, content: string): Promise<CheckResult & { account?: Account }>;
+  /** Windows only: run the elevated helper installer (one UAC, spec §7). Stubbed for
+   * now — returns `{ok:false, reasonKey:'hma.windowsLater'}` until the Windows track. */
+  enableHmaSupport(): Promise<CheckResult>;
+  importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
   listTargets(providerId?: ProviderId): Promise<Target[]>;
 
   // ports
@@ -205,7 +208,7 @@ export interface ProxyFarmApi {
 /** Channel names used by preload ↔ main. Preload exposes exactly these, nothing else. */
 export const IPC = {
   invoke: [
-    'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'importConfigFile', 'listTargets',
+    'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive',
   ] as const,
