@@ -213,7 +213,7 @@ bold "1b/12 App-translocation guard gate"
 if grep -rqiE 'translocat|AppTranslocation|isInApplicationsFolder' "$ROOT/src/main" 2>/dev/null; then
   green "  Translocation guard found in src/main"
 else
-  if [[ "${PROXYFARM_REQUIRE_TRANSLOCATION_GUARD:-0}" == "1" ]]; then
+  if [[ "${PROXYFARM_REQUIRE_TRANSLOCATION_GUARD:-1}" == "1" ]]; then
     red "No app-translocation guard found under src/main (spec §9). Set PROXYFARM_REQUIRE_TRANSLOCATION_GUARD=0 to downgrade to a warning."
     exit 1
   fi
