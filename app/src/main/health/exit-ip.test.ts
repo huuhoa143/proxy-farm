@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { probeExitIp, type FetchViaProxy } from './exit-ip';
+import { probeExitIp, buildSocksProxyUrl, isValidCountryCode, type FetchViaProxy } from './exit-ip';
 
 /** Builds a fake transport keyed by URL substring, bypassing a real SOCKS5 hop — the
  * unit under test is the fallback/parse/cache logic, not the `socks` library itself. */
@@ -91,5 +91,79 @@ describe('probeExitIp', () => {
       'ipinfo.io': { error: 'down' },
     });
     await expect(probeExitIp(1234, { fetchViaProxy: transport, geoCache: new Map() })).rejects.toThrow(/every IP-echo endpoint failed/);
+  });
+
+  it('checks the geo cache right after ipify returns the ip, short-circuiting the rest of the chain', async () => {
+    let ifconfigCalled = false;
+    let ipinfoCalled = false;
+    const transport: FetchViaProxy = async (url) => {
+      if (url.includes('api.ipify.org')) return JSON.stringify({ ip: '9.9.9.9' });
+      if (url.includes('ifconfig.co')) {
+        ifconfigCalled = true;
+        return JSON.stringify({ ip: '9.9.9.9', country_iso: 'FR' });
+      }
+      if (url.includes('ipinfo.io')) {
+        ipinfoCalled = true;
+        return JSON.stringify({ ip: '9.9.9.9', country: 'FR' });
+      }
+      throw new Error(`unexpected url ${url}`);
+    };
+    const geoCache = new Map([['9.9.9.9', 'DE']]); // pre-cached from an earlier probe
+
+    const result = await probeExitIp(1234, { fetchViaProxy: transport, geoCache });
+
+    expect(result).toEqual({ ip: '9.9.9.9', country: 'DE' });
+    expect(ifconfigCalled).toBe(false);
+    expect(ipinfoCalled).toBe(false);
+  });
+
+  it('rejects a non-alpha2 country (e.g. a full name) and falls through to the next source', async () => {
+    const transport = fakeTransport({
+      'api.ipify.org': { body: JSON.stringify({ ip: '1.1.1.1' }) },
+      'ifconfig.co': { body: JSON.stringify({ ip: '1.1.1.1', country: 'Netherlands' }) }, // no country_iso, full name only
+      'ipinfo.io': { body: JSON.stringify({ ip: '1.1.1.1', country: 'NL' }) },
+    });
+    const result = await probeExitIp(1234, { fetchViaProxy: transport, geoCache: new Map() });
+    expect(result).toEqual({ ip: '1.1.1.1', country: 'NL' });
+  });
+
+  it('rejects a lower-case country code and falls through to the next source', async () => {
+    const transport = fakeTransport({
+      'api.ipify.org': { body: JSON.stringify({ ip: '1.1.1.1' }) },
+      'ifconfig.co': { body: JSON.stringify({ ip: '1.1.1.1', country_iso: 'nl' }) },
+      'ipinfo.io': { body: JSON.stringify({ ip: '1.1.1.1', country: 'NL' }) },
+    });
+    const result = await probeExitIp(1234, { fetchViaProxy: transport, geoCache: new Map() });
+    expect(result).toEqual({ ip: '1.1.1.1', country: 'NL' });
+  });
+});
+
+describe('isValidCountryCode', () => {
+  it('accepts upper-case alpha-2', () => {
+    expect(isValidCountryCode('NL')).toBe(true);
+    expect(isValidCountryCode('US')).toBe(true);
+  });
+
+  it('rejects lower case, full names, 3-letter codes, and undefined', () => {
+    expect(isValidCountryCode('nl')).toBe(false);
+    expect(isValidCountryCode('Netherlands')).toBe(false);
+    expect(isValidCountryCode('NLD')).toBe(false);
+    expect(isValidCountryCode(undefined)).toBe(false);
+  });
+});
+
+describe('buildSocksProxyUrl', () => {
+  it('builds a plain socks5h url with no auth', () => {
+    expect(buildSocksProxyUrl(1080)).toBe('socks5h://127.0.0.1:1080');
+  });
+
+  it('embeds username:password as userinfo when auth is given', () => {
+    expect(buildSocksProxyUrl(1080, { username: 'alice', password: 'S3cr3t' })).toBe('socks5h://alice:S3cr3t@127.0.0.1:1080');
+  });
+
+  it('percent-encodes special characters in username/password', () => {
+    expect(buildSocksProxyUrl(1080, { username: 'a@b', password: 'p@ss:word' })).toBe(
+      'socks5h://a%40b:p%40ss%3Aword@127.0.0.1:1080',
+    );
   });
 });

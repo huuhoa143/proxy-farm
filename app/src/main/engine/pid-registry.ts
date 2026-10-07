@@ -26,25 +26,54 @@ async function loadRegistry(registryPath: string): Promise<Registry> {
 /** Writes via a temp file + rename so a crash mid-write never corrupts the registry. */
 async function saveRegistry(registryPath: string, registry: Registry): Promise<void> {
   await mkdir(path.dirname(registryPath), { recursive: true });
-  const tmpPath = `${registryPath}.tmp-${process.pid}-${Date.now()}`;
+  const tmpPath = `${registryPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   await writeFile(tmpPath, JSON.stringify(registry, null, 2), 'utf8');
   await rename(tmpPath, registryPath);
 }
 
+/**
+ * Serializes every read-modify-write against a given registry file, keyed by
+ * its path: `recordPid`/`removePid` each do a full load → mutate → save, and
+ * without this queue two concurrent calls racing on the same file would
+ * both load the same "before" state and the second save would silently
+ * clobber the first's write. Chaining through a per-path promise queue makes
+ * concurrent calls against the same file behave like a strictly-ordered
+ * sequence of transactions; a failed task never poisons the chain for
+ * subsequent ones.
+ */
+const writeQueues = new Map<string, Promise<void>>();
+
+function enqueue<T>(registryPath: string, task: () => Promise<T>): Promise<T> {
+  const previous = writeQueues.get(registryPath) ?? Promise.resolve();
+  const result = previous.then(task, task);
+  writeQueues.set(
+    registryPath,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return result;
+}
+
 /** Records (or overwrites) the tracked process for `key` in the JSON registry at `registryPath` (spec §6.3). */
 export async function recordPid(registryPath: string, key: string, entry: PidEntry): Promise<void> {
-  const registry = await loadRegistry(registryPath);
-  registry[key] = entry;
-  await saveRegistry(registryPath, registry);
+  return enqueue(registryPath, async () => {
+    const registry = await loadRegistry(registryPath);
+    registry[key] = entry;
+    await saveRegistry(registryPath, registry);
+  });
 }
 
 /** Removes the tracked process for `key`, if present. No-op if the key (or the file) doesn't exist. */
 export async function removePid(registryPath: string, key: string): Promise<void> {
-  const registry = await loadRegistry(registryPath);
-  if (key in registry) {
-    delete registry[key];
-    await saveRegistry(registryPath, registry);
-  }
+  return enqueue(registryPath, async () => {
+    const registry = await loadRegistry(registryPath);
+    if (key in registry) {
+      delete registry[key];
+      await saveRegistry(registryPath, registry);
+    }
+  });
 }
 
 export interface ProcessSnapshot {
@@ -57,48 +86,66 @@ export type ReadProcess = (pid: number) => Promise<ProcessSnapshot | null>;
 const DEFAULT_START_TIME_TOLERANCE_MS = 5000;
 
 /**
- * Best-effort real process reader: `ps` on macOS/Linux, `wmic` on Windows.
- * Resolves null if no such pid currently exists or its info can't be read.
- * Start-time resolution from `ps`/`wmic` is second-level at best, which is
- * why matching uses a tolerance window rather than exact equality — tests
- * that need exact control should inject `readProcess`.
+ * Parses macOS/Linux `ps -o lstart=,comm= -p <pid>` output, e.g.
+ * `"Thu Oct  8 00:36:38 2026     /bin/zsh"` — `lstart` is a fixed 24-char
+ * date, `comm` follows. Exported for testing against a captured fixture
+ * (start-time resolution from `ps` is second-level at best, hence the
+ * tolerance window used by `reapOrphans` rather than exact equality).
+ */
+export function parseDarwinPsOutput(stdout: string): ProcessSnapshot | null {
+  const line = stdout.trim();
+  if (!line) return null;
+  const dateStr = line.slice(0, 24).trim();
+  const exe = line.slice(24).trim();
+  if (!exe) return null;
+  const startedAt = new Date(dateStr).getTime();
+  if (Number.isNaN(startedAt)) return null;
+  return { exe, startedAt };
+}
+
+/**
+ * Parses the output of the PowerShell `Get-CimInstance Win32_Process | ...
+ * ConvertTo-Json` command `defaultReadProcess` runs on win32 — a compact
+ * JSON object `{"ExecutablePath": "...", "CreationDateUtc": "<ISO-8601 UTC>"}`.
+ * The UTC offset is handled by asking PowerShell itself for an ISO-8601 UTC
+ * string (`.ToUniversalTime().ToString('o')`), so there's no local-timezone
+ * ambiguity left for this parser to get wrong.
+ */
+export function parseWindowsProcessJson(stdout: string): ProcessSnapshot | null {
+  const trimmed = stdout.trim();
+  if (!trimmed) return null;
+  let parsed: { ExecutablePath?: string; CreationDateUtc?: string };
+  try {
+    parsed = JSON.parse(trimmed) as { ExecutablePath?: string; CreationDateUtc?: string };
+  } catch {
+    return null;
+  }
+  if (!parsed.ExecutablePath || !parsed.CreationDateUtc) return null;
+  const startedAt = new Date(parsed.CreationDateUtc).getTime();
+  if (Number.isNaN(startedAt)) return null;
+  return { exe: parsed.ExecutablePath, startedAt };
+}
+
+/**
+ * Best-effort real process reader: `ps` on macOS/Linux, PowerShell's
+ * `Get-CimInstance Win32_Process` on Windows (`wmic` is deprecated/removed
+ * on newer Windows builds). Resolves null if no such pid currently exists or
+ * its info can't be read. Tests that need exact control should inject
+ * `readProcess` instead of relying on this.
  */
 async function defaultReadProcess(pid: number): Promise<ProcessSnapshot | null> {
   try {
     if (process.platform === 'win32') {
-      const { stdout } = await execFileAsync('wmic', [
-        'process',
-        'where',
-        `ProcessId=${pid}`,
-        'get',
-        'ExecutablePath,CreationDate',
-        '/format:list',
-      ]);
-      const exeMatch = stdout.match(/ExecutablePath=(.+)/);
-      const dateMatch = stdout.match(/CreationDate=(\d{14})/);
-      if (!exeMatch || !dateMatch) return null;
-      const exe = exeMatch[1].trim();
-      const d = dateMatch[1];
-      const startedAt = Date.UTC(
-        Number(d.slice(0, 4)),
-        Number(d.slice(4, 6)) - 1,
-        Number(d.slice(6, 8)),
-        Number(d.slice(8, 10)),
-        Number(d.slice(10, 12)),
-        Number(d.slice(12, 14)),
-      );
-      return { exe, startedAt };
+      const script =
+        `Get-CimInstance Win32_Process -Filter "ProcessId=${pid}" | ` +
+        `Select-Object ExecutablePath,@{Name='CreationDateUtc';Expression={$_.CreationDate.ToUniversalTime().ToString('o')}} | ` +
+        `ConvertTo-Json -Compress`;
+      const { stdout } = await execFileAsync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script]);
+      return parseWindowsProcessJson(stdout);
     }
 
     const { stdout } = await execFileAsync('ps', ['-o', 'lstart=,comm=', '-p', String(pid)]);
-    const line = stdout.trim();
-    if (!line) return null;
-    // `lstart` is a fixed 24-char date like "Mon Oct  7 23:59:00 2026", `comm` follows.
-    const dateStr = line.slice(0, 24).trim();
-    const exe = line.slice(24).trim();
-    const startedAt = new Date(dateStr).getTime();
-    if (Number.isNaN(startedAt)) return null;
-    return { exe, startedAt };
+    return parseDarwinPsOutput(stdout);
   } catch {
     return null;
   }
@@ -122,7 +169,7 @@ function defaultKill(pid: number): void {
 }
 
 export interface ReapOrphansOptions {
-  /** @default a best-effort OS process reader (`ps` on mac/linux, `wmic` on win32) */
+  /** @default a best-effort OS process reader (`ps` on mac/linux, PowerShell on win32) */
   readProcess?: ReadProcess;
   /** @default SIGKILL via process.kill */
   kill?: (pid: number) => void;
@@ -140,25 +187,27 @@ export interface ReapOrphansOptions {
  * number of processes killed.
  */
 export async function reapOrphans(registryPath: string, opts: ReapOrphansOptions = {}): Promise<number> {
-  const registry = await loadRegistry(registryPath);
-  const readProcess = opts.readProcess ?? defaultReadProcess;
-  const kill = opts.kill ?? defaultKill;
-  const tolerance = opts.startTimeToleranceMs ?? DEFAULT_START_TIME_TOLERANCE_MS;
+  return enqueue(registryPath, async () => {
+    const registry = await loadRegistry(registryPath);
+    const readProcess = opts.readProcess ?? defaultReadProcess;
+    const kill = opts.kill ?? defaultKill;
+    const tolerance = opts.startTimeToleranceMs ?? DEFAULT_START_TIME_TOLERANCE_MS;
 
-  let killedCount = 0;
-  for (const entry of Object.values(registry)) {
-    if (!isAlive(entry.pid)) continue;
-    // eslint-disable-next-line no-await-in-loop
-    const snapshot = await readProcess(entry.pid);
-    if (!snapshot) continue;
-    const exeMatches = snapshot.exe === entry.exe;
-    const timeMatches = Math.abs(snapshot.startedAt - entry.startedAt) <= tolerance;
-    if (exeMatches && timeMatches) {
-      kill(entry.pid);
-      killedCount += 1;
+    let killedCount = 0;
+    for (const entry of Object.values(registry)) {
+      if (!isAlive(entry.pid)) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const snapshot = await readProcess(entry.pid);
+      if (!snapshot) continue;
+      const exeMatches = snapshot.exe === entry.exe;
+      const timeMatches = Math.abs(snapshot.startedAt - entry.startedAt) <= tolerance;
+      if (exeMatches && timeMatches) {
+        kill(entry.pid);
+        killedCount += 1;
+      }
     }
-  }
 
-  await saveRegistry(registryPath, {});
-  return killedCount;
+    await saveRegistry(registryPath, {});
+    return killedCount;
+  });
 }

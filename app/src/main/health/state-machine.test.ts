@@ -203,4 +203,170 @@ describe('PortHealth', () => {
     health.feedLog('established');
     expect(seen).toEqual(['connecting', 'verifying']);
   });
+
+  // ── signal gating: only act while connecting/verifying/online ──────────
+
+  it('a late delay probe after stop() does not revive the port', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '1.2.3.4', country: 'US' });
+    health.stop();
+    expect(health.state).toEqual({ kind: 'stopped' });
+
+    health.feedDelay(200);
+    health.feedLog('established');
+    expect(health.state).toEqual({ kind: 'stopped' });
+  });
+
+  it('a late auth-terminal log after stop() does not revive the port', () => {
+    const health = new PortHealth();
+    health.start();
+    health.stop();
+    health.feedLog('auth-terminal');
+    expect(health.state).toEqual({ kind: 'stopped' });
+  });
+
+  it('signals are ignored while failed, and do not bump the attempt counter', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    health.feedLog('auth-terminal'); // -> failed(auth), attempt 1
+    expect(health.state.kind).toBe('failed');
+    const pendingBefore = clock.pendingDelayMs;
+
+    health.feedLog('auth-terminal'); // ignored: not active
+    health.feedDelay(504); // ignored: not active
+    expect(health.state.kind).toBe('failed');
+    if (health.state.kind === 'failed') {
+      expect(health.state.attempt).toBe(1); // unchanged
+    }
+    expect(clock.pendingDelayMs).toBe(pendingBefore); // timer was not reset
+  });
+
+  it('repeated 504s while already retrying do not reset the back-off or livelock — onRetryDue still fires once', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    let retryDueCount = 0;
+    health.onRetryDue(() => {
+      retryDueCount += 1;
+    });
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '1.2.3.4', country: 'US' });
+
+    health.feedDelay(504); // online -> retrying, attempt 1
+    const firstDelay = clock.pendingDelayMs!;
+
+    // Flood of repeated 504s while already retrying: must not reset the timer or bump attempt.
+    health.feedDelay(504);
+    health.feedDelay(504);
+    health.feedDelay(504);
+    expect(clock.pendingDelayMs).toBe(firstDelay);
+    if (health.state.kind === 'retrying') {
+      expect(health.state.attempt).toBe(1);
+    }
+
+    clock.advance(firstDelay);
+    clock.fire();
+    expect(health.state.kind).toBe('connecting');
+    expect(retryDueCount).toBe(1);
+  });
+
+  // ── feedExit ─────────────────────────────────────────────────────────────
+
+  it('feedExit moves an active (online) port to retrying("exited")', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '1.2.3.4', country: 'US' });
+
+    health.feedExit(1);
+    expect(health.state.kind).toBe('retrying');
+    if (health.state.kind === 'retrying') {
+      expect(health.state.reasonKey).toBe('exited');
+    }
+  });
+
+  it('feedExit while connecting also moves to retrying("exited")', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    health.feedExit(134);
+    expect(health.state.kind).toBe('retrying');
+  });
+
+  it('feedExit is ignored while already stopped', () => {
+    const health = new PortHealth();
+    health.start();
+    health.stop();
+    health.feedExit(1);
+    expect(health.state).toEqual({ kind: 'stopped' });
+  });
+
+  // ── connecting deadline ───────────────────────────────────────────────────
+
+  it('drops connecting -> retrying("unreachable") after the connecting deadline elapses with no signal', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule, connectingDeadlineMs: 90_000 });
+    health.start();
+    expect(clock.pendingDelayMs).toBe(90_000);
+
+    clock.advance(90_000);
+    clock.fire();
+
+    expect(health.state.kind).toBe('retrying');
+    if (health.state.kind === 'retrying') {
+      expect(health.state.reasonKey).toBe('unreachable');
+    }
+  });
+
+  it('the connecting deadline is cancelled once "established" arrives, so it never fires late', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule, connectingDeadlineMs: 90_000 });
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '1.2.3.4', country: 'US' });
+
+    expect(clock.hasPending).toBe(false); // no stray deadline timer left armed
+    expect(health.state.kind).toBe('online');
+  });
+
+  // ── giveUpAfter ───────────────────────────────────────────────────────────
+
+  it('giveUpAfter=0 (default) never gives up: failed keeps rescheduling indefinitely', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    for (let i = 0; i < 5; i += 1) {
+      health.feedLog('auth-terminal');
+      expect(health.state.kind).toBe('failed');
+      clock.advance(clock.pendingDelayMs!);
+      clock.fire();
+      expect(health.state.kind).toBe('connecting');
+    }
+  });
+
+  it('giveUpAfter=3 moves to stopped with giveUpReason set after 3 failed attempts, and schedules no further retry', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule, giveUpAfter: 3 });
+    health.start();
+
+    health.feedLog('auth-terminal'); // attempt 1 -> failed
+    expect(health.state.kind).toBe('failed');
+    clock.advance(clock.pendingDelayMs!);
+    clock.fire(); // -> connecting
+
+    health.feedLog('auth-terminal'); // attempt 2 -> failed
+    expect(health.state.kind).toBe('failed');
+    clock.advance(clock.pendingDelayMs!);
+    clock.fire(); // -> connecting
+
+    health.feedLog('auth-terminal'); // attempt 3 -> give up
+    expect(health.state).toEqual({ kind: 'stopped' });
+    expect(health.giveUpReason).toBe('auth');
+    expect(clock.hasPending).toBe(false); // no retry timer scheduled — truly stopped
+  });
 });

@@ -13,5 +13,6 @@ export function nextBackoffMs(attempt: number, rng: () => number = Math.random):
   const capped = Math.min(raw, MAX_MS);
   const jitterSpan = capped * JITTER_RATIO;
   const jitter = (rng() * 2 - 1) * jitterSpan; // uniform in [-jitterSpan, +jitterSpan]
-  return Math.max(0, Math.round(capped + jitter));
+  // Clamp AFTER jitter too: positive jitter on an already-capped value must never push the result past MAX_MS.
+  return Math.min(MAX_MS, Math.max(0, Math.round(capped + jitter)));
 }

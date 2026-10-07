@@ -82,4 +82,8 @@ describe('allocatePort', () => {
       await close(wildcard);
     }
   });
+
+  it('never scans past port 65535 (throws cleanly instead of trying an invalid port number)', async () => {
+    await expect(allocatePort({ base: 65535, taken: new Set([65535]) })).rejects.toThrow(/65535/);
+  });
 });
