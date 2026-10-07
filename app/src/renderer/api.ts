@@ -17,6 +17,7 @@ import type {
   RotateResult,
   Settings,
   Target,
+  UpdateStatus,
 } from '../shared/contracts';
 
 export function getProxyFarmApi(): ProxyFarmApi {
@@ -112,6 +113,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     giveUpAfter: 0,
     webhook: { enabled: false, port: 29999, bearer: '' },
     language: 'system',
+    autoCheckUpdates: true,
   };
 
   let hostVpnActive = false;
@@ -143,6 +145,14 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   const portsListeners = new Set<Listener<PortRow[]>>();
   const hostVpnListeners = new Set<Listener<boolean>>();
+  const updateStatusListeners = new Set<Listener<UpdateStatus>>();
+  const appVersion = typeof __PROXYFARM_APP_VERSION__ !== 'undefined' ? __PROXYFARM_APP_VERSION__ : 'dev';
+  let updateStatus: UpdateStatus = { phase: 'idle', currentVersion: appVersion };
+
+  function emitUpdateStatus(next: UpdateStatus): void {
+    updateStatus = next;
+    for (const listener of updateStatusListeners) listener(next);
+  }
 
   function emitPorts(): void {
     const rows = Array.from(ports.values());
@@ -395,6 +405,18 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return { secretsUnavailable: false };
     },
 
+    async checkForUpdate() {
+      // The dev/standalone fake has no real feed: simulate a quick "up to date" check.
+      emitUpdateStatus({ phase: 'checking', currentVersion: appVersion });
+      emitUpdateStatus({ phase: 'up-to-date', currentVersion: appVersion });
+      return updateStatus;
+    },
+
+    async downloadAndInstallUpdate() {
+      // No real installer in the fake; just report success without quitting.
+      return { success: true };
+    },
+
     onPortsChanged(cb) {
       portsListeners.add(cb);
       return () => portsListeners.delete(cb);
@@ -403,6 +425,11 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     onHostVpnChanged(cb) {
       hostVpnListeners.add(cb);
       return () => hostVpnListeners.delete(cb);
+    },
+
+    onUpdateStatus(cb) {
+      updateStatusListeners.add(cb);
+      return () => updateStatusListeners.delete(cb);
     },
 
     __setHostVpnActive(active) {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ProxyFarmApi, Settings } from '../../shared/contracts';
+import type { ProxyFarmApi, Settings, UpdateStatus } from '../../shared/contracts';
 import { changeLanguage } from '../i18n';
 import { Icon, type IconName } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
@@ -8,6 +8,9 @@ import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 export interface SettingsScreenProps {
   api: ProxyFarmApi;
 }
+
+/** App version inlined by vite.renderer.config.ts; `'dev'` under vitest/jsdom. */
+const APP_VERSION = typeof __PROXYFARM_APP_VERSION__ !== 'undefined' ? __PROXYFARM_APP_VERSION__ : 'dev';
 
 function Section({
   icon,
@@ -52,17 +55,48 @@ function Row({ id, label, note, children }: { id?: string; label: string; note?:
   );
 }
 
+type TranslateFn = (key: string, opts?: Record<string, unknown>) => string;
+
+/** The human-readable note under the "Check for updates" row for the current phase. */
+function updateStatusNote(update: UpdateStatus | null, t: TranslateFn): string | undefined {
+  switch (update?.phase) {
+    case 'checking':
+      return t('settings.update.checking');
+    case 'up-to-date':
+      return t('settings.update.upToDate');
+    case 'available':
+      return t('settings.update.available', { version: update.availableVersion ?? '' });
+    case 'downloading':
+      return t('settings.update.downloading', { percent: Math.round(update.percent ?? 0) });
+    case 'downloaded':
+      return t('settings.update.downloaded');
+    case 'error':
+      return update.message || t('settings.update.error');
+    default:
+      return undefined;
+  }
+}
+
 export function SettingsScreen({ api }: SettingsScreenProps) {
   const { t } = useTranslation();
   const [settings, setSettingsState] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPass, setShowPass] = useState(false);
+  const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const schedule = useKeyedTimeouts();
 
   useEffect(() => {
     void api.getSettings().then(setSettingsState);
   }, [api]);
+
+  // Status is pushed from main on every updater transition (check/available/progress/…).
+  useEffect(() => api.onUpdateStatus(setUpdate), [api]);
+
+  async function checkForUpdate() {
+    setUpdate({ phase: 'checking', currentVersion: APP_VERSION });
+    setUpdate(await api.checkForUpdate());
+  }
 
   async function patch(update: Partial<Settings>) {
     let result: Settings;
@@ -238,6 +272,51 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
               <option value="en">{t('common.languageEnglish')}</option>
               <option value="vi">{t('common.languageVietnamese')}</option>
             </select>
+          </Row>
+        </Section>
+
+        <Section icon="activity" title={t('settings.update.title')}>
+          <Row label={t('settings.update.currentVersion')}>
+            <span className="pill mono" data-testid="app-version">
+              v{APP_VERSION}
+            </span>
+          </Row>
+          <Row label={t('settings.update.check')} note={updateStatusNote(update, t as TranslateFn)}>
+            <div className="btns">
+              {update?.phase === 'downloaded' ? (
+                <button className="btn primary" onClick={() => void api.downloadAndInstallUpdate()}>
+                  {t('settings.update.restartInstall')}
+                </button>
+              ) : update?.phase === 'available' ? (
+                <button className="btn primary" data-testid="install-update" onClick={() => void api.downloadAndInstallUpdate()}>
+                  {t('settings.update.downloadInstall')}
+                </button>
+              ) : (
+                <button
+                  className="btn"
+                  data-testid="check-update"
+                  disabled={update?.phase === 'checking' || update?.phase === 'downloading'}
+                  onClick={() => void checkForUpdate()}
+                >
+                  {t('settings.update.check')}
+                </button>
+              )}
+              {update?.phase === 'error' && update.releasesUrl && (
+                <a className="btn link" href={update.releasesUrl} target="_blank" rel="noreferrer" data-testid="open-releases">
+                  {t('settings.update.openReleases')}
+                </a>
+              )}
+            </div>
+          </Row>
+          <Row id="set-autoupd" label={t('settings.update.autoCheck')} note={t('settings.update.autoCheckNote')}>
+            <input
+              id="set-autoupd"
+              type="checkbox"
+              role="switch"
+              className="switch"
+              checked={settings.autoCheckUpdates}
+              onChange={(e) => void patch({ autoCheckUpdates: e.target.checked })}
+            />
           </Row>
         </Section>
       </div>

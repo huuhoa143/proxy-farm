@@ -315,7 +315,23 @@
       "system": "Máy tính này"
     },
     "lanSharingRequiresAuth": "Chia sẻ LAN cần tên đăng nhập và mật khẩu proxy.",
-    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự."
+    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự.",
+    "update": {
+      "title": "Cập nhật",
+      "currentVersion": "Phiên bản hiện tại",
+      "check": "Kiểm tra cập nhật",
+      "checking": "Đang kiểm tra cập nhật…",
+      "upToDate": "Bạn đang dùng phiên bản mới nhất.",
+      "available": "Đã có phiên bản {{version}}.",
+      "downloadInstall": "Tải và cài đặt",
+      "downloading": "Đang tải… {{percent}}%",
+      "downloaded": "Đã tải xong bản cập nhật.",
+      "restartInstall": "Khởi động lại & cài đặt",
+      "error": "Kiểm tra cập nhật thất bại.",
+      "openReleases": "Mở trang phát hành",
+      "autoCheck": "Tự động kiểm tra cập nhật",
+      "autoCheckNote": "Kiểm tra khi khởi động và mỗi ngày một lần. Chỉ cài đặt khi bạn chọn."
+    }
   },
   "tray": {
     "onlineCount_zero": "Không có cổng nào đang bật",

@@ -315,7 +315,23 @@
       "system": "This computer"
     },
     "lanSharingRequiresAuth": "LAN sharing needs a proxy username and password.",
-    "webhookBearerTooShort": "The webhook key must be at least 16 characters."
+    "webhookBearerTooShort": "The webhook key must be at least 16 characters.",
+    "update": {
+      "title": "Updates",
+      "currentVersion": "Current version",
+      "check": "Check for updates",
+      "checking": "Checking for updates…",
+      "upToDate": "You're on the latest version.",
+      "available": "Version {{version}} is available.",
+      "downloadInstall": "Download & install",
+      "downloading": "Downloading… {{percent}}%",
+      "downloaded": "Update downloaded.",
+      "restartInstall": "Restart & install",
+      "error": "Update check failed.",
+      "openReleases": "Open releases page",
+      "autoCheck": "Check for updates automatically",
+      "autoCheckNote": "Checks on start and once a day. Updates install only when you choose."
+    }
   },
   "tray": {
     "onlineCount_zero": "No ports online",
