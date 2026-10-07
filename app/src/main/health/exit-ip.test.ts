@@ -167,3 +167,16 @@ describe('buildSocksProxyUrl', () => {
     );
   });
 });
+
+describe('ipinfo 429-in-200 body', () => {
+  it('falls through to another endpoint instead of returning empty', async () => {
+    const bodies: Record<string, string> = {
+      'https://ipinfo.io/json': JSON.stringify({ status: 429, error: { title: 'rate limited' } }),
+      'https://ifconfig.co/json': JSON.stringify({ ip: '203.0.113.9', country_iso: 'JP' }),
+      'https://api.ipify.org?format=json': JSON.stringify({ ip: '203.0.113.9' }),
+    };
+    const res = await probeExitIp(39999, { fetchViaProxy: async (url: string) => bodies[url] ?? '' });
+    expect(res.ip).toBe('203.0.113.9');
+    expect(res.country).toBe('JP');
+  });
+});

@@ -33,7 +33,11 @@ const ENDPOINTS: EchoEndpoint[] = [
     name: 'ipinfo.io',
     url: 'https://ipinfo.io/json',
     parse: (body) => {
-      const j = JSON.parse(body) as { ip?: string; country?: string };
+      // ipinfo.io rate-limits with HTTP 200 carrying a body like
+      // `{"status":429,"error":{...}}` — no `ip` field, so treat it as no data
+      // and let the chain fall through rather than returning an empty result.
+      const j = JSON.parse(body) as { ip?: string; country?: string; status?: number };
+      if (typeof j.status === 'number' && j.status >= 400) return {};
       return { ip: j.ip, country: j.country };
     },
   },
