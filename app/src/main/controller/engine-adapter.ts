@@ -14,6 +14,29 @@ import { PortInUseError, type Engine } from './ports';
 
 const CLASH_AUX_BASE = 40000;
 
+/** Heuristic, LOCAL to this adapter (reviewer item 5) — deliberately NOT added to
+ * `health/signals.ts`'s shared `classifyLog`, which is PortHealth's own vocabulary for
+ * connectivity signals, not an engine-process-management concern. Matches sing-box's Go
+ * `net` bind-failure message (e.g. `listen tcp4 127.0.0.1:29001: bind: address already
+ * in use`) and pulls out the colliding port number so the caller can tell whether it was
+ * the PROXY port (terminal, spec §6.2) or the auxiliary clash_api port (reallocate and
+ * retry) that got stolen out from under us between render time and spawn time. */
+const BIND_ERROR_PORT_RE = /:(\d{2,5})\b[^\n]*address already in use/i;
+
+function detectBindErrorPort(line: string | undefined): number | undefined {
+  if (!line) return undefined;
+  const match = line.match(BIND_ERROR_PORT_RE);
+  return match ? Number(match[1]) : undefined;
+}
+
+/** Caps how many times a clash_api (auxiliary) port bind-collision is reallocated and
+ * retried in a row before giving up and letting the exit be fed to `PortHealth` as an
+ * ordinary failure (its own backoff then applies) — this is ephemeral port-allocation
+ * noise, not a connectivity problem, so it is NOT subject to PortHealth's own backoff by
+ * default, but must still not spin tight forever in some genuinely pathological case
+ * (e.g. almost the entire ephemeral range externally occupied). */
+const MAX_CLASH_BIND_RETRIES = 5;
+
 /** The slice of `EngineProcess`'s public API this adapter needs — a structural
  * interface (not the class itself) so tests can inject a plain-object fake; a class
  * with private fields can't otherwise satisfy a class-typed parameter. */
@@ -81,10 +104,32 @@ function defaultSchedule(ms: number, cb: () => void): () => void {
 interface PortEntry {
   process: EngineProcessLike;
   health: PortHealthLike;
+  /** Mutable (reviewer item 5): reassigned in place when a clash_api bind collision is
+   * reallocated — the in-flight `/delay` poll closure reads these fields fresh on every
+   * tick, so mutating them here is enough to redirect it with no extra wiring. */
   clashPort: number;
   clashSecret: string;
   proxyPort: number;
   auth?: { username: string; password: string };
+  /** The caller-supplied `RenderInput` as given to `start(key, input)`, BEFORE this
+   * adapter overrides `.clash` — kept so a bind-error reallocation (or any future
+   * respawn needing a full re-render) can rebuild a config without the caller having to
+   * call `start` again (reviewer item 5). */
+  callerInput: RenderInput;
+  /** The most recently rendered+validated config actually sent to `process.start()`
+   * (reviewer item 6): `onRetryDue`'s respawn and the bind-error respawn both read THIS,
+   * never a value closed over at the original `start()` call, so either path always
+   * resends whatever was last valid — including a clash-port reallocation that happened
+   * in between. */
+  lastConfig: string;
+  /** Last redacted log line seen for this entry's CURRENT process instance (reviewer
+   * item 5): sing-box's bind-failure message is the line immediately preceding its
+   * exit, so this is what `detectBindErrorPort` is run against from `onExit`. */
+  lastLogLine?: string;
+  /** How many times IN A ROW a clash_api bind collision has been reallocated+retried
+   * for this entry (reviewer item 5) — reset whenever the process starts cleanly and
+   * reaches any state other than an immediate bind-error exit. */
+  bindErrorRetries: number;
   cancelDelayPoll: () => void;
   unsubscribe: Array<() => void>;
   /** True once `stop()` has been called for this key, so a resulting process exit is
@@ -113,14 +158,77 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
   const entries = new Map<string, PortEntry>();
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
+  // Survives `entries.delete(key)` (reviewer item 10): `getLogs` falls back to this so a
+  // UI still open on a just-stopped/rotated-away port keeps showing its last known ring
+  // instead of suddenly going blank.
+  const lastKnownLogs = new Map<string, string[]>();
 
   async function teardown(key: string, entry: PortEntry): Promise<void> {
     entry.stopping = true;
     entry.cancelDelayPoll();
     for (const unsub of entry.unsubscribe) unsub();
     entry.health.stop();
+    lastKnownLogs.set(key, entry.process.logs);
     await entry.process.stop();
     await doRemovePid(options.registryPath, key);
+  }
+
+  /** Every proxy/clash port currently claimed by ANY entry (reviewer item 5): the
+   * `taken` set a clash-port bind-error reallocation must scan around, same spirit as
+   * `port-manager.ts`'s `takenProxyPorts()` for the proxy side. */
+  function allClaimedPorts(): Set<number> {
+    const taken = new Set<number>();
+    for (const e of entries.values()) {
+      taken.add(e.proxyPort);
+      taken.add(e.clashPort);
+    }
+    return taken;
+  }
+
+  /**
+   * Reacts to an unexpected process exit whose last log line was sing-box reporting a
+   * bind failure (reviewer item 5 — a race between render time and spawn time: some
+   * other process grabbed the port out from under us). Distinguishes which port
+   * collided:
+   * - the PROXY port: terminal, per spec §6.2 ("the one bind failure that's not
+   *   retried with a new port") — quiesce `PortHealth` and report `failed('port-in-use')`
+   *   directly, since `PortHealth` has no first-class reason for "the OS port was stolen
+   *   mid-session" to map a generic `feedExit` onto.
+   * - the auxiliary clash_api port: not a real connectivity problem, so it's reallocated
+   *   (excluding every port any entry currently holds) and retried immediately, up to
+   *   `MAX_CLASH_BIND_RETRIES` times before falling back to an ordinary `feedExit`.
+   */
+  async function handleBindError(key: string, entry: PortEntry, collidedPort: number): Promise<void> {
+    if (collidedPort === entry.proxyPort) {
+      await teardown(key, entry);
+      const failedState: PortState = { kind: 'failed', reason: 'port-in-use', untilMs: now(), attempt: 1 };
+      for (const cb of stateChangeCbs) cb(key, failedState);
+      return;
+    }
+
+    entry.bindErrorRetries += 1;
+    if (entry.bindErrorRetries > MAX_CLASH_BIND_RETRIES) {
+      entry.health.feedExit(null);
+      return;
+    }
+
+    const newClashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
+    const newClashSecret = randomBytes(16).toString('hex');
+    const finalInput: RenderInput = { ...entry.callerInput, clash: { port: newClashPort, secret: newClashSecret } };
+    const newConfig = renderConfig(finalInput);
+    assertConfigInvariants(JSON.parse(newConfig));
+
+    // Mutated in place (not a new PortEntry): the `/delay` poll and `probe()` both read
+    // `entry.clashPort`/`entry.clashSecret` fresh on every call, so this alone redirects
+    // them — no need to recreate the poll or any subscription.
+    entry.clashPort = newClashPort;
+    entry.clashSecret = newClashSecret;
+    entry.lastConfig = newConfig;
+
+    entry.process.start(newConfig);
+    if (entry.process.pid !== undefined) {
+      await doRecordPid(options.registryPath, key, { pid: entry.process.pid, exe: binPath, startedAt: now() });
+    }
   }
 
   async function start(key: string, input: RenderInput): Promise<void> {
@@ -135,7 +243,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       throw new PortInUseError(input.listen.port);
     }
 
-    const clashPort = await allocatePort({ base: CLASH_AUX_BASE });
+    const clashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
     const clashSecret = randomBytes(16).toString('hex');
     const finalInput: RenderInput = { ...input, clash: { port: clashPort, secret: clashSecret } };
     const config = renderConfig(finalInput);
@@ -151,11 +259,15 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       clashSecret,
       proxyPort: input.listen.port,
       auth: input.listen.proxyAuth,
+      callerInput: input,
+      lastConfig: config,
+      bindErrorRetries: 0,
       cancelDelayPoll: () => undefined,
       unsubscribe: [],
       stopping: false,
     };
     entries.set(key, entry);
+    lastKnownLogs.delete(key); // a fresh process: the old ring (if any) is stale now
 
     entry.unsubscribe.push(health.onStateChange((state) => {
       for (const cb of stateChangeCbs) cb(key, state);
@@ -175,14 +287,24 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     entry.unsubscribe.push(
       health.onRetryDue(() => {
-        // Re-spawn with the exact same rendered config; a genuinely different server
-        // is a `rotatePort` (a fresh `start()` call under this or another key), not a retry.
-        engineProcess.start(config);
+        // Re-spawn with the MOST RECENT rendered config (reviewer item 6: a value closed
+        // over from the original `start()` call would go stale the instant a bind-error
+        // reallocation — or any future respawn path — updates `entry.lastConfig`). A
+        // genuinely different server is a `rotatePort` (a fresh `start()` call under
+        // this or another key), not a retry.
+        engineProcess.start(entry.lastConfig);
+        // Re-record the pid on EVERY respawn, not just the first spawn (reviewer item
+        // 6): the pid registry (spec §6.3, used to reap orphans after a crash) must
+        // always reflect the CURRENT child, which gets a new pid each time.
+        if (engineProcess.pid !== undefined) {
+          void doRecordPid(options.registryPath, key, { pid: engineProcess.pid, exe: binPath, startedAt: now() }).catch(() => undefined);
+        }
       }),
     );
 
     entry.unsubscribe.push(
       engineProcess.onLog((line) => {
+        entry.lastLogLine = line;
         const signal = doClassifyLog(line);
         if (signal) health.feedLog(signal);
       }),
@@ -191,6 +313,12 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     entry.unsubscribe.push(
       engineProcess.onExit((info: ExitInfo) => {
         if (entry.stopping) return; // our own stop(), not a crash
+        const collidedPort = detectBindErrorPort(entry.lastLogLine);
+        if (collidedPort !== undefined) {
+          void handleBindError(key, entry, collidedPort);
+          return;
+        }
+        entry.bindErrorRetries = 0; // a clean/non-bind exit resets the reallocation counter
         health.feedExit(info.code);
       }),
     );
@@ -224,7 +352,9 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   }
 
   function getLogs(key: string): string[] {
-    return entries.get(key)?.process.logs ?? [];
+    // The live entry (if any) first; otherwise the ring captured at teardown time
+    // (reviewer item 10) — never just blank the moment a port is stopped/rotated away.
+    return entries.get(key)?.process.logs ?? lastKnownLogs.get(key) ?? [];
   }
 
   function onStateChange(cb: (key: string, state: PortState) => void): () => void {

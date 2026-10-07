@@ -37,7 +37,11 @@ const TUNNEL_INTERFACE_RE = /^(ipsec|utun|tun|ppp)\d*$/i;
  */
 function defaultRunner(): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('/sbin/route', ['-n', 'get', '1.1.1.1'], (err, stdout) => {
+    // A `timeout` guards against a hung/zombie `route` child (seen in sandboxed CI and
+    // some VPN clients that intercept routing-socket queries) wedging the poll loop
+    // forever — `execFile` kills the child and errors out once the limit is hit
+    // (reviewer item 10).
+    execFile('/sbin/route', ['-n', 'get', '1.1.1.1'], { timeout: 5000 }, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout);
     });

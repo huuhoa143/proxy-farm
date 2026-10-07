@@ -1,9 +1,16 @@
 import { IPC, type PortRow, type ProxyFarmApi } from '../../shared/contracts';
 
-/** The shape of the `event` Electron's `ipcMain.handle` listener is called with — just
- * enough of it (`sender.id`) to check the call came from our own window. */
+/** The shape of the `event` Electron's `ipcMain.handle` listener is called with. Trust
+ * decisions use `senderFrame` (Electron's `WebFrameMain`), not `sender.id`/`sender`:
+ * `sender` identifies the whole `WebContents` (the top-level page), but a compromised
+ * or malicious *subframe* embedded in that same page (a devtools extension, a stray
+ * `<iframe>`, a future `<webview>`) shares the same `sender.id` while being a distinct,
+ * untrusted `senderFrame` — only a same-origin check against the main window's own main
+ * frame actually rules that out (reviewer item 9). `sender` is kept only for the
+ * rejection message's diagnostics. */
 export interface IpcEventLike {
   sender: { id: number };
+  senderFrame: unknown;
 }
 
 /** The subset of Electron's `ipcMain` this module needs. */
@@ -28,24 +35,26 @@ export type ControllerFacade = Omit<ProxyFarmApi, 'onPortsChanged' | 'onHostVpnC
  * preload exposes exactly the same set (see `preload/index.ts`), so the two are kept
  * in sync by both reading `IPC.invoke` from the shared contract.
  *
- * `isTrustedSender` checks `event.sender.id` against the app's own window(s) (anything
- * else — a devtools-opened extra frame, a future <webview>, etc. — is rejected). The
- * real wiring at app startup should pass `(id) => id === mainWindow.webContents.id`
- * (or a small allowlist, once more windows exist). Defaults to allowing everything, so
- * tests that don't care about this can omit it.
+ * `isTrustedFrame` checks `event.senderFrame` — Electron's `WebFrameMain` for the frame
+ * that actually made the call — against the app's own main window's main frame (anything
+ * else, e.g. a devtools-opened extra frame or a future `<webview>`'s guest frame, is
+ * rejected even though it may share the same top-level `sender`). The real wiring at
+ * app startup should pass `(frame) => frame === mainWindow.webContents.mainFrame` (or a
+ * small allowlist, once more windows exist). Defaults to allowing everything, so tests
+ * that don't care about this can omit it.
  */
 export function registerIpcHandlers(
   ipcMain: IpcMainLike,
   controller: ControllerFacade,
-  isTrustedSender: (senderId: number) => boolean = () => true,
+  isTrustedFrame: (senderFrame: unknown) => boolean = () => true,
 ): void {
   for (const name of IPC.invoke) {
     ipcMain.handle(name, (event, ...args) => {
-      if (!isTrustedSender(event.sender.id)) {
+      if (!isTrustedFrame(event.senderFrame)) {
         // Rejected, not thrown: a real `ipcMain.handle` listener that throws
         // synchronously still crosses the IPC boundary as a rejection on the renderer
         // side, so returning one directly keeps this testable without that boundary.
-        return Promise.reject(new Error(`ipc: rejected "${name}" from an untrusted sender (webContents id ${event.sender.id})`));
+        return Promise.reject(new Error(`ipc: rejected "${name}" from an untrusted frame (webContents id ${event.sender.id})`));
       }
       const method = controller[name] as (...a: unknown[]) => unknown;
       return method.apply(controller, args);

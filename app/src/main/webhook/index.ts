@@ -60,6 +60,14 @@ export function generateBearer(): string {
 export const MIN_BEARER_LENGTH = 16;
 
 export function startWebhook(options: WebhookOptions): Promise<Webhook> {
+  // Enforced here too (reviewer item 10), not just by the caller (`controller/settings.ts`'s
+  // `applySettingsPatch`): a short bearer is a brute-forceable auth bypass on a listener
+  // that's reachable from the LAN whenever `lanSharing` is also on, so this must hold
+  // regardless of which caller starts the webhook.
+  if (options.bearer.length < MIN_BEARER_LENGTH) {
+    return Promise.reject(new Error(`webhook bearer must be at least ${MIN_BEARER_LENGTH} characters`));
+  }
+
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void handle(req, res).catch(() => send(res, 500, 'internal error'));
   });

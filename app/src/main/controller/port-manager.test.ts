@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Account, EndpointSpec, ExitIpResult, PortRow, PortState, Provider, RenderInput, Target } from '../../shared/contracts';
 import type { SecretStore } from '../store/secrets';
 import { createStateStore } from '../store/state';
@@ -24,23 +24,40 @@ function fakeSecretStore(): SecretStore {
  * that care about the resulting `PortRow.state` call it explicitly, decoupling "did
  * port-manager ask the engine to start the right thing" from "what does the engine's
  * own health machine eventually report".
+ *
+ * `start()` resolves immediately (modeling only "the spawn was initiated"), same as
+ * before, but — unless `autoOnline: false` — a REAL (if tiny) timer separately fires an
+ * `online` state for that key shortly afterwards (reviewer item 1: "make the fake engine
+ * model async handshake so tests catch this"). This is deliberately NOT synchronous
+ * with `start()` resolving: a `rotatePort`/`startPort` implementation that (incorrectly)
+ * assumes the tunnel is already up the instant `engine.start()` returns would see NO
+ * state transition yet and have to actually wait for it, exactly like it would against
+ * the real engine. Tests that need full manual control over timing (e.g. to prove a
+ * probe never fires before `online`) pass `autoOnline: false` and drive `fireState`
+ * themselves.
  */
-function fakeEngine(): Engine & {
+function fakeEngine(opts: { autoOnline?: boolean } = {}): Engine & {
   started: Array<{ key: string; input: RenderInput }>;
   stopped: string[];
   fireState: (key: string, state: PortState) => void;
 } {
+  const autoOnline = opts.autoOnline ?? true;
   const started: Array<{ key: string; input: RenderInput }> = [];
   const stopped: string[] = [];
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
+  function fireState(key: string, state: PortState): void {
+    for (const cb of stateChangeCbs) cb(key, state);
+  }
   return {
     started,
     stopped,
-    fireState: (key, state) => {
-      for (const cb of stateChangeCbs) cb(key, state);
-    },
+    fireState,
     start: async (key, input) => {
       started.push({ key, input });
+      if (autoOnline) {
+        const timer = setTimeout(() => fireState(key, { kind: 'online', since: Date.now(), exitIp: '0.0.0.0', country: 'XX' }), 0);
+        timer.unref?.();
+      }
     },
     stop: async (key) => {
       stopped.push(key);
@@ -76,12 +93,13 @@ function fakeExitIpProber(
 /** Honours `taken`/`preferred` like the real engine's `allocatePort` (reviewer item 5:
  * the previous fake always returned incrementing ports regardless of `taken`, which
  * hid the duplicate-port bug entirely). */
-function fakeAllocator(): PortAllocator & { allocateCalls: Array<{ preferred?: number; taken?: Set<number> }> } {
+function fakeAllocator(): PortAllocator & { allocateCalls: Array<{ preferred?: number; taken?: Set<number> }>; allocateAuxCalls: number } {
   let auxNext = 30000;
   const allocateCalls: Array<{ preferred?: number; taken?: Set<number> }> = [];
-  return {
+  const tracker = {
     allocateCalls,
-    allocate: async (opts = {}) => {
+    allocateAuxCalls: 0,
+    allocate: async (opts: { preferred?: number; taken?: Set<number>; base?: number } = {}) => {
       allocateCalls.push(opts);
       const taken = opts.taken ?? new Set<number>();
       if (opts.preferred !== undefined && !taken.has(opts.preferred)) return opts.preferred;
@@ -89,9 +107,13 @@ function fakeAllocator(): PortAllocator & { allocateCalls: Array<{ preferred?: n
       while (taken.has(candidate)) candidate++;
       return candidate;
     },
-    allocateAux: async () => auxNext++,
+    allocateAux: async () => {
+      tracker.allocateAuxCalls++;
+      return auxNext++;
+    },
     release: () => undefined,
   };
+  return tracker;
 }
 
 function fakeProvider(targets: Target[]): Provider {
@@ -143,6 +165,8 @@ describe('port manager', () => {
     port?: Partial<PortRow>;
     exitIpResults?: Array<ExitIpResult | Error>;
     portServers?: Record<string, string>;
+    engine?: Engine;
+    depsOverrides?: Partial<PortManagerDeps>;
   }) {
     const secrets = fakeSecretStore();
     secrets.saveSecret('z1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
@@ -153,7 +177,7 @@ describe('port manager', () => {
       ports: [basePort(opts.port)],
       portServers: opts.portServers ?? { 'zoogvpn:nl-ams': '10.0.0.1' },
     }));
-    const engine = fakeEngine();
+    const engine: Engine = opts.engine ?? fakeEngine();
     const exitIp = fakeExitIpProber(opts.exitIpResults ?? []);
     const allocator = fakeAllocator();
     const provider = fakeProvider(opts.targets);
@@ -165,8 +189,12 @@ describe('port manager', () => {
       exitIp,
       allocator,
       getLanIPv4: () => '192.168.1.50',
+      ...opts.depsOverrides,
     };
-    return { manager: createPortManager(deps), state, engine, secrets, exitIp, allocator };
+    // Cast back to the richer fake shape for the (overwhelmingly common) default case;
+    // tests that pass a custom `engine` override hold their own typed reference to it
+    // instead of relying on this field.
+    return { manager: createPortManager(deps), state, engine: engine as ReturnType<typeof fakeEngine>, secrets, exitIp, allocator };
   }
 
   describe('rotatePort (spec §6.5)', () => {
@@ -461,18 +489,21 @@ describe('port manager', () => {
         targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }],
         port: { enabled: false, state: { kind: 'stopped' } },
       });
-      // Exercise the real throw path via the allocator (used by buildRenderInput's aux
-      // allocation) — `manager`/`state` from `setup()` above are unused; this test
-      // builds its own instance wired to a throwing allocator.
+      // Exercise the real throw path via the engine itself (an unexpected exception from
+      // `Engine.start`, not the one specifically-handled `PortInUseError`) — `manager`/
+      // `state` from `setup()` above are unused; this test builds its own instance wired
+      // to a throwing engine.
       void manager;
       const secrets = fakeSecretStore();
       secrets.saveSecret('z1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
-      const throwingAllocator: PortAllocator = {
-        allocate: async (opts = {}) => opts.preferred ?? 29001,
-        allocateAux: async () => {
-          throw new Error('boom: no aux port available');
+      const throwingEngine: Engine = {
+        start: async () => {
+          throw new Error('boom: engine spawn failed unexpectedly');
         },
-        release: () => undefined,
+        stop: async () => undefined,
+        probe: async () => ({ code: 'error', message: 'n/a' }),
+        getLogs: () => [],
+        onStateChange: () => () => undefined,
       };
       const d = mkdtempSync(join(tmpdir(), 'pf-portmgr-throw-'));
       const st = createStateStore(join(d, 'state.json'), secrets);
@@ -485,13 +516,14 @@ describe('port manager', () => {
       const m2 = createPortManager({
         state: st,
         secrets,
-        engine: fakeEngine(),
+        engine: throwingEngine,
         providers: {
           get: () =>
             fakeProvider([{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }]),
         },
         exitIp: fakeExitIpProber([]),
-        allocator: throwingAllocator,
+        allocator: fakeAllocator(),
+        scheduleRetry: () => () => undefined, // don't actually schedule a real retry in this test
       });
       await expect(m2.startPort('zoogvpn:nl-ams')).rejects.toThrow(/boom/);
       expect(st.getState().ports[0].state.kind).toBe('retrying');
@@ -641,6 +673,230 @@ describe('port manager', () => {
       expect(state.getState().refusals.failures.z1).toEqual(seedTimestamps);
       expect(state.getState().refusals.online.z1?.['zoogvpn:nl-ams']).toBeTypeOf('number');
       rmSync(d, { recursive: true, force: true });
+    });
+  });
+
+  describe('fix round 2', () => {
+    it('item 1: never probes the post-restart exit IP before the port actually reaches online', async () => {
+      const engine = fakeEngine({ autoOnline: false });
+      const { manager, exitIp } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }],
+        exitIpResults: [{ ip: '2.2.2.2', country: 'NL' }],
+        engine,
+      });
+      const resultPromise = manager.rotatePort('zoogvpn:nl-ams');
+
+      // Give a (hypothetically buggy) implementation every chance to probe immediately
+      // after `engine.start()` resolves, before asserting it never actually did.
+      await new Promise((r) => setTimeout(r, 20));
+      expect(exitIp.calls).toHaveLength(0);
+
+      engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: Date.now(), exitIp: 'ignored-by-design', country: 'NL' });
+      const result = await resultPromise;
+      expect(exitIp.calls).toHaveLength(1);
+      expect(result.to).toBe('2.2.2.2');
+    });
+
+    it('item 1: gives up (noteKey "online-timeout") rather than hanging forever if online never arrives', async () => {
+      const engine = fakeEngine({ autoOnline: false });
+      const { manager } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }],
+        engine,
+        depsOverrides: { rotateOnlineTimeoutMs: 20 },
+      });
+      const result = await manager.rotatePort('zoogvpn:nl-ams');
+      expect(result).toEqual({ changed: false, from: '1.1.1.1', to: undefined, noteKey: 'online-timeout' });
+    });
+
+    it('item 2: a state event fired SYNCHRONOUSLY inside engine.start lands on the RENAMED row, not dropped', async () => {
+      const targets: Target[] = [
+        { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] },
+        { key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] },
+      ];
+      // The worst-case ordering for the old bug: the engine reports a state transition
+      // for `finalKey` BEFORE `start()` even resolves. If the row is renamed only after
+      // `engine.start()` returns (the old code), `updatePort`'s `.map()` finds no row
+      // keyed `finalKey` yet and silently drops this event.
+      const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
+      const engine: Engine & { started: string[] } = {
+        started: [],
+        start: async (key) => {
+          engine.started.push(key);
+          for (const cb of stateChangeCbs) cb(key, { kind: 'connecting', since: 1 });
+        },
+        stop: async () => undefined,
+        probe: async () => ({ code: 'error', message: 'n/a' }),
+        getLogs: () => [],
+        onStateChange: (cb) => {
+          stateChangeCbs.add(cb);
+          return () => stateChangeCbs.delete(cb);
+        },
+      };
+      const { manager, state } = setup({
+        targets,
+        engine,
+        exitIpResults: [],
+        depsOverrides: { rotateOnlineTimeoutMs: 20 }, // online never arrives; times out quickly
+      });
+      await manager.rotatePort('zoogvpn:nl-ams'); // falls back to nl-rot (single-server location)
+      const row = state.getState().ports.find((p) => p.key === 'zoogvpn:nl-rot');
+      expect(row).toBeDefined();
+      expect(row!.state).toEqual({ kind: 'connecting', since: 1 });
+    });
+
+    it('item 3: two concurrent rotates falling back within the same country never produce duplicate keys', async () => {
+      // The two existing rows are kept under keys that are NOT themselves in the
+      // provider's catalog (a renamed/retired location id, say) — so neither rotate's
+      // own `currentTarget` ever matches, forcing BOTH straight into the fallback branch,
+      // and — crucially — renaming one of them away never "frees up" a key the other
+      // could legitimately claim (there's nothing in the catalog under the vacated key to
+      // begin with). The catalog has exactly ONE real alternative (`zoogvpn:nl-rot`), so
+      // under genuine scarcity exactly one of the two concurrent rotates can claim it.
+      const targets: Target[] = [{ key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] }];
+      // An artificial delay on `targets()` forces the two rotates' pre-lock work to
+      // genuinely overlap — maximizing the chance a missing/broken lock would let both
+      // claim the same alt target (reviewer item 3).
+      const slowProvider: Provider = {
+        id: 'zoogvpn',
+        check: () => ({ ok: true }),
+        targets: async () => {
+          await new Promise((r) => setTimeout(r, 5));
+          return targets;
+        },
+        bind: (target, serverIp): EndpointSpec => ({
+          type: 'wireguard',
+          address: ['10.14.0.2/16'],
+          private_key: 'fake',
+          mtu: 1280,
+          peers: [{ address: serverIp, port: 51820, public_key: 'fake', allowed_ips: ['0.0.0.0/0'] }],
+        }),
+      };
+      const secrets = fakeSecretStore();
+      secrets.saveSecret('z1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
+      const state = createStateStore(join(dir, 'state.json'), secrets);
+      state.setState((s) => ({
+        ...s,
+        accounts: [account],
+        ports: [
+          basePort({ key: 'zoogvpn:nl-bogus1', city: 'Bogus1', proxyPort: 29001 }),
+          basePort({
+            key: 'zoogvpn:nl-bogus2',
+            city: 'Bogus2',
+            proxyPort: 29002,
+            state: { kind: 'online', since: 1, exitIp: '1.1.1.2', country: 'NL' },
+          }),
+        ],
+      }));
+      const engine = fakeEngine();
+      const exitIp = fakeExitIpProber([
+        { ip: '2.2.2.2', country: 'NL' },
+        { ip: '2.2.2.3', country: 'NL' },
+      ]);
+      const manager = createPortManager({
+        state,
+        secrets,
+        engine,
+        providers: { get: () => slowProvider },
+        exitIp,
+        allocator: fakeAllocator(),
+      });
+
+      const [r1, r2] = await Promise.all([manager.rotatePort('zoogvpn:nl-bogus1'), manager.rotatePort('zoogvpn:nl-bogus2')]);
+
+      const keys = state.getState().ports.map((p) => p.key);
+      expect(new Set(keys).size).toBe(keys.length); // never a duplicate key
+      expect(keys).toContain('zoogvpn:nl-rot'); // the one real alt WAS claimed by someone
+
+      // Exactly one of the two could claim the only available alt ('zoogvpn:nl-rot');
+      // the other must find nothing left and report so, never silently stealing it.
+      const results = [r1, r2];
+      expect(results.filter((r) => r.noteKey === 'rotated-to-another-city')).toHaveLength(1);
+      expect(results.filter((r) => r.noteKey === 'no-server')).toHaveLength(1);
+    });
+
+    it('item 7: a real timer behind a retrying row actually retries startPort once the scheduled backoff elapses', async () => {
+      const pendingRetries: Array<() => void> = [];
+      const scheduleRetry = (_ms: number, cb: () => void): (() => void) => {
+        pendingRetries.push(cb);
+        return () => {
+          const i = pendingRetries.indexOf(cb);
+          if (i !== -1) pendingRetries.splice(i, 1);
+        };
+      };
+      const { manager, state, secrets, engine } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        depsOverrides: { scheduleRetry },
+      });
+      secrets.deleteSecret('z1-secret'); // simulate the account secret being unreadable right now
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(state.getState().ports[0].state.kind).toBe('retrying');
+      expect(engine.started).toHaveLength(0); // never got far enough to touch the engine
+      expect(pendingRetries).toHaveLength(1);
+
+      // The secret becomes readable again before the scheduled retry fires (e.g.
+      // safeStorage recovers) — firing the scheduled callback must actually re-attempt
+      // `startPort`, not just sit there forever (the original bug: `untilMs` was set in
+      // the state but nothing was ever scheduled to act on it).
+      secrets.saveSecret('z1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
+      const retry = pendingRetries[0];
+      pendingRetries.length = 0;
+      retry();
+      await new Promise((r) => setTimeout(r, 0)); // let the retried startPort's awaits settle
+
+      expect(engine.started).toHaveLength(1);
+      expect(engine.started[0].key).toBe('zoogvpn:nl-ams');
+    });
+
+    it('item 8: syncAutoRotate is exported, and called internally after start/stop/remove/setAutoRotate/rotate', async () => {
+      const autoRotate = { sync: vi.fn(), stopAll: vi.fn() };
+      const { manager, state } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        exitIpResults: [{ ip: '2.2.2.2', country: 'NL' }],
+        depsOverrides: { autoRotate },
+      });
+
+      await manager.setAutoRotate('zoogvpn:nl-ams', 15);
+      expect(autoRotate.sync).toHaveBeenLastCalledWith(state.getState().ports);
+
+      autoRotate.sync.mockClear();
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(autoRotate.sync).toHaveBeenCalled();
+
+      autoRotate.sync.mockClear();
+      await manager.rotatePort('zoogvpn:nl-ams');
+      expect(autoRotate.sync).toHaveBeenCalled();
+
+      autoRotate.sync.mockClear();
+      await manager.stopPort('zoogvpn:nl-ams');
+      expect(autoRotate.sync).toHaveBeenCalled();
+
+      autoRotate.sync.mockClear();
+      manager.syncAutoRotate();
+      expect(autoRotate.sync).toHaveBeenCalledTimes(1);
+
+      autoRotate.sync.mockClear();
+      await manager.removePort('zoogvpn:nl-ams');
+      expect(autoRotate.sync).toHaveBeenCalled();
+    });
+
+    it('item 10: rotate reports a distinct noteKey when the account secret cannot be decrypted (never "no-server")', async () => {
+      const { manager, secrets } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }],
+      });
+      secrets.deleteSecret('z1-secret');
+      const result = await manager.rotatePort('zoogvpn:nl-ams');
+      expect(result).toEqual({ changed: false, noteKey: 'decrypt-failed' });
+    });
+
+    it('item 10: buildRenderInput never allocates an aux (clash) port — the real engine adapter allocates its own', async () => {
+      const { manager, allocator } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(allocator.allocateAuxCalls).toBe(0);
     });
   });
 });

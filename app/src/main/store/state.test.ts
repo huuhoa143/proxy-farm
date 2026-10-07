@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createSecretStore, type SafeStorageLike } from './secrets';
+import { createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createStateStore, defaultSettings, PROXY_PASS_SECRET_ID, SCHEMA_VERSION, WEBHOOK_BEARER_SECRET_ID } from './state';
 
 function fakeSafeStorage(): SafeStorageLike {
@@ -153,11 +153,137 @@ describe('state store', () => {
       expect(readdirSync(dir).some((f) => f.startsWith('state.json.corrupt-'))).toBe(true);
     });
 
-    it('a file missing schemaVersion entirely is treated the same way', () => {
-      writeFileSync(filePath, JSON.stringify({ ports: [] }));
+    it('a file missing schemaVersion entirely is migrated (treated as v0), not corrupt (reviewer item 10)', () => {
+      writeFileSync(filePath, JSON.stringify({ ports: [{ key: 'kept' }] }));
       const store = createStateStore(filePath, secrets());
-      expect(store.getState().schemaVersion).toBe(SCHEMA_VERSION);
-      expect(readdirSync(dir).some((f) => f.startsWith('state.json.corrupt-'))).toBe(true);
+      const state = store.getState();
+      expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+      // Migrated via fillDefaults, not discarded: the field that WAS present survives.
+      expect(state.ports).toEqual([{ key: 'kept' }]);
+      expect(readdirSync(dir).some((f) => f.startsWith('state.json.corrupt-'))).toBe(false);
+    });
+  });
+
+  describe('secrets never fall back to the on-disk placeholder (reviewer item 4 — SECURITY)', () => {
+    it('a loaded file whose proxy-password secret cannot be found gets a fresh random password, never the literal placeholder', () => {
+      // Simulate state.json already written with the real secrets saved elsewhere, then
+      // the secret store losing/never having the proxyPass entry (e.g. a different
+      // profile dir, or a corrupted secrets file).
+      const s = secrets();
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: SCHEMA_VERSION,
+          ports: [],
+          accounts: [],
+          limits: {},
+          refusals: { failures: {}, online: {} },
+          portServers: {},
+          settings: { ...defaultSettings(() => '<secret>'), webhook: { enabled: false, port: 0, bearer: '<secret>' } },
+        }),
+      );
+      const store = createStateStore(filePath, s, { randomPass: () => 'freshly-generated-pass' });
+      const state = store.getState();
+      expect(state.settings.proxyPass).toBe('freshly-generated-pass');
+      expect(state.settings.proxyPass).not.toBe('<secret>');
+      expect(state.settings.webhook.bearer).not.toBe('<secret>');
+      expect(store.takeSecretNotice()).toMatch(/proxy password/i);
+    });
+
+    it('a loaded file whose webhook bearer secret cannot be found disables the webhook instead of using the placeholder', () => {
+      const s = secrets();
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: SCHEMA_VERSION,
+          ports: [],
+          accounts: [],
+          limits: {},
+          refusals: { failures: {}, online: {} },
+          portServers: {},
+          settings: { ...defaultSettings(() => 'pass'), webhook: { enabled: true, port: 9000, bearer: '<secret>' } },
+        }),
+      );
+      const store = createStateStore(filePath, s);
+      const state = store.getState();
+      expect(state.settings.webhook.bearer).toBe('');
+      expect(state.settings.webhook.enabled).toBe(false);
+      expect(store.takeSecretNotice()).toMatch(/webhook/i);
+    });
+
+    it('takeSecretNotice is one-time: a second call returns null', () => {
+      const s = secrets();
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: SCHEMA_VERSION,
+          ports: [],
+          accounts: [],
+          limits: {},
+          refusals: { failures: {}, online: {} },
+          portServers: {},
+          settings: { ...defaultSettings(() => 'pass'), webhook: { enabled: false, port: 0, bearer: '<secret>' } },
+        }),
+      );
+      const store = createStateStore(filePath, s);
+      store.getState();
+      expect(store.takeSecretNotice()).not.toBeNull();
+      expect(store.takeSecretNotice()).toBeNull();
+    });
+
+    it('a fresh install is unaffected: no secret saved yet is the expected first-run case, not an error', () => {
+      const store = createStateStore(filePath, secrets(), { randomPass: () => 'first-run-pass' });
+      const state = store.getState();
+      expect(state.settings.proxyPass).toBe('first-run-pass');
+      expect(store.takeSecretNotice()).toBeNull();
+      expect(store.secretsUnavailable()).toBe(false);
+    });
+  });
+
+  describe('secretsUnavailable() and degraded persistence (reviewer item 4)', () => {
+    function brokenSecrets(): SecretStore {
+      return {
+        saveSecret: () => {
+          throw new Error('safeStorage encryption is not available on this platform');
+        },
+        loadSecret: () => null,
+        deleteSecret: () => undefined,
+      };
+    }
+
+    it('setState does not throw when the secret store cannot save, and non-secret state still persists', () => {
+      const store = createStateStore(filePath, brokenSecrets(), { randomPass: () => 'in-memory-pass' });
+      expect(() => store.setState((s) => ({ ...s, limits: { ...s.limits, hma: 7 } as any }))).not.toThrow();
+      expect(store.getState().limits.hma).toBe(7);
+      expect(store.getState().settings.proxyPass).toBe('in-memory-pass');
+      expect(store.secretsUnavailable()).toBe(true);
+      // state.json itself was still written (non-secret fields persist normally).
+      expect(existsSync(filePath)).toBe(true);
+    });
+  });
+
+  describe('secret files are only rewritten when the value actually changes (reviewer minor)', () => {
+    it('does not re-save proxyPass/bearer on a setState that leaves them untouched', () => {
+      const saveCalls: string[] = [];
+      const base = secrets();
+      const spying: SecretStore = {
+        saveSecret: (id, v) => {
+          saveCalls.push(id);
+          base.saveSecret(id, v);
+        },
+        loadSecret: (id) => base.loadSecret(id),
+        deleteSecret: (id) => base.deleteSecret(id),
+      };
+      const store = createStateStore(filePath, spying);
+      store.getState(); // initial creation: one save per secret expected
+      const afterInit = saveCalls.length;
+      expect(afterInit).toBeGreaterThan(0);
+
+      store.setState((s) => ({ ...s, limits: { ...s.limits, hma: 3 } as any }));
+      expect(saveCalls.length).toBe(afterInit); // unchanged proxyPass/bearer -> no new saves
+
+      store.setState((s) => ({ ...s, settings: { ...s.settings, webhook: { ...s.settings.webhook, bearer: 'new-bearer-value' } } }));
+      expect(saveCalls.length).toBe(afterInit + 1); // only the bearer actually changed
     });
   });
 

@@ -43,7 +43,7 @@ describe('rotate webhook (spec §6.6)', () => {
     webhook = await startWebhook({
       host: '127.0.0.1',
       port: 0,
-      bearer: 'sekret-token',
+      bearer: 'sekret-token-0123',
       hostAllowlist: ['127.0.0.1', 'proxyfarm.local'],
       rotate,
     });
@@ -61,7 +61,7 @@ describe('rotate webhook (spec §6.6)', () => {
     const { port, rotate } = await start();
     const getRes = await call(port, { method: 'GET', path: '/status' });
     expect(getRes.status).toBe(404);
-    const postRes = await call(port, { path: '/status', authorization: 'Bearer sekret-token' });
+    const postRes = await call(port, { path: '/status', authorization: 'Bearer sekret-token-0123' });
     expect(postRes.status).toBe(404);
     expect(rotate).not.toHaveBeenCalled();
   });
@@ -78,14 +78,14 @@ describe('rotate webhook (spec §6.6)', () => {
 
   it('a Host header outside the allowlist is rejected with 403, even with a correct bearer', async () => {
     const { port, rotate } = await start();
-    const res = await call(port, { host: 'evil.example.com', authorization: 'Bearer sekret-token' });
+    const res = await call(port, { host: 'evil.example.com', authorization: 'Bearer sekret-token-0123' });
     expect(res.status).toBe(403);
     expect(rotate).not.toHaveBeenCalled();
   });
 
   it('a well-formed request calls rotate with the decoded key and returns its result as JSON', async () => {
     const { port, rotate } = await start();
-    const res = await call(port, { path: '/rotate/hma%3Ajp-tok', authorization: 'Bearer sekret-token' });
+    const res = await call(port, { path: '/rotate/hma%3Ajp-tok', authorization: 'Bearer sekret-token-0123' });
     expect(res.status).toBe(200);
     expect(rotate).toHaveBeenCalledWith('hma:jp-tok');
     expect(res.headers['content-type']).toMatch(/^application\/json/);
@@ -94,7 +94,7 @@ describe('rotate webhook (spec §6.6)', () => {
 
   it('never sends CORS headers, success or failure', async () => {
     const { port } = await start();
-    const ok = await call(port, { authorization: 'Bearer sekret-token' });
+    const ok = await call(port, { authorization: 'Bearer sekret-token-0123' });
     const bad = await call(port, { authorization: 'Bearer nope' });
     for (const res of [ok, bad]) {
       expect(res.headers['access-control-allow-origin']).toBeUndefined();
@@ -104,7 +104,7 @@ describe('rotate webhook (spec §6.6)', () => {
 
   it('an allowlisted Host with a port suffix is still accepted (host header compared without :port)', async () => {
     const { port, rotate } = await start();
-    const res = await call(port, { host: `127.0.0.1:${port}`, authorization: 'Bearer sekret-token' });
+    const res = await call(port, { host: `127.0.0.1:${port}`, authorization: 'Bearer sekret-token-0123' });
     expect(res.status).toBe(200);
     expect(rotate).toHaveBeenCalled();
   });
@@ -113,12 +113,12 @@ describe('rotate webhook (spec §6.6)', () => {
     webhook = await startWebhook({
       host: '127.0.0.1',
       port: 0,
-      bearer: 'sekret-token',
+      bearer: 'sekret-token-0123',
       hostAllowlist: ['::1'],
       rotate: vi.fn(async (): Promise<RotateResult> => ({ changed: false, noteKey: 'no-server' })),
     });
     const port = (webhook.server.address() as AddressInfo).port;
-    const res = await call(port, { host: `[::1]:${port}`, authorization: 'Bearer sekret-token' });
+    const res = await call(port, { host: `[::1]:${port}`, authorization: 'Bearer sekret-token-0123' });
     expect(res.status).toBe(200);
   });
 });

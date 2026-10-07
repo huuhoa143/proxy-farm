@@ -27,21 +27,27 @@ function fakeController(): ControllerFacade {
   };
 }
 
+type FakeEvent = { sender: { id: number }; senderFrame: unknown };
+
+/** Stands in for a real `WebFrameMain`: identity-compared (`===`), never read into. */
+const MAIN_FRAME = { label: 'main-frame' };
+const OTHER_FRAME = { label: 'other-frame' };
+
 function fakeIpcMain() {
-  const handlers = new Map<string, (event: { sender: { id: number } }, ...args: unknown[]) => unknown>();
+  const handlers = new Map<string, (event: FakeEvent, ...args: unknown[]) => unknown>();
   return {
-    handle(channel: string, listener: (event: { sender: { id: number } }, ...args: unknown[]) => unknown) {
+    handle(channel: string, listener: (event: FakeEvent, ...args: unknown[]) => unknown) {
       handlers.set(channel, listener);
     },
     invoke(channel: string, ...args: unknown[]) {
       const h = handlers.get(channel);
       if (!h) throw new Error(`no handler registered for ${channel}`);
-      return h({ sender: { id: 1 } }, ...args);
+      return h({ sender: { id: 1 }, senderFrame: MAIN_FRAME }, ...args);
     },
-    invokeFromSender(channel: string, senderId: number, ...args: unknown[]) {
+    invokeFromFrame(channel: string, senderFrame: unknown, ...args: unknown[]) {
       const h = handlers.get(channel);
       if (!h) throw new Error(`no handler registered for ${channel}`);
-      return h({ sender: { id: senderId } }, ...args);
+      return h({ sender: { id: 1 }, senderFrame }, ...args);
     },
     channels: () => [...handlers.keys()],
   };
@@ -79,19 +85,24 @@ describe('ipc registration (spec §3)', () => {
     expect(result).toEqual({ ok: true, exitIp: '1.2.3.4' });
   });
 
-  it('rejects a call from an untrusted sender and never reaches the controller', async () => {
+  it('rejects a call from an untrusted frame (sharing sender.id with the trusted window) and never reaches the controller', async () => {
+    // The whole point of checking `senderFrame` instead of `sender.id` (reviewer item 9):
+    // a subframe of the same WebContents (devtools extension, stray <iframe>, a future
+    // <webview> guest) shares `sender.id` with the trusted window but is a different,
+    // untrusted `WebFrameMain`. `fakeIpcMain.invoke`/`invokeFromFrame` both use
+    // `sender.id: 1` here precisely to prove the id is not what gates trust.
     const ipcMain = fakeIpcMain();
     const controller = fakeController();
-    registerIpcHandlers(ipcMain, controller, (id) => id === 1);
-    await expect(ipcMain.invokeFromSender('rotatePort', 2, 'hma:jp-tok')).rejects.toThrow(/untrusted sender/);
+    registerIpcHandlers(ipcMain, controller, (frame) => frame === MAIN_FRAME);
+    await expect(ipcMain.invokeFromFrame('rotatePort', OTHER_FRAME, 'hma:jp-tok')).rejects.toThrow(/untrusted frame/);
     expect(controller.rotatePort).not.toHaveBeenCalled();
   });
 
-  it('allows a call from a trusted sender', async () => {
+  it('allows a call from the trusted main frame', async () => {
     const ipcMain = fakeIpcMain();
     const controller = fakeController();
-    registerIpcHandlers(ipcMain, controller, (id) => id === 1);
-    await ipcMain.invokeFromSender('rotatePort', 1, 'hma:jp-tok');
+    registerIpcHandlers(ipcMain, controller, (frame) => frame === MAIN_FRAME);
+    await ipcMain.invokeFromFrame('rotatePort', MAIN_FRAME, 'hma:jp-tok');
     expect(controller.rotatePort).toHaveBeenCalledWith('hma:jp-tok');
   });
 });

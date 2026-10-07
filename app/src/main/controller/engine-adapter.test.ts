@@ -258,6 +258,69 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     expect(processes[0].startedConfigs[0]).toBe(processes[0].startedConfigs[1]);
   });
 
+  it('reviewer item 6: onRetryDue re-records the pid on every respawn, not just the first spawn', async () => {
+    const { engine, healths } = setup();
+    await engine.start('k1', sampleInput(45230));
+    expect(recordedPids).toHaveLength(1);
+    healths[0].fireRetryDue();
+    await vi.waitFor(() => expect(recordedPids).toHaveLength(2));
+    expect(recordedPids[1].key).toBe('k1');
+  });
+
+  describe('reviewer item 5: bind-error reallocation/termination', () => {
+    it('a PROXY port bind collision is terminal: reports failed(port-in-use) and quiesces PortHealth rather than retrying', async () => {
+      const { engine, processes, healths } = setup();
+      const seen: Array<{ key: string; state: PortState }> = [];
+      engine.onStateChange((key, state) => seen.push({ key, state }));
+      await engine.start('k1', sampleInput(45231));
+
+      processes[0].emitLog('FATAL[0000] start: listen tcp4 127.0.0.1:45231: bind: address already in use');
+      processes[0].emitExit({ code: 1, signal: null });
+      await vi.waitFor(() => expect(seen.some((s) => s.state.kind === 'failed')).toBe(true));
+
+      const failedEvent = seen.find((s) => s.state.kind === 'failed')!;
+      expect(failedEvent.state).toMatchObject({ kind: 'failed', reason: 'port-in-use' });
+      // Quiesced, not fed a generic exit: PortHealth never gets to apply its own
+      // connectivity backoff/retry to a bind collision that it has no vocabulary for.
+      expect(healths[0].stopped).toBe(1);
+      expect(healths[0].fedExit).toEqual([]);
+      await vi.waitFor(() => expect(removedPids).toEqual([{ registryPath: '/tmp/pf-fake-registry.json', key: 'k1' }]));
+    });
+
+    it('a clash_api (aux) port bind collision reallocates and retries immediately, re-recording the pid, without touching PortHealth', async () => {
+      const { engine, processes, healths, delayCalls } = setup();
+      await engine.start('k1', sampleInput(45232));
+      await engine.probe('k1'); // learn the (randomly-allocated) current clash port
+      const oldClashPort = delayCalls[0].clashPort;
+
+      processes[0].emitLog(`FATAL[0000] start: listen tcp4 127.0.0.1:${oldClashPort}: bind: address already in use`);
+      processes[0].emitExit({ code: 1, signal: null });
+      await vi.waitFor(() => expect(processes[0].startedConfigs).toHaveLength(2));
+
+      expect(recordedPids).toHaveLength(2); // respawn re-recorded the pid (reviewer item 6)
+      expect(healths[0].fedExit).toEqual([]); // not surfaced to PortHealth as a failure
+
+      await engine.probe('k1');
+      const newClashPort = delayCalls[delayCalls.length - 1].clashPort;
+      expect(newClashPort).not.toBe(oldClashPort);
+    });
+
+    it('gives up reallocating after MAX_CLASH_BIND_RETRIES and lets PortHealth see an ordinary exit', async () => {
+      const { engine, processes, healths } = setup();
+      await engine.start('k1', sampleInput(45233));
+
+      // Keep "colliding" on the clash port past the retry cap.
+      for (let i = 0; i < 6; i++) {
+        const configsBefore = processes[0].startedConfigs.length;
+        processes[0].emitLog('FATAL[0000] start: listen tcp4 127.0.0.1:49999: bind: address already in use');
+        processes[0].emitExit({ code: 1, signal: null });
+        // eslint-disable-next-line no-await-in-loop
+        await vi.waitFor(() => expect(processes[0].startedConfigs.length > configsBefore || healths[0].fedExit.length > 0).toBe(true));
+      }
+      expect(healths[0].fedExit.length).toBeGreaterThan(0); // eventually handed to PortHealth
+    });
+  });
+
   it('the periodic /delay poll feeds PortHealth.feedDelay with the stored clash port/secret', async () => {
     const { engine, healths, delayCalls, fireDelayTick } = setup({ delayResult: { code: 504 } });
     await engine.start('k1', sampleInput(45210));
@@ -286,6 +349,34 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     processes[0].logs.push('line 1', 'line 2');
     expect(engine.getLogs('k1')).toEqual(['line 1', 'line 2']);
     expect(engine.getLogs('nope')).toEqual([]);
+  });
+
+  it('reviewer item 10: getLogs keeps the last known ring after stop(), rather than going blank', async () => {
+    const { engine, processes } = setup();
+    await engine.start('k1', sampleInput(45234));
+    processes[0].logs.push('line 1', 'line 2');
+    await engine.stop('k1');
+    expect(engine.getLogs('k1')).toEqual(['line 1', 'line 2']);
+  });
+
+  it('reviewer item 10: getLogs keeps the last known ring after a rotate-away (start under a new key), for the OLD key', async () => {
+    const { engine, processes } = setup();
+    await engine.start('k1', sampleInput(45235));
+    processes[0].logs.push('old line');
+    await engine.stop('k1'); // rotate's own stop(oldKey) before start(finalKey, ...)
+    await engine.start('k2', sampleInput(45236));
+    expect(engine.getLogs('k1')).toEqual(['old line']);
+    expect(engine.getLogs('k2')).toEqual([]);
+  });
+
+  it('reviewer item 10: a fresh start() under the SAME key clears the stale last-known ring', async () => {
+    const { engine, processes } = setup();
+    await engine.start('k1', sampleInput(45237));
+    processes[0].logs.push('first run');
+    await engine.stop('k1');
+    expect(engine.getLogs('k1')).toEqual(['first run']);
+    await engine.start('k1', sampleInput(45238));
+    expect(engine.getLogs('k1')).toEqual([]); // the new process's own (empty) ring, not the old snapshot
   });
 
   it('onStateChange(key, state) fires with the key for every PortHealth transition', async () => {
