@@ -1,8 +1,6 @@
 import { createRoot } from 'react-dom/client';
-
-function App() {
-  return <div>Proxy Farm</div>;
-}
+import './styles.css';
+import { App } from './App';
 
 const container = document.getElementById('root');
 if (container) {
