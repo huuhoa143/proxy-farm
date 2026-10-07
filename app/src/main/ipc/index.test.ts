@@ -24,6 +24,7 @@ function fakeController(): ControllerFacade {
     getSettings: vi.fn(async () => ({}) as any),
     setSettings: vi.fn(async () => ({}) as any),
     getHostVpnActive: vi.fn(async () => false),
+    getAppStatus: vi.fn(async () => ({ secretsUnavailable: false })),
   };
 }
 

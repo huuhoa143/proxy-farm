@@ -185,6 +185,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         id,
         accounts: accounts.filter((a) => a.account.providerId === id).map((a) => a.account),
         detected: id === 'hma' ? { found: true } : undefined,
+        limit: limits.get(id) ?? 0,
       }));
     },
 
@@ -388,6 +389,10 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
     async getHostVpnActive() {
       return hostVpnActive;
+    },
+
+    async getAppStatus() {
+      return { secretsUnavailable: false };
     },
 
     onPortsChanged(cb) {

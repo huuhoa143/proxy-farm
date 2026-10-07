@@ -168,11 +168,23 @@ export interface RotateResult {
   noteKey?: string;
 }
 
+export interface AppStatus {
+  /** `safeStorage` encryption unavailable: secrets live in memory for this session only. */
+  secretsUnavailable: boolean;
+  /** Set when the bundled sing-box is missing, quarantined, or the wrong version. */
+  engineError?: string;
+  /** A one-time human-readable notice (e.g. the proxy password had to be reset). */
+  notice?: string;
+}
+
 // ───────────────────────── IPC surface exposed as `window.proxyFarm` (spec §3) ─────────────────────────
 
 export interface ProxyFarmApi {
   // providers & accounts
-  listProviders(): Promise<Array<{ id: ProviderId; accounts: Account[]; detected?: { found: boolean; hintKey?: string } }>>;
+  /** `limit` is the provider's current port limit (0 = unlimited; integration Ruling C). */
+  listProviders(): Promise<
+    Array<{ id: ProviderId; accounts: Account[]; detected?: { found: boolean; hintKey?: string }; limit?: number }>
+  >;
   addAccount(providerId: ProviderId, input: Record<string, string>): Promise<CheckResult & { account?: Account }>;
   removeAccount(accountId: string): Promise<void>;
   /** HMA: (re)import device credentials from the local HMA install. */
@@ -199,6 +211,9 @@ export interface ProxyFarmApi {
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<Settings>;
   getHostVpnActive(): Promise<boolean>;
+  /** App-level health the UI must surface: engine missing/quarantined (blocking error
+   * screen), secrets kept in memory only (safeStorage unavailable), one-time notices. */
+  getAppStatus(): Promise<AppStatus>;
 
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
@@ -210,7 +225,7 @@ export const IPC = {
   invoke: [
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
-    'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive',
+    'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
   ] as const,
   events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged' } as const,
 } as const;
