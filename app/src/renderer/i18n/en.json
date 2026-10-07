@@ -39,12 +39,14 @@
         "detectedTitle": "HMA found on this computer",
         "detectedSubtitle": "Device credentials are ready to use.",
         "notDetectedTitle": "HMA not found",
+        "helperMissingTitle": "HMA needs one more step on Windows",
         "step1": "Install HMA VPN",
         "step2": "Sign in and connect once",
         "step3": "Come back here — the app will pick it up automatically",
         "connect": "Connect",
         "connecting": "Connecting…",
         "enableSupport": "Enable HMA support",
+        "enablingSupport": "Enabling…",
         "windowsHelperNote": "This installs a small helper service and needs administrator approval once. Updates afterwards need no approval.",
         "waiting": "Waiting for HMA — watching for credentials…"
       },
@@ -75,6 +77,11 @@
         "countryGuessedNote": "Guessed from the file name — edit if wrong.",
         "import": "Import"
       }
+    },
+    "portLimit": {
+      "label": "Port limit",
+      "unlimited": "0 = unlimited",
+      "save": "Save"
     }
   },
   "checkResult": {
@@ -113,6 +120,26 @@
     "rotating": "Rotating…",
     "details": "Details",
     "selectAll": "Select all",
+    "logs": {
+      "title": "Logs",
+      "refresh": "Refresh",
+      "close": "Close",
+      "empty": "No log lines yet."
+    },
+    "test": {
+      "run": "Test",
+      "running": "Testing…",
+      "speedRun": "Speed test",
+      "speedRunning": "Testing speed…",
+      "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
+      "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
+      "failed": "Test failed — this port is not online."
+    },
+    "autoRotate": {
+      "label": "Auto-rotate every",
+      "off": "Off",
+      "minutesSuffix": "min"
+    },
     "bulk": {
       "selectedCount": "{{count}} ports selected",
       "start": "Start",
@@ -121,7 +148,8 @@
       "remove": "Remove",
       "export": "Export",
       "clear": "Clear selection",
-      "autoRotate": "Auto-rotate…"
+      "autoRotate": "Auto-rotate…",
+      "rotateSummary": "{{changed}} rotated, {{moved}} moved to another city, {{unavailable}} had no other server available"
     },
     "export": {
       "title": "Export ports",
@@ -135,6 +163,7 @@
       "close": "Close"
     },
     "rotateResult": {
+      "changedNote": "Exit IP changed: {{from}} → {{to}}",
       "sameCityNote": "No other server in this city — moved to another city in the same country.",
       "unchangedNote": "No other server is available for this location."
     }

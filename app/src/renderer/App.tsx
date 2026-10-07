@@ -6,6 +6,7 @@ import { Onboarding } from './components/Onboarding';
 import { MainScreen } from './components/MainScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { ThemeToggle } from './components/ThemeToggle';
+import { LanguageSwitch } from './components/LanguageSwitch';
 
 type Screen = 'onboarding' | 'main' | 'settings';
 
@@ -50,6 +51,7 @@ export function App() {
           {t('common.nav.settings')}
         </button>
         <div style={{ flex: 1 }} />
+        <LanguageSwitch api={api} />
         <ThemeToggle />
       </nav>
       <div className="main-area">

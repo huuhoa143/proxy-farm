@@ -56,6 +56,10 @@ const SAMPLE_TARGETS: Target[] = [
   makeTarget('zoogvpn:NL-AMS', 'zoogvpn', 'NL', 'Amsterdam', ['198.51.100.10']),
   makeTarget('zoogvpn:VN-HAN', 'zoogvpn', 'VN', 'Hanoi', ['198.51.100.20']),
   makeTarget('surfshark:DE-FRA', 'surfshark', 'DE', 'Frankfurt', ['192.0.2.10', '192.0.2.11']),
+  // Appended (not inserted) so the index-based sample-port wiring below keeps
+  // pointing at the same targets. Gives hma:US-NYC a same-country sibling to
+  // exercise rotate's "moved to another city" path (spec §6.5 step 2).
+  makeTarget('hma:US-LA', 'hma', 'US', 'Los Angeles', ['203.0.113.21']),
 ];
 
 function samplePortRow(target: Target, accountId: string, proxyPort: number, state: PortRow['state']): PortRow {
@@ -111,6 +115,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
   };
 
   let hostVpnActive = false;
+  const limits = new Map<ProviderId, number>();
+  const logCounters = new Map<string, number>();
 
   const ports = new Map<string, PortRow>([
     [SAMPLE_TARGETS[0].key, samplePortRow(SAMPLE_TARGETS[0], 'hma-1', 29001, {
@@ -230,7 +236,13 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return { ok: true, account, label: account.label };
     },
 
-    async importConfigFile(name, content) {
+    async enableHmaSupport() {
+      // Simulates spec §7: install the elevated Windows helper (one UAC).
+      // The fake has no real installer to run, so it just reports success.
+      return { ok: true, label: 'HMA helper installed' };
+    },
+
+    async importConfigFile(name, content, country) {
       if (!content.includes('PrivateKey') && !content.includes('remote ')) {
         return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
       }
@@ -238,7 +250,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         id: `file-${accounts.length + 1}`,
         providerId: 'file',
         label: name,
-        meta: { name },
+        meta: country ? { name, country } : { name },
         secretRef: `file-${accounts.length + 1}`,
       };
       accounts.push({ account, secret: { kind: 'file', content } });
@@ -291,12 +303,31 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         return { changed: false, noteKey: 'main.rotateResult.unchangedNote' };
       }
       const target = SAMPLE_TARGETS.find((t) => t.key === targetKey);
-      const servers = target?.servers ?? [];
       const from = row.state.exitIp;
-      const to = servers.find((ip) => ip !== from) ?? from;
-      row.state = { kind: 'online', since: Date.now(), exitIp: to, country: row.country, latencyMs: 48 };
-      emitPorts();
-      return { changed: to !== from, from, to };
+
+      // §6.5 step 1: another IP of the same location.
+      const sameLocationIp = target?.servers.find((ip) => ip !== from);
+      if (sameLocationIp) {
+        row.state = { kind: 'online', since: Date.now(), exitIp: sameLocationIp, country: row.country, latencyMs: 48 };
+        emitPorts();
+        return { changed: true, from, to: sameLocationIp };
+      }
+
+      // §6.5 step 2: otherwise another location in the same country.
+      const sibling = target
+        ? SAMPLE_TARGETS.find((t) => t.providerId === target.providerId && t.country === target.country && t.key !== target.key)
+        : undefined;
+      if (sibling) {
+        const to = sibling.servers[0];
+        row.city = sibling.city;
+        row.label = sibling.label;
+        row.state = { kind: 'online', since: Date.now(), exitIp: to, country: row.country, latencyMs: 48 };
+        emitPorts();
+        return { changed: true, from, to, noteKey: 'main.rotateResult.sameCityNote' };
+      }
+
+      // §6.5 step 3: no other server available.
+      return { changed: false, from, noteKey: 'main.rotateResult.unchangedNote' };
     },
 
     async setAutoRotate(targetKey, minutes) {
@@ -305,8 +336,11 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       emitPorts();
     },
 
-    async setLimit() {
-      // No per-provider limit enforced in the fake.
+    async setLimit(providerId, limit) {
+      // Write-only in the fake (contracts has no getLimit) — stored so a
+      // second call / a future getter could observe it, but nothing reads
+      // this map today.
+      limits.set(providerId, limit);
     },
 
     async testPort(targetKey, speed) {
@@ -318,7 +352,9 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     },
 
     async getLogs(targetKey) {
-      return [`[fake] no real sing-box process backs ${targetKey} in the dev fallback`];
+      const n = (logCounters.get(targetKey) ?? 0) + 1;
+      logCounters.set(targetKey, n);
+      return [`[fake] log line ${n} for ${targetKey}`, `[fake] no real sing-box process backs this port in the dev fallback`];
     },
 
     async exportPorts(targetKeys, format: ExportFormat) {

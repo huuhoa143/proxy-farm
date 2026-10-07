@@ -39,12 +39,14 @@
         "detectedTitle": "Đã tìm thấy HMA trên máy này",
         "detectedSubtitle": "Thông tin đăng nhập thiết bị đã sẵn sàng sử dụng.",
         "notDetectedTitle": "Chưa tìm thấy HMA",
+        "helperMissingTitle": "HMA cần thêm một bước trên Windows",
         "step1": "Cài đặt HMA VPN",
         "step2": "Đăng nhập và kết nối một lần",
         "step3": "Quay lại đây — ứng dụng sẽ tự nhận ra",
         "connect": "Kết nối",
         "connecting": "Đang kết nối…",
         "enableSupport": "Bật hỗ trợ HMA",
+        "enablingSupport": "Đang bật…",
         "windowsHelperNote": "Thao tác này cài một dịch vụ hỗ trợ nhỏ và cần xác nhận quản trị viên một lần. Các lần cập nhật sau không cần xác nhận lại.",
         "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…"
       },
@@ -75,6 +77,11 @@
         "countryGuessedNote": "Đoán từ tên tệp — sửa lại nếu sai.",
         "import": "Nhập"
       }
+    },
+    "portLimit": {
+      "label": "Giới hạn số cổng",
+      "unlimited": "0 = không giới hạn",
+      "save": "Lưu"
     }
   },
   "checkResult": {
@@ -113,6 +120,26 @@
     "rotating": "Đang xoay…",
     "details": "Chi tiết",
     "selectAll": "Chọn tất cả",
+    "logs": {
+      "title": "Nhật ký",
+      "refresh": "Làm mới",
+      "close": "Đóng",
+      "empty": "Chưa có dòng nhật ký nào."
+    },
+    "test": {
+      "run": "Kiểm tra",
+      "running": "Đang kiểm tra…",
+      "speedRun": "Kiểm tra tốc độ",
+      "speedRunning": "Đang đo tốc độ…",
+      "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
+      "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
+      "failed": "Kiểm tra thất bại — cổng này chưa hoạt động."
+    },
+    "autoRotate": {
+      "label": "Tự xoay mỗi",
+      "off": "Tắt",
+      "minutesSuffix": "phút"
+    },
     "bulk": {
       "selectedCount": "Đã chọn {{count}} cổng",
       "start": "Bật",
@@ -121,7 +148,8 @@
       "remove": "Xoá",
       "export": "Xuất",
       "clear": "Bỏ chọn",
-      "autoRotate": "Tự xoay…"
+      "autoRotate": "Tự xoay…",
+      "rotateSummary": "{{changed}} đã xoay, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ khác"
     },
     "export": {
       "title": "Xuất danh sách cổng",
@@ -135,6 +163,7 @@
       "close": "Đóng"
     },
     "rotateResult": {
+      "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
       "sameCityNote": "Không còn máy chủ khác ở thành phố này — đã chuyển sang thành phố khác cùng quốc gia.",
       "unchangedNote": "Không có máy chủ khác khả dụng cho vị trí này."
     }

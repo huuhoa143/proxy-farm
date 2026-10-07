@@ -141,4 +141,43 @@ describe('createFakeProxyFarmApi', () => {
     const result = await api.importConfigFile('sample.conf', content);
     expect(result.ok).toBe(true);
   });
+
+  it('importConfigFile stores the (optionally edited) country on the account meta', async () => {
+    const content = '[Interface]\nPrivateKey = abc\n[Peer]\nPublicKey = def\nEndpoint = 1.2.3.4:51820';
+    const result = await api.importConfigFile('mullvad-se-got.conf', content, 'SE');
+    expect(result.ok).toBe(true);
+    expect(result.account?.meta.country).toBe('SE');
+  });
+
+  it('enableHmaSupport reports success (spec §7 elevated helper installer)', async () => {
+    const result = await api.enableHmaSupport();
+    expect(result.ok).toBe(true);
+  });
+
+  it('rotatePort moves to another city in the same country when the location has no other IP (§6.5 step 2)', async () => {
+    await api.startPorts(['hma:US-NYC']);
+    const result = await api.rotatePort('hma:US-NYC');
+    expect(result.changed).toBe(true);
+    expect(result.to).toBe('203.0.113.21');
+    expect(result.noteKey).toBe('main.rotateResult.sameCityNote');
+    const row = (await api.listPorts()).find((p) => p.key === 'hma:US-NYC');
+    expect(row?.city).toBe('Los Angeles');
+  });
+
+  it('rotatePort reports no server available when there is truly no alternative (§6.5 step 3)', async () => {
+    await api.startPorts(['zoogvpn:NL-AMS']);
+    const result = await api.rotatePort('zoogvpn:NL-AMS');
+    expect(result.changed).toBe(false);
+    expect(result.noteKey).toBe('main.rotateResult.unchangedNote');
+  });
+
+  it('getLogs returns fresh content on every call so a Refresh action is observable', async () => {
+    const first = await api.getLogs('hma:JP-TOKYO');
+    const second = await api.getLogs('hma:JP-TOKYO');
+    expect(first[0]).not.toBe(second[0]);
+  });
+
+  it('setLimit accepts a per-provider limit without throwing', async () => {
+    await expect(api.setLimit('hma', 5)).resolves.toBeUndefined();
+  });
 });

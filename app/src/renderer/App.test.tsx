@@ -25,4 +25,19 @@ describe('App', () => {
     fireEvent.click(screen.getByText('Settings'));
     await waitFor(() => expect(screen.getByTestId('settings-screen')).toBeInTheDocument());
   });
+
+  it('switches language from the header, not only from Settings (fix item 3)', async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('main-screen')).toBeInTheDocument());
+
+    const headerSwitch = screen.getByLabelText('Language') as HTMLSelectElement;
+    fireEvent.change(headerSwitch, { target: { value: 'vi' } });
+
+    // "Nhà cung cấp" (Providers) is unambiguous — unlike "Cổng" (Ports),
+    // which also labels the port-table's Port column.
+    await waitFor(() => expect(screen.getByText('Nhà cung cấp')).toBeInTheDocument());
+    // Switch back so later tests in this file see English again.
+    fireEvent.change(screen.getByLabelText('Ngôn ngữ'), { target: { value: 'en' } });
+    await waitFor(() => expect(screen.getByText('Providers')).toBeInTheDocument());
+  });
 });

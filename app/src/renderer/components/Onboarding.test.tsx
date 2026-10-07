@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeAll } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi, beforeAll } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { Onboarding } from './Onboarding';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
@@ -9,29 +9,41 @@ beforeAll(() => {
   initI18n('en');
 });
 
-function apiWithHmaDetected(detected: boolean): ProxyFarmApi {
+function apiWithHmaDetected(detected: { found: boolean; hintKey?: string }): ProxyFarmApi {
   const api = createFakeProxyFarmApi();
   const original = api.listProviders.bind(api);
   api.listProviders = async () => {
     const providers = await original();
-    return providers.map((p) => (p.id === 'hma' ? { ...p, detected: { found: detected } } : p));
+    return providers.map((p) => (p.id === 'hma' ? { ...p, detected } : p));
   };
   return api;
 }
 
 describe('Onboarding', () => {
   it('shows the HMA "found" state and a Connect CTA when detected', async () => {
-    render(<Onboarding api={apiWithHmaDetected(true)} onDone={() => {}} />);
+    render(<Onboarding api={apiWithHmaDetected({ found: true })} onDone={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('hma-detected')).toBeInTheDocument());
     expect(screen.getByTestId('hma-detected')).toHaveTextContent('HMA found on this computer');
     expect(screen.getByText('Connect')).toBeInTheDocument();
   });
 
-  it('shows the HMA "not found" guidance steps and an Enable-support CTA when not detected', async () => {
-    render(<Onboarding api={apiWithHmaDetected(false)} onDone={() => {}} />);
+  it('shows the HMA "not found" guidance steps with no action button when there is no helper-missing hint', async () => {
+    render(<Onboarding api={apiWithHmaDetected({ found: false })} onDone={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('hma-not-detected')).toBeInTheDocument());
     expect(screen.getByTestId('hma-not-detected')).toHaveTextContent('HMA not found');
-    expect(screen.getByText('Enable HMA support')).toBeInTheDocument();
+    expect(screen.queryByText('Enable HMA support')).toBeNull();
+  });
+
+  it('shows the Enable-HMA-support CTA and calls enableHmaSupport() when the helper is missing (ruling A)', async () => {
+    const api = apiWithHmaDetected({ found: false, hintKey: 'hma.helperMissing' });
+    const spy = vi.spyOn(api, 'enableHmaSupport');
+    render(<Onboarding api={api} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('hma-helper-missing')).toBeInTheDocument());
+    expect(screen.getByTestId('hma-helper-missing')).toHaveTextContent('HMA needs one more step on Windows');
+
+    fireEvent.click(screen.getByText('Enable HMA support'));
+    expect(spy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId('hma-message')).toHaveTextContent('HMA helper installed'));
   });
 
   it('renders all four provider cards', async () => {

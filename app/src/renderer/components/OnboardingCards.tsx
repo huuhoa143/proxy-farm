@@ -8,11 +8,19 @@ function resultMessage(t: ReturnType<typeof useTranslation>['t'], result: CheckR
   return t(key, { defaultValue: key }) as string;
 }
 
+export interface HmaDetected {
+  found: boolean;
+  /** e.g. 'hma.helperMissing' — Windows detected an HMA install but the privileged helper isn't set up yet (spec §7). */
+  hintKey?: string;
+}
+
 export interface HmaCardProps {
   api: ProxyFarmApi;
-  detected: boolean;
+  detected: HmaDetected | undefined;
   onAdded: () => void;
 }
+
+const HMA_HELPER_MISSING_HINT = 'hma.helperMissing';
 
 export function HmaCard({ api, detected, onAdded }: HmaCardProps) {
   const { t } = useTranslation();
@@ -31,17 +39,38 @@ export function HmaCard({ api, detected, onAdded }: HmaCardProps) {
     }
   }
 
+  async function enableSupport() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.enableHmaSupport();
+      setMessage(resultMessage(t, result));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const helperMissing = !detected?.found && detected?.hintKey === HMA_HELPER_MISSING_HINT;
+
   return (
     <div className="provider-card" data-testid="provider-card-hma">
       <h3>{t('onboarding.providers.hma.name')}</h3>
       <p>{t('onboarding.providers.hma.description')}</p>
-      {detected ? (
+      {detected?.found ? (
         <>
           <p data-testid="hma-detected">{t('onboarding.providers.hma.detectedTitle')}</p>
           <p className="guidance">{t('onboarding.providers.hma.detectedSubtitle')}</p>
           <button className="btn primary" onClick={connect} disabled={busy}>
             {busy ? t('onboarding.providers.hma.connecting') : t('onboarding.providers.hma.connect')}
           </button>
+        </>
+      ) : helperMissing ? (
+        <>
+          <p data-testid="hma-helper-missing">{t('onboarding.providers.hma.helperMissingTitle')}</p>
+          <button className="btn primary" onClick={enableSupport} disabled={busy}>
+            {busy ? t('onboarding.providers.hma.enablingSupport') : t('onboarding.providers.hma.enableSupport')}
+          </button>
+          <p className="guidance">{t('onboarding.providers.hma.windowsHelperNote')}</p>
         </>
       ) : (
         <>
@@ -51,10 +80,6 @@ export function HmaCard({ api, detected, onAdded }: HmaCardProps) {
             <li>{t('onboarding.providers.hma.step2')}</li>
             <li>{t('onboarding.providers.hma.step3')}</li>
           </ol>
-          <button className="btn primary" onClick={connect} disabled={busy}>
-            {t('onboarding.providers.hma.enableSupport')}
-          </button>
-          <p className="guidance">{t('onboarding.providers.hma.windowsHelperNote')}</p>
         </>
       )}
       {message && <p data-testid="hma-message">{message}</p>}
@@ -158,51 +183,99 @@ export interface FileCardProps {
   onAdded: () => void;
 }
 
+/**
+ * Simple 2-letter-token heuristic (ruling B): split the basename on
+ * non-letter characters and take the first all-letter token of length 2,
+ * e.g. 'mullvad-se-got.conf' -> 'SE', 'us-nyc.ovpn' -> 'US'.
+ */
+export function guessCountryFromFilename(name: string): string {
+  const base = name.replace(/\.[^.]+$/, '');
+  const tokens = base.split(/[^a-zA-Z]+/).filter(Boolean);
+  const twoLetter = tokens.find((token) => token.length === 2);
+  return twoLetter ? twoLetter.toUpperCase() : '';
+}
+
+interface PendingFile {
+  name: string;
+  content: string;
+}
+
 export function FileCard({ api, onAdded }: FileCardProps) {
   const { t } = useTranslation();
   const [dragOver, setDragOver] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingFile | null>(null);
+  const [country, setCountry] = useState('');
 
-  async function importFile(file: File) {
+  async function stageFile(file: File) {
     const content = await file.text();
-    const result = await api.importConfigFile(file.name, content);
+    setPending({ name: file.name, content });
+    setCountry(guessCountryFromFilename(file.name));
+    setMessage(null);
+  }
+
+  async function confirmImport() {
+    if (!pending) return;
+    const result = await api.importConfigFile(pending.name, pending.content, country || undefined);
     setMessage(resultMessage(t, result));
-    if (result.ok) onAdded();
+    if (result.ok) {
+      setPending(null);
+      setCountry('');
+      onAdded();
+    }
   }
 
   return (
     <div className="provider-card" data-testid="provider-card-file">
       <h3>{t('onboarding.providers.file.name')}</h3>
       <p>{t('onboarding.providers.file.description')}</p>
-      <div
-        className={`dropzone${dragOver ? ' dragover' : ''}`}
-        data-testid="file-dropzone"
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files[0];
-          if (file) void importFile(file);
-        }}
-      >
-        <p>{t('onboarding.providers.file.dragHint')}</p>
-        <label className="btn ghost">
-          {t('onboarding.providers.file.browse')}
-          <input
-            type="file"
-            accept=".ovpn,.conf"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void importFile(file);
-            }}
-          />
-        </label>
-      </div>
+      {!pending ? (
+        <div
+          className={`dropzone${dragOver ? ' dragover' : ''}`}
+          data-testid="file-dropzone"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files[0];
+            if (file) void stageFile(file);
+          }}
+        >
+          <p>{t('onboarding.providers.file.dragHint')}</p>
+          <label className="btn ghost">
+            {t('onboarding.providers.file.browse')}
+            <input
+              type="file"
+              accept=".ovpn,.conf"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void stageFile(file);
+              }}
+            />
+          </label>
+        </div>
+      ) : (
+        <div data-testid="file-pending">
+          <p>{pending.name}</p>
+          <label>
+            {t('onboarding.providers.file.countryLabel')}
+            <input
+              aria-label={t('onboarding.providers.file.countryLabel') as string}
+              value={country}
+              onChange={(e) => setCountry(e.target.value.toUpperCase())}
+            />
+          </label>
+          <p className="guidance">{t('onboarding.providers.file.countryGuessedNote')}</p>
+          <button className="btn primary" onClick={() => void confirmImport()}>
+            {t('onboarding.providers.file.import')}
+          </button>
+        </div>
+      )}
       {message && <p data-testid="file-message">{message}</p>}
     </div>
   );
