@@ -1,3 +1,5 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import type { AccountSecret, ExportFormat, FailReason, PortRow, PortState, RenderInput, RotateResult, Target } from '../../shared/contracts';
 import { createRefusalTracker, type RefusalTracker } from '../accounts/refusals';
@@ -44,6 +46,14 @@ export interface PortManagerDeps {
   scheduleRetry?: (ms: number, cb: () => void) => () => void;
   /** Injectable for deterministic backoff-jitter tests. @default `Math.random`. */
   backoffRng?: () => number;
+  /**
+   * Turns a target's server entry into an IPv4 literal before `provider.bind` (spec
+   * §6.1.4: "server hostnames are resolved by the controller beforehand, so configs
+   * contain IPs only"). ZoogVPN and Surfshark targets carry hostnames; resolving on every
+   * (re)start also gives §5.3's "re-resolve the host" for free. @default IP literals pass
+   * through, hostnames go through the OS resolver (IPv4 only).
+   */
+  resolveServer?: (server: string) => Promise<string>;
 }
 
 export interface PortManager {
@@ -106,6 +116,12 @@ function nextServerRoundRobin(servers: string[], current: string | undefined): s
  * up on confirming the new exit IP (reviewer item 1). */
 const DEFAULT_ROTATE_ONLINE_TIMEOUT_MS = 45_000;
 
+async function defaultResolveServer(server: string): Promise<string> {
+  if (isIP(server)) return server;
+  const { address } = await lookup(server, { family: 4 });
+  return address;
+}
+
 function defaultScheduleRetry(ms: number, cb: () => void): () => void {
   const timer = setTimeout(cb, ms);
   timer.unref?.();
@@ -118,6 +134,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const rotateOnlineTimeoutMs = deps.rotateOnlineTimeoutMs ?? DEFAULT_ROTATE_ONLINE_TIMEOUT_MS;
   const scheduleRetryFn = deps.scheduleRetry ?? defaultScheduleRetry;
   const backoffRng = deps.backoffRng ?? Math.random;
+  const resolveServer = deps.resolveServer ?? defaultResolveServer;
   // §4.2/§6.5 auto-rotate timers (reviewer item 8): this module owns syncing them —
   // callers (IPC layer, webhook, the real engine via `rotatePort`) never have to
   // remember to do it themselves.
@@ -361,7 +378,16 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         return;
       }
 
-      const endpoint = provider.bind(target, serverIp, account, secret);
+      let resolvedIp: string;
+      try {
+        resolvedIp = await resolveServer(serverIp);
+      } catch {
+        // DNS failure (offline, or the provider retired the host): retry later.
+        updatePort(key, { enabled: true });
+        failWithRetry(key, { kind: 'retrying', reasonKey: 'dns-failed' });
+        return;
+      }
+      const endpoint = provider.bind(target, resolvedIp, account, secret);
       const renderInput = buildRenderInput(port, endpoint);
       // `enabled` is the only field port-manager sets directly here: the actual
       // connecting/verifying/online/retrying lifecycle is `PortHealth`'s, observed via
@@ -535,7 +561,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     // `key` (reviewer round 3, item 2).
     effectiveKey.current = finalKey;
 
-    const endpoint = provider.bind(nextTarget, nextServer, account, secret);
+    const endpoint = provider.bind(nextTarget, await resolveServer(nextServer), account, secret);
     const renderInput = buildRenderInput(port, endpoint);
 
     // Stop the OLD key's engine process first, then start under the FINAL key (the row

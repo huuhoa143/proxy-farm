@@ -79,6 +79,13 @@ export interface CreateRealEngineOptions {
   giveUpAfter?: number;
   /** How often to poll clash_api `/delay` while a port is active. @default 30_000 (§6.4) */
   delayPollMs?: number;
+  /**
+   * Extra one-shot `/delay` probes after each spawn, while the port is still
+   * `connecting` (integration fix): WireGuard never logs "established", so without these
+   * a healthy WireGuard port sat in `connecting` until the first 30 s poll.
+   * @default [1500, 4000, 8000, 15000]
+   */
+  initialProbeDelaysMs?: number[];
   /** Injectable for tests. */
   createEngineProcess?: (opts?: EngineProcessOptions) => EngineProcessLike;
   createPortHealth?: (opts?: PortHealthOptions) => PortHealthLike;
@@ -156,6 +163,7 @@ interface PortEntry {
 export function createRealEngine(options: CreateRealEngineOptions): Engine {
   const binPath = options.binPath ?? singboxPath();
   const delayPollMs = options.delayPollMs ?? 30_000;
+  const initialProbeDelaysMs = options.initialProbeDelaysMs ?? [1500, 4000, 8000, 15000];
   const schedule = options.schedule ?? defaultSchedule;
   const doDelayProbe = options.delayProbeFn ?? delayProbe;
   const doExitIpProbe = options.exitIpProbeFn ?? probeExitIp;
@@ -347,11 +355,23 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       }),
     );
 
-    entry.cancelDelayPoll = schedule(delayPollMs, () => {
+    const probeOnce = () => {
       void doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG)
         .then((result: DelayResult) => health.feedDelay(result.code))
         .catch(() => undefined);
+    };
+    const cancelPoll = schedule(delayPollMs, probeOnce);
+    const earlyTimers = initialProbeDelaysMs.map((ms) => {
+      const t = setTimeout(() => {
+        if (!entry.stopping && health.state.kind === 'connecting') probeOnce();
+      }, ms);
+      t.unref?.();
+      return t;
     });
+    entry.cancelDelayPoll = () => {
+      cancelPoll();
+      for (const t of earlyTimers) clearTimeout(t);
+    };
 
     health.start();
     engineProcess.start(config);

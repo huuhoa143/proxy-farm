@@ -158,6 +158,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
         healths.push(h);
         return h;
       },
+      initialProbeDelaysMs: [],
       schedule: (_ms, cb) => {
         scheduledCb = cb;
         return () => {

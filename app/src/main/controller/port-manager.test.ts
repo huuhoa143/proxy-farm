@@ -189,6 +189,7 @@ describe('port manager', () => {
       exitIp,
       allocator,
       getLanIPv4: () => '192.168.1.50',
+      resolveServer: async (server) => server,
       ...opts.depsOverrides,
     };
     // Cast back to the richer fake shape for the (overwhelmingly common) default case;
@@ -277,6 +278,43 @@ describe('port manager', () => {
       expect(engine.started[0].key).toBe('zoogvpn:nl-ams');
       expect(state.getState().portServers['zoogvpn:nl-ams']).toBe('10.0.0.1');
       expect(state.getState().ports[0].enabled).toBe(true);
+    });
+
+    it('resolves a hostname server to an IP before bind (spec §6.1.4), but records the hostname', async () => {
+      const resolved: string[] = [];
+      const { manager, state, engine } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['nl1.example.net'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        depsOverrides: {
+          resolveServer: async (server) => {
+            resolved.push(server);
+            return '203.0.113.7';
+          },
+        },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(resolved).toEqual(['nl1.example.net']);
+      const ep = engine.started[0].input.endpoint;
+      expect(ep.type === 'wireguard' && ep.peers[0].address).toBe('203.0.113.7');
+      expect(state.getState().portServers['zoogvpn:nl-ams']).toBe('nl1.example.net');
+    });
+
+    it('a DNS failure becomes retrying(dns-failed) with no engine start', async () => {
+      const { manager, state, engine } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['gone.example.net'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        depsOverrides: {
+          resolveServer: async () => {
+            throw new Error('ENOTFOUND');
+          },
+          scheduleRetry: () => () => undefined,
+        },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(engine.started).toHaveLength(0);
+      expect(state.getState().ports[0].state).toMatchObject({ kind: 'retrying', reasonKey: 'dns-failed' });
     });
 
     it("startPort persists whatever PortHealth reports via the engine's onStateChange (reviewer item 6)", async () => {
@@ -400,6 +438,7 @@ describe('port manager', () => {
       const state = createStateStore(join(d, 'state.json'), secrets);
       state.setState((s) => ({ ...s, accounts: [account], ports: [basePort()] }));
       const m2 = createPortManager({
+        resolveServer: async (server: string) => server,
         state,
         secrets,
         engine: fakeEngine(),
@@ -514,6 +553,7 @@ describe('port manager', () => {
         portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
       }));
       const m2 = createPortManager({
+        resolveServer: async (server: string) => server,
         state: st,
         secrets,
         engine: throwingEngine,
@@ -658,6 +698,7 @@ describe('port manager', () => {
       }));
       const engine = fakeEngine();
       const m2 = createPortManager({
+        resolveServer: async (server: string) => server,
         state,
         secrets,
         engine,
@@ -793,6 +834,7 @@ describe('port manager', () => {
         { ip: '2.2.2.3', country: 'NL' },
       ]);
       const manager = createPortManager({
+        resolveServer: async (server: string) => server,
         state,
         secrets,
         engine,
