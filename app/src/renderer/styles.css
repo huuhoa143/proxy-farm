@@ -2146,3 +2146,44 @@ table.port-table {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ───────── app status (integration) ───────── */
+.app-banner {
+  margin: 0 24px 4px;
+}
+.engine-error {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12px;
+  min-height: 100vh;
+  padding: 40px;
+  text-align: center;
+  color: var(--tx);
+}
+.engine-error > svg {
+  width: 36px;
+  height: 36px;
+  color: var(--bad, #e5484d);
+}
+.engine-error h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.engine-error p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--mut);
+  line-height: 1.55;
+}
+.engine-error details {
+  max-width: 640px;
+  color: var(--mut);
+  font-size: 12px;
+}
+.engine-error pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
+  font-family: var(--fm);
+}

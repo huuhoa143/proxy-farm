@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { AppStatus } from '../shared/contracts';
 import { useTranslation } from 'react-i18next';
 import { getProxyFarmApi } from './api';
 import { initI18n, changeLanguage } from './i18n';
@@ -32,11 +33,13 @@ const TITLE: Record<Screen, { title: string; subtitle?: string }> = {
 export function App() {
   const { t } = useTranslation();
   const [screen, setScreen] = useState<Screen | null>(null);
+  const [status, setStatus] = useState<AppStatus>({ secretsUnavailable: false });
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([api.getSettings(), api.listProviders()]).then(([settings, providers]) => {
+    void Promise.all([api.getSettings(), api.listProviders(), api.getAppStatus()]).then(([settings, providers, appStatus]) => {
       if (cancelled) return;
+      setStatus(appStatus);
       void changeLanguage(settings.language);
       const hasAccount = providers.some((p) => p.accounts.length > 0);
       setScreen(hasAccount ? 'main' : 'onboarding');
@@ -48,6 +51,21 @@ export function App() {
 
   if (screen === null) {
     return <p className="boot">{t('common.loading')}</p>;
+  }
+
+  if (status.engineError) {
+    // spec §9/§6.3: a missing or quarantined engine is a clear error screen, not a crash.
+    return (
+      <div className="engine-error" role="alert" data-testid="engine-error">
+        <Icon name="alert" />
+        <h1>{t('app.engineErrorTitle')}</h1>
+        <p>{t('app.engineErrorBody')}</p>
+        <details>
+          <summary>{t('app.engineErrorDetails')}</summary>
+          <pre>{status.engineError}</pre>
+        </details>
+      </div>
+    );
   }
 
   const heading = TITLE[screen];
@@ -82,6 +100,18 @@ export function App() {
             <LanguageSwitch api={api} />
           </div>
         </header>
+        {status.secretsUnavailable && (
+          <div className="callout warn app-banner" role="status" data-testid="secrets-unavailable">
+            <Icon name="alert" />
+            <span>{t('app.secretsUnavailable')}</span>
+          </div>
+        )}
+        {status.notice && (
+          <div className="callout warn app-banner" role="status" data-testid="app-notice">
+            <Icon name="info" />
+            <span>{status.notice}</span>
+          </div>
+        )}
         {screen === 'onboarding' && <Onboarding api={api} onDone={() => setScreen('main')} />}
         {screen === 'main' && <MainScreen api={api} />}
         {screen === 'settings' && <SettingsScreen api={api} />}

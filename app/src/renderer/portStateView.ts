@@ -67,7 +67,8 @@ export function describePortState(state: PortState, providerId: ProviderId, t: T
       return {
         tone: 'warn',
         label: t('portState.retrying', { seconds }),
-        guidance: t(state.reasonKey, { defaultValue: state.reasonKey }),
+        // engine/controller reasons are bare keys ('unreachable'); older callers pass a full i18n key.
+        guidance: t([`portState.reason.${state.reasonKey}`, state.reasonKey], { defaultValue: state.reasonKey }),
         countdownSeconds: seconds,
       };
     }

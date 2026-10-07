@@ -13,7 +13,7 @@ interface Message {
 function resultMessage(t: ReturnType<typeof useTranslation>['t'], result: CheckResult): Message {
   if (result.ok) return { ok: true, text: result.label ? result.label : (t('checkResult.ok') as string) };
   const key = result.reasonKey ?? 'checkResult.reason.invalid-format';
-  return { ok: false, text: t(key, { defaultValue: key }) as string };
+  return { ok: false, text: t(key, { defaultValue: key, label: result.label ?? '' }) as string };
 }
 
 function ResultLine({ message, testId }: { message: Message | null; testId: string }) {

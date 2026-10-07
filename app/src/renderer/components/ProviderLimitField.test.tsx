@@ -34,4 +34,10 @@ describe('ProviderLimitField', () => {
     expect(spy).toHaveBeenCalledWith('hma', 12);
     await waitFor(() => expect(screen.getByTestId('provider-limit-saved-hma')).toHaveTextContent('Saved'));
   });
+
+  it('starts at the current limit reported by listProviders (Ruling C)', async () => {
+    const { rerender } = render(<ProviderLimitField api={createFakeProxyFarmApi()} providerId="hma" />);
+    rerender(<ProviderLimitField api={createFakeProxyFarmApi()} providerId="hma" initialLimit={7} />);
+    await waitFor(() => expect((screen.getByLabelText('Port limit — HMA') as HTMLInputElement).value).toBe('7'));
+  });
 });

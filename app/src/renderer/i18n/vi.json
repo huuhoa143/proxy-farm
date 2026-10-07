@@ -254,7 +254,17 @@
       }
     },
     "attempt": "lần {{n}}",
-    "nextTry": "Thử lại sau {{time}}"
+    "nextTry": "Thử lại sau {{time}}",
+    "reason": {
+      "timeout": "Kết nối không lên kịp.",
+      "unreachable": "Máy chủ không phản hồi.",
+      "verify-failed": "Đã kết nối nhưng không kiểm tra được IP ra.",
+      "exited": "Bộ máy dừng bất ngờ.",
+      "secret-unavailable": "Không đọc được thông tin đăng nhập đã lưu.",
+      "start-error": "Khởi động cổng thất bại.",
+      "rotate-error": "Đổi IP thất bại.",
+      "dns-failed": "Không tra được địa chỉ máy chủ."
+    }
   },
   "settings": {
     "title": "Cài đặt",
@@ -303,7 +313,9 @@
     "sections": {
       "network": "Mạng",
       "system": "Máy tính này"
-    }
+    },
+    "lanSharingRequiresAuth": "Chia sẻ LAN cần tên đăng nhập và mật khẩu proxy.",
+    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự."
   },
   "tray": {
     "onlineCount_zero": "Không có cổng nào đang bật",
@@ -312,5 +324,54 @@
     "show": "Hiện Proxy Farm",
     "stopAll": "Tắt tất cả cổng",
     "quit": "Thoát Proxy Farm"
+  },
+  "app": {
+    "moveTitle": "Chuyển Proxy Farm vào Applications?",
+    "moveMessage": "Proxy Farm đang chạy từ file ảnh đĩa hoặc một vị trí tạm. Ở đây ứng dụng không tự cập nhật được.",
+    "moveDetail": "Chuyển vào thư mục Applications ngay? Ứng dụng sẽ khởi động lại.",
+    "moveNow": "Chuyển vào Applications",
+    "moveLater": "Để sau",
+    "moveFailed": "Không chuyển được ứng dụng. Hãy tự kéo Proxy Farm vào Applications rồi mở lại từ đó.",
+    "engineErrorTitle": "Bộ máy proxy không khởi động được",
+    "engineErrorBody": "Bộ máy tích hợp của Proxy Farm bị thiếu hoặc bị macOS chặn. Hãy cài lại Proxy Farm từ bản tải chính thức rồi mở lại.",
+    "engineErrorDetails": "Chi tiết kỹ thuật",
+    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khoá chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
+  },
+  "rotate": {
+    "not-verified": "Đã đổi, nhưng không biết IP cũ nên không xác nhận được thay đổi.",
+    "online-timeout": "Máy chủ mới không lên kịp.",
+    "probe-failed": "Đã đổi, nhưng không kiểm tra được IP mới.",
+    "exit-ip-unchanged": "Đã kết nối lại nhưng IP ra không đổi.",
+    "rotate-in-progress": "Cổng này đang được đổi IP.",
+    "port-disabled": "Hãy bật cổng trước khi đổi IP.",
+    "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu."
+  },
+  "hma": {
+    "windowsLater": "Hỗ trợ HMA trên Windows sẽ có ở phiên bản sau.",
+    "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
+    "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
+    "check": {
+      "invalidUdid": "Mã thiết bị HMA không hợp lệ.",
+      "invalidPassword": "Mật khẩu thiết bị HMA không hợp lệ."
+    }
+  },
+  "zoogvpn": {
+    "check": {
+      "missingUsername": "Nhập email ZoogVPN.",
+      "missingPassword": "Nhập mật khẩu ZoogVPN."
+    }
+  },
+  "surfshark": {
+    "check": {
+      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =)."
+    }
+  },
+  "file": {
+    "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
+    "check": {
+      "needsCredentials": "File .ovpn này cần tên đăng nhập và mật khẩu, hiện chưa được hỗ trợ.",
+      "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
+      "parseError": "Không đọc được file này."
+    }
   }
 }

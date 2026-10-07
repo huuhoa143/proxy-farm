@@ -7,15 +7,23 @@ import { Icon } from '../ui/Icon';
 export interface ProviderLimitFieldProps {
   api: ProxyFarmApi;
   providerId: ProviderId;
+  /** The provider's current limit from `listProviders()` (Ruling C). */
+  initialLimit?: number;
 }
 
 /**
  * One row of the per-provider port limit list (spec §4.2 "Per-provider port
- * limits"). Write-only: contracts has no getter, so it always starts at 0.
+ * limits"). Starts at the current limit reported by `listProviders()`.
  */
-export function ProviderLimitField({ api, providerId }: ProviderLimitFieldProps) {
+export function ProviderLimitField({ api, providerId, initialLimit }: ProviderLimitFieldProps) {
   const { t } = useTranslation();
-  const [value, setValue] = useState(0);
+  const [value, setValue] = useState(initialLimit ?? 0);
+  const [touched, setTouched] = useState(false);
+
+  // The limit arrives asynchronously (listProviders); adopt it until the user edits.
+  useEffect(() => {
+    if (!touched && initialLimit !== undefined) setValue(initialLimit);
+  }, [initialLimit, touched]);
   const [saved, setSaved] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const name = providerName(providerId, t);
@@ -52,6 +60,7 @@ export function ProviderLimitField({ api, providerId }: ProviderLimitFieldProps)
         value={value}
         onChange={(e) => {
           setValue(Math.max(0, Number(e.target.value) || 0));
+          setTouched(true);
           setSaved(false);
         }}
       />

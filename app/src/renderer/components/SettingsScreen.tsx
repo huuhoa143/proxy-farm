@@ -56,6 +56,7 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
   const { t } = useTranslation();
   const [settings, setSettingsState] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showPass, setShowPass] = useState(false);
   const schedule = useKeyedTimeouts();
 
@@ -64,7 +65,18 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
   }, [api]);
 
   async function patch(update: Partial<Settings>) {
-    const result = await api.setSettings(update);
+    let result: Settings;
+    try {
+      result = await api.setSettings(update);
+    } catch (err) {
+      // main rejects an invalid patch with the i18n reason key as the message
+      // (e.g. LAN sharing without proxy credentials). IPC prefixes it.
+      const key = (err instanceof Error ? err.message : String(err)).split(': ').pop() ?? '';
+      setError(t(key, { defaultValue: key }) as string);
+      schedule('settings-error', () => setError(null), 5000);
+      return;
+    }
+    setError(null);
     setSettingsState(result);
     setSaved(true);
     schedule('saved', () => setSaved(false), 2000);
@@ -229,6 +241,12 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
           </Row>
         </Section>
       </div>
+      {error && (
+        <div className="callout warn app-banner" data-testid="settings-error" role="alert">
+          <Icon name="alert" />
+          <span>{error}</span>
+        </div>
+      )}
       {saved && (
         <div className="toast" data-testid="settings-saved" role="status">
           <Icon name="check" />

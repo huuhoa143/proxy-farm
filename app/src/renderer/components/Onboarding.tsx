@@ -12,12 +12,14 @@ export interface OnboardingProps {
 
 const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
 type Counts = Record<ProviderId, number>;
+const HMA_WATCH_MS = 3000;
 const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, file: 0 };
 
 export function Onboarding({ api, onDone }: OnboardingProps) {
   const { t } = useTranslation();
   const [hmaDetected, setHmaDetected] = useState<HmaDetected | undefined>(undefined);
   const [counts, setCounts] = useState<Counts>(NO_ACCOUNTS);
+  const [limits, setLimits] = useState<Partial<Record<ProviderId, number>>>({});
 
   async function refresh(cancelled: () => boolean = () => false) {
     const providers = await api.listProviders();
@@ -27,6 +29,7 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
     const next = { ...NO_ACCOUNTS };
     for (const p of providers) next[p.id] = p.accounts.length;
     setCounts(next);
+    setLimits(Object.fromEntries(providers.map((p) => [p.id, p.limit])));
   }
 
   useEffect(() => {
@@ -37,6 +40,20 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
+
+  // spec §4.1: while HMA isn't found, keep watching so the card flips to
+  // "found" by itself once the user installs/signs in to HMA.
+  const hmaFound = hmaDetected?.found ?? false;
+  useEffect(() => {
+    if (hmaFound) return undefined;
+    let cancelled = false;
+    const timer = setInterval(() => void refresh(() => cancelled), HMA_WATCH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, hmaFound]);
 
   function markAdded() {
     void refresh();
@@ -63,7 +80,7 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
         </div>
         <div className="limit-list">
           {PROVIDER_IDS.map((id) => (
-            <ProviderLimitField key={id} api={api} providerId={id} />
+            <ProviderLimitField key={id} api={api} providerId={id} initialLimit={limits[id]} />
           ))}
         </div>
       </section>

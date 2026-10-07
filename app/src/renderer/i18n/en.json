@@ -254,7 +254,17 @@
       }
     },
     "attempt": "attempt {{n}}",
-    "nextTry": "Next try in {{time}}"
+    "nextTry": "Next try in {{time}}",
+    "reason": {
+      "timeout": "The connection didn't come up in time.",
+      "unreachable": "The server isn't answering.",
+      "verify-failed": "Connected, but the exit IP couldn't be checked.",
+      "exited": "The engine stopped unexpectedly.",
+      "secret-unavailable": "Your saved credentials couldn't be read.",
+      "start-error": "Starting the port failed.",
+      "rotate-error": "Rotating failed.",
+      "dns-failed": "The server's address couldn't be looked up."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -303,7 +313,9 @@
     "sections": {
       "network": "Network",
       "system": "This computer"
-    }
+    },
+    "lanSharingRequiresAuth": "LAN sharing needs a proxy username and password.",
+    "webhookBearerTooShort": "The webhook key must be at least 16 characters."
   },
   "tray": {
     "onlineCount_zero": "No ports online",
@@ -312,5 +324,54 @@
     "show": "Show Proxy Farm",
     "stopAll": "Stop all ports",
     "quit": "Quit Proxy Farm"
+  },
+  "app": {
+    "moveTitle": "Move Proxy Farm to Applications?",
+    "moveMessage": "Proxy Farm is running from the disk image or a temporary location. It can't update itself from here.",
+    "moveDetail": "Move it to your Applications folder now? The app will restart.",
+    "moveNow": "Move to Applications",
+    "moveLater": "Not now",
+    "moveFailed": "Couldn't move the app. Drag Proxy Farm into Applications yourself, then open it from there.",
+    "engineErrorTitle": "The proxy engine can't start",
+    "engineErrorBody": "Proxy Farm's built-in engine is missing or was blocked by macOS. Reinstall Proxy Farm from the official download, then open it again.",
+    "engineErrorDetails": "Technical details",
+    "secretsUnavailable": "This computer's secure storage isn't available, so your passwords and keys are kept in memory only. You'll need to add them again after you quit."
+  },
+  "rotate": {
+    "not-verified": "Rotated, but the old exit IP was unknown, so the change couldn't be confirmed.",
+    "online-timeout": "The new server didn't come online in time.",
+    "probe-failed": "Rotated, but the new exit IP couldn't be checked.",
+    "exit-ip-unchanged": "Reconnected, but the exit IP stayed the same.",
+    "rotate-in-progress": "This port is already rotating.",
+    "port-disabled": "Start the port before rotating it.",
+    "decrypt-failed": "Your saved credentials couldn't be read."
+  },
+  "hma": {
+    "windowsLater": "HMA support on Windows is coming in a later version.",
+    "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
+    "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
+    "check": {
+      "invalidUdid": "HMA's device ID looks wrong.",
+      "invalidPassword": "HMA's device password looks wrong."
+    }
+  },
+  "zoogvpn": {
+    "check": {
+      "missingUsername": "Enter your ZoogVPN email.",
+      "missingPassword": "Enter your ZoogVPN password."
+    }
+  },
+  "surfshark": {
+    "check": {
+      "invalidKey": "That isn't a WireGuard private key (44 characters ending in =)."
+    }
+  },
+  "file": {
+    "unsupportedDirective": "This file uses a setting Proxy Farm doesn't support: {{label}}",
+    "check": {
+      "needsCredentials": "This .ovpn file needs a username and password, which isn't supported yet.",
+      "unknownExtension": "Only .ovpn and .conf files are supported.",
+      "parseError": "This file couldn't be read."
+    }
   }
 }

@@ -23,6 +23,11 @@ describe('describePortState', () => {
     }
   });
 
+  it('translates bare engine retry reasons (integration)', () => {
+    const state: PortState = { kind: 'retrying', untilMs: Date.now() + 5_000, attempt: 2, reasonKey: 'unreachable' };
+    expect(describePortState(state, 'hma', i18next.t.bind(i18next)).guidance).toBe("The server isn't answering.");
+  });
+
   it('renders a retrying countdown with a guidance reason', () => {
     const state: PortState = { kind: 'retrying', untilMs: Date.now() + 10_000, attempt: 1, reasonKey: 'portState.failed.no-server.guidance' };
     const view = describePortState(state, 'surfshark', i18next.t.bind(i18next));
