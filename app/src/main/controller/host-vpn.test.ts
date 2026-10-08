@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHostVpnMonitor, isDefaultRouteViaTunnel } from './host-vpn';
+import { createHostVpnMonitor, isDefaultRouteViaTunnel, isWindowsRouteViaVpn, type WindowsRouteSnapshot } from './host-vpn';
 
 const ROUTE_VIA_IPSEC0 = `   route to: default
 destination: default
@@ -8,6 +8,30 @@ destination: default
   interface: ipsec0
       flags: <UP,GATEWAY,DONE,STATIC,PRCLONING,GLOBAL>
 `;
+
+// `netsh interface ipv4 show route` / `show interfaces` recorded on Windows 10 with HMA
+// installed but disconnected: its Wintun adapter keeps link-local routes while down.
+const NETSH_ROUTES_IDLE = `Publish  Type      Met  Prefix                    Idx  Gateway/Interface Name
+-------  --------  ---  ------------------------  ---  ------------------------
+No       Manual    0    0.0.0.0/0                   4  192.168.1.1
+No       System    256  127.0.0.0/8                 1  Loopback Pseudo-Interface 1
+No       System    256  169.254.0.0/16             16  HMA VPN Wintun
+No       System    256  192.168.1.0/24              4  Ethernet 2
+No       System    256  192.168.1.113/32            4  Ethernet 2
+No       System    256  224.0.0.0/4                16  HMA VPN Wintun
+`;
+const NETSH_INTERFACES = `Idx     Met         MTU          State                Name
+---  ----------  ----------  ------------  ---------------------------
+  1          75  4294967295  connected     Loopback Pseudo-Interface 1
+ 16           5        1500  connected     HMA VPN Wintun
+ 33          25        1500  disconnected  OpenVPN Data Channel Offload for Surfshark
+  4          35        1500  connected     Ethernet 2
+`;
+// The same machine with a client's split pair over its Wintun adapter.
+const NETSH_ROUTES_SPLIT = `${NETSH_ROUTES_IDLE}No       Manual    0    0.0.0.0/1                  16  HMA VPN Wintun
+No       Manual    0    128.0.0.0/1                16  HMA VPN Wintun
+`;
+const win = (routes: string, upNames: string[]): WindowsRouteSnapshot => ({ routes, interfaces: NETSH_INTERFACES, upNames });
 
 const ROUTE_VIA_EN0 = `   route to: default
 destination: default
@@ -64,14 +88,52 @@ describe('isDefaultRouteViaTunnel (spec §4.3 macOS detection)', () => {
   });
 });
 
+describe('isWindowsRouteViaVpn (spec §4.3 Windows detection)', () => {
+  it('the plain default route via the LAN adapter is not a VPN', () => {
+    expect(isWindowsRouteViaVpn(win(NETSH_ROUTES_IDLE, ['Ethernet 2']))).toBe(false);
+  });
+
+  it('a split pair via a Wintun adapter that is up is a VPN', () => {
+    expect(isWindowsRouteViaVpn(win(NETSH_ROUTES_SPLIT, ['Ethernet 2', 'HMA VPN Wintun']))).toBe(true);
+  });
+
+  it('routes left on an adapter that is down are ignored', () => {
+    expect(isWindowsRouteViaVpn(win(NETSH_ROUTES_SPLIT, ['Ethernet 2']))).toBe(false);
+  });
+
+  it('a default route via a VPN adapter wins on metric over the LAN one', () => {
+    const routes = `${NETSH_ROUTES_IDLE}No       Manual    0    0.0.0.0/0                  16  10.8.0.1
+`;
+    expect(isWindowsRouteViaVpn(win(routes, ['Ethernet 2', 'HMA VPN Wintun']))).toBe(true);
+  });
+
+  it('unparsable output is treated as inactive', () => {
+    expect(isWindowsRouteViaVpn({ routes: 'garbage', interfaces: '', upNames: [] })).toBe(false);
+  });
+});
+
 describe('createHostVpnMonitor', () => {
   it('isHostVpnActive on darwin reflects the injected route check', async () => {
     const monitor = createHostVpnMonitor({ platform: 'darwin', runDefaultRouteCheck: async () => ROUTE_VIA_IPSEC0 });
     expect(await monitor.isHostVpnActive()).toBe(true);
   });
 
-  it('isHostVpnActive always returns false on win32 (§12: unverified TODO)', async () => {
-    const monitor = createHostVpnMonitor({ platform: 'win32', runDefaultRouteCheck: async () => ROUTE_VIA_IPSEC0 });
+  it('isHostVpnActive on win32 reads the route table, not the macOS route check', async () => {
+    const monitor = createHostVpnMonitor({
+      platform: 'win32',
+      runDefaultRouteCheck: async () => ROUTE_VIA_IPSEC0,
+      readWindowsRoutes: async () => win(NETSH_ROUTES_SPLIT, ['Ethernet 2', 'HMA VPN Wintun']),
+    });
+    expect(await monitor.isHostVpnActive()).toBe(true);
+  });
+
+  it('isHostVpnActive on win32 is false when reading the route table fails', async () => {
+    const monitor = createHostVpnMonitor({
+      platform: 'win32',
+      readWindowsRoutes: async () => {
+        throw new Error('netsh missing');
+      },
+    });
     expect(await monitor.isHostVpnActive()).toBe(false);
   });
 
