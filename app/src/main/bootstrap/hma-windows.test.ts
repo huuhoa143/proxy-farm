@@ -8,6 +8,7 @@ import {
   hmaMirrorPath,
   MAX_COMMAND_LINE,
   parseWhoamiSid,
+  psQuote,
   type RunFile,
 } from './hma-windows';
 
@@ -27,6 +28,11 @@ describe('HMA support on Windows (spec §7)', () => {
 
   it('refuses to build the setup for anything but a SID', () => {
     expect(() => buildSetupScript({ userSid: "S-1-5-21-1'; rm -r C:\\", appExe: 'C:\\a.exe' })).toThrow(/not a SID/);
+  });
+
+  it('doubles every quote PowerShell ends a single-quoted string at', () => {
+    expect(psQuote("a'b")).toBe("'a''b'");
+    expect(psQuote('C:\\Users\\O\u2019Brien\u2018x\u201Ay\u201Bz')).toBe("'C:\\Users\\O\u2019\u2019Brien\u2018\u2018x\u201A\u201Ay\u201B\u201Bz'");
   });
 
   it('quotes the app path as a PowerShell literal in the task script', () => {

@@ -46,9 +46,12 @@ export function system32(exe: string): string {
 
 const SID_RE = /^S-1-\d+(-\d+)+$/;
 
-/** A PowerShell single-quoted string literal. */
-function psQuote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+/**
+ * A PowerShell single-quoted string literal. PowerShell also ends such a string at the
+ * typographic quotes ‘ ’ ‚ ‛, so every variant is doubled, not just the ASCII one.
+ */
+export function psQuote(value: string): string {
+  return `'${value.replace(/['‘’‚‛]/g, (q) => q + q)}'`;
 }
 
 /**
