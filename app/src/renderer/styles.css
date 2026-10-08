@@ -483,6 +483,9 @@ input[type='checkbox'].switch:checked::after {
 }
 
 .main-area {
+  /* Horizontal page gutter shared by the top bar, the app banners and every screen, so
+     a banner lines up exactly with the content (cards, tables) below it. */
+  --page-x: 30px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -491,7 +494,7 @@ input[type='checkbox'].switch:checked::after {
   display: flex;
   align-items: flex-end;
   gap: 18px;
-  padding: 24px 30px 18px;
+  padding: 24px var(--page-x) 18px;
   flex-wrap: wrap;
 }
 .topbar-title h1 {
@@ -533,7 +536,7 @@ input[type='checkbox'].switch:checked::after {
   color: var(--dim);
 }
 .screen {
-  padding: 0 30px 34px;
+  padding: 0 var(--page-x) 34px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2385,10 +2388,8 @@ a.btn {
   }
 }
 @media (max-width: 900px) {
-  .topbar,
-  .screen {
-    padding-left: 18px;
-    padding-right: 18px;
+  .main-area {
+    --page-x: 18px;
   }
   .stats {
     flex-wrap: wrap;
@@ -2437,7 +2438,7 @@ a.btn {
 
 /* ───────── app status (integration) ───────── */
 .app-banner {
-  margin: 0 24px 4px;
+  margin: 0 var(--page-x) 4px;
 }
 .engine-error {
   display: grid;
