@@ -178,6 +178,8 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleRemove(keys: string[]) {
     await api.removePorts(keys);
     setPorts(await api.listPorts());
+    // A later port may reuse the key: it must not inherit a lasting move note.
+    setRotateNotes((prev) => keys.reduce(removeKey, prev));
     setSelected((prev) => {
       const next = new Set(prev);
       for (const key of keys) next.delete(key);
@@ -201,6 +203,7 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleRotate(row: PortRow, toServer?: string) {
     // Captured up front: a port moved to another city comes back under a new key.
     const key = row.key;
+    const fromCity = row.city;
     setRotating((prev) => new Set(prev).add(key));
     let result: RotateResult;
     try {
@@ -216,10 +219,16 @@ export function MainScreen({ api }: MainScreenProps) {
     setPorts(rows);
     const note = describeRotateResult(result);
     if (!note) return;
-    // A port moved to another city gets that location's key and group, so the
-    // note can't hang off the old row: show it as a toast instead.
+    // A port moved to another city gets that location's key and group: announce
+    // it, and leave a lasting note on the moved row (found by its proxy port,
+    // which a move keeps) so the move is still visible once the toast is gone.
     if (!rows.some((r) => r.key === key)) {
       showNotice(note);
+      const moved = rows.find((r) => r.proxyPort === row.proxyPort);
+      if (moved) {
+        const movedNote = t('main.rotateResult.movedFromToNote', { from: fromCity, to: result.movedTo ?? moved.city });
+        setRotateNotes((prev) => ({ ...removeKey(prev, key), [moved.key]: movedNote }));
+      }
       return;
     }
     setRotateNotes((prev) => ({ ...prev, [key]: note }));

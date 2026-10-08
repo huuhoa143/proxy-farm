@@ -206,6 +206,7 @@
       "changedNote": "Exit IP changed: {{from}} → {{to}}",
       "sameCityNote": "No free server left in that city — the port moved to another city in the same country.",
       "movedToCityNote": "No free server left here — the port moved to {{city}}, in the same country.",
+      "movedFromToNote": "Moved from {{from}} to {{to}}, in the same country: no free server was left in {{from}}.",
       "unchangedNote": "No free server left for this location — the IP stays the same.",
       "serverTaken": "That server is no longer free — pick another one."
     },

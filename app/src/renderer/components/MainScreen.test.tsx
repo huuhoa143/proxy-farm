@@ -190,6 +190,26 @@ describe('MainScreen', () => {
     expect(screen.queryByTestId('port-row-hma:US-NYC#1')).toBeNull();
     expect(screen.getByTestId('group-hma:US-LA')).toBeInTheDocument();
     expect(await screen.findByTestId('notice-toast')).toHaveTextContent('the port moved to Los Angeles, in the same country');
+    // The toast goes away; the moved row keeps saying where it came from.
+    expect(screen.getByTestId('rotate-note-hma:US-LA#1')).toHaveTextContent(
+      'Moved from New York to Los Angeles, in the same country: no free server was left in New York.',
+    );
+  });
+
+  it('the moved-city note outlives the toast', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await renderMain();
+      await changeIp('hma:US-NYC#1');
+      await screen.findByTestId('notice-toast');
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(screen.queryByTestId('notice-toast')).toBeNull();
+      expect(screen.getByTestId('rotate-note-hma:US-LA#1')).toHaveTextContent('Moved from New York to Los Angeles');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a move to another city is reported even when the new exit IP could not be confirmed', async () => {
