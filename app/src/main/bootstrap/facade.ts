@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import path from 'node:path';
 import {
   splitPortKey,
@@ -163,7 +164,11 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       log(`addPorts: unknown location ${locationKey}`);
       return { added: [], noteKey: 'no-free-server' };
     }
-    const wanted = Math.min(Math.max(0, Math.floor(Number(count) || 0)), target.servers.length);
+    // One port per server — except that a round-robin pool hostname may stand for many
+    // servers, so there the port manager's own pick decides when the pool is used up.
+    const requested = Math.max(0, Math.floor(Number(count) || 0));
+    const poolHostname = target.poolHostnames === true && target.servers.some((s) => !isIP(s));
+    const wanted = poolHostname ? requested : Math.min(requested, target.servers.length);
     const added: PortRow[] = [];
     let noteKey: string | undefined;
     while (added.length < wanted) {
@@ -183,7 +188,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       added.push(row);
       enqueueStart(row.key);
     }
-    if (added.length < Math.floor(Number(count) || 0) && !noteKey) noteKey = 'no-free-server';
+    if (added.length < requested && !noteKey) noteKey = 'no-free-server';
     return { added: added.map((r) => findPort(r.key) ?? r), ...(noteKey ? { noteKey } : {}) };
   }
 

@@ -380,6 +380,71 @@ describe('port manager', () => {
       const b = await manager.addPort(tok, 'z1');
       expect([a!.serverIp, b!.serverIp]).toEqual(['203.0.113.1', '203.0.113.2']);
     });
+
+    describe('a pool hostname (Target.poolHostnames, Surfshark before discovery)', () => {
+      const HOST = 'jp-tok.prod.surfshark.com';
+      const tok = (poolHostnames = true): Target => ({
+        key: 'surfshark:jp-tok', providerId: 'surfshark', country: 'JP', city: 'Tokyo', label: 'Tokyo', servers: [HOST], ...(poolHostnames ? { poolHostnames } : {}),
+      });
+      /** Answers the scripted IPs in order (the last repeats), recording each call's options. */
+      function scriptedResolver(answers: string[]) {
+        const calls: Array<{ fresh?: boolean } | undefined> = [];
+        const resolveServer = async (_server: string, opts?: { fresh?: boolean }) => {
+          calls.push(opts);
+          return answers[Math.min(calls.length - 1, answers.length - 1)];
+        };
+        return { resolveServer, calls };
+      }
+      const surfsharkAccount: Account = { ...account, providerId: 'surfshark' };
+
+      it('a held pool hostname still counts as free (+ Add port stays enabled); listServers still shows its holder', async () => {
+        const { manager, state } = setup({ targets: [], depsOverrides: { resolveServer: scriptedResolver(['203.0.113.1']).resolveServer } });
+        state.setState((s) => ({ ...s, accounts: [surfsharkAccount], ports: [] }));
+        const row = await manager.addPort(tok(), 'z1');
+        expect(manager.listServers(tok())).toEqual([{ server: HOST, ip: '203.0.113.1', health: 'unknown', heldBy: row!.key }]);
+        expect(manager.freeServerCount(tok())).toBe(1);
+        expect(manager.freeServerCount(tok(false))).toBe(0); // a plain hostname is one server
+      });
+
+      it('a second port re-resolves past the IP the first one holds', async () => {
+        const dns = scriptedResolver(['203.0.113.1', '203.0.113.1', '203.0.113.1', '203.0.113.7']);
+        const { manager, state } = setup({ targets: [], depsOverrides: { resolveServer: dns.resolveServer } });
+        state.setState((s) => ({ ...s, accounts: [surfsharkAccount], ports: [] }));
+        const a = await manager.addPort(tok(), 'z1');
+        const b = await manager.addPort(tok(), 'z1');
+        expect([a!.serverIp, b!.serverIp]).toEqual(['203.0.113.1', '203.0.113.7']);
+        expect(dns.calls.every((o) => o?.fresh === true)).toBe(true); // straight from DNS, not the OS cache
+      });
+
+      it('gives up after a few answers that are all held', async () => {
+        const dns = scriptedResolver(['203.0.113.1']);
+        const { manager, state } = setup({ targets: [], depsOverrides: { resolveServer: dns.resolveServer } });
+        state.setState((s) => ({ ...s, accounts: [surfsharkAccount], ports: [] }));
+        await manager.addPort(tok(), 'z1');
+        dns.calls.length = 0;
+        expect(await manager.addPort(tok(), 'z1')).toBeUndefined();
+        expect(dns.calls).toHaveLength(4);
+      });
+
+      it("a restart of a port pinned to the hostname skips an answer another port's holds", async () => {
+        const dns = scriptedResolver(['203.0.113.1', '203.0.113.7']);
+        const { manager, state, engine } = setup({
+          targets: [tok()],
+          port: { key: 'surfshark:jp-tok#2', locationKey: 'surfshark:jp-tok', providerId: 'surfshark', proxyPort: 29002, server: HOST, enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { resolveServer: dns.resolveServer },
+        });
+        state.setState((s) => ({
+          ...s,
+          accounts: [surfsharkAccount],
+          ports: [basePort({ key: 'surfshark:jp-tok#1', locationKey: 'surfshark:jp-tok', providerId: 'surfshark', server: HOST, serverIp: '203.0.113.1' }), ...s.ports],
+        }));
+        await manager.startPort('surfshark:jp-tok#2');
+        expect((engine.started[0].input.endpoint as { peers: Array<{ address: string }> }).peers[0].address).toBe('203.0.113.7');
+        expect(state.getState().ports[1]).toMatchObject({ server: HOST, serverIp: '203.0.113.7' });
+      });
+    });
   });
 
   describe('startPort / stopPort / removePort', () => {

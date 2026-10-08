@@ -298,6 +298,20 @@ describe('controller facade', () => {
     expect(r.noteKey).toBe('limit-reached');
   });
 
+  it('addPorts is not capped at one port for a round-robin pool hostname; the port manager decides', async () => {
+    const tok: Target = { ...target('surfshark:jp-tok', 'JP', ['jp-tok.prod.surfshark.com']), poolHostnames: true };
+    const surfshark = fakeProvider('surfshark', () => [tok]);
+    const { facade, state, portManager } = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+    state.setState((s) => ({ ...s, accounts: [{ id: 'surfshark-1', providerId: 'surfshark', label: 'k', meta: {}, secretRef: 'account:surfshark-1' }] }));
+    // Two distinct IPs behind the hostname, then every answer is held.
+    let n = 0;
+    const realAdd = portManager.addPort;
+    portManager.addPort = async (t, accountId) => (++n <= 2 ? realAdd({ ...t, servers: [`203.0.113.${n}`] }, accountId) : undefined);
+    const r = await facade.addPorts('surfshark:jp-tok', 3);
+    expect(r.added).toHaveLength(2);
+    expect(r.noteKey).toBe('no-free-server');
+  });
+
   it('addPorts tries another account when the pooled one has no usable free server', async () => {
     const { facade } = setup({}, { 'zoogvpn-1': ['10.0.0.1'] });
     await facade.addAccount('zoogvpn', { username: 'a', password: 'p' });

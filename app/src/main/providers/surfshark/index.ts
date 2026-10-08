@@ -88,6 +88,7 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
           city: cluster.location,
           label: `${cluster.country} — ${cluster.location}`,
           servers: pool.length > 0 ? pool : [cluster.connectionName],
+          poolHostnames: true,
         };
       });
     },

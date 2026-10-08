@@ -1,4 +1,4 @@
-import { lookup } from 'node:dns/promises';
+import { lookup, resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import {
@@ -66,9 +66,13 @@ export interface PortManagerDeps {
    * Turns a server token into an IPv4 literal before `provider.bind` (spec §6.1.4:
    * "server hostnames are resolved by the controller beforehand, so configs contain IPs
    * only"). Resolving on every (re)start also catches a host that vanished from DNS.
-   * @default IP literals pass through, hostnames go through the OS resolver (IPv4 only).
+   * `fresh` asks for an answer straight from the DNS server rather than the OS cache:
+   * set for a round-robin pool hostname (`Target.poolHostnames`), whose next answer may
+   * name another server.
+   * @default IP literals pass through, hostnames go through the OS resolver (IPv4 only);
+   * `fresh` queries the configured DNS server (one random A record), falling back to it.
    */
-  resolveServer?: (server: string) => Promise<string>;
+  resolveServer?: (server: string, opts?: { fresh?: boolean }) => Promise<string>;
   /**
    * Per-(account, server) health behind the server-pool failover (spec §6.8). @default a
    * fresh instance seeded from `AppState.serverHealth`; the persisted half (refused,
@@ -147,10 +151,28 @@ const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 
  * up on confirming the new exit IP (reviewer item 1). */
 const DEFAULT_ROTATE_ONLINE_TIMEOUT_MS = 45_000;
 
-async function defaultResolveServer(server: string): Promise<string> {
+/** How many answers a round-robin pool hostname gets to name a server no other port
+ * holds before the pick gives up on it (spec §6.8, Surfshark before discovery). */
+const POOL_HOSTNAME_ATTEMPTS = 4;
+
+async function defaultResolveServer(server: string, opts: { fresh?: boolean } = {}): Promise<string> {
   if (isIP(server)) return server;
+  if (opts.fresh) {
+    try {
+      const all = await resolve4(server);
+      if (all.length > 0) return all[Math.floor(Math.random() * all.length)];
+    } catch {
+      // Fall back to the OS resolver (it may know hosts the DNS server does not).
+    }
+  }
   const { address } = await lookup(server, { family: 4 });
   return address;
+}
+
+/** A hostname of a provider whose hostnames are round-robin pools: one token, many
+ * servers. Never an IP literal. */
+function isPoolHostname(target: Target, server: string): boolean {
+  return target.poolHostnames === true && !isIP(server);
 }
 
 function defaultScheduleRetry(ms: number, cb: () => void): () => void {
@@ -333,19 +355,24 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     for (const server of orderCandidates(opts)) {
       // An IP literal is its own identity; a hostname is judged on what it resolves to now.
       if (opts.exclude && isIP(server) && opts.exclude.token === server) continue;
-      let ip: string;
-      try {
-        ip = await resolveServer(server);
-      } catch {
-        dnsFailed = true;
-        health.markDead(opts.accountId, server); // the host vanished from DNS
-        continue;
+      // A round-robin pool hostname is asked again while its answer is held by another
+      // port (or is the machine being left): the next answer may name a free server.
+      const pool = isPoolHostname(opts.target, server);
+      for (let attempt = 0; attempt < (pool ? POOL_HOSTNAME_ATTEMPTS : 1); attempt++) {
+        let ip: string;
+        try {
+          ip = await resolveServer(server, pool ? { fresh: true } : undefined);
+        } catch {
+          dnsFailed = true;
+          health.markDead(opts.accountId, server); // the host vanished from DNS
+          break;
+        }
+        resolvedIp.set(server, ip);
+        const id = identityOf(server, ip);
+        if (opts.exclude && sameMachine(opts.exclude, id)) continue;
+        if (heldBy(opts.target.providerId, id, opts.portKey)) continue;
+        return { pick: { server, ip }, dnsFailed };
       }
-      resolvedIp.set(server, ip);
-      const id = identityOf(server, ip);
-      if (opts.exclude && sameMachine(opts.exclude, id)) continue;
-      if (heldBy(opts.target.providerId, id, opts.portKey)) continue;
-      return { pick: { server, ip }, dnsFailed };
     }
     return { dnsFailed };
   }
@@ -906,7 +933,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   }
 
   function freeServerCount(target: Target): number {
-    return listServers(target).filter((s) => !s.heldBy && (s.health === 'ok' || s.health === 'unknown')).length;
+    // A pool hostname held by a port still counts: its next answer may be another server.
+    return listServers(target).filter(
+      (s) => (!s.heldBy || isPoolHostname(target, s.server)) && (s.health === 'ok' || s.health === 'unknown'),
+    ).length;
   }
 
   async function setAutoRotate(key: string, minutes: number): Promise<void> {

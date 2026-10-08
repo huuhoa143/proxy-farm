@@ -102,6 +102,8 @@ describe('surfshark provider: targets', () => {
     });
     const [target] = await provider.targets(account);
     expect(target.servers).toEqual(['jp-tok.prod.surfshark.com']);
+    // The hostname is a round-robin pool: one port pinned to it does not use it up.
+    expect(target.poolHostnames).toBe(true);
   });
 
   it('persists the pool beside the cluster cache, so a new instance starts with it', async () => {

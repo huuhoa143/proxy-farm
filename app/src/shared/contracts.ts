@@ -80,6 +80,13 @@ export interface Target {
    * (ZoogVPN, file remotes) that the controller resolves before bind.
    */
   servers: string[];
+  /**
+   * The provider's hostnames are DNS round-robin pools (Surfshark clusters before their
+   * pool IPs are discovered): one hostname token may stand for many servers, so a port
+   * pinned to it does not use it up. IP literals in `servers` are unaffected. Optional;
+   * absent means every token is one server.
+   */
+  poolHostnames?: boolean;
   /** Filled by the controller in `listTargets`: usable servers not held by any port. */
   freeServers?: number;
 }
