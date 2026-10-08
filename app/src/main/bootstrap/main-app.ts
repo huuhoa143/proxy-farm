@@ -9,7 +9,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, powerSaveBlocker, safeStorage, session, shell, Tray } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
-import { networkInterfaces } from 'node:os';
+import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
 import type { AppStatus, PortRow, PortState, ProviderId, Settings, Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
@@ -21,7 +21,7 @@ import { reattachWithAliases } from '../controller/reattach';
 import type { Engine } from '../controller/ports';
 import { createRealExitIpProber, createRealPortAllocator } from '../controller/real-bindings';
 import { createStartQueue } from '../controller/start-queue';
-import { assertSingboxVersion, singboxPath } from '../engine/singbox-path';
+import { assertSingboxVersion, SINGBOX_PINNED_VERSION, singboxPath } from '../engine/singbox-path';
 import { PortHealth } from '../health/state-machine';
 import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
 import { installPowerHooks, type PowerManager } from '../power/index';
@@ -325,6 +325,13 @@ export function runApp(): void {
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
       appStatus,
       updater,
+      diagnosticsEnv: () => ({
+        appVersion: app.getVersion(),
+        os: { platform: process.platform, release: osRelease(), arch: process.arch },
+        versions: { electron: process.versions.electron ?? '', chrome: process.versions.chrome ?? '', node: process.versions.node },
+        // assertSingboxVersion passed at startup, so the bundled binary is the pinned one.
+        singBox: engineError ? null : SINGBOX_PINNED_VERSION,
+      }),
       log,
       onSettingsChanged: async (prev, next) => {
         const fx = settingsEffects(prev, next);

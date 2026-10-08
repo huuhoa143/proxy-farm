@@ -184,6 +184,12 @@ describe('controller facade', () => {
       onSettingsChanged,
       appStatus: () => ({ secretsUnavailable: true }),
       updater,
+      diagnosticsEnv: () => ({
+        appVersion: '1.2.3',
+        os: { platform: 'darwin', release: '23.4.0', arch: 'arm64' },
+        versions: { electron: '42.0.1', chrome: '140.0.0.0', node: '22.0.0' },
+        singBox: '1.14.2',
+      }),
       log: () => undefined,
       ...overrides,
     };
@@ -455,6 +461,41 @@ describe('controller facade', () => {
     expect(next.basePort).toBe(30001);
     expect((await facade.getSettings()).basePort).toBe(30001);
     expect(onSettingsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('getDiagnostics reports versions and per-provider counts, and nothing identifying', async () => {
+    const { facade, state, secrets } = setup();
+    await facade.connectHma();
+    await facade.addAccount('zoogvpn', { email: 'someone@example.com', password: 'zoog-secret-pw' });
+    const base = { providerId: 'hma' as const, accountId: 'hma-1', label: 'Amsterdam', country: 'NL', city: 'Amsterdam', enabled: true, autoRotateMin: 0 };
+    state.setState((s) => ({
+      ...s,
+      settings: { ...s.settings, proxyUser: 'proxy-user-x', proxyPass: 'proxy-pass-x', webhook: { enabled: true, port: 29000, bearer: 'bearer-token-x'.repeat(3) } },
+      ports: [
+        { ...base, key: 'hma:NL-AMS#1', locationKey: 'hma:NL-AMS', server: '10.0.0.1', serverIp: '10.0.0.1', proxyPort: 29001, state: { kind: 'online', since: 1, exitIp: '198.51.100.7', country: 'NL' } },
+        { ...base, key: 'hma:NL-AMS#2', locationKey: 'hma:NL-AMS', server: '10.0.0.2', serverIp: '10.0.0.2', proxyPort: 29002, state: { kind: 'online', since: 1, exitIp: '198.51.100.8', country: 'NL' } },
+        { ...base, key: 'hma:NL-AMS#3', locationKey: 'hma:NL-AMS', server: '10.0.0.3', proxyPort: 29003, state: { kind: 'failed', reason: 'auth', untilMs: 1, attempt: 2 } },
+        { ...base, key: 'zoogvpn:nl1#1', locationKey: 'zoogvpn:nl1', providerId: 'zoogvpn', accountId: 'zoogvpn-1', server: 'nl1.webunlim.com', serverIp: '203.0.113.9', proxyPort: 29004, state: { kind: 'stopped' }, enabled: false },
+      ],
+    }));
+
+    const d = await facade.getDiagnostics();
+    expect(d.appVersion).toBe('1.2.3');
+    expect(d.singBox).toBe('1.14.2');
+    expect(d.providers).toEqual([
+      { id: 'hma', accounts: 1, ports: 3, portStates: { online: 2, failed: 1 } },
+      { id: 'zoogvpn', accounts: 1, ports: 1, portStates: { stopped: 1 } },
+      { id: 'surfshark', accounts: 0, ports: 0, portStates: {} },
+      { id: 'file', accounts: 0, ports: 0, portStates: {} },
+    ]);
+
+    const json = JSON.stringify(d);
+    const forbidden = [
+      HMA_UDID, HMA_PASS, '000000000000', 'someone@example.com', 'zoog-secret-pw', 'proxy-user-x', 'proxy-pass-x', 'bearer-token-x',
+      '198.51.100', '10.0.0.', '203.0.113.9', 'webunlim', '29001', 'hma-1', 'account:',
+      ...[...secrets.map.values()],
+    ];
+    for (const s of forbidden) expect(json, `diagnostics must not contain ${s}`).not.toContain(s);
   });
 
   it('passes getLogs / getHostVpnActive / getAppStatus through', async () => {

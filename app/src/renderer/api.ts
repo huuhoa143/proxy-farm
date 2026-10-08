@@ -607,6 +607,23 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return { success: true };
     },
 
+    async getDiagnostics() {
+      // Same shape and redaction as main's collectDiagnostics: ids and counts only.
+      const rows = [...ports.values()];
+      return {
+        appVersion,
+        os: { platform: 'fake', release: '0', arch: 'fake' },
+        versions: { electron: 'fake', chrome: 'fake', node: 'fake' },
+        singBox: '1.14.2',
+        providers: (['hma', 'zoogvpn', 'surfshark', 'file'] as ProviderId[]).map((id) => {
+          const own = rows.filter((r) => r.providerId === id);
+          const portStates: Partial<Record<PortRow['state']['kind'], number>> = {};
+          for (const r of own) portStates[r.state.kind] = (portStates[r.state.kind] ?? 0) + 1;
+          return { id, accounts: accounts.filter((a) => a.account.providerId === id).length, ports: own.length, portStates };
+        }),
+      };
+    },
+
     onPortsChanged(cb) {
       portsListeners.add(cb);
       return () => portsListeners.delete(cb);

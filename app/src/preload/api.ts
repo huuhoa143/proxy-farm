@@ -50,6 +50,7 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     checkForUpdate: () => ipcRenderer.invoke('checkForUpdate') as ReturnType<ProxyFarmApi['checkForUpdate']>,
     downloadAndInstallUpdate: () =>
       ipcRenderer.invoke('downloadAndInstallUpdate') as ReturnType<ProxyFarmApi['downloadAndInstallUpdate']>,
+    getDiagnostics: () => ipcRenderer.invoke('getDiagnostics') as ReturnType<ProxyFarmApi['getDiagnostics']>,
 
     onPortsChanged: (cb) => {
       const listener = (_event: unknown, rows: unknown) => cb(rows as Parameters<typeof cb>[0]);

@@ -30,6 +30,7 @@ function fakeController(): ControllerFacade {
     getUpdateStatus: vi.fn(async () => ({ phase: 'idle', currentVersion: '1.0.0' }) as any),
     checkForUpdate: vi.fn(async () => ({ phase: 'idle', currentVersion: '1.0.0' }) as any),
     downloadAndInstallUpdate: vi.fn(async () => ({ success: true })),
+    getDiagnostics: vi.fn(async () => ({}) as any),
   };
 }
 

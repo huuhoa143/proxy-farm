@@ -81,7 +81,9 @@ export function singboxPath(opts: SingboxPathOptions = {}): string {
   return path.join(appRoot, 'resources', 'sing-box', platformKey, binaryName);
 }
 
-const PINNED_VERSION = '1.14.2';
+/** The sing-box version the app ships and requires (checked at startup). */
+export const SINGBOX_PINNED_VERSION = '1.14.2';
+const PINNED_VERSION = SINGBOX_PINNED_VERSION;
 const REQUIRED_TAGS = ['with_gvisor', 'with_wireguard', 'with_openvpn'] as const;
 
 /**

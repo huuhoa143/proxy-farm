@@ -264,6 +264,29 @@ export interface UpdateStatus {
   releasesUrl?: string;
 }
 
+// ───────────────────────── diagnostics (Settings → About & help) ─────────────────────────
+
+/**
+ * What "Copy diagnostics" reports, built in main from non-secret fields only. Counts,
+ * versions and provider ids — NEVER keys, passwords, udids, proxy credentials, account
+ * labels (they can be emails), exit IPs or server IPs/hostnames. Keep it that way: the
+ * text is meant to be pasted into a public GitHub issue.
+ */
+export interface Diagnostics {
+  appVersion: string;
+  os: { platform: string; release: string; arch: string };
+  versions: { electron: string; chrome: string; node: string };
+  /** The bundled sing-box version, or null when the engine check failed at startup. */
+  singBox: string | null;
+  providers: Array<{
+    id: ProviderId;
+    accounts: number;
+    ports: number;
+    /** Port count per `PortState['kind']`; kinds with no ports are omitted. */
+    portStates: Partial<Record<PortState['kind'], number>>;
+  }>;
+}
+
 // ───────────────────────── IPC surface exposed as `window.proxyFarm` (spec §3) ─────────────────────────
 
 export interface ProxyFarmApi {
@@ -327,6 +350,10 @@ export interface ProxyFarmApi {
    * Resolves (`{success:true}`) once the download finished and install was scheduled. */
   downloadAndInstallUpdate(): Promise<{ success: boolean; error?: string }>;
 
+  // support
+  /** A redacted environment summary for bug reports (see `Diagnostics`). */
+  getDiagnostics(): Promise<Diagnostics>;
+
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
   onHostVpnChanged(cb: (active: boolean) => void): () => void;
@@ -339,7 +366,7 @@ export const IPC = {
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'addPorts', 'listServers', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
-    'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate',
+    'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',
   ] as const,
   events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
 } as const;

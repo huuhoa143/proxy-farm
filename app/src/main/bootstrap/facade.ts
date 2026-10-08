@@ -23,6 +23,7 @@ import type { ControllerFacade } from '../ipc/index';
 import type { SecretStore } from '../store/secrets';
 import type { StateStore } from '../store/state';
 import type { UpdateStatus } from '../../shared/contracts';
+import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
 
 export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
@@ -54,6 +55,8 @@ export interface FacadeDeps {
   /** Auto-updater (spec §9). The renderer's "Check for updates" / "Restart & install"
    * buttons come through here. */
   updater: FacadeUpdater;
+  /** Versions/OS for "Copy diagnostics"; the facade adds the redacted counts. */
+  diagnosticsEnv(): DiagnosticsEnv;
   log?: (msg: string, err?: unknown) => void;
 }
 
@@ -408,5 +411,10 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     checkForUpdate: () => deps.updater.checkForUpdates(),
 
     downloadAndInstallUpdate: () => deps.updater.downloadAndInstall(),
+
+    async getDiagnostics() {
+      const { accounts: accountList, ports } = deps.state.getState();
+      return collectDiagnostics({ accounts: accountList, ports }, deps.diagnosticsEnv(), PROVIDER_IDS);
+    },
   };
 }
