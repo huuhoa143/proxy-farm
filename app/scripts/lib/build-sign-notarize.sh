@@ -63,7 +63,11 @@ smoke_launch_app() {
 
   # shellcheck disable=SC2329 # invoked indirectly via `trap ... RETURN` below
   _smoke_cleanup() {
-    if [[ -n "$NEW_PID" ]] && kill -0 "$NEW_PID" 2>/dev/null; then
+    # `trap … RETURN` is global, not scoped to this function: clear it first
+    # so it can't fire again when a later function returns (where NEW_PID is
+    # unset and `set -u` would abort the release).
+    trap - RETURN
+    if [[ -n "${NEW_PID:-}" ]] && kill -0 "$NEW_PID" 2>/dev/null; then
       kill "$NEW_PID" 2>/dev/null || true
       for child in $(pgrep -P "$NEW_PID" 2>/dev/null || true); do
         kill "$child" 2>/dev/null || true
