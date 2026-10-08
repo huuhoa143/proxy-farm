@@ -48,8 +48,10 @@ export interface CredentialProbeDeps {
   engine: Engine;
   /** Hostname → IPv4 (the controller resolves before bind, spec §6.1.4). */
   resolveServer(server: string): Promise<string>;
-  /** A free loopback port for the probe's proxy inbound. */
+  /** A free loopback port for the probe's proxy inbound, held for it until `releasePort`. */
   allocatePort(): Promise<number>;
+  /** The probe's engine for `port` has stopped: the port may be handed out again. */
+  releasePort?(port: number): void;
   /** The account's handshake budget, shared with its ports. */
   limiter: AttemptLimiter;
   /** Per host: how long to wait for "established" or an auth failure. @default 40_000 */
@@ -172,7 +174,7 @@ export function createCredentialProbe(deps: CredentialProbeDeps): CredentialProb
         clash: { port: 0, secret: '' }, // the engine allocates its own
       };
       seq += 1;
-      const outcome = await handshake(`${PROBE_KEY_PREFIX}${account.id}:${seq}`, input);
+      const outcome = await handshake(`${PROBE_KEY_PREFIX}${account.id}:${seq}`, input).finally(() => deps.releasePort?.(port));
       if (outcome !== 'unreachable') return { outcome, host: host.server };
     }
     return { outcome: 'unreachable' };

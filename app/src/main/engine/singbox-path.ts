@@ -89,6 +89,9 @@ const REQUIRED_TAGS = ['with_gvisor', 'with_wireguard', 'with_openvpn'] as const
 /**
  * Runs `<bin> version` and throws unless the output reports the pinned
  * version with all required build tags (spec §2).
+ *
+ * This is a short-lived sing-box process (~0.25 s) at every app start, before any port
+ * or credential probe runs: a process sampler sees it as an engine that exited at once.
  */
 export async function assertSingboxVersion(binPath: string = singboxPath()): Promise<void> {
   let stdout: string;

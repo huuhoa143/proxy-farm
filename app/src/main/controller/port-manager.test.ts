@@ -1938,6 +1938,32 @@ describe('port manager', () => {
       });
     });
 
+    describe('credential probes never share a proxy port', () => {
+      it('two probes at once get different loopback ports, neither a port row\'s, and give them back when done', async () => {
+        const engine = fakeEngine({ autoOnline: false });
+        const { manager, state, secrets } = setup({ targets: [freeTier], engine });
+        const z2: Account = { ...account, id: 'z2', label: 'z2', secretRef: 'z2-secret' };
+        secrets.saveSecret('z2-secret', JSON.stringify({ kind: 'userpass', username: 'u2', password: 'p2' }));
+        state.setState((s) => ({ ...s, accounts: [account, z2] }));
+        const secret = { kind: 'userpass' as const, username: 'u', password: 'p' };
+        const a = manager.checkCredentials(account, secret);
+        const b = manager.checkCredentials(z2, secret);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        const ports = engine.started.map((s) => s.input.listen.port);
+        expect(new Set(ports).size).toBe(2);
+        expect(ports).not.toContain(29001); // the port row's
+        for (const s of engine.started) engine.fireState(s.key, { kind: 'verifying', since: 1 });
+        expect(await a).toBe('verified');
+        expect(await b).toBe('verified');
+        // Released: the next probe may use the first port again.
+        const c = manager.checkCredentials(account, secret);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(3));
+        expect(engine.started[2].input.listen.port).toBe(Math.min(...ports));
+        engine.fireState(engine.started[2].key, { kind: 'verifying', since: 1 });
+        await c;
+      });
+    });
+
     describe('ZoogVPN plan refusal (spec §5.2)', () => {
       const z2: Account = { id: 'z2', providerId: 'zoogvpn', label: 'z2', meta: {}, secretRef: 'z2-secret' };
       const ams = (servers: string[]): Target => ({ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers });

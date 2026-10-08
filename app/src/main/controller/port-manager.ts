@@ -397,12 +397,27 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const health = observeHealth(deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth }));
   const limiter = deps.attemptLimiter ?? createAttemptLimiter({ now });
   const wgGuard = deps.wgKeyGuard ?? createWgKeyGuard({ now, initial: deps.state.getState().wgLockouts });
+  /** Proxy ports of credential probes, from allocation until their engine stopped. */
+  const probePorts = new Set<number>();
+  /** Probe port allocations run one at a time: two scanning at once would both see the
+   * same port free (it is added to `probePorts` only once a scan returns). */
+  let probeAllocChain: Promise<unknown> = Promise.resolve();
+  function allocateProbePort(): Promise<number> {
+    const run = probeAllocChain.then(async () => {
+      const port = await deps.allocator.allocate({ base: PROBE_PORT_BASE, taken: takenProxyPorts() });
+      probePorts.add(port);
+      return port;
+    });
+    probeAllocChain = run.catch(() => undefined);
+    return run;
+  }
   const credentialProbe =
     deps.credentialProbe ??
     createCredentialProbe({
       engine: deps.engine,
       resolveServer: (server) => resolveServer(server),
-      allocatePort: () => deps.allocator.allocate({ base: PROBE_PORT_BASE, taken: takenProxyPorts() }),
+      allocatePort: allocateProbePort,
+      releasePort: (port) => probePorts.delete(port),
       limiter,
     });
   /** Providers with a free-tier server to check a login against (spec §5.2), learned
@@ -477,8 +492,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return { server, serverIp, state: { kind: 'connecting', since: Date.now() } };
   }
 
+  /** Every proxy port in use: the ports' own, and those of credential probes running. */
   function takenProxyPorts(): Set<number> {
-    return new Set(deps.state.getState().ports.map((p) => p.proxyPort));
+    return new Set([...deps.state.getState().ports.map((p) => p.proxyPort), ...probePorts]);
   }
 
   /** `n` for a new port of `locationKey`: the smallest free number, starting at 1. */

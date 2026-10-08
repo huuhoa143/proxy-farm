@@ -122,6 +122,25 @@ describe('free hosts and proximity', () => {
 });
 
 describe('credential probe (spec §5.2)', () => {
+  it('gives each host attempt\'s proxy port back once its engine has stopped, whatever the outcome', async () => {
+    const e = scriptedEngine([{ kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' }, verifying]);
+    const events: string[] = [];
+    const stop = e.engine.stop;
+    e.engine.stop = async (key) => {
+      events.push(`stop ${key}`);
+      return stop(key);
+    };
+    let next = 39001;
+    const probe = createCredentialProbe(
+      deps(e.engine, {
+        allocatePort: async () => next++,
+        releasePort: (port) => void events.push(`release ${port}`),
+      }),
+    );
+    expect(await probe(account, secret, provider())).toEqual({ outcome: 'ok', host: 'nl.zgfree.info' });
+    expect(events).toEqual([`stop ${PROBE_KEY_PREFIX}zoogvpn-1:1`, 'release 39001', `stop ${PROBE_KEY_PREFIX}zoogvpn-1:2`, 'release 39002']);
+  });
+
   it('a free host that brings the tunnel up → ok; the probe runs as an engine start on loopback, then stops', async () => {
     const e = scriptedEngine([verifying]);
     const p = provider();
