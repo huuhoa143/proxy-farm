@@ -13,7 +13,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { PortRow, Settings } from '../../src/shared/contracts';
+import { DISCLAIMER_NOTICE_VERSION, type PortRow, type Settings } from '../../src/shared/contracts';
 import { APP_ROOT, BUNDLED_SINGBOX, launchPackagedApp, type RunningApp } from './helpers/packaged-app';
 import { curlThrough, isAlive, singboxProcesses } from './helpers/procs';
 import { startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
@@ -52,6 +52,10 @@ test.describe.serial('packaged Proxy Farm', () => {
     work = mkdtempSync(path.join(tmpdir(), 'pf-e2e-wg-'));
     peers = [startLocalWgPeer(BUNDLED_SINGBOX, work, 51991), startLocalWgPeer(BUNDLED_SINGBOX, work, 51992)];
     app = await launchPackagedApp(userData);
+    // A fresh profile starts in Vietnamese with the first-run notice up; this suite
+    // drives the English UI. Both settings persist, so relaunches below stay English.
+    await app.page.evaluate((v) => window.proxyFarm.setSettings({ language: 'en', acknowledgedDisclaimer: v }), DISCLAIMER_NOTICE_VERSION);
+    await app.page.reload();
   });
 
   test.afterAll(async () => {
