@@ -149,6 +149,11 @@ describe('terminal failures stay terminal (no timer, no engine until the user ac
     const state = createStateStore(join(dir, 'state.json'), secrets);
     const account: Account = { id: 'a1', providerId, label: 'a1', meta: {}, secretRef: 'a1-secret' };
     const target: Target = { key: `${providerId}:JP`, providerId, country: 'JP', city: 'Japan', label: 'Japan', servers };
+    // ZoogVPN has free-tier servers (spec §5.2); HMA does not.
+    const free: Target[] =
+      providerId === 'zoogvpn'
+        ? [{ key: 'zoogvpn:NL', providerId, country: 'NL', city: 'Netherlands', label: 'Netherlands', servers: ['nl.zgfree.info'], freeTierServers: ['nl.zgfree.info'] }]
+        : [];
     state.setState((s) => ({ ...s, accounts: [account], ports }));
     const eng = healthEngine();
     const serverHealth = createServerHealth();
@@ -156,7 +161,8 @@ describe('terminal failures stay terminal (no timer, no engine until the user ac
       state,
       secrets,
       engine: eng.engine,
-      providers: { get: () => openvpnProvider(providerId, [target]) },
+      providers: { get: () => openvpnProvider(providerId, [target, ...free]) },
+      credentialProbe: async () => ({ outcome: 'unreachable' }),
       exitIp: { probe: async () => ({ ip: '0.0.0.0', country: 'XX' }) },
       allocator: { allocate: async () => 29001, allocateAux: async () => 40000, release: () => undefined },
       resolveServer: async (s) => s,

@@ -8,6 +8,7 @@ import {
   type Account,
   type AccountSecret,
   type ExportFormat,
+  type FailDetail,
   type FailReason,
   type PortRow,
   type PortState,
@@ -22,7 +23,8 @@ import { createRefusalTracker, type RefusalTracker } from '../accounts/refusals'
 import { createAutoRotateScheduler, type AutoRotateScheduler } from './auto-rotate';
 import { nextBackoffMs } from '../health/backoff';
 import type { SecretStore } from '../store/secrets';
-import type { StateStore } from '../store/state';
+import type { CredentialCheck, StateStore } from '../store/state';
+import { createCredentialProbe, freeHosts, isProbeKey, type CredentialProbe } from './credential-probe';
 import { exportLines, type ExportCreds } from './export-format';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator, type ProviderRegistry } from './ports';
 import { createServerHealth, type ServerHealth } from './server-health';
@@ -40,12 +42,20 @@ export interface PortManagerDeps {
    * `127.0.0.1` if no external IPv4 interface is found. */
   getLanIPv4?: () => string;
   /**
-   * ZoogVPN plan-refusal-vs-login tracker (spec §5.2), keyed by (account, server).
+   * Auth-failure evidence per (account, server), the last resort of spec §5.2 when no
+   * free-tier server can be reached (see accounts/refusals.ts).
    * @default a fresh tracker seeded from `AppState.refusals` (so it survives an app
    * restart) — the same instance should also be handed to `accounts/pool.ts`'s
    * `createAccountPool` so both see the same memory.
    */
   refusals?: RefusalTracker;
+  /**
+   * Live credential check against a provider's free-tier server (spec §5.2): tells a
+   * wrong password from a server outside the plan. Injectable for tests.
+   * @default the real probe (controller/credential-probe.ts) through `engine`, sharing
+   * `attemptLimiter`.
+   */
+  credentialProbe?: CredentialProbe;
   /** How long `rotatePort` waits for the restarted port to actually reach `online`
    * (verified by `PortHealth`, via `Engine.onStateChange`) before giving up on
    * confirming the new exit IP (reviewer item 1). @default 45_000 */
@@ -150,10 +160,23 @@ export interface PortManager {
    * fires (or keeps the event loop alive) while engines are being torn down. */
   stopAutoRotate(): void;
   /** The account's secret changed (HMA re-import, a re-entered password): forget the
-   * refused/dead marks and auth-failure evidence gathered under the old credentials, so
-   * no server stays shunned for days because of them. */
+   * refused/dead marks, auth-failure evidence and credential check gathered under the
+   * old credentials, so no server stays shunned for days because of them. */
   credentialsChanged(accountId: string): void;
+  /**
+   * One live credential check (spec §5.2) for `secret`, which need not be saved yet (the
+   * "Check" button runs it before storing a new password). Takes from the account's
+   * attempt budget. Persists nothing: call `recordCredentialCheck` once the secret is
+   * stored. 'unsupported' when the provider has no free-tier server.
+   */
+  checkCredentials(account: Account, secret: AccountSecret): Promise<CredentialVerdict>;
+  /** Stores the result of `checkCredentials` for an account whose secret is now saved. */
+  recordCredentialCheck(accountId: string, verdict: CredentialVerdict): void;
 }
+
+/** What a live credential check showed (spec §5.2): the login works, is wrong, or could
+ * not be checked (no free-tier server reachable); 'unsupported' = nothing to ask. */
+export type CredentialVerdict = 'verified' | 'rejected' | 'unverified' | 'unsupported';
 
 /**
  * Convention owned by this module: a `secretRef` is the id passed to the injected
@@ -244,18 +267,16 @@ function defaultScheduleRetry(ms: number, cb: () => void): () => void {
   return () => clearTimeout(timer);
 }
 
-/**
- * What an auth failure on one server means, per provider (spec §5.1, §5.2). This table
- * is the only provider-specific part of the failover; everything else works on
- * (account, server) pairs.
- *   'refused'     — this server refused this account: mark it and move on.
- *   'credentials' — the account itself is rejected: stay `failed(auth)`.
- *   'unproven'    — could be either (ZoogVPN without enough evidence yet): mark the
- *                   server dead for the account (2 h, not the 7-day refusal) and move
- *                   on, so failures on distinct servers accumulate until one of the
- *                   two above can be decided.
- */
-type AuthVerdict = 'refused' | 'credentials' | 'unproven';
+/** At most one live credential check per account in this window when a port's login
+ * is refused (spec §5.2). A user's "Check" is not throttled by it. */
+export const CREDENTIAL_PROBE_INTERVAL_MS = 10 * 60_000;
+
+/** How long the row shows "checking your sign-in" (two free hosts × 40 s, plus DNS). */
+const CREDENTIAL_PROBE_BUDGET_MS = 90_000;
+
+/** Where a credential probe's loopback proxy port is looked for: clear of the default
+ * proxy range (29001…) and of the engine's clash_api range (40000…). */
+const PROBE_PORT_BASE = 39_000;
 
 /** One server's identity for the allocation invariant (spec §6.8). Each part is compared
  * only with its own kind (a Surfshark exit IP is the server IP + 1, which may well be
@@ -312,6 +333,24 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const health = deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth });
   const limiter = deps.attemptLimiter ?? createAttemptLimiter({ now });
   const wgGuard = deps.wgKeyGuard ?? createWgKeyGuard({ now, initial: deps.state.getState().wgLockouts });
+  const credentialProbe =
+    deps.credentialProbe ??
+    createCredentialProbe({
+      engine: deps.engine,
+      resolveServer: (server) => resolveServer(server),
+      allocatePort: () => deps.allocator.allocate({ base: PROBE_PORT_BASE, taken: takenProxyPorts() }),
+      limiter,
+    });
+  /** Providers with a free-tier server to check a login against (spec §5.2), learned
+   * from their targets on every start. */
+  const freeTierProviders = new Map<ProviderId, boolean>();
+  /** accountId -> epoch ms of its last live credential check from a port's refusal. */
+  const lastProbeAt = new Map<string, number>();
+  /** accountId -> the live credential check in flight, shared by all of its ports. */
+  const probesInFlight = new Map<string, Promise<CredentialVerdict>>();
+  /** accountId -> bumped whenever its credentials change, so a check of the old ones
+   * that ends afterwards is not applied to the new ones. */
+  const credentialEpoch = new Map<string, number>();
   /** accountId -> whether it is a WireGuard account (needs its secret; cached). */
   const wgAccounts = new Map<string, boolean>();
   /** server token -> last resolved IPv4, for the invariant check and `listServers`. */
@@ -604,10 +643,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * The stop is deferred (callers run inside the engine's state-change callback) and
    * skipped if the user restarted the port in between.
    */
-  function failTerminal(key: string, reason: FailReason, from?: Extract<PortState, { kind: 'failed' }>): void {
+  function failTerminal(key: string, reason: FailReason, from?: Extract<PortState, { kind: 'failed' }>, detail?: FailDetail): void {
     cancelLocalRetry(key);
     const attempt = from?.attempt ?? Math.max(1, backoffAttempts.get(key) ?? 0);
-    updatePort(key, { state: { kind: 'failed', reason, untilMs: from?.untilMs ?? Date.now(), attempt } });
+    updatePort(key, { state: { kind: 'failed', reason, untilMs: from?.untilMs ?? Date.now(), attempt, ...(detail ? { detail } : {}) } });
     setTimeout(() => {
       const row = findPort(key);
       if (row && isTerminalState(row.state)) void deps.engine.stop(key).catch(() => undefined);
@@ -636,45 +675,168 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return true;
   }
 
+  // ── Credentials: plan refusal vs wrong password (spec §5.2) ──────────────────────
+
+  function credentialOf(accountId: string): CredentialCheck | undefined {
+    return deps.state.getState().credentials?.[accountId];
+  }
+
+  function setCredential(accountId: string, state: CredentialCheck['state']): void {
+    const at = now();
+    deps.state.setState((st) => {
+      const prev = st.credentials?.[accountId];
+      const verifiedAt = state === 'verified' ? at : prev?.verifiedAt;
+      const next: CredentialCheck = { state, at, ...(verifiedAt !== undefined ? { verifiedAt } : {}) };
+      return { ...st, credentials: { ...st.credentials, [accountId]: next } };
+    });
+  }
+
+  /** The machine a server token stands for, as far as it is known. */
+  function machineKey(server: string): string {
+    return knownIp(server) ?? server;
+  }
+
+  async function runProbe(account: Account, secret: AccountSecret): Promise<CredentialVerdict> {
+    const provider = deps.providers.get(account.providerId);
+    if (!provider) return 'unsupported';
+    try {
+      const { outcome } = await credentialProbe(account, secret, provider);
+      return outcome === 'ok' ? 'verified' : outcome === 'auth' ? 'rejected' : outcome === 'unsupported' ? 'unsupported' : 'unverified';
+    } catch {
+      return 'unverified';
+    }
+  }
+
+  /** The login was checked and is wrong (a free-tier server refused it). Every refusal
+   * marked since it was last verified was marked on the false assumption that it works,
+   * so those go; every port of the account that is not up now fails for good. */
+  function credentialsRejected(accountId: string): void {
+    health.forgetRefusalsSince(accountId, credentialOf(accountId)?.verifiedAt ?? 0);
+    persistHealth();
+    setCredential(accountId, 'rejected');
+    for (const p of deps.state.getState().ports) {
+      if (p.accountId !== accountId || !p.enabled || rotatingKeys.has(p.key)) continue;
+      if (p.state.kind === 'online' || p.state.kind === 'verifying') continue; // an old session still up
+      failTerminal(p.key, 'auth', undefined, 'wrong-credentials');
+    }
+  }
+
+  function applyVerdict(accountId: string, verdict: CredentialVerdict): void {
+    if (verdict === 'verified') setCredential(accountId, 'verified');
+    else if (verdict === 'rejected') credentialsRejected(accountId);
+    else if (verdict === 'unverified') setCredential(accountId, 'unverified');
+  }
+
+  /** A live check of the account's STORED credentials, applied when it ends. Undefined
+   * when one ran within `CREDENTIAL_PROBE_INTERVAL_MS`; joins one already in flight. */
+  function verifyStoredCredentials(accountId: string): Promise<CredentialVerdict> | undefined {
+    const inFlight = probesInFlight.get(accountId);
+    if (inFlight) return inFlight;
+    const last = lastProbeAt.get(accountId);
+    if (last !== undefined && now() - last < CREDENTIAL_PROBE_INTERVAL_MS) return undefined;
+    const account = deps.state.getState().accounts.find((a) => a.id === accountId);
+    const secret = account && loadAccountSecret(deps.secrets, account.secretRef);
+    if (!account || !secret) return undefined;
+    lastProbeAt.set(accountId, now());
+    const epoch = credentialEpoch.get(accountId) ?? 0;
+    const current = () => (credentialEpoch.get(accountId) ?? 0) === epoch && deps.state.getState().accounts.some((a) => a.id === accountId);
+    const run = runProbe(account, secret)
+      .then((verdict) => {
+        // Replaced (or removed) while it ran: it checked credentials that are gone.
+        if (!current()) return 'unsupported' as const;
+        applyVerdict(accountId, verdict);
+        return verdict;
+      })
+      .finally(() => {
+        if (probesInFlight.get(accountId) === run) probesInFlight.delete(accountId);
+      });
+    probesInFlight.set(accountId, run);
+    return run;
+  }
+
+  function anyOnline(accountId: string, exceptKey?: string): boolean {
+    return deps.state.getState().ports.some((p) => p.key !== exceptKey && p.accountId === accountId && p.state.kind === 'online');
+  }
+
   /** The port's account demonstrably works: another of its ports is online, or it was
    * confirmed online on another server recently. */
   function accountWorksElsewhere(port: PortRow & { server: string }): boolean {
-    const otherOnline = deps.state
-      .getState()
-      .ports.some((p) => p.key !== port.key && p.accountId === port.accountId && p.state.kind === 'online');
-    return otherOnline || health.workedRecently(port.accountId, HMA_PROVEN_WINDOW_MS, port.server);
+    return anyOnline(port.accountId, port.key) || health.workedRecently(port.accountId, HMA_PROVEN_WINDOW_MS, port.server);
   }
 
-  function authVerdict(port: PortRow & { server: string }): AuthVerdict {
-    // §5.1: device creds, per-server tenant — but a refusal only once the creds are known
-    // to work somewhere; otherwise (stale or revoked device creds) walking the pool would
-    // just mark every server refused for a week.
-    if (port.providerId === 'hma') return accountWorksElsewhere(port) ? 'refused' : 'credentials';
-    if (port.providerId === 'zoogvpn') {
-      refusals.recordAuthFailure(port.accountId, port.server);
-      const verdict = refusals.classifyAuthFailure(port.accountId);
-      return verdict === 'not-in-plan' ? 'refused' : verdict === 'bad-login' ? 'credentials' : 'unproven';
-    }
-    return 'credentials';
+  /** Every server of the port's location has refused its account. */
+  function locationRefusesAll(port: PortRow): boolean {
+    const target = portTargets.get(port.key);
+    return Boolean(target && target.servers.length > 0 && target.servers.every((s) => health.isRefused(port.accountId, s)));
   }
 
-  /** A `failed(auth)` from the engine (spec §6.8 "server refused"). Every outcome either
-   * moves the port to another server or leaves it terminally failed. */
-  function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
-    const verdict = authVerdict(port);
-    if (verdict === 'credentials') return failTerminal(port.key, 'auth', state);
-    if (verdict === 'unproven') {
-      // Stays failed(auth) only if there is nowhere else to gather evidence.
-      health.markDead(port.accountId, port.server);
-      if (!failOver(port.key, 'server-refused')) failTerminal(port.key, 'auth', state);
-      return;
-    }
+  /** A server outside the account's plan refused it (the login itself works): mark it
+   * (7 days, per machine) and move on; with nowhere left, `failed(not-in-plan)`. */
+  function planRefusal(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     health.markRefused(port.accountId, port.server);
     persistHealth();
-    if (failOver(port.key, 'server-refused')) return;
+    if (failOver(port.key, 'server-not-in-plan')) return;
     if (moveToAnotherAccount(port.key)) return;
-    // Nothing left: failed(auth) for HMA, failed(not-in-plan) for a plan refusal.
-    failTerminal(port.key, port.providerId === 'zoogvpn' ? 'not-in-plan' : 'auth', state);
+    failTerminal(port.key, 'not-in-plan', state, locationRefusesAll(port) ? 'location-not-in-plan' : undefined);
+    // Verified a while ago, and nothing of the account is up: the password may have been
+    // changed since. Check again (throttled) before blaming the plan for good.
+    if (!anyOnline(port.accountId)) void verifyStoredCredentials(port.accountId);
+  }
+
+  /** No free-tier server could be reached, so nothing is known (spec §5.2, last resort):
+   * the server is only marked dead (2 h, not a 7-day refusal) and the port moves on;
+   * after refusals on 3 distinct servers with nothing online the walk stops, saying the
+   * login could not be verified — never that the password is wrong. */
+  function unverifiedRefusal(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
+    if (refusals.suspectsBadLogin(port.accountId)) return failTerminal(port.key, 'auth', state, 'unverified-login');
+    health.markDead(port.accountId, port.server);
+    if (!failOver(port.key, 'server-refused')) failTerminal(port.key, 'auth', state, 'unverified-login');
+  }
+
+  /** A `failed(auth)` from the engine (spec §5.1, §5.2, §6.8 "server refused"). Every
+   * outcome either moves the port to another server or leaves it terminally failed. */
+  function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
+    if (port.providerId === 'hma') {
+      // §5.1: device creds, per-server tenant — but a refusal only once the creds are
+      // known to work somewhere; otherwise (stale or revoked device creds) walking the
+      // pool would just mark every server refused for a week.
+      if (!accountWorksElsewhere(port)) return failTerminal(port.key, 'auth', state);
+      health.markRefused(port.accountId, port.server);
+      persistHealth();
+      if (failOver(port.key, 'server-refused')) return;
+      if (moveToAnotherAccount(port.key)) return;
+      return failTerminal(port.key, 'auth', state);
+    }
+    // No free-tier server to tell a wrong password from a plan refusal: it is the login.
+    if (!freeTierProviders.get(port.providerId)) return failTerminal(port.key, 'auth', state);
+
+    refusals.recordAuthFailure(port.accountId, machineKey(port.server));
+    const check = credentialOf(port.accountId);
+    if (check?.state === 'verified' || anyOnline(port.accountId, port.key)) return planRefusal(port, state);
+    if (check?.state === 'rejected') return failTerminal(port.key, 'auth', state, 'wrong-credentials');
+
+    // Unknown or unverified: ask a free-tier server (at most once per 10 min per account).
+    const verdict = verifyStoredCredentials(port.accountId);
+    if (!verdict) return unverifiedRefusal(port, state);
+    const { key, server } = port;
+    cancelLocalRetry(key);
+    updatePort(key, { state: { kind: 'retrying', untilMs: Date.now() + CREDENTIAL_PROBE_BUDGET_MS, attempt: state.attempt, reasonKey: 'checking-sign-in' } });
+    const waiting = findPort(key)?.state;
+    // Nothing runs for the port meanwhile: its engine is stopped (after this callback).
+    setTimeout(() => {
+      if (findPort(key)?.state === waiting) void deps.engine.stop(key).catch(() => undefined);
+    }, 0);
+    void verdict.then((v) => {
+      const row = findPort(key);
+      // Stopped, removed, restarted or moved meanwhile: that path owns the port now.
+      if (!row || !row.enabled || row.state !== waiting || row.server !== server) return;
+      const pinned = row as PortRow & { server: string };
+      if (v === 'verified') planRefusal(pinned, state);
+      else if (v === 'unverified') unverifiedRefusal(pinned, state);
+      // The credentials were replaced while the check ran: try again with the new ones.
+      else if (v === 'unsupported') restartElsewhere(key, 'credentials-changed');
+      // 'rejected': `credentialsRejected` has already failed every port of the account.
+    });
   }
 
   // Bookkeeping for `onConnectivityFailure` (spec §6.4 "a port's exit IP is sticky").
@@ -811,6 +973,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const handledOnline = new Map<string, number>();
 
   deps.engine.onStateChange((key, state) => {
+    if (isProbeKey(key)) return; // a credential probe (credential-probe.ts), not a port
     updatePort(key, { state });
     if (state.kind === 'retrying' || state.kind === 'failed') backoffAttempts.set(key, state.attempt);
     else if (state.kind === 'online') backoffAttempts.delete(key);
@@ -825,10 +988,12 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (state.kind === 'online') {
       health.markOk(port.accountId, port.server);
       persistHealth();
+      // A server accepted the login: the credentials are right (spec §5.2).
+      if (freeTierProviders.get(port.providerId)) setCredential(port.accountId, 'verified');
     }
     if (port.providerId === 'zoogvpn') {
-      if (state.kind === 'online') refusals.recordOnline(port.accountId, port.server);
-      else refusals.clearOnline(port.accountId, port.server);
+      if (state.kind === 'online') refusals.recordOnline(port.accountId, machineKey(port.server));
+      else refusals.clearOnline(port.accountId, machineKey(port.server));
     }
 
     let incident: ProviderId | '*' | undefined;
@@ -851,7 +1016,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // path re-resolves and re-selects, so a dead server fails over (spec §6.8). A rotate
   // in flight already does its own stop+start, so skip the retry then.
   deps.engine.onRetryDue?.((key) => {
-    if (rotatingKeys.has(key)) return;
+    if (isProbeKey(key) || rotatingKeys.has(key)) return;
     const row = findPort(key);
     if (row && isTerminalState(row.state)) return; // terminal: only the user restarts it
     void startPort(key).catch(() => undefined);
@@ -982,7 +1147,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         }
       }
 
-      const target = (await provider.targets(account)).find((t) => t.key === port.locationKey);
+      const targets = await provider.targets(account);
+      freeTierProviders.set(provider.id, freeHosts(targets).length > 0);
+      const target = targets.find((t) => t.key === port.locationKey);
       if (stoppedMeanwhile()) return;
       if (!target) {
         updatePort(key, { enabled: true });
@@ -1137,6 +1304,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         targets.push(t);
       }
     }
+    freeTierProviders.set(provider.id, freeHosts(targets).length > 0);
     const currentTarget = targets.find((t) => t.key === port.locationKey);
 
     const claim = await withClaimLock(async (): Promise<RotateClaim | { noteKey: string }> => {
@@ -1356,9 +1524,32 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     refusals.forgetFailures(accountId);
     wgGuard.forget(accountId);
     wgAccounts.delete(accountId);
+    // A check of the old credentials says nothing about the new ones, and one still in
+    // flight must not be applied to them.
+    credentialEpoch.set(accountId, (credentialEpoch.get(accountId) ?? 0) + 1);
+    probesInFlight.delete(accountId);
+    lastProbeAt.delete(accountId);
+    deps.state.setState((st) => {
+      if (!st.credentials?.[accountId]) return st;
+      const { [accountId]: _dropped, ...rest } = st.credentials;
+      return { ...st, credentials: rest };
+    });
     persistHealth();
     persistRefusals();
     persistLockouts();
+  }
+
+  async function checkCredentials(account: Account, secret: AccountSecret): Promise<CredentialVerdict> {
+    const verdict = await runProbe(account, secret);
+    if (verdict !== 'unsupported') freeTierProviders.set(account.providerId, true);
+    return verdict;
+  }
+
+  function recordCredentialCheck(accountId: string, verdict: CredentialVerdict): void {
+    if (verdict === 'unsupported') return;
+    lastProbeAt.set(accountId, now());
+    if (verdict === 'rejected') credentialsRejected(accountId);
+    else setCredential(accountId, verdict);
   }
 
   return {
@@ -1375,5 +1566,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     syncAutoRotate,
     stopAutoRotate: () => autoRotate.stopAll(),
     credentialsChanged,
+    checkCredentials,
+    recordCredentialCheck,
   };
 }

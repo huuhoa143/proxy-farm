@@ -87,6 +87,12 @@ export interface Target {
    * absent means every token is one server.
    */
   poolHostnames?: boolean;
+  /**
+   * Servers of `servers` on the provider's free tier: any valid login may use them,
+   * whatever its plan, so a handshake there checks the credentials alone (spec §5.2,
+   * ZoogVPN `*.zgfree.info`). Optional; absent means none.
+   */
+  freeTierServers?: string[];
   /** Filled by the controller in `listTargets`: usable servers not held by any port. */
   freeServers?: number;
 }
@@ -143,6 +149,9 @@ export interface CheckResult {
   ok: boolean;
   reasonKey?: string; // i18n key
   label?: string; // human label for the account, e.g. 'key …AbC='
+  /** i18n key of a caveat on an accepted result, e.g. the login could not be checked
+   * live right now ('zoogvpn.check.unverified'). */
+  noteKey?: string;
 }
 
 export interface Provider {
@@ -172,6 +181,17 @@ export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 50
 export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server' | 'key-rejected';
 
 /**
+ * What the app found out about a failure, beyond its reason (spec §5.2):
+ *   wrong-credentials    — `auth`: a free-tier server refused the login too, so the
+ *                          email/password are wrong (not the plan).
+ *   unverified-login     — `auth`: several servers refused the login and no free-tier
+ *                          server could be reached to tell a wrong password from the plan.
+ *   location-not-in-plan — `not-in-plan`: every server of the location refused an
+ *                          account whose login works.
+ */
+export type FailDetail = 'wrong-credentials' | 'unverified-login' | 'location-not-in-plan';
+
+/**
  * Failures retrying cannot fix: the provider refused the login, the plan does not
  * include the location's servers, or a WireGuard key got no answer. Nothing restarts
  * such a port automatically (no timer, no engine) until the user acts: Start, Change
@@ -192,7 +212,7 @@ export type PortState =
   | { kind: 'verifying'; since: number }
   | { kind: 'online'; since: number; exitIp: string; country: string; latencyMs?: number }
   | { kind: 'retrying'; untilMs: number; attempt: number; reasonKey: string }
-  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number }
+  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number; detail?: FailDetail }
   | { kind: 'stopped' };
 
 export interface ExitIpResult {

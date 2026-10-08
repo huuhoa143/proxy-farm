@@ -349,6 +349,20 @@
       "no-server": {
         "label": "Không có máy chủ khả dụng",
         "guidance": "Chưa kết nối được máy chủ nào hoạt động cho vị trí này. Hệ thống sẽ tiếp tục thử lại."
+      },
+      "detail": {
+        "wrong-credentials": {
+          "label": "Sai email hoặc mật khẩu",
+          "guidance": "{{provider}} từ chối email và mật khẩu này, kể cả trên máy chủ miễn phí, nên không phải do gói. Nhập lại trong thẻ {{provider}} rồi bấm Kiểm tra, sau đó bật lại cổng."
+        },
+        "unverified-login": {
+          "label": "Chưa xác minh được đăng nhập",
+          "guidance": "Nhiều máy chủ {{provider}} từ chối đăng nhập, và không kết nối được máy chủ miễn phí để phân biệt sai mật khẩu với giới hạn của gói. Hãy kiểm tra email và mật khẩu trong thẻ {{provider}}, hoặc bật lại cổng để thử lần nữa."
+        },
+        "location-not-in-plan": {
+          "label": "Không có trong gói",
+          "guidance": "Gói {{provider}} của bạn không bao gồm vị trí này — chọn vị trí khác hoặc nâng cấp gói."
+        }
       }
     },
     "attempt": "lần {{n}}",
@@ -368,7 +382,10 @@
       "server-refused": "Máy chủ này từ chối đăng nhập — đang chuyển sang máy chủ khác cùng vị trí.",
       "server-dead": "Máy chủ này không còn phản hồi — đang chuyển sang máy chủ khác cùng vị trí.",
       "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác.",
-      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên."
+      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên.",
+      "server-not-in-plan": "Gói {{provider}} của bạn không bao gồm máy chủ này — đang chuyển sang máy chủ khác.",
+      "checking-sign-in": "Máy chủ từ chối đăng nhập — đang kiểm tra email và mật khẩu qua một máy chủ miễn phí của {{provider}}…",
+      "credentials-changed": "Thông tin đăng nhập vừa thay đổi — đang kết nối lại."
     }
   },
   "settings": {
@@ -492,7 +509,9 @@
   "zoogvpn": {
     "check": {
       "missingUsername": "Nhập email ZoogVPN.",
-      "missingPassword": "Nhập mật khẩu ZoogVPN."
+      "missingPassword": "Nhập mật khẩu ZoogVPN.",
+      "wrongCredentials": "ZoogVPN báo sai email hoặc mật khẩu. Hãy kiểm tra lại rồi thử lần nữa.",
+      "unverified": "Đã thêm, nhưng lúc này chưa kiểm tra được đăng nhập vì các máy chủ miễn phí của ZoogVPN không phản hồi. Proxy Farm sẽ kiểm tra lại khi một cổng kết nối."
     }
   },
   "surfshark": {

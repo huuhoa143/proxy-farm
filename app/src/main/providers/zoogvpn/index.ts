@@ -12,15 +12,22 @@
  * needs either a contracts change or a controller-side decision encoded
  * into `Target`, which is out of this module's scope.
  *
- * Plan-refusal vs wrong-password disambiguation (spec §5.2, ⚠️) is a
- * health/back-off concern (tracking auth failures across servers of the
- * same account over time) and belongs in the health module, not here.
+ * Plan refusal vs wrong password (spec §5.2): both arrive as `AUTH_FAILED`.
+ * This module only says which hosts are on the free tier (`freeTierServers`);
+ * the controller's credential probe (controller/credential-probe.ts) asks one
+ * of them to tell the two apart.
  */
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { loadCaLines, loadTlsAuthLines } from './ca';
 import { loadServers, type ZoogServer } from './servers';
 
 const SERVER_PORT = 1194;
+
+/** ZoogVPN's free-tier hosts (`nl.zgfree.info`, `uk.zgfree.info`, `us.zgfree.info`):
+ * every account may use them, whatever its plan (✅ 2026-10-09). */
+export function isFreeTierHost(host: string): boolean {
+  return /\.zgfree\.info$/i.test(host);
+}
 
 /**
  * Location key (spec §6.8): `zoogvpn:<CC>` for a country-wide location (the
@@ -52,16 +59,18 @@ export function groupLocations(servers: ZoogServer[]): Target[] {
     const existing = byKey.get(key);
     if (existing) {
       if (!existing.servers.includes(s.host)) existing.servers.push(s.host);
-      continue;
+    } else {
+      byKey.set(key, {
+        key,
+        providerId: 'zoogvpn',
+        country: s.country,
+        city: s.city,
+        label: s.city === s.countryName || s.city === '' ? s.countryName : `${s.countryName} — ${s.city}`,
+        servers: [s.host],
+      });
     }
-    byKey.set(key, {
-      key,
-      providerId: 'zoogvpn',
-      country: s.country,
-      city: s.city,
-      label: s.city === s.countryName || s.city === '' ? s.countryName : `${s.countryName} — ${s.city}`,
-      servers: [s.host],
-    });
+    const target = byKey.get(key)!;
+    if (isFreeTierHost(s.host) && !target.freeTierServers?.includes(s.host)) target.freeTierServers = [...(target.freeTierServers ?? []), s.host];
   }
   return [...byKey.values()];
 }

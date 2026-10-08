@@ -7,6 +7,18 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- ZoogVPN: a refused sign-in is now told apart from a server outside your plan by a
+  live check on a ZoogVPN free server, instead of being guessed from how many servers
+  refused it (0.1.0 could tell a new account on a restrictive plan that its password was
+  wrong). "Check" makes one short test connection before the account is saved: a wrong
+  email or password is rejected with that message, and if no free server answers the
+  account is added as unverified. A port refused by a server checks the login the same
+  way (at most once per 10 minutes per account) and then either moves on as a plan
+  refusal or stops with "wrong email or password". A location where every server
+  refuses a working login says so: "Your ZoogVPN plan doesn't include this location".
+
 ### Fixed
 
 - A port that failed for good (sign-in rejected, location not in the plan, WireGuard key

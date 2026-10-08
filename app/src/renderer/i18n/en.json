@@ -349,6 +349,20 @@
       "no-server": {
         "label": "No server available",
         "guidance": "No working server could be reached for this location yet. It will keep retrying."
+      },
+      "detail": {
+        "wrong-credentials": {
+          "label": "Wrong email or password",
+          "guidance": "{{provider}} refused this email and password, on a free server too, so it's not your plan. Re-enter them on the {{provider}} card and press Check, then start the port."
+        },
+        "unverified-login": {
+          "label": "Sign-in couldn't be verified",
+          "guidance": "Several {{provider}} servers refused the sign-in, and the free servers that tell a wrong password from your plan couldn't be reached. Check your email and password on the {{provider}} card, or start the port to try again."
+        },
+        "location-not-in-plan": {
+          "label": "Not in your plan",
+          "guidance": "Your {{provider}} plan doesn't include this location — pick another location or upgrade your plan."
+        }
       }
     },
     "attempt": "attempt {{n}}",
@@ -368,7 +382,10 @@
       "server-refused": "This server refused the sign-in — moving to another server in the same location.",
       "server-dead": "This server stopped answering — moving to another server in the same location.",
       "duplicate-exit": "Another port already exits through this IP — moving to a different server.",
-      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often."
+      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often.",
+      "server-not-in-plan": "Your {{provider}} plan doesn't include this server — moving to another one.",
+      "checking-sign-in": "The server refused the sign-in — checking your email and password on a {{provider}} free server…",
+      "credentials-changed": "Your sign-in details just changed — connecting again."
     }
   },
   "settings": {
@@ -492,7 +509,9 @@
   "zoogvpn": {
     "check": {
       "missingUsername": "Enter your ZoogVPN email.",
-      "missingPassword": "Enter your ZoogVPN password."
+      "missingPassword": "Enter your ZoogVPN password.",
+      "wrongCredentials": "ZoogVPN says this email or password is wrong. Check them and try again.",
+      "unverified": "Added, but the sign-in couldn't be checked right now: ZoogVPN's free servers didn't answer. Proxy Farm checks it again when a port connects."
     }
   },
   "surfshark": {

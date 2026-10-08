@@ -77,6 +77,7 @@ describe('zoogvpn provider: targets', () => {
         city: 'United States',
         label: 'United States',
         servers: ['us.zgfree.info'],
+        freeTierServers: ['us.zgfree.info'],
       },
     ]);
   });

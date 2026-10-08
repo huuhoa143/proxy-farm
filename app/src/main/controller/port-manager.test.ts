@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Account, EndpointSpec, ExitIpResult, PortRow, PortState, Provider, RenderInput, Target } from '../../shared/contracts';
 import type { SecretStore } from '../store/secrets';
-import { createStateStore, type StateStore } from '../store/state';
+import { createStateStore, type AppState, type StateStore } from '../store/state';
+
+type AppStateCredentials = AppState['credentials'];
 import { createPortManager, type PortManagerDeps } from './port-manager';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator } from './ports';
 import { createServerHealth } from './server-health';
@@ -147,6 +149,18 @@ function fakeProvider(targets: Target[]): Provider {
 }
 
 const account: Account = { id: 'z1', providerId: 'zoogvpn', label: 'z1', meta: {}, secretRef: 'z1-secret' };
+
+/** A ZoogVPN-style free-tier location (spec §5.2): its presence among a provider's
+ * targets turns on the live credential check on an auth failure. */
+const freeTier: Target = {
+  key: 'zoogvpn:free',
+  providerId: 'zoogvpn',
+  country: 'NL',
+  city: 'Netherlands',
+  label: 'Netherlands',
+  servers: ['nl.zgfree.info'],
+  freeTierServers: ['nl.zgfree.info'],
+};
 
 /** The pinned server of the row with this port key (or, for a moved row, location key). */
 function serverOf(state: StateStore, key: string): string | undefined {
@@ -1121,7 +1135,12 @@ describe('port manager', () => {
     });
 
     it('a zoogvpn port reaching failed(auth) records an auth failure for its server, persisted into AppState.refusals', async () => {
-      const { state, engine } = setup({ targets: [] });
+      const { manager, state, engine } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }, freeTier],
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { credentialProbe: async () => ({ outcome: 'unreachable' }) },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
       engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
       expect(state.getState().refusals.failures.z1?.['10.0.0.1']).toBeTypeOf('number');
     });
@@ -1752,44 +1771,171 @@ describe('port manager', () => {
       expect(engine.started[1].attempt).toBe(0);
     });
 
-    it('a ZoogVPN auth failure with no other evidence is undecided: the server is marked dead (not refused) and the port moves on', async () => {
-      const serverHealth = createServerHealth();
-      const { manager, engine, state } = setup({
-        targets: twoServerTargets,
-        port: { enabled: false, state: { kind: 'stopped' } },
-        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
-        engine: fakeEngine({ autoOnline: false }),
-        depsOverrides: { serverHealth },
-      });
-      await manager.startPort('zoogvpn:nl-ams');
-      engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
-      expect(serverHealth.isDead('z1', '10.0.0.1')).toBe(true);
-      expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(false);
-      expect(state.getState().serverHealth.refused.z1).toBeUndefined(); // no 7-day mark persisted
-      await vi.waitFor(() => expect(engine.started).toHaveLength(2));
-      expect(boundIp(engine.started[1].input)).toBe('10.0.0.2');
-    });
+    describe('ZoogVPN plan vs password: the free-tier check (spec §5.2)', () => {
+      const ams = (servers: string[]): Target => ({ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers });
+      const authFailed: PortState = { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 };
 
-    it('ZoogVPN: undecided failures on distinct servers accumulate until bad-login, which stops the walk', async () => {
-      const serverHealth = createServerHealth();
-      const servers = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
-      const { manager, engine, state } = setup({
-        targets: [{ ...twoServerTargets[0], servers }],
-        port: { enabled: false, state: { kind: 'stopped' } },
-        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
-        engine: fakeEngine({ autoOnline: false }),
-        depsOverrides: { serverHealth },
-      });
-      await manager.startPort('zoogvpn:nl-ams');
-      for (let i = 1; i <= 3; i++) {
-        engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
-        if (i < 3) await vi.waitFor(() => expect(engine.started).toHaveLength(i + 1));
+      /** One stopped port on 10.0.0.1 of a 4-server location; `probe` answers the check. */
+      function checkSetup(outcome: 'ok' | 'auth' | 'unreachable' | (() => Promise<{ outcome: 'ok' | 'auth' | 'unreachable' }>), opts: { credentials?: AppStateCredentials } = {}) {
+        const serverHealth = createServerHealth();
+        const probe = vi.fn(typeof outcome === 'function' ? outcome : async () => ({ outcome, host: 'nl.zgfree.info' }));
+        const ctx = setup({
+          targets: [ams(['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4']), freeTier],
+          port: { enabled: false, state: { kind: 'stopped' } },
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, credentialProbe: probe, attemptLimiter: { take: () => 0 } },
+        });
+        if (opts.credentials) ctx.state.setState((st) => ({ ...st, credentials: opts.credentials! }));
+        return { ...ctx, serverHealth, probe, stateOf: () => ctx.state.getState().ports[0].state };
       }
-      // The third distinct server decides it: wrong credentials, so no further move.
-      await new Promise((r) => setTimeout(r, 10));
-      expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.1', '10.0.0.2', '10.0.0.3']);
-      expect(serverHealth.isUsable('z1', '10.0.0.3')).toBe(true);
-      expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'auth' });
+
+      it('an unknown login is checked on a free-tier server first; while it runs the port waits with its engine stopped', async () => {
+        let answer!: (r: { outcome: 'ok' }) => void;
+        const { manager, engine, probe, stateOf } = checkSetup(() => new Promise((r) => (answer = r)));
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        expect(probe).toHaveBeenCalledTimes(1);
+        expect((probe.mock.calls[0] as unknown[])[0]).toMatchObject({ id: 'z1' });
+        expect(stateOf()).toMatchObject({ kind: 'retrying', reasonKey: 'checking-sign-in' });
+        await vi.waitFor(() => expect(engine.stopped).toContain('zoogvpn:nl-ams'));
+        expect(engine.started).toHaveLength(1);
+        answer({ outcome: 'ok' });
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      });
+
+      it('the free host accepts the login → verified (persisted), the server is a plan refusal: refused 7 days, the port moves', async () => {
+        const { manager, engine, state, serverHealth, stateOf } = checkSetup('ok');
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'verified', verifiedAt: expect.any(Number) });
+        expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(true);
+        expect(boundIp(engine.started[1].input)).toBe('10.0.0.2');
+        expect(stateOf()).toMatchObject({ kind: 'connecting' });
+        // Verified now: the next refusal is a plan refusal at once, no second check.
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        expect(stateOf()).toMatchObject({ kind: 'retrying', reasonKey: 'server-not-in-plan' });
+        expect(serverHealth.isRefused('z1', '10.0.0.2')).toBe(true);
+      });
+
+      it('the free host refuses the login too → wrong email or password: terminal, no walk, marks made on the assumption dropped', async () => {
+        const { manager, engine, state, serverHealth, stateOf, probe } = checkSetup('auth');
+        serverHealth.markRefused('z1', '10.0.0.4'); // a refusal recorded while the login was never verified
+        state.setState((st) => ({
+          ...st,
+          ports: [...st.ports, basePort({ key: 'zoogvpn:nl-ams#2', proxyPort: 29002, server: '10.0.0.3', state: { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' } })],
+        }));
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        await vi.waitFor(() => expect(stateOf()).toMatchObject({ kind: 'failed', reason: 'auth', detail: 'wrong-credentials' }));
+        // Every port of the account that is not up fails with it; nothing is marked refused.
+        expect(state.getState().ports[1].state).toMatchObject({ kind: 'failed', reason: 'auth', detail: 'wrong-credentials' });
+        expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(false);
+        expect(serverHealth.isRefused('z1', '10.0.0.4')).toBe(false);
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'rejected' });
+        await new Promise((r) => setTimeout(r, 10));
+        expect(engine.started).toHaveLength(1);
+        expect(engine.stopped).toContain('zoogvpn:nl-ams');
+        // Known wrong now: the user's Start tries again, and a refusal fails it at once.
+        await manager.startPort('zoogvpn:nl-ams', { user: true });
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        expect(stateOf()).toMatchObject({ kind: 'failed', reason: 'auth', detail: 'wrong-credentials' });
+        expect(probe).toHaveBeenCalledTimes(1);
+      });
+
+      it('no free host reachable → only the last resort: dead (not refused) marks, then "could not verify" after 3 servers; one check per 10 min', async () => {
+        const { manager, engine, state, serverHealth, stateOf, probe } = checkSetup('unreachable');
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        expect(serverHealth.isDead('z1', '10.0.0.1')).toBe(true);
+        expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(false);
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'unverified' });
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(3));
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        await new Promise((r) => setTimeout(r, 10));
+        expect(engine.started).toHaveLength(3);
+        expect(stateOf()).toMatchObject({ kind: 'failed', reason: 'auth', detail: 'unverified-login' });
+        expect(probe).toHaveBeenCalledTimes(1);
+        expect(serverHealth.serialize().refused).toEqual({});
+      });
+
+      it('a verified login never triggers a check: the refusal is the plan', async () => {
+        const { manager, engine, serverHealth, probe, stateOf } = checkSetup('auth', { credentials: { z1: { state: 'verified', at: 1, verifiedAt: 1 } } });
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(true);
+        expect(stateOf()).toMatchObject({ kind: 'retrying', reasonKey: 'server-not-in-plan' });
+        expect(probe).not.toHaveBeenCalled();
+      });
+
+      it('a location where every server refuses a working login → failed(not-in-plan, location-not-in-plan); a stale login is re-checked', async () => {
+        const { manager, engine, state, serverHealth, probe, stateOf } = checkSetup('auth', { credentials: { z1: { state: 'verified', at: 1, verifiedAt: 1 } } });
+        for (const ip of ['10.0.0.2', '10.0.0.3', '10.0.0.4']) serverHealth.markRefused('z1', ip);
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        expect(stateOf()).toMatchObject({ kind: 'failed', reason: 'not-in-plan', detail: 'location-not-in-plan' });
+        // Nothing of the account is up, and the login was verified long ago: check it again.
+        expect(probe).toHaveBeenCalledTimes(1);
+        // It turns out wrong now (a new password on the website): the plan was not to blame.
+        await vi.waitFor(() => expect(stateOf()).toMatchObject({ kind: 'failed', reason: 'auth', detail: 'wrong-credentials' }));
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'rejected', verifiedAt: 1 });
+        expect(serverHealth.serialize().refused).toEqual({}); // all made after verifiedAt
+      });
+
+      it('ports of one account refused together share one check', async () => {
+        let answer!: (r: { outcome: 'ok' }) => void;
+        const { manager, engine, state, probe } = checkSetup(() => new Promise((r) => (answer = r)));
+        state.setState((st) => ({ ...st, ports: [...st.ports, basePort({ key: 'zoogvpn:nl-ams#2', proxyPort: 29002, server: '10.0.0.2', enabled: false, state: { kind: 'stopped' } })] }));
+        await manager.startPort('zoogvpn:nl-ams');
+        await manager.startPort('zoogvpn:nl-ams#2');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        engine.fireState('zoogvpn:nl-ams#2', authFailed);
+        expect(probe).toHaveBeenCalledTimes(1);
+        answer({ outcome: 'ok' });
+        await vi.waitFor(() => expect(engine.started).toHaveLength(4));
+        expect(new Set(engine.started.slice(2).map((st) => boundIp(st.input)))).toEqual(new Set(['10.0.0.3', '10.0.0.4']));
+      });
+
+      it('a port reaching online verifies the login; new credentials drop the check, and an old check still running is ignored', async () => {
+        let answer!: (r: { outcome: 'auth' }) => void;
+        const { manager, engine, state, stateOf } = checkSetup(() => new Promise((r) => (answer = r)));
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 1, exitIp: '10.0.0.1', country: 'NL' });
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'verified' });
+        manager.credentialsChanged('z1');
+        expect(state.getState().credentials.z1).toBeUndefined();
+        engine.fireState('zoogvpn:nl-ams', authFailed); // probe of the current creds starts
+        manager.credentialsChanged('z1'); // …and they are replaced while it runs
+        answer({ outcome: 'auth' });
+        // Not failed(wrong-credentials): the port tries again, with the new credentials.
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        expect(state.getState().credentials.z1).toBeUndefined();
+        expect(stateOf()).not.toMatchObject({ kind: 'failed' });
+      });
+
+      it('engine events of a credential probe are not port events', async () => {
+        const { engine, state } = checkSetup('ok');
+        const before = JSON.stringify(state.getState().ports);
+        engine.fireState('probe:z1:1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        engine.fireRetryDue('probe:z1:1');
+        await new Promise((r) => setTimeout(r, 10));
+        expect(JSON.stringify(state.getState().ports)).toBe(before);
+        expect(engine.started).toHaveLength(0);
+      });
+
+      it('checkCredentials runs one probe and stores nothing; recordCredentialCheck stores the verdict', async () => {
+        const { manager, state, probe } = checkSetup('ok');
+        const secret = { kind: 'userpass' as const, username: 'me', password: 'new' };
+        expect(await manager.checkCredentials(account, secret)).toBe('verified');
+        expect(probe).toHaveBeenCalledWith(account, secret, expect.anything());
+        expect(state.getState().credentials.z1).toBeUndefined();
+        manager.recordCredentialCheck('z1', 'unverified');
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'unverified' });
+        manager.recordCredentialCheck('z1', 'verified');
+        expect(state.getState().credentials.z1).toMatchObject({ state: 'verified' });
+      });
     });
 
     describe('ZoogVPN plan refusal (spec §5.2)', () => {
@@ -1800,7 +1946,7 @@ describe('port manager', () => {
       function planSetup(servers: string[], second: string, opts: { accounts?: Account[]; pool?: PortManagerDeps['pool'] } = {}) {
         const serverHealth = createServerHealth();
         const ctx = setup({
-          targets: [ams(servers)],
+          targets: [ams(servers), freeTier],
           port: { key: 'zoogvpn:nl-ams#1', state: { kind: 'online', since: 1, exitIp: '10.0.0.1', country: 'NL' } },
           engine: fakeEngine({ autoOnline: false }),
           depsOverrides: { serverHealth, pool: opts.pool },
@@ -1823,7 +1969,7 @@ describe('port manager', () => {
         engine.fireState('zoogvpn:nl-ams#2', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
         expect(serverHealth.isRefused('z1', '10.0.0.2')).toBe(true);
         expect(state.getState().serverHealth.refused.z1?.['10.0.0.2']).toBeTypeOf('number'); // persisted
-        expect(state.getState().ports[1].state).toMatchObject({ kind: 'retrying', reasonKey: 'server-refused' });
+        expect(state.getState().ports[1].state).toMatchObject({ kind: 'retrying', reasonKey: 'server-not-in-plan' });
         await vi.waitFor(() => expect(engine.started).toHaveLength(1));
         expect(engine.started[0].key).toBe('zoogvpn:nl-ams#2');
         expect(boundIp(engine.started[0].input)).toBe('10.0.0.3'); // 10.0.0.1 is held by #1

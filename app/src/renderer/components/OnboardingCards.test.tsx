@@ -84,6 +84,28 @@ describe('ZoogVpnCard', () => {
       expect(screen.getByTestId('zoogvpn-message')).toHaveTextContent('Enter your ZoogVPN password.'),
     );
   });
+
+  it('says plainly when the free-server check found the email or password wrong', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'addAccount').mockResolvedValueOnce({ ok: false, reasonKey: 'zoogvpn.check.wrongCredentials', label: 'me@example.com' });
+    const onAdded = vi.fn();
+    render(<ZoogVpnCard api={api} onAdded={onAdded} />);
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'typo' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(screen.getByTestId('zoogvpn-message')).toHaveTextContent('ZoogVPN says this email or password is wrong.'));
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  it('shows the caveat of an account accepted without a live check', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'addAccount').mockResolvedValueOnce({ ok: true, label: 'me@example.com', noteKey: 'zoogvpn.check.unverified' });
+    render(<ZoogVpnCard api={api} onAdded={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(screen.getByTestId('zoogvpn-message')).toHaveTextContent("me@example.com — Added, but the sign-in couldn't be checked right now"));
+  });
 });
 
 describe('SurfsharkCard', () => {

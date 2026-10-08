@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Account, PortRow, Provider, ProviderId, RotateResult, Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
-import type { PortManager } from '../controller/port-manager';
+import type { CredentialVerdict, PortManager } from '../controller/port-manager';
 import type { StartQueue } from '../controller/start-queue';
 import type { SecretStore } from '../store/secrets';
 import { createStateStore, type StateStore } from '../store/state';
@@ -60,12 +60,14 @@ function fakeProvider(id: ProviderId, targets: (account: Account) => Target[]): 
  * real one (per account: `refusedFor` lists servers that account may not use). */
 function fakePortManager(state: StateStore, refusedFor: Record<string, string[]> = {}) {
   const calls: string[] = [];
+  let verdict: CredentialVerdict = 'unsupported';
   let rotateResult: RotateResult = { changed: true, from: '1.1.1.1', to: '2.2.2.2' };
   const held = (t: Target) => new Set(state.getState().ports.filter((p) => p.locationKey === t.key).map((p) => p.server));
   let addLock: Promise<unknown> = Promise.resolve();
-  const pm: PortManager & { calls: string[]; setRotate(r: RotateResult): void } = {
+  const pm: PortManager & { calls: string[]; setRotate(r: RotateResult): void; setVerdict(v: CredentialVerdict): void } = {
     calls,
     setRotate: (r) => (rotateResult = r),
+    setVerdict: (v) => (verdict = v),
     startPort: async (key) => void calls.push(`start:${key}`),
     stopPort: async (key) => {
       calls.push(`stop:${key}`);
@@ -106,6 +108,11 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
     syncAutoRotate: () => undefined,
     stopAutoRotate: () => undefined,
     credentialsChanged: (accountId) => void calls.push(`creds:${accountId}`),
+    checkCredentials: async (account, secret) => {
+      calls.push(`check:${account.id}:${secret.kind === 'userpass' ? secret.password : secret.kind}`);
+      return verdict;
+    },
+    recordCredentialCheck: (accountId, v) => void calls.push(`record:${accountId}:${v}`),
   };
   return pm;
 }
@@ -278,6 +285,76 @@ describe('controller facade', () => {
     expect(r.ok).toBe(true);
     expect(JSON.parse(secrets.loadSecret(r.account!.secretRef)!)).toEqual({ kind: 'userpass', username: 'me@example.com', password: 'pw' });
     expect(await facade.addAccount('zoogvpn', { password: 'pw' })).toMatchObject({ ok: false, reasonKey: 'zoogvpn.check.missingUsername' });
+  });
+
+  describe('addAccount: one live login check before an email/password is stored (spec §5.2)', () => {
+    it('verified → stored, the verdict recorded', async () => {
+      const { facade, portManager, state } = setup();
+      portManager.setVerdict('verified');
+      const r = await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'pw' });
+      expect(r).toMatchObject({ ok: true, label: 'me@example.com' });
+      expect(r.noteKey).toBeUndefined();
+      expect(portManager.calls.filter((c) => c.startsWith('check:') || c.startsWith('record:'))).toEqual(['check:zoogvpn-1:pw', 'record:zoogvpn-1:verified']);
+      expect(state.getState().accounts).toHaveLength(1);
+    });
+
+    it('rejected by the free-tier server → "wrong email or password", nothing stored', async () => {
+      const { facade, portManager, state, secrets } = setup();
+      portManager.setVerdict('rejected');
+      expect(await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'bad' })).toEqual({
+        ok: false,
+        reasonKey: 'zoogvpn.check.wrongCredentials',
+        label: 'me@example.com',
+      });
+      expect(state.getState().accounts).toEqual([]);
+      expect(secrets.loadSecret('account:zoogvpn-1')).toBeNull();
+    });
+
+    it('a wrong new password for an existing account keeps the old one', async () => {
+      const { facade, portManager, secrets } = setup();
+      portManager.setVerdict('verified');
+      const first = await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'good' });
+      portManager.setVerdict('rejected');
+      expect((await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'typo' })).ok).toBe(false);
+      expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!).password).toBe('good');
+      expect(portManager.calls).not.toContain('creds:zoogvpn-1');
+    });
+
+    it('no free-tier server reachable → accepted but marked unverified, with a note', async () => {
+      const { facade, portManager } = setup();
+      portManager.setVerdict('unverified');
+      const r = await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'pw' });
+      expect(r).toMatchObject({ ok: true, noteKey: 'zoogvpn.check.unverified' });
+      expect(portManager.calls).toContain('record:zoogvpn-1:unverified');
+    });
+
+    it('new credentials that check out restart the account\'s terminally failed ports (a user action)', async () => {
+      const { facade, portManager, state, queue } = setup();
+      portManager.setVerdict('verified');
+      const { account } = await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'old' });
+      const failed = (key: string, reason: 'auth' | 'not-in-plan'): PortRow => ({
+        key, locationKey: key.split('#')[0], providerId: 'zoogvpn', accountId: account!.id, label: 'X', country: 'JP', city: 'Japan',
+        proxyPort: 29001 + queue.enqueued.length, enabled: true, state: { kind: 'failed', reason, untilMs: 0, attempt: 1 }, autoRotateMin: 0,
+      });
+      state.setState((s) => ({ ...s, ports: [failed('zoogvpn:JP#1', 'auth'), failed('zoogvpn:DE#1', 'not-in-plan')] }));
+      // Same password, checked again: only the sign-in failure is retried.
+      await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'old' });
+      expect(queue.enqueued).toEqual(['zoogvpn:JP#1']);
+      state.setState((s) => ({ ...s, ports: [failed('zoogvpn:JP#1', 'auth'), failed('zoogvpn:DE#1', 'not-in-plan')] }));
+      // A new password: every terminal failure of the account is retried.
+      await facade.addAccount('zoogvpn', { email: 'me@example.com', password: 'new' });
+      expect(queue.enqueued).toEqual(['zoogvpn:JP#1', 'zoogvpn:JP#1', 'zoogvpn:DE#1']);
+    });
+
+    it('only an email/password login is probed (not a WireGuard key)', async () => {
+      const surfshark: Provider = {
+        ...fakeProvider('surfshark', () => []),
+        check: () => ({ ok: true, label: 'key …abcdef', secret: { kind: 'wgkey', privateKey: 'k' }, meta: {} }),
+      };
+      const { facade, portManager } = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+      await facade.addAccount('surfshark', { privateKey: 'k' });
+      expect(portManager.calls.some((c) => c.startsWith('check:'))).toBe(false);
+    });
   });
 
   it('importConfigFile honours the country override, else guesses it from the file name', async () => {
