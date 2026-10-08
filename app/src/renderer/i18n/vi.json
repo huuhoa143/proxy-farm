@@ -302,7 +302,8 @@
       },
       "pick": "Chuyển cổng này sang {{server}}",
       "freeTier": "Miễn phí",
-      "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói."
+      "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói.",
+      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ"
     },
     "addResult": {
       "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",

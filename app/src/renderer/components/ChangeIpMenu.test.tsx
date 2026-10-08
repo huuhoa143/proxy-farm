@@ -99,6 +99,36 @@ describe('ChangeIpMenu', () => {
     expect(screen.queryByText('Servers in Japan')).toBeNull();
   });
 
+  describe('"Next free server" with nothing free here (spec §6.5 step 2)', () => {
+    async function noneFree(sameCountryAlternative?: boolean) {
+      const api = createFakeProxyFarmApi();
+      const rows = await api.listPorts();
+      const row = rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow;
+      vi.spyOn(api, 'listServers').mockResolvedValue([
+        { server: '203.0.113.10', health: 'ok', heldBy: 'hma:JP-TOKYO#1' },
+        { server: '203.0.113.13', health: 'refused' },
+      ]);
+      render(<ChangeIpMenu row={row} api={api} rows={rows} onChange={() => {}} sameCountryAlternative={sameCountryAlternative} />);
+      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#1'));
+      await screen.findByTestId('server-203.0.113.13');
+      return screen.getByRole('menuitem', { name: /Next free server/ });
+    }
+
+    it('promises another city of the same country only when the provider has one', async () => {
+      expect(await noneFree(true)).toHaveTextContent('None free here — tries another city in the same country');
+    });
+
+    it('otherwise says the port keeps its server (ZoogVPN Japan is one location)', async () => {
+      const next = await noneFree(false);
+      expect(next).toHaveTextContent('no other location in this country — the port keeps its server');
+      expect(next).not.toHaveTextContent('another city');
+    });
+
+    it('makes no promise when it is not told about other locations', async () => {
+      expect(await noneFree()).not.toHaveTextContent('another city');
+    });
+  });
+
   it('tags a free-tier server (not to be confused with an unheld, "free" one)', async () => {
     const { api, trigger } = await setup();
     vi.spyOn(api, 'listServers').mockResolvedValue([

@@ -427,6 +427,21 @@ describe('PortTable', () => {
       }
     });
 
+    it("the Change IP menu learns whether the port's provider has another location in its country", async () => {
+      const api = createFakeProxyFarmApi();
+      const spy = vi.spyOn(api, 'listServers').mockResolvedValue([{ server: '10.0.0.1', health: 'ok', heldBy: 'hma:JP-TOKYO#2' }]);
+      const osaka: Target = { ...tokyo, key: 'hma:JP-OSAKA', city: 'Osaka' };
+      const surfsharkOsaka: Target = { ...osaka, key: 'surfshark:JP-OSA', providerId: 'surfshark' };
+      const { unmount } = renderGrouped({ api, targets: [tokyo, hanoi, surfsharkOsaka] }); // another provider's city does not count
+      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
+      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('no other location in this country');
+      unmount();
+      renderGrouped({ api, targets: [tokyo, hanoi, osaka] });
+      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
+      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('tries another city in the same country');
+      expect(spy).toHaveBeenCalled();
+    });
+
     it('+ Add port says so when the location is not in the plan', () => {
       renderGrouped({ targets: [tokyo, { ...hanoi, notInPlan: true }] });
       const blocked = screen.getByTestId('add-port-zoogvpn:VN-HAN');

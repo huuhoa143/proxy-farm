@@ -302,7 +302,8 @@
       },
       "pick": "Move this port to {{server}}",
       "freeTier": "Free tier",
-      "freeTierHint": "A free-tier server: it works on every plan."
+      "freeTierHint": "A free-tier server: it works on every plan.",
+      "noneFreeNoAltHint": "None free here, and no other location in this country — the port keeps its server"
     },
     "addResult": {
       "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",

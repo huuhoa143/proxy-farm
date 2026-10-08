@@ -24,6 +24,9 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A location that covers a whole country (most ZoogVPN locations) is named after the
   country in the UI language: "Đức", not "Germany" or "Germany Đức", in the picker, the
   group header, the port labels and the Change IP menu heading.
+- With no free server left, the Change IP menu no longer promises to try "another city
+  in the same country" when the provider has no other location there (ZoogVPN Japan);
+  it says the port keeps its server.
 
 ### Fixed
 

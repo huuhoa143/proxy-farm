@@ -396,6 +396,9 @@ export function PortTable({
                     api={api}
                     rows={rows}
                     locationName={rowLocation}
+                    sameCountryAlternative={targets.some(
+                      (tg) => tg.providerId === row.providerId && tg.country === row.country && tg.key !== row.locationKey && !tg.notInPlan,
+                    )}
                     disabled={!canChangeIp}
                     busy={rotatingKeys?.has(row.key)}
                     onChange={onRotate}
