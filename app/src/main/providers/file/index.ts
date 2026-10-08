@@ -5,6 +5,13 @@
  * the raw content from the secrets store (never a path on disk — "imported
  * files are kept in the encrypted secrets store, not as plain files") to
  * build the endpoint.
+ *
+ * The location's server pool (spec §6.8) is the file's remotes: every
+ * `remote` host of an `.ovpn` (see ovpn-parser.ts for which ones), or the
+ * single `Endpoint` of a WireGuard `.conf`. `targets()` has no access to the
+ * secret, so `check()` records the pool in `meta.servers` (space-separated;
+ * hostnames and IP literals never contain spaces). Files imported before
+ * that field existed fall back to `meta.host`.
  */
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { UnsupportedDirectiveError } from './errors';
@@ -38,6 +45,7 @@ export function createFileProvider(): Provider {
             format: 'openvpn' satisfies Format,
             host: parsed.remoteHost,
             port: String(parsed.remotePort),
+            servers: parsed.servers.join(' '),
           };
           const secret: AccountSecret = {
             kind: 'file',
@@ -54,6 +62,7 @@ export function createFileProvider(): Provider {
             format: 'wireguard' satisfies Format,
             host: parsed.endpointHost,
             port: String(parsed.endpointPort),
+            servers: parsed.endpointHost,
           };
           const secret: AccountSecret = { kind: 'file', content };
           return { ok: true, label: `${parsed.endpointHost}:${parsed.endpointPort}`, secret, meta };
@@ -72,6 +81,7 @@ export function createFileProvider(): Provider {
       const host = account.meta.host;
       const port = account.meta.port;
       if (!host) return [];
+      const servers = account.meta.servers?.split(' ').filter(Boolean);
       return [
         {
           key: `file:${account.id}`,
@@ -79,7 +89,7 @@ export function createFileProvider(): Provider {
           country: account.meta.country ?? '??',
           city: account.meta.city ?? '',
           label: `${host}:${port}`,
-          servers: [host],
+          servers: servers?.length ? servers : [host],
         },
       ];
     },

@@ -68,6 +68,31 @@ describe('file provider: targets + bind round trip', () => {
     expect(json).not.toMatch(/_path/);
   });
 
+  it('.ovpn with several remotes: targets() exposes every remote host as the pool', async () => {
+    const multi = GOOD_OVPN.replace('remote vpn.example.net 1194', 'remote a.example.net 1194\nremote b.example.net 1194');
+    const checked = fileProvider.check({ name: 'multi.ovpn', content: multi, username: 'me', password: 'pw' });
+    expect(checked.ok).toBe(true);
+    const account: Account = { id: 'file-3', providerId: 'file', label: 'Multi', meta: checked.meta!, secretRef: 'file-3' };
+    const [target] = await fileProvider.targets(account);
+    expect(target.servers).toEqual(['a.example.net', 'b.example.net']);
+
+    const endpoint = fileProvider.bind(target, '203.0.113.10', account, checked.secret as AccountSecret);
+    expect((endpoint as any).server).toBe('203.0.113.10');
+    expect((endpoint as any).server_port).toBe(1194);
+  });
+
+  it('an account imported before meta.servers existed falls back to meta.host', async () => {
+    const account: Account = {
+      id: 'file-old',
+      providerId: 'file',
+      label: 'Old',
+      meta: { format: 'openvpn', host: 'vpn.example.net', port: '1194' },
+      secretRef: 'file-old',
+    };
+    const [target] = await fileProvider.targets(account);
+    expect(target.servers).toEqual(['vpn.example.net']);
+  });
+
   it('.conf: targets() + bind() produce a valid WireguardEndpoint with no *_path fields', async () => {
     const checked = fileProvider.check({ name: 'vpn.conf', content: GOOD_CONF });
     expect(checked.ok).toBe(true);
@@ -80,6 +105,7 @@ describe('file provider: targets + bind round trip', () => {
     };
     const targets = await fileProvider.targets(account);
     expect(targets).toHaveLength(1);
+    expect(targets[0].servers).toEqual(['vpn.example.net']);
 
     const endpoint = fileProvider.bind(targets[0], '203.0.113.9', account, checked.secret as AccountSecret);
     expect(endpoint.type).toBe('wireguard');

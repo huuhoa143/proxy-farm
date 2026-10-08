@@ -59,6 +59,54 @@ describe('parseOvpn', () => {
     expect(() => parseOvpn('client\ndev tun\nproto udp\n')).toThrow(/remote/);
   });
 
+  it('a single remote is a one-server pool', () => {
+    const parsed = parseOvpn(GOOD);
+    expect(parsed.remotes).toEqual([{ host: 'vpn.example.net', port: 1194, proto: 'udp' }]);
+    expect(parsed.servers).toEqual(['vpn.example.net']);
+  });
+
+  it('keeps every remote line, in file order, as the server pool', () => {
+    const multi = GOOD.replace(
+      'remote vpn.example.net 1194',
+      'remote a.example.net 1194\nremote 198.51.100.7 1194\nremote b.example.net 1194\nremote-random',
+    );
+    const parsed = parseOvpn(multi);
+    expect(parsed.servers).toEqual(['a.example.net', '198.51.100.7', 'b.example.net']);
+    expect(parsed.remoteHost).toBe('a.example.net');
+    expect(parsed.remotes).toHaveLength(3);
+  });
+
+  it('dedupes a host listed twice and drops remotes whose port or protocol differs from the first', () => {
+    // bind() only learns the resolved IP, so every server must share one port + protocol.
+    const multi = GOOD.replace(
+      'remote vpn.example.net 1194',
+      'remote a.example.net 1194\nremote a.example.net 443 tcp\nremote b.example.net 1194 udp\nremote c.example.net 1195\nremote a.example.net 1194',
+    );
+    const parsed = parseOvpn(multi);
+    expect(parsed.remotes).toHaveLength(5);
+    expect(parsed.remotes[1]).toEqual({ host: 'a.example.net', port: 443, proto: 'tcp' });
+    expect(parsed.servers).toEqual(['a.example.net', 'b.example.net']);
+  });
+
+  it("applies the file's proto to remotes without their own, even when proto comes later", () => {
+    const parsed = parseOvpn(GOOD.replace('proto udp\n', '').replace('cipher AES', 'proto tcp\ncipher AES'));
+    expect(parsed.proto).toBe('tcp');
+    expect(parsed.remotes[0].proto).toBe('tcp');
+  });
+
+  it("uses the first remote's own protocol over the file's proto", () => {
+    const parsed = parseOvpn(GOOD.replace('remote vpn.example.net 1194', 'remote vpn.example.net 443 tcp'));
+    expect(parsed.proto).toBe('tcp');
+    expect(parsed.remotePort).toBe(443);
+  });
+
+  it('rejects a remote with an unknown protocol or a bad port', () => {
+    expect(() => parseOvpn(GOOD.replace('remote vpn.example.net 1194', 'remote vpn.example.net 1194 udp6'))).toThrow(
+      UnsupportedDirectiveError,
+    );
+    expect(() => parseOvpn(GOOD.replace('remote vpn.example.net 1194', 'remote vpn.example.net 70000'))).toThrow(/port/);
+  });
+
   it('extracts a numeric tun-mtu directive', () => {
     const withTunMtu = GOOD.replace('fast-io', 'tun-mtu 1350\nfast-io');
     expect(parseOvpn(withTunMtu).tunMtu).toBe(1350);

@@ -9,6 +9,8 @@ function baseParsed(overrides: Partial<ParsedOvpn> = {}): ParsedOvpn {
     remoteHost: 'vpn.example.net',
     remotePort: 1194,
     proto: 'udp',
+    remotes: [{ host: 'vpn.example.net', port: 1194, proto: 'udp' }],
+    servers: ['vpn.example.net'],
     caLines: FAKE_CA_LINES,
     needsAuthUserPass: false,
     ...overrides,

@@ -10,13 +10,31 @@
  * externally-referenced CA/key files, routing/DNS overrides, etc. — is
  * rejected with `UnsupportedDirectiveError` rather than silently dropped,
  * per spec §5.4.
+ *
+ * Every `remote` line is kept (spec §5.4 rev 3): the file's server pool is the
+ * distinct hosts of its remotes, in file order. `bind()` only receives the
+ * resolved IP of the chosen server, not which line it came from, so a server
+ * must not need its own port or protocol: the pool keeps only the remotes that
+ * share the first remote's port and protocol. Today's single-remote behaviour
+ * (first remote wins) is the degenerate case.
  */
 import { UnsupportedDirectiveError } from './errors';
 
+export interface OvpnRemote {
+  host: string;
+  port: number;
+  proto: 'udp' | 'tcp';
+}
+
 export interface ParsedOvpn {
+  /** The first `remote` line; its port and protocol apply to every server of the pool. */
   remoteHost: string;
   remotePort: number;
   proto: 'udp' | 'tcp';
+  /** Every `remote` line, in file order. */
+  remotes: OvpnRemote[];
+  /** The file's server pool: distinct hosts of the remotes sharing the first remote's port and protocol. */
+  servers: string[];
   cipher?: string;
   auth?: string;
   caLines: string[];
@@ -49,6 +67,8 @@ const IGNORABLE_DIRECTIVES = new Set([
   'float',
   'tls-client',
   'tls-version-min',
+  // Order of the remotes only; the controller picks servers from the pool itself.
+  'remote-random',
 ]);
 
 // Blocks (<tag>...</tag>) we understand. `cert`/`key`/`pkcs12`/`extra-certs`
@@ -63,8 +83,9 @@ function isCommentOrBlank(line: string): boolean {
 export function parseOvpn(content: string): ParsedOvpn {
   const lines = content.split(/\r?\n/);
 
-  let remoteHost: string | undefined;
-  let remotePort: number | undefined;
+  // A remote's own protocol (third argument) wins; otherwise the file's `proto`,
+  // which may appear after the remote lines, so it is applied after the loop.
+  const rawRemotes: Array<{ host: string; port: number; proto?: 'udp' | 'tcp' }> = [];
   let proto: 'udp' | 'tcp' = 'udp';
   let cipher: string | undefined;
   let auth: string | undefined;
@@ -107,9 +128,16 @@ export function parseOvpn(content: string): ParsedOvpn {
 
     switch (directive) {
       case 'remote': {
-        const [host, portStr] = rest;
-        remoteHost = host;
-        remotePort = portStr ? Number(portStr) : 1194;
+        const [host, portStr, remoteProto] = rest;
+        if (!host) break; // caught below as "missing remote" if no other remote exists
+        const port = portStr ? Number(portStr) : 1194;
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          throw new Error(`file: remote "${host}" has an invalid port "${portStr}"`);
+        }
+        if (remoteProto !== undefined && remoteProto !== 'udp' && remoteProto !== 'tcp') {
+          throw new UnsupportedDirectiveError('remote', `protocol ${remoteProto}`);
+        }
+        rawRemotes.push({ host, port, proto: remoteProto });
         break;
       }
       case 'proto':
@@ -156,9 +184,14 @@ export function parseOvpn(content: string): ParsedOvpn {
     }
   }
 
-  if (!remoteHost || !remotePort) {
+  if (rawRemotes.length === 0) {
     throw new Error('file: .ovpn is missing a `remote <host> <port>` directive');
   }
+  const remotes: OvpnRemote[] = rawRemotes.map((r) => ({ host: r.host, port: r.port, proto: r.proto ?? proto }));
+  const first = remotes[0];
+  const servers = [
+    ...new Set(remotes.filter((r) => r.port === first.port && r.proto === first.proto).map((r) => r.host)),
+  ];
   if (!caLines) {
     throw new Error('file: .ovpn is missing an inline <ca> block');
   }
@@ -171,9 +204,11 @@ export function parseOvpn(content: string): ParsedOvpn {
   void keyDirection;
 
   return {
-    remoteHost,
-    remotePort,
-    proto,
+    remoteHost: first.host,
+    remotePort: first.port,
+    proto: first.proto,
+    remotes,
+    servers,
     cipher,
     auth,
     caLines,
