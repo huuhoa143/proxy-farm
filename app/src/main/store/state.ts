@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs';
+import { closeSync, constants, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { makePortKey, type Account, type PortRow, type ProviderId, type Settings } from '../../shared/contracts';
 import type { SecretStore } from './secrets';
@@ -148,6 +148,16 @@ function migrateV1(raw: LoadedState): LoadedState {
   return { ...rest, ports, refusals };
 }
 
+/**
+ * What is left of a file whose v1 → v2 migration threw (malformed rows or refusal
+ * records): the accounts (their secrets are keyed by account id, so dropping them would
+ * orphan every credential), settings and limits. Ports, refusal evidence and server
+ * health are dropped; the original is kept in the `.v1.bak` copy.
+ */
+function salvageUnmigratable(raw: LoadedState): LoadedState {
+  return { schemaVersion: SCHEMA_VERSION, accounts: raw.accounts, settings: raw.settings, limits: raw.limits };
+}
+
 /** Fills in any field missing from a loaded (possibly older/partial/hand-edited) file
  * with the current defaults, one level deep for `settings`/`settings.webhook`, after
  * migrating a v1 (or version-less) file with `migrateV1`. */
@@ -224,6 +234,18 @@ export function createStateStore(filePath: string, secrets: SecretStore, options
     return existing ? `${existing} ${msg}` : msg;
   }
 
+  /** Before the first v2 write over a v1 file: keep the original as `state.json.v1.bak`.
+   * Only once — a later migration (e.g. after a downgrade) never overwrites that copy. */
+  function backupV1File(): void {
+    try {
+      copyFileSync(filePath, `${filePath}.v1.bak`, constants.COPYFILE_EXCL);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'EEXIST') return;
+      // eslint-disable-next-line no-console
+      console.error(`[state] could not back up ${filePath} before migrating it`, err);
+    }
+  }
+
   function backupCorruptFile(reason: string): void {
     try {
       const backupPath = `${filePath}.corrupt-${now()}`;
@@ -279,7 +301,7 @@ export function createStateStore(filePath: string, secrets: SecretStore, options
       );
     }
 
-    if (notice) pendingSecretNotice = notice;
+    if (notice) pendingSecretNotice = appendNotice(pendingSecretNotice, notice);
 
     return {
       ...state,
@@ -317,7 +339,21 @@ export function createStateStore(filePath: string, secrets: SecretStore, options
       return initializeDefaults();
     }
 
-    const filled = fillDefaults(parsed, options.randomPass);
+    if (parsed.schemaVersion !== SCHEMA_VERSION) backupV1File();
+    let filled: AppState;
+    try {
+      filled = fillDefaults(parsed, options.randomPass);
+    } catch (err) {
+      // A malformed v1 file: start over like a corrupt one, but keep its accounts (and
+      // settings) — the original stays in the `.v1.bak` copy taken above.
+      // eslint-disable-next-line no-console
+      console.error(`[state] ${filePath} could not be migrated; kept its accounts and settings, dropped its ports`, err);
+      filled = fillDefaults(salvageUnmigratable(parsed), options.randomPass);
+      pendingSecretNotice = appendNotice(
+        pendingSecretNotice,
+        `Your saved ports could not be carried over from the previous version and were cleared; your accounts and settings were kept. The old file is at ${filePath}.v1.bak.`,
+      );
+    }
     const resolved = resolveLoadedSecrets(filled);
     persist(resolved);
     return resolved;

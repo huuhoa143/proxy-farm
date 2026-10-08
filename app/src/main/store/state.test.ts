@@ -361,6 +361,46 @@ describe('state store', () => {
       expect(state.refusals.failures).toEqual({ z1: { 'jp3.webunlim.com': 5 } });
     });
 
+    it('keeps the original v1 file as state.json.v1.bak before the first v2 write, and only once', () => {
+      const original = JSON.stringify({ schemaVersion: 1, ports: [v1Row('hma:VN-51-HANOI')] });
+      writeFileSync(filePath, original);
+      createStateStore(filePath, secrets()).getState();
+      expect(readFileSync(`${filePath}.v1.bak`, 'utf8')).toBe(original);
+      expect(JSON.parse(readFileSync(filePath, 'utf8')).schemaVersion).toBe(2);
+
+      // A later v1 file (say, after running an older build again) never overwrites it.
+      writeFileSync(filePath, JSON.stringify({ schemaVersion: 1, ports: [] }));
+      createStateStore(filePath, secrets()).getState();
+      expect(readFileSync(`${filePath}.v1.bak`, 'utf8')).toBe(original);
+    });
+
+    it('a v2 file is not backed up', () => {
+      writeFileSync(filePath, JSON.stringify({ schemaVersion: 2, ports: [] }));
+      createStateStore(filePath, secrets()).getState();
+      expect(existsSync(`${filePath}.v1.bak`)).toBe(false);
+    });
+
+    it('a v1 file whose migration throws starts over without crashing, but keeps its accounts and settings', () => {
+      const accounts = [{ id: 'hma-1', providerId: 'hma', label: 'device', meta: {}, secretRef: 'account:hma-1' }];
+      const original = JSON.stringify({
+        schemaVersion: 1,
+        ports: [null, v1Row('hma:VN-51-HANOI')], // a malformed row makes the migration throw
+        accounts,
+        settings: { basePort: 30001 },
+        limits: { hma: 4 },
+      });
+      writeFileSync(filePath, original);
+      const store = createStateStore(filePath, secrets());
+      const state = store.getState();
+      expect(state.schemaVersion).toBe(2);
+      expect(state.accounts).toEqual(accounts);
+      expect(state.settings.basePort).toBe(30001);
+      expect(state.limits).toEqual({ hma: 4 });
+      expect(state.ports).toEqual([]);
+      expect(readFileSync(`${filePath}.v1.bak`, 'utf8')).toBe(original); // nothing lost for good
+      expect(store.takeSecretNotice()).toContain('state.json.v1.bak');
+    });
+
     it('loads a v2 file as is (no second migration)', () => {
       writeFileSync(
         filePath,
