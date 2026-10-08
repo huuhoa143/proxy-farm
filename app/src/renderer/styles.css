@@ -1138,7 +1138,8 @@ table.port-table {
   border-color: var(--line-2);
   color: var(--tx);
 }
-.rowact .btn[aria-expanded='true'] svg {
+/* Only the Details chevron turns sideways-to-down; the Change IP caret has its own rule. */
+.rowact .det-btn[aria-expanded='true'] svg {
   transform: rotate(90deg);
 }
 /* secondary row actions are icon-only; the label stays for screen readers and the tooltip */
