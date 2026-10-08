@@ -25,6 +25,15 @@ export interface Engine {
   getLogs(key: string): string[];
   /** Subscribes to every `PortHealth` state transition for every port. */
   onStateChange(cb: (key: string, state: PortState) => void): () => void;
+  /**
+   * Subscribes to a port's back-off timer elapsing (a retry is due). The controller
+   * handles it by re-resolving the host + re-selecting a server (skipping IPs recently
+   * marked bad) and respawning through its own start path, so a dead/stale IP is not
+   * looped on forever (spec §6.4 bad-IP failover). OPTIONAL: an engine without this —
+   * or with no listener registered — falls back to respawning its own last rendered
+   * config in place (the pre-failover behaviour).
+   */
+  onRetryDue?(cb: (key: string) => void): () => void;
 }
 
 /** Thrown by the real `Engine.start` when the proxy port itself (not an auxiliary one)
