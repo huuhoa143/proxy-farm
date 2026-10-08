@@ -44,7 +44,9 @@
 # notarization submission is not something a rehearsal should spend).
 #
 # Credentials (Keychain, one-time setup per machine):
-#   PROXYFARM_NOTARIZE   notarytool keychain profile
+#   PROXYFARM_NOTARIZE   notarytool keychain profile (override the name with
+#                        PROXYFARM_NOTARIZE_PROFILE, e.g. a profile shared
+#                        with another app of the same team)
 #
 # GH_TOKEN auto-derived from `gh auth token -u huuhoa143` when unset.
 
@@ -86,7 +88,7 @@ source "$ROOT/scripts/lib/state-helpers.sh"
 source "$ROOT/scripts/lib/build-sign-notarize.sh"
 
 SIGN_IDENTITY="Developer ID Application: Chien Bui Minh (CCQUC3AGRH)"
-NOTARIZE_PROFILE="PROXYFARM_NOTARIZE"
+NOTARIZE_PROFILE="${PROXYFARM_NOTARIZE_PROFILE:-PROXYFARM_NOTARIZE}"
 ENTITLEMENTS="$ROOT/entitlements.plist"
 SINGBOX_ENTITLEMENTS="$ROOT/entitlements.singbox.plist"
 PRODUCT_SLUG="ProxyFarm"
