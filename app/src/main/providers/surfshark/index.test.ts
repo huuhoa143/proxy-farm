@@ -1,10 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createSurfsharkProvider } from './index';
 import type { Account, AccountSecret } from '../types';
 import type { SurfsharkCluster } from './clusters';
+import type { PoolNet } from './pool';
 
 // A syntactically valid-looking WireGuard key shape (32 random bytes,
 // base64), NOT a real key used by any account.
@@ -41,8 +42,18 @@ function writeCacheFile(clusters: SurfsharkCluster[], fetchedAt = 1_000_000) {
   writeFileSync(cachePath, JSON.stringify({ fetchedAt, clusters }), 'utf8');
 }
 
-function makeProvider() {
-  return createSurfsharkProvider({ cachePath, loadClusters: async () => fakeClusters() });
+/** Hermetic DNS: every lookup of the cluster answers with the given IPs. */
+function fakePoolNet(answers: string[][] = [['192.0.2.10', '192.0.2.11']]): PoolNet {
+  let i = 0;
+  return {
+    resolveSystem: async () => answers[Math.min(i++, answers.length - 1)],
+    resolveDoh: async () => [],
+    sleep: async () => {},
+  };
+}
+
+function makeProvider(poolNet: PoolNet = fakePoolNet()) {
+  return createSurfsharkProvider({ cachePath, loadClusters: async () => fakeClusters(), poolNet });
 }
 
 describe('surfshark provider: check', () => {
@@ -65,16 +76,41 @@ describe('surfshark provider: check', () => {
 });
 
 describe('surfshark provider: targets', () => {
-  it('targets() reflects the cached cluster list', async () => {
+  const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
+
+  it("targets() reflects the cluster list, with the cluster's discovered pool IPs as servers", async () => {
     const provider = makeProvider();
-    const account: Account = { id: 'ss-1', providerId: 'surfshark', label: 'Surfshark', meta: {}, secretRef: 'ss-1' };
     const targets = await provider.targets(account);
     expect(targets).toHaveLength(1);
     expect(targets[0]).toMatchObject({
+      key: 'surfshark:jp-tok',
       providerId: 'surfshark',
       country: 'JP',
-      servers: ['jp-tok.prod.surfshark.com'],
+      servers: ['192.0.2.10', '192.0.2.11'],
     });
+  });
+
+  it('falls back to the cluster hostname while discovery has found nothing', async () => {
+    const provider = makeProvider({
+      resolveSystem: async () => {
+        throw new Error('offline');
+      },
+      resolveDoh: async () => {
+        throw new Error('offline');
+      },
+      sleep: async () => {},
+    });
+    const [target] = await provider.targets(account);
+    expect(target.servers).toEqual(['jp-tok.prod.surfshark.com']);
+  });
+
+  it('persists the pool beside the cluster cache, so a new instance starts with it', async () => {
+    await makeProvider().targets(account);
+    await vi.waitFor(() => expect(existsSync(path.join(cacheDir, 'surfshark-pools.json'))).toBe(true));
+
+    const offline: PoolNet = { resolveSystem: async () => [], resolveDoh: async () => [], sleep: async () => {} };
+    const [target] = await makeProvider(offline).targets(account);
+    expect(target.servers).toEqual(['192.0.2.10', '192.0.2.11']);
   });
 });
 

@@ -16,12 +16,18 @@
  * it, so the controller must pass something durable, e.g.
  * `path.join(app.getPath('userData'), 'cache', 'surfshark-clusters.json')`.
  *
- * Re-resolving the host and switching the peer IP when a probe fails
- * (spec §5.3, "IPs went stale within minutes") is a health-module concern:
- * `bind()` just takes whatever `serverIp` it's given.
+ * A target's servers are its cluster's pool IPs (spec §5.3 rev 3, pool.ts),
+ * persisted next to the cluster cache. Each pool IP is one fixed exit and
+ * the cluster pubKey works for all of them, so `bind()` just takes whatever
+ * `serverIp` it's given; failing over between pool servers is the
+ * controller's job (§6.8). Until a cluster's first DNS sample lands (or if
+ * discovery keeps failing) its only server is the cluster hostname, which
+ * the controller resolves to whichever pool IP DNS hands out.
  */
+import path from 'node:path';
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { getClusters, readClustersCacheSync, type SurfsharkCluster } from './clusters';
+import { createSurfsharkPools, type PoolNet, type SurfsharkPools } from './pool';
 
 const WG_PORT = 51820;
 const WG_KEY_RE = /^[A-Za-z0-9+/]{43}=$/;
@@ -30,6 +36,12 @@ export interface SurfsharkProviderDeps {
   /** Required: where the 12h cluster cache lives. No cwd-based default. */
   cachePath: string;
   loadClusters?: () => Promise<SurfsharkCluster[]>;
+  /** Where the server pools live; defaults to `surfshark-pools.json` beside `cachePath`. */
+  poolPath?: string;
+  /** DNS access for pool discovery (tests inject a fake). */
+  poolNet?: PoolNet;
+  /** A ready-made pool store; overrides `poolPath` / `poolNet`. */
+  pools?: SurfsharkPools;
 }
 
 function targetKeyFor(cluster: SurfsharkCluster): string {
@@ -42,6 +54,12 @@ function targetKeyFor(cluster: SurfsharkCluster): string {
 export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
   const cachePath = deps.cachePath;
   const loadClusters = deps.loadClusters ?? (() => getClusters({ cachePath }));
+  const pools =
+    deps.pools ??
+    createSurfsharkPools({
+      poolPath: deps.poolPath ?? path.join(path.dirname(cachePath), 'surfshark-pools.json'),
+      net: deps.poolNet,
+    });
 
   return {
     id: 'surfshark',
@@ -60,14 +78,18 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
 
     async targets(_account: Account): Promise<Target[]> {
       const clusters = await loadClusters();
-      return clusters.map((cluster) => ({
-        key: targetKeyFor(cluster),
-        providerId: 'surfshark',
-        country: cluster.countryCode,
-        city: cluster.location,
-        label: `${cluster.country} — ${cluster.location}`,
-        servers: [cluster.connectionName],
-      }));
+      await pools.ensure(clusters.map((c) => c.connectionName));
+      return clusters.map((cluster) => {
+        const pool = pools.servers(cluster.connectionName);
+        return {
+          key: targetKeyFor(cluster),
+          providerId: 'surfshark',
+          country: cluster.countryCode,
+          city: cluster.location,
+          label: `${cluster.country} — ${cluster.location}`,
+          servers: pool.length > 0 ? pool : [cluster.connectionName],
+        };
+      });
     },
 
     bind(target: Target, serverIp: string, _account: Account, secret: AccountSecret) {

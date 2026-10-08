@@ -14,6 +14,7 @@ export interface RegisterAllProvidersOptions {
    * Where Surfshark's 12h cluster cache lives — required, no cwd default
    * (see surfshark/index.ts). The controller should pass something durable,
    * e.g. `path.join(app.getPath('userData'), 'cache', 'surfshark-clusters.json')`.
+   * The discovered server pools are kept beside it (`surfshark-pools.json`).
    */
   surfsharkCachePath: string;
 }
