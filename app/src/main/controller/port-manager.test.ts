@@ -243,8 +243,8 @@ describe('port manager', () => {
       expect(engine.stopped).toEqual(['zoogvpn:nl-ams']);
       expect(engine.started.map((s) => s.key)).toEqual(['zoogvpn:nl-ams']);
       expect(serverOf(state, 'zoogvpn:nl-ams')).toBe('10.0.0.2');
-      // port-manager itself leaves `state` alone (reviewer item 6: PortHealth owns it);
-      // it only persists whatever the engine's own onStateChange reports.
+      // Beyond resetting the moved row to `connecting`, port-manager leaves `state` to
+      // PortHealth (reviewer item 6): it persists whatever onStateChange reports.
       engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 123, exitIp: '2.2.2.2', country: 'NL' });
       expect(state.getState().ports[0].state).toMatchObject({ kind: 'online', exitIp: '2.2.2.2' });
     });
@@ -298,6 +298,97 @@ describe('port manager', () => {
       });
       const result = await manager.rotatePort('zoogvpn:nl-ams');
       expect(result).toEqual({ changed: false, from: '1.1.1.1', to: undefined, noteKey: 'probe-failed' });
+    });
+  });
+
+  describe('a server change never shows the old tunnel as online', () => {
+    const ams = (servers: string[]): Target => ({ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers });
+    const rot: Target = { key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] };
+
+    /** An engine that records the moved row's state at the moment the old tunnel is
+     * stopped and the new one started — the window in which the proxy port is down. */
+    function observingEngine(rowState: () => PortState | undefined) {
+      const engine = fakeEngine();
+      const seen: Array<{ at: 'stop' | 'start'; state: PortState | undefined }> = [];
+      const { stop, start } = engine;
+      engine.stop = async (key) => {
+        seen.push({ at: 'stop', state: rowState() });
+        await stop(key);
+      };
+      engine.start = async (key, input) => {
+        seen.push({ at: 'start', state: rowState() });
+        await start(key, input);
+      };
+      return { engine, seen };
+    }
+
+    function expectConnectingThroughout(seen: Array<{ state: PortState | undefined }>): void {
+      expect(seen.length).toBeGreaterThan(0);
+      for (const { state } of seen) {
+        expect(state?.kind).toBe('connecting');
+        expect(state).not.toHaveProperty('exitIp');
+        expect(state).not.toHaveProperty('latencyMs');
+      }
+    }
+
+    it('a move to another city drops the old online state with the rename, before the engine restarts', async () => {
+      let rows: () => PortRow[] = () => [];
+      const { engine, seen } = observingEngine(() => rows()[0]?.state);
+      const { manager, state } = setup({
+        targets: [ams(['10.0.0.1']), rot],
+        port: { state: { kind: 'online', since: 1, exitIp: '1.1.1.1', country: 'NL', latencyMs: 40 } },
+        engine,
+        exitIpResults: [{ ip: '3.3.3.3', country: 'NL' }],
+      });
+      rows = () => state.getState().ports;
+      const result = await manager.rotatePort('zoogvpn:nl-ams');
+      expect(result.noteKey).toBe('rotated-to-another-city');
+      expect(seen.map((s) => s.at)).toEqual(['stop', 'start']);
+      expectConnectingThroughout(seen);
+      expect(state.getState().ports[0]).toMatchObject({ key: 'zoogvpn:nl-rot#1', state: { kind: 'online', exitIp: '10.0.0.9' } });
+    });
+
+    it('a same-location Change IP does the same', async () => {
+      let rows: () => PortRow[] = () => [];
+      const { engine, seen } = observingEngine(() => rows()[0]?.state);
+      const { manager, state } = setup({ targets: [ams(['10.0.0.1', '10.0.0.2'])], engine, exitIpResults: [{ ip: '2.2.2.2', country: 'NL' }] });
+      rows = () => state.getState().ports;
+      expect((await manager.rotatePort('zoogvpn:nl-ams')).changed).toBe(true);
+      expectConnectingThroughout(seen);
+    });
+
+    it('so does a Change IP to a picked server', async () => {
+      let rows: () => PortRow[] = () => [];
+      const { engine, seen } = observingEngine(() => rows()[0]?.state);
+      const { manager, state } = setup({ targets: [ams(['10.0.0.1', '10.0.0.2'])], engine, exitIpResults: [{ ip: '2.2.2.2', country: 'NL' }] });
+      rows = () => state.getState().ports;
+      expect((await manager.rotatePort('zoogvpn:nl-ams', '10.0.0.2')).changed).toBe(true);
+      expectConnectingThroughout(seen);
+    });
+
+    it('a restart that fails over to another server shows connecting, not the reason it left', async () => {
+      const serverHealth = createServerHealth();
+      let rows: () => PortRow[] = () => [];
+      const { engine, seen } = observingEngine(() => rows()[0]?.state);
+      const { manager, state } = setup({ targets: [ams(['10.0.0.1', '10.0.0.2'])], engine, depsOverrides: { serverHealth } });
+      rows = () => state.getState().ports;
+      serverHealth.markDead('z1', '10.0.0.1');
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(serverOf(state, 'zoogvpn:nl-ams')).toBe('10.0.0.2');
+      expectConnectingThroughout(seen);
+    });
+
+    it('a restart on the same server leaves the state to the engine', async () => {
+      let rows: () => PortRow[] = () => [];
+      const { engine, seen } = observingEngine(() => rows()[0]?.state);
+      const { manager, state } = setup({
+        targets: [ams(['10.0.0.1', '10.0.0.2'])],
+        port: { serverIp: '10.0.0.1', state: { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' } },
+        engine,
+      });
+      rows = () => state.getState().ports;
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(seen).toEqual([{ at: 'start', state: expect.objectContaining({ kind: 'retrying' }) }]);
     });
   });
 

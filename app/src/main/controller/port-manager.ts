@@ -302,6 +302,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }));
   }
 
+  /** A row moved to another server (Change IP, failover, a move to another city): the
+   * old tunnel's exit IP and latency no longer describe it, and its proxy port is down
+   * until the new engine is up, so it shows `connecting` until `PortHealth` verifies the
+   * new tunnel. Applied with the server change itself, never after the engine starts. */
+  function onNewServer(server: string, serverIp: string): Partial<PortRow> {
+    return { server, serverIp, state: { kind: 'connecting', since: Date.now() } };
+  }
+
   function takenProxyPorts(): Set<number> {
     return new Set(deps.state.getState().ports.map((p) => p.proxyPort));
   }
@@ -798,7 +806,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         const result = await selectServer({ target, accountId: fresh.accountId, portKey: key, mode: 'restart', pinned: fresh.server });
         if (stoppedMeanwhile()) return undefined; // stopped while resolving
         // Claimed together with `enabled`, so the next selection already sees it held.
-        updatePort(key, result.pick ? { enabled: true, server: result.pick.server, serverIp: result.pick.ip } : { enabled: true });
+        const { pick } = result;
+        if (!pick) updatePort(key, { enabled: true });
+        else if (pick.server !== fresh.server || pick.ip !== fresh.serverIp) updatePort(key, { enabled: true, ...onNewServer(pick.server, pick.ip) });
+        else updatePort(key, { enabled: true, server: pick.server, serverIp: pick.ip });
         return result;
       });
       if (!selected) return; // removed or stopped meanwhile
@@ -921,7 +932,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         }
         resolvedIp.set(toServer, ip);
         if (heldBy(fresh.providerId, identityOf(toServer, ip), key)) return { noteKey: 'server-unavailable' };
-        updatePort(key, { server: toServer, serverIp: ip });
+        updatePort(key, onNewServer(toServer, ip));
         return { target: currentTarget, pick: { server: toServer, ip }, account, finalKey: key, fellBackToAnotherCity: false };
       }
 
@@ -936,7 +947,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           roundRobinFrom: fresh.server,
         });
         if (pick) {
-          updatePort(key, { server: pick.server, serverIp: pick.ip });
+          updatePort(key, onNewServer(pick.server, pick.ip));
           return { target: currentTarget, pick, account, finalKey: key, fellBackToAnotherCity: false };
         }
       }
@@ -949,7 +960,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         if (!pick) continue;
         const finalKey = makePortKey(alt.key, nextPortNumber(alt.key));
         // Rename NOW, before the engine is told about it (reviewer item 2): a state event
-        // fired for `finalKey` must find its row.
+        // fired for `finalKey` must find its row. The old key's `online` must not carry
+        // over: nothing reports for that key any more once it is renamed.
         deps.state.setState((st) => ({
           ...st,
           ports: st.ports.map((p) =>
@@ -962,8 +974,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
                   city: alt.city,
                   label: alt.label,
                   accountId: altAccount.id,
-                  server: pick.server,
-                  serverIp: pick.ip,
+                  ...onNewServer(pick.server, pick.ip),
                 }
               : p,
           ),
