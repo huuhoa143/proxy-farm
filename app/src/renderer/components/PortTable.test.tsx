@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeAll, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { PortTable } from './PortTable';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
-import type { PortRow, PortState, ProxyFarmApi } from '../../shared/contracts';
+import type { PortRow, PortState, ProxyFarmApi, Target } from '../../shared/contracts';
 
 beforeAll(() => {
   initI18n('en');
@@ -29,6 +29,10 @@ function row(key: string, state: PortState, overrides: Partial<PortRow> = {}): P
 const noop = () => {};
 
 describe('PortTable', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -87,7 +91,7 @@ describe('PortTable', () => {
     expect(stoppedRotateBtn).not.toBeNull();
   });
 
-  it('calls onCopy and onRotate when the corresponding buttons are clicked', () => {
+  it('calls onCopy, and onRotate from the Change IP menu', async () => {
     const onCopy = vi.fn();
     const onRotate = vi.fn();
     const online = row('online', { kind: 'online', since: Date.now(), exitIp: '1.2.3.4', country: 'JP' });
@@ -106,8 +110,9 @@ describe('PortTable', () => {
 
     fireEvent.click(screen.getByText('Copy'));
     expect(onCopy).toHaveBeenCalledWith(online);
-    fireEvent.click(screen.getByText('Rotate IP'));
-    expect(onRotate).toHaveBeenCalledWith(online);
+    fireEvent.click(screen.getByText('Change IP'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Next free server/ }));
+    expect(onRotate).toHaveBeenCalledWith(online, undefined);
   });
 
   it('toggles row selection via the checkbox', () => {
@@ -172,7 +177,7 @@ describe('PortTable', () => {
     // an ad-hoc PortRow, because testPort() looks the key up in the fake's
     // internal port map.
     const api = defaultApi();
-    const online = (await api.listPorts()).find((p) => p.key === 'hma:JP-TOKYO')!;
+    const online = (await api.listPorts()).find((p) => p.key === 'hma:JP-TOKYO#1')!;
     expect(online.state.kind).toBe('online');
 
     render(
@@ -283,5 +288,131 @@ describe('PortTable', () => {
       vi.advanceTimersByTime(2000);
     });
     expect(screen.getByTestId('port-row-retrying')).toHaveTextContent('Retrying in 2s');
+  });
+
+  describe('grouped by location (spec §4.1)', () => {
+    const tokyo: Target = {
+      key: 'hma:JP-TOKYO',
+      providerId: 'hma',
+      country: 'JP',
+      city: 'Tokyo',
+      label: 'Tokyo, Japan',
+      servers: ['10.0.0.1', '10.0.0.2', '10.0.0.3'],
+      freeServers: 1,
+    };
+    const hanoi: Target = {
+      key: 'zoogvpn:VN-HAN',
+      providerId: 'zoogvpn',
+      country: 'VN',
+      city: 'Hanoi',
+      label: 'Hanoi, Vietnam',
+      servers: ['vn1.example'],
+      freeServers: 0,
+    };
+    const online = (ip: string): PortState => ({ kind: 'online', since: Date.now(), exitIp: ip, country: 'JP' });
+    const rows: PortRow[] = [
+      row('zoogvpn:VN-HAN#1', { kind: 'stopped' }, { locationKey: 'zoogvpn:VN-HAN', providerId: 'zoogvpn', country: 'VN', city: 'Hanoi', server: 'vn1.example', serverIp: '198.51.100.20', proxyPort: 29003 }),
+      row('hma:JP-TOKYO#2', online('10.0.0.2'), { locationKey: 'hma:JP-TOKYO', server: '10.0.0.2', serverIp: '10.0.0.2', proxyPort: 29002 }),
+      row('hma:JP-TOKYO#1', { kind: 'connecting', since: Date.now() }, { locationKey: 'hma:JP-TOKYO', server: '10.0.0.1', serverIp: '10.0.0.1', proxyPort: 29001 }),
+    ];
+
+    function renderGrouped(overrides: Partial<Parameters<typeof PortTable>[0]> = {}) {
+      return render(
+        <PortTable
+          rows={rows}
+          targets={[tokyo, hanoi]}
+          selectedKeys={new Set()}
+          onToggleSelect={noop}
+          onToggleSelectAll={noop}
+          onCopy={noop}
+          onRotate={noop}
+          onAddPort={noop}
+          api={defaultApi()}
+          {...overrides}
+        />,
+      );
+    }
+
+    it('renders one header per location, sorted by country, ports sorted by number', () => {
+      renderGrouped();
+      const order = screen
+        .getAllByTestId(/^(group-(?!stats)|port-row-)/)
+        .map((el) => el.getAttribute('data-testid'));
+      expect(order).toEqual([
+        'group-hma:JP-TOKYO',
+        'port-row-hma:JP-TOKYO#1',
+        'port-row-hma:JP-TOKYO#2',
+        'group-zoogvpn:VN-HAN',
+        'port-row-zoogvpn:VN-HAN#1',
+      ]);
+    });
+
+    it('header shows ports, online count and the server pool', () => {
+      renderGrouped();
+      expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('2 ports · 1 online');
+      expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('3 servers · 1 free');
+      expect(screen.getByTestId('group-stats-zoogvpn:VN-HAN')).toHaveTextContent('1 port · 0 online');
+      expect(screen.getByTestId('group-stats-zoogvpn:VN-HAN')).toHaveTextContent('1 server · 0 free');
+    });
+
+    it('rows show #n and the pinned server IP', () => {
+      renderGrouped();
+      const r = screen.getByTestId('port-row-zoogvpn:VN-HAN#1');
+      expect(r).toHaveTextContent('#1');
+      expect(within(r).getByText('198.51.100.20')).toHaveAttribute('title', expect.stringContaining('vn1.example'));
+      expect(within(r).getByRole('checkbox')).toHaveAccessibleName('Hanoi · port #1');
+    });
+
+    it('+ Add port calls onAddPort, and is disabled with a reason when no server is free', () => {
+      const onAddPort = vi.fn();
+      renderGrouped({ onAddPort });
+      fireEvent.click(screen.getByTestId('add-port-hma:JP-TOKYO'));
+      expect(onAddPort).toHaveBeenCalledWith('hma:JP-TOKYO');
+
+      const blocked = screen.getByTestId('add-port-zoogvpn:VN-HAN');
+      expect(blocked).toHaveAttribute('aria-disabled', 'true');
+      expect(blocked).toHaveAttribute('title', 'Every server in Hanoi is already in use or unavailable.');
+      fireEvent.click(blocked);
+      expect(onAddPort).toHaveBeenCalledTimes(1);
+    });
+
+    it("+ Add port is disabled at the provider's port limit", () => {
+      renderGrouped({ limits: { hma: 2 } });
+      const blocked = screen.getByTestId('add-port-hma:JP-TOKYO');
+      expect(blocked).toHaveAttribute('aria-disabled', 'true');
+      expect(blocked).toHaveAttribute('title', 'HMA is at its limit of 2 ports — raise it in Settings.');
+    });
+
+    it('collapsing a group hides its ports and is remembered', () => {
+      const { unmount } = renderGrouped();
+      const toggle = within(screen.getByTestId('group-hma:JP-TOKYO')).getByRole('button', {
+        name: 'Show or hide the ports in Tokyo',
+      });
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByTestId('port-row-hma:JP-TOKYO#1')).toBeNull();
+      expect(screen.getByTestId('port-row-zoogvpn:VN-HAN#1')).toBeInTheDocument();
+
+      unmount();
+      renderGrouped();
+      expect(screen.queryByTestId('port-row-hma:JP-TOKYO#1')).toBeNull();
+    });
+
+    it('the group checkbox selects every port of the group', () => {
+      const onSelectGroup = vi.fn();
+      renderGrouped({ onSelectGroup, selectedKeys: new Set(['hma:JP-TOKYO#1']) });
+      const box = screen.getByLabelText('Select every port in Tokyo') as HTMLInputElement;
+      expect(box.indeterminate).toBe(true);
+      fireEvent.click(box);
+      expect(onSelectGroup).toHaveBeenCalledWith(['hma:JP-TOKYO#1', 'hma:JP-TOKYO#2'], true);
+    });
+
+    it('Change IP is offered for online/failed ports but not while stopped or connecting', () => {
+      renderGrouped();
+      expect(screen.getByTestId('change-ip-hma:JP-TOKYO#2')).toBeEnabled();
+      expect(screen.getByTestId('change-ip-hma:JP-TOKYO#1')).toBeDisabled();
+      expect(screen.getByTestId('change-ip-zoogvpn:VN-HAN#1')).toBeDisabled();
+    });
   });
 });

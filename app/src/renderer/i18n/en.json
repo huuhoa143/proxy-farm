@@ -124,7 +124,7 @@
     "start": "Start",
     "noTargetsSelected": "Select at least one location to start.",
     "selectedCount": "{{count}} selected",
-    "emptyState": "Pick one or more locations and press Start — each one gets its own local proxy port.",
+    "emptyState": "Pick a location and how many ports — each port gets its own server, so its own fixed exit IP.",
     "table": {
       "status": "Status",
       "location": "Location",
@@ -133,14 +133,15 @@
       "latency": "Latency",
       "actions": "Actions",
       "provider": "Provider",
-      "account": "Account"
+      "account": "Account",
+      "server": "Server"
     },
     "copyPort": "Copy address",
     "copied": "Copied",
     "copyFailed": "Couldn't copy — opened Export so you can copy it by hand.",
-    "rotate": "Rotate IP",
-    "rotating": "Rotating…",
-    "rotateDisabledHint": "Only an online port can rotate its IP.",
+    "rotate": "Change IP",
+    "rotating": "Changing…",
+    "rotateDisabledHint": "Start this port (or wait until it finishes connecting) to change its IP.",
     "stop": "Stop",
     "stopDisabledHint": "This port is already stopped.",
     "remove": "Remove",
@@ -179,12 +180,12 @@
       "selectedCount": "{{count}} ports selected",
       "start": "Start",
       "stop": "Stop",
-      "rotate": "Rotate IP",
+      "rotate": "Change IP",
       "remove": "Remove",
       "export": "Export",
       "clear": "Clear selection",
       "autoRotate": "Auto-rotate…",
-      "rotateSummary": "{{changed}} rotated, {{moved}} moved to another city, {{unavailable}} had no other server available"
+      "rotateSummary": "{{changed}} changed IP, {{moved}} moved to another city, {{unavailable}} had no free server"
     },
     "export": {
       "title": "Export ports",
@@ -202,8 +203,9 @@
     },
     "rotateResult": {
       "changedNote": "Exit IP changed: {{from}} → {{to}}",
-      "sameCityNote": "No other server in this city — moved to another city in the same country.",
-      "unchangedNote": "No other server is available for this location."
+      "sameCityNote": "No free server left in that city — the port moved to another city in the same country.",
+      "unchangedNote": "No free server left for this location — the IP stays the same.",
+      "serverTaken": "That server is no longer free — pick another one."
     },
     "emptyTitle": "No ports yet",
     "addLocations": "Add locations",
@@ -219,17 +221,79 @@
     },
     "picker": {
       "title": "Add locations",
-      "subtitle": "Each location becomes one local proxy port.",
+      "subtitle": "Each port gets its own server — its own fixed exit IP. Pick how many per location.",
       "searchPlaceholder": "Search country or city",
       "allProviders": "All",
-      "running": "Running",
       "noResults": "No locations match “{{query}}”.",
       "clear": "Clear",
       "selectCountry": "Select every city in {{country}}",
       "cities_one": "{{count}} city",
       "cities_other": "{{count}} cities",
-      "startN_one": "Start {{count}} port",
-      "startN_other": "Start {{count}} ports"
+      "servers_one": "{{count}} server · {{free}} free",
+      "servers_other": "{{count}} servers · {{free}} free",
+      "noFree": "No free server",
+      "limitReached": "Port limit reached",
+      "portsHere_one": "{{count}} port",
+      "portsHere_other": "{{count}} ports",
+      "qty": "Ports in {{location}}",
+      "fewer": "One port fewer in {{location}}",
+      "more": "One more port in {{location}}",
+      "maxHint": "Up to {{max}} — one per free server",
+      "addN_one": "Add {{count}} port",
+      "addN_other": "Add {{count}} ports"
+    },
+    "group": {
+      "toggle": "Show or hide the ports in {{location}}",
+      "select": "Select every port in {{location}}",
+      "ports_one": "{{count}} port",
+      "ports_other": "{{count}} ports",
+      "online": "{{count}} online",
+      "servers_one": "{{count}} server",
+      "servers_other": "{{count}} servers",
+      "free": "{{count}} free",
+      "addPort": "Add port",
+      "addPortLabel": "Add a port in {{location}}",
+      "addPortHint": "Adds one port on a free server — a new exit IP in {{location}}.",
+      "noFreeServer": "Every server in {{location}} is already in use or unavailable.",
+      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it in Settings."
+    },
+    "port": {
+      "label": "{{location}} · port #{{n}}",
+      "serverTitle": "Pinned to server {{server}}. This port keeps this exit IP until you change it.",
+      "noServer": "Chosen on first start"
+    },
+    "changeIp": {
+      "menuLabel": "Change IP for port #{{n}}",
+      "next": "Next free server",
+      "nextHint": "Picks the best free server for you",
+      "noneFreeHint": "None free here — tries another city in the same country",
+      "heading": "Servers in {{city}}",
+      "loading": "Loading servers…",
+      "loadFailed": "Couldn't load the server list.",
+      "empty": "This location has no servers.",
+      "current": "This port",
+      "heldBy": "Used by :{{port}}",
+      "heldByOther": "Used by another port",
+      "free": "Free",
+      "health": {
+        "ok": "Working",
+        "unknown": "Not tried yet",
+        "refused": "Refused",
+        "dead": "Not responding"
+      },
+      "reason": {
+        "current": "This port is already on this server.",
+        "held": "Port :{{port}} uses this server — two ports never share an exit IP.",
+        "heldOther": "Another port uses this server — two ports never share an exit IP.",
+        "refused": "This server turned your account away, so it is skipped for 7 days.",
+        "dead": "This server didn't respond, so it is skipped for 2 hours."
+      },
+      "pick": "Move this port to {{server}}"
+    },
+    "addResult": {
+      "no-free-server": "Added {{added}} of {{requested}} ports in {{location}} — no more free servers there.",
+      "limit-reached": "Added {{added}} of {{requested}} ports in {{location}} — {{provider}} reached its port limit.",
+      "other": "Added {{added}} of {{requested}} ports in {{location}}."
     }
   },
   "vpnNote": {

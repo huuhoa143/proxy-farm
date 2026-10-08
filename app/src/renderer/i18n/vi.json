@@ -124,7 +124,7 @@
     "start": "Bật",
     "noTargetsSelected": "Chọn ít nhất một vị trí để bắt đầu.",
     "selectedCount": "Đã chọn {{count}}",
-    "emptyState": "Chọn một hoặc nhiều vị trí rồi bấm Bật — mỗi vị trí có một cổng proxy cục bộ riêng.",
+    "emptyState": "Chọn vị trí và số cổng — mỗi cổng dùng một máy chủ riêng, nên có một IP thoát cố định riêng.",
     "table": {
       "status": "Trạng thái",
       "location": "Vị trí",
@@ -133,14 +133,15 @@
       "latency": "Độ trễ",
       "actions": "Thao tác",
       "provider": "Nhà cung cấp",
-      "account": "Tài khoản"
+      "account": "Tài khoản",
+      "server": "Máy chủ"
     },
     "copyPort": "Sao chép địa chỉ",
     "copied": "Đã sao chép",
     "copyFailed": "Không sao chép được — đã mở Xuất để bạn tự sao chép.",
-    "rotate": "Xoay IP",
-    "rotating": "Đang xoay…",
-    "rotateDisabledHint": "Chỉ cổng đang hoạt động mới xoay được IP.",
+    "rotate": "Đổi IP",
+    "rotating": "Đang đổi…",
+    "rotateDisabledHint": "Hãy bật cổng (hoặc chờ kết nối xong) rồi mới đổi IP.",
     "stop": "Tắt",
     "stopDisabledHint": "Cổng này đã dừng.",
     "remove": "Xoá",
@@ -179,12 +180,12 @@
       "selectedCount": "Đã chọn {{count}} cổng",
       "start": "Bật",
       "stop": "Tắt",
-      "rotate": "Xoay IP",
+      "rotate": "Đổi IP",
       "remove": "Xoá",
       "export": "Xuất",
       "clear": "Bỏ chọn",
       "autoRotate": "Tự xoay…",
-      "rotateSummary": "{{changed}} đã xoay, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ khác"
+      "rotateSummary": "{{changed}} đã đổi IP, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ trống"
     },
     "export": {
       "title": "Xuất danh sách cổng",
@@ -202,8 +203,9 @@
     },
     "rotateResult": {
       "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
-      "sameCityNote": "Không còn máy chủ khác ở thành phố này — đã chuyển sang thành phố khác cùng quốc gia.",
-      "unchangedNote": "Không có máy chủ khác khả dụng cho vị trí này."
+      "sameCityNote": "Thành phố đó không còn máy chủ trống — cổng đã chuyển sang thành phố khác cùng quốc gia.",
+      "unchangedNote": "Vị trí này không còn máy chủ trống — IP giữ nguyên.",
+      "serverTaken": "Máy chủ đó vừa có cổng khác dùng — hãy chọn máy chủ khác."
     },
     "emptyTitle": "Chưa có cổng nào",
     "addLocations": "Thêm vị trí",
@@ -219,17 +221,79 @@
     },
     "picker": {
       "title": "Thêm vị trí",
-      "subtitle": "Mỗi vị trí trở thành một cổng proxy cục bộ.",
+      "subtitle": "Mỗi cổng dùng một máy chủ riêng — một IP thoát cố định riêng. Chọn số cổng cho từng vị trí.",
       "searchPlaceholder": "Tìm quốc gia hoặc thành phố",
       "allProviders": "Tất cả",
-      "running": "Đang chạy",
       "noResults": "Không có vị trí nào khớp “{{query}}”.",
       "clear": "Bỏ chọn",
       "selectCountry": "Chọn mọi thành phố ở {{country}}",
       "cities_one": "{{count}} thành phố",
       "cities_other": "{{count}} thành phố",
-      "startN_one": "Bật {{count}} cổng",
-      "startN_other": "Bật {{count}} cổng"
+      "servers_one": "{{count}} máy chủ · {{free}} trống",
+      "servers_other": "{{count}} máy chủ · {{free}} trống",
+      "noFree": "Hết máy chủ trống",
+      "limitReached": "Đã đạt giới hạn cổng",
+      "portsHere_one": "{{count}} cổng",
+      "portsHere_other": "{{count}} cổng",
+      "qty": "Số cổng ở {{location}}",
+      "fewer": "Bớt một cổng ở {{location}}",
+      "more": "Thêm một cổng ở {{location}}",
+      "maxHint": "Tối đa {{max}} — mỗi máy chủ trống một cổng",
+      "addN_one": "Thêm {{count}} cổng",
+      "addN_other": "Thêm {{count}} cổng"
+    },
+    "group": {
+      "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",
+      "select": "Chọn mọi cổng ở {{location}}",
+      "ports_one": "{{count}} cổng",
+      "ports_other": "{{count}} cổng",
+      "online": "{{count}} đang chạy",
+      "servers_one": "{{count}} máy chủ",
+      "servers_other": "{{count}} máy chủ",
+      "free": "{{count}} trống",
+      "addPort": "Thêm cổng",
+      "addPortLabel": "Thêm một cổng ở {{location}}",
+      "addPortHint": "Thêm một cổng trên một máy chủ trống — thêm một IP thoát ở {{location}}.",
+      "noFreeServer": "Mọi máy chủ ở {{location}} đều đang được dùng hoặc không khả dụng.",
+      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng trong Cài đặt."
+    },
+    "port": {
+      "label": "{{location}} · cổng #{{n}}",
+      "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
+      "noServer": "Chọn khi bật lần đầu"
+    },
+    "changeIp": {
+      "menuLabel": "Đổi IP cho cổng #{{n}}",
+      "next": "Máy chủ trống tiếp theo",
+      "nextHint": "Tự chọn máy chủ trống tốt nhất",
+      "noneFreeHint": "Ở đây hết chỗ — sẽ thử thành phố khác cùng quốc gia",
+      "heading": "Máy chủ ở {{city}}",
+      "loading": "Đang tải danh sách máy chủ…",
+      "loadFailed": "Không tải được danh sách máy chủ.",
+      "empty": "Vị trí này không có máy chủ nào.",
+      "current": "Cổng này",
+      "heldBy": "Cổng :{{port}} đang dùng",
+      "heldByOther": "Cổng khác đang dùng",
+      "free": "Trống",
+      "health": {
+        "ok": "Hoạt động",
+        "unknown": "Chưa thử",
+        "refused": "Bị từ chối",
+        "dead": "Không phản hồi"
+      },
+      "reason": {
+        "current": "Cổng này đang dùng máy chủ này rồi.",
+        "held": "Cổng :{{port}} đang dùng máy chủ này — hai cổng không bao giờ dùng chung một IP thoát.",
+        "heldOther": "Một cổng khác đang dùng máy chủ này — hai cổng không bao giờ dùng chung một IP thoát.",
+        "refused": "Máy chủ này đã từ chối tài khoản của bạn nên tạm bỏ qua 7 ngày.",
+        "dead": "Máy chủ này không phản hồi nên tạm bỏ qua 2 giờ."
+      },
+      "pick": "Chuyển cổng này sang {{server}}"
+    },
+    "addResult": {
+      "no-free-server": "Đã thêm {{added}}/{{requested}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
+      "limit-reached": "Đã thêm {{added}}/{{requested}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
+      "other": "Đã thêm {{added}}/{{requested}} cổng ở {{location}}."
     }
   },
   "vpnNote": {

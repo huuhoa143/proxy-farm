@@ -6,12 +6,21 @@ import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
 import { providerName } from '../ui/providerName';
 import { useModalFocusTrap } from '../ui/useModalFocusTrap';
+import { addableCount } from '../portGroups';
+
+/** "Add `count` ports to this location" (spec §4.1, §6.8). */
+export interface PortRequest {
+  locationKey: string;
+  count: number;
+}
 
 export interface LocationPickerProps {
   targets: Target[];
-  /** Target keys that already have a port — tagged "Running" in the list. */
-  runningKeys?: ReadonlySet<string>;
-  onStart: (keys: string[]) => void;
+  /** Ports each location already has (location key → count), shown as a tag. */
+  portCounts?: ReadonlyMap<string, number>;
+  /** Ports each provider may still add under its limit; a missing provider is unlimited. */
+  remaining?: Partial<Record<ProviderId, number>>;
+  onSubmit: (requests: PortRequest[]) => void;
   onClose: () => void;
 }
 
@@ -32,13 +41,16 @@ function normalise(text: string): string {
 
 /**
  * Location picker drawer: search, provider filter, countries grouped with
- * flags, multi-select city rows, sticky "Start N" footer.
+ * flags, multi-select city rows. A picked city gets a quantity stepper
+ * (default 1, max = its free servers, capped by what the provider's port
+ * limit still allows across every picked city); the sticky footer adds them.
  */
-export function LocationPicker({ targets, runningKeys, onStart, onClose }: LocationPickerProps) {
+export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, onClose }: LocationPickerProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  // Picked location key → how many ports to add there.
+  const [picked, setPicked] = useState<Map<string, number>>(new Map());
   const searchRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const language = i18n.language || 'en';
@@ -78,26 +90,54 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
     return list;
   }, [targets, provider, query, language]);
 
-  function toggle(key: string) {
+  const targetByKey = useMemo(() => new Map(targets.map((tg) => [tg.key, tg])), [targets]);
+
+  /** Max ports for `target` given what the other picks of its provider already use. */
+  function maxFor(target: Target, picks: ReadonlyMap<string, number> = picked): number {
+    let max = addableCount(target, {});
+    const cap = remaining[target.providerId];
+    if (cap !== undefined) {
+      let usedElsewhere = 0;
+      for (const [key, count] of picks) {
+        if (key !== target.key && targetByKey.get(key)?.providerId === target.providerId) usedElsewhere += count;
+      }
+      max = Math.min(max, cap - usedElsewhere);
+    }
+    return Math.max(0, max);
+  }
+
+  function toggle(target: Target) {
     setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      const next = new Map(prev);
+      if (next.has(target.key)) next.delete(target.key);
+      else if (maxFor(target, prev) > 0) next.set(target.key, 1);
+      return next;
+    });
+  }
+
+  function setCount(target: Target, count: number) {
+    setPicked((prev) => {
+      if (!prev.has(target.key)) return prev;
+      const next = new Map(prev);
+      next.set(target.key, Math.max(1, Math.min(maxFor(target, prev), Math.round(count) || 1)));
       return next;
     });
   }
 
   function toggleGroup(group: CountryGroup) {
     setPicked((prev) => {
-      const next = new Set(prev);
-      const all = group.targets.every((tg) => next.has(tg.key));
-      for (const tg of group.targets) {
+      const next = new Map(prev);
+      const available = group.targets.filter((tg) => next.has(tg.key) || maxFor(tg, next) > 0);
+      const all = available.length > 0 && available.every((tg) => next.has(tg.key));
+      for (const tg of available) {
         if (all) next.delete(tg.key);
-        else next.add(tg.key);
+        else if (!next.has(tg.key) && maxFor(tg, next) > 0) next.set(tg.key, 1);
       }
       return next;
     });
   }
+
+  const totalPorts = Array.from(picked.values()).reduce((a, b) => a + b, 0);
 
   return (
     <>
@@ -155,7 +195,8 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
           {groups.length === 0 && <p className="pick-empty">{t('main.picker.noResults', { query })}</p>}
           {groups.map((group) => {
             const pickedInGroup = group.targets.filter((tg) => picked.has(tg.key)).length;
-            const all = pickedInGroup === group.targets.length;
+            const pickable = group.targets.filter((tg) => picked.has(tg.key) || maxFor(tg) > 0).length;
+            const all = pickable > 0 && pickedInGroup === pickable;
             return (
               <div className="grp" key={group.country} role="group" aria-label={group.name}>
                 <div className="grp-h">
@@ -163,6 +204,7 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
                     type="checkbox"
                     className="ck"
                     checked={all}
+                    disabled={pickable === 0}
                     ref={(el) => {
                       if (el) el.indeterminate = pickedInGroup > 0 && !all;
                     }}
@@ -174,18 +216,79 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
                   <span className="n">{t('main.picker.cities', { count: group.targets.length })}</span>
                 </div>
                 {group.targets.map((target) => {
-                  const on = picked.has(target.key);
-                  const running = runningKeys?.has(target.key) ?? false;
+                  const count = picked.get(target.key);
+                  const on = count !== undefined;
+                  const have = portCounts?.get(target.key) ?? 0;
+                  const max = maxFor(target);
+                  const free = target.freeServers ?? target.servers.length;
+                  const unavailable = !on && max === 0;
+                  const unavailableLabel =
+                    free === 0 ? t('main.picker.noFree') : t('main.picker.limitReached');
                   return (
-                    <label key={target.key} className={`opt${on ? ' on' : ''}${running ? ' run' : ''}`}>
-                      <input type="checkbox" className="ck" checked={on} onChange={() => toggle(target.key)} />
-                      <span className="city">{target.city}</span>
-                      {running && <span className="pill ok">{t('main.picker.running')}</span>}
-                      <span className="prov">
-                        <span className={`psw ${target.providerId}`} />
-                        {providerName(target.providerId, t)}
-                      </span>
-                    </label>
+                    <div
+                      key={target.key}
+                      className={`opt${on ? ' on' : ''}${have ? ' run' : ''}${unavailable ? ' off' : ''}`}
+                      data-testid={`pick-${target.key}`}
+                    >
+                      <label className="opt-main">
+                        <input
+                          type="checkbox"
+                          className="ck"
+                          checked={on}
+                          disabled={unavailable}
+                          onChange={() => toggle(target)}
+                        />
+                        <span className="city">
+                          {target.city}
+                          <small className="pool">
+                            {unavailable
+                              ? unavailableLabel
+                              : t('main.picker.servers', { count: target.servers.length, free })}
+                          </small>
+                        </span>
+                        {have > 0 && <span className="pill ok">{t('main.picker.portsHere', { count: have })}</span>}
+                        {!on && (
+                          <span className="prov">
+                            <span className={`psw ${target.providerId}`} />
+                            {providerName(target.providerId, t)}
+                          </span>
+                        )}
+                      </label>
+                      {on && (
+                        <div
+                          className="stepper"
+                          role="group"
+                          aria-label={t('main.picker.qty', { location: target.city }) as string}
+                          title={t('main.picker.maxHint', { max }) as string}
+                        >
+                          <button
+                            type="button"
+                            aria-label={t('main.picker.fewer', { location: target.city }) as string}
+                            disabled={count <= 1}
+                            onClick={() => setCount(target, count - 1)}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={max}
+                            value={count}
+                            aria-label={t('main.picker.qty', { location: target.city }) as string}
+                            onChange={(e) => setCount(target, Number(e.target.value))}
+                          />
+                          <button
+                            type="button"
+                            aria-label={t('main.picker.more', { location: target.city }) as string}
+                            disabled={count >= max}
+                            onClick={() => setCount(target, count + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -195,7 +298,7 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
         <div className="drawer-f">
           <span className="sum">{t('main.selectedCount', { count: picked.size })}</span>
           {picked.size > 0 && (
-            <button className="btn ghost" onClick={() => setPicked(new Set())}>
+            <button className="btn ghost" onClick={() => setPicked(new Map())}>
               {t('main.picker.clear')}
             </button>
           )}
@@ -203,12 +306,13 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
             className="btn primary"
             disabled={picked.size === 0}
             onClick={() => {
-              onStart(Array.from(picked));
-              setPicked(new Set());
+              onSubmit(Array.from(picked, ([locationKey, count]) => ({ locationKey, count })));
+              setPicked(new Map());
             }}
+            data-testid="picker-submit"
           >
-            <Icon name="power" />
-            {picked.size === 0 ? t('main.start') : t('main.picker.startN', { count: picked.size })}
+            <Icon name="plus" />
+            {picked.size === 0 ? t('main.group.addPort') : t('main.picker.addN', { count: totalPorts })}
           </button>
         </div>
       </aside>

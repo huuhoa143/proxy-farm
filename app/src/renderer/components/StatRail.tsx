@@ -6,6 +6,8 @@ export function StatRail({ rows }: { rows: PortRow[] }) {
   const { t } = useTranslation();
   const online = rows.filter((r) => r.state.kind === 'online');
   const countries = new Set(rows.map((r) => r.country)).size;
+  // Several ports can share a location (spec §6.8): count locations, not rows.
+  const locations = new Set(rows.map((r) => r.locationKey || r.key)).size;
   const latencies = online
     .map((r) => (r.state.kind === 'online' ? r.state.latencyMs : undefined))
     .filter((ms): ms is number => typeof ms === 'number');
@@ -25,7 +27,7 @@ export function StatRail({ rows }: { rows: PortRow[] }) {
       </div>
       <div className="stat">
         <span className="k">{t('main.stats.locations')}</span>
-        <span className="v">{rows.length}</span>
+        <span className="v">{locations}</span>
       </div>
       <div className="stat">
         <span className="k">{t('main.stats.countries')}</span>
