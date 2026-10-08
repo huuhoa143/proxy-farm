@@ -533,6 +533,8 @@ proxy-farm/
 | Host-VPN detection | ✅ `netsh` route table; adapters that are down keep routes and are ignored |
 | Firewall | ✅ no prompt for the app's engines (they listen on 127.0.0.1 and only dial out); only the e2e suite's WireGuard test peers (listening on every interface) prompt |
 | Packaged e2e suite, release dry-run, NSIS install/launch/`--quit`/uninstall | ✅ 11/11; gate + make + smoke pass; per-user install and silent uninstall clean |
+| ZoogVPN live on Windows (account login as OpenVPN creds) | ✅ SG `15.235.215.98`, VN `103.163.219.200`, US `216.106.176.6` online, exit = server IP; JP `jp1` `AUTH_FAILED` — the known plan-refusal case (§5.2), handled by refusal memory + failover |
+| Surfshark live on Windows | ⚠️ app path correct (registered key, cluster pubKey matches the `.conf` peer, current server IP, config renders, tunnel starts) but the handshake never completes — no traffic flows even to a literal IP. Server/account-side, not app/Windows; consistent with the 2026-10-08 account-suspension incident (§12). Awaiting a non-suspended account to confirm the exit |
 
 ## 12. Risks & open items
 
