@@ -899,6 +899,23 @@ table.port-table {
 .port-table .c-sel {
   width: 44px;
   padding-right: 0;
+  /* Pinned so the selection stays reachable if the table ever scrolls sideways. */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+.port-table thead th.c-sel {
+  background: var(--panel-2);
+}
+.port-table tbody tr.row:hover > td.c-sel {
+  background: var(--panel-2);
+}
+.port-table tbody tr.row.is-selected > td.c-sel {
+  background: linear-gradient(var(--acc-soft), var(--acc-soft)), var(--panel);
+}
+.port-table tbody tr.row.is-failed > td.c-sel {
+  background: linear-gradient(var(--bad-row), var(--bad-row)), var(--panel);
 }
 .port-table .c-st {
   min-width: 190px;
@@ -1112,7 +1129,7 @@ table.port-table {
 }
 .rowact {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   justify-content: flex-end;
   white-space: nowrap;
 }
@@ -1123,6 +1140,10 @@ table.port-table {
 }
 .rowact .btn[aria-expanded='true'] svg {
   transform: rotate(90deg);
+}
+/* secondary row actions are icon-only; the label stays for screen readers and the tooltip */
+.btn.sm.icon-only {
+  padding: 5px 8px;
 }
 .rowact .btn svg {
   transition: transform 0.18s var(--ease);
@@ -2278,7 +2299,10 @@ table.port-table {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-width: 0;
+  /* width 0 with min-width 100%: fill the cell without adding to the table's
+     min-content width, so a long city/country truncates instead of widening it */
+  width: 0;
+  min-width: 100%;
 }
 .grp-bar .sp {
   flex: 1;
@@ -2316,7 +2340,14 @@ table.port-table {
   align-items: baseline;
   gap: 10px;
   min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
+}
+.grp-name b,
+.grp-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .grp-name b {
   font-family: var(--fd);
@@ -2335,6 +2366,8 @@ table.port-table {
   display: inline-flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--dim);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -2363,6 +2396,7 @@ table.port-table {
   font-weight: 500;
 }
 .btn.grp-add {
+  flex: none;
   color: var(--acc);
 }
 .btn.grp-add:hover {

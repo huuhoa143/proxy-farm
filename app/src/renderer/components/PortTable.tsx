@@ -201,7 +201,7 @@ export function PortTable({
             >
               <Icon name="chevron" className="grp-chev" />
               <Flag country={group.country} />
-              <span className="grp-name">
+              <span className="grp-name" title={`${group.city} · ${countryName(group.country, language)} · ${provider}`}>
                 <b>{group.city}</b>
                 <span className="grp-sub">
                   {countryName(group.country, language)}
@@ -398,33 +398,33 @@ export function PortTable({
                   />
                   {onStop && (
                     <button
-                      className="btn ghost sm"
+                      className="btn ghost sm icon-only"
                       title={(state.kind === 'stopped' ? t('main.stopDisabledHint') : t('main.stop')) as string}
                       disabled={state.kind === 'stopped'}
                       onClick={() => onStop(row)}
                     >
                       <Icon name="power" />
-                      <span>{t('main.stop')}</span>
+                      <span className="sr-only">{t('main.stop')}</span>
                     </button>
                   )}
                   {onRemove && (
                     <button
-                      className="btn ghost sm danger"
+                      className="btn ghost sm icon-only danger"
                       title={t('main.remove') as string}
                       onClick={() => onRemove(row)}
                     >
                       <Icon name="trash" />
-                      <span>{t('main.remove')}</span>
+                      <span className="sr-only">{t('main.remove')}</span>
                     </button>
                   )}
                   <button
-                    className="btn ghost sm"
+                    className="btn ghost sm icon-only det-btn"
                     aria-expanded={isOpen}
                     title={t('main.details') as string}
                     onClick={() => toggleExpanded(row.key)}
                   >
                     <Icon name="chevron" />
-                    <span>{t('main.details')}</span>
+                    <span className="sr-only">{t('main.details')}</span>
                   </button>
                 </div>
               </td>
