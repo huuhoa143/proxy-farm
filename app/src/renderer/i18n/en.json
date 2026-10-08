@@ -177,7 +177,8 @@
       "every_other": "Rotates every {{count}} minutes."
     },
     "bulk": {
-      "selectedCount": "{{count}} ports selected",
+      "selectedCount_one": "{{count}} port selected",
+      "selectedCount_other": "{{count}} ports selected",
       "start": "Start",
       "stop": "Stop",
       "rotate": "Change IP",
@@ -294,9 +295,12 @@
       "pick": "Move this port to {{server}}"
     },
     "addResult": {
-      "no-free-server": "Added {{added}} of {{requested}} ports in {{location}} — no more free servers there.",
-      "limit-reached": "Added {{added}} of {{requested}} ports in {{location}} — {{provider}} reached its port limit.",
-      "other": "Added {{added}} of {{requested}} ports in {{location}}."
+      "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",
+      "no-free-server_other": "Added {{added}} of {{count}} ports in {{location}} — no more free servers there.",
+      "limit-reached_one": "Added {{added}} of {{count}} port in {{location}} — {{provider}} reached its port limit.",
+      "limit-reached_other": "Added {{added}} of {{count}} ports in {{location}} — {{provider}} reached its port limit.",
+      "generic_one": "Added {{added}} of {{count}} port in {{location}}.",
+      "generic_other": "Added {{added}} of {{count}} ports in {{location}}."
     }
   },
   "vpnNote": {

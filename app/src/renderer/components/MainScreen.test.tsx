@@ -79,7 +79,21 @@ describe('MainScreen', () => {
     vi.spyOn(api, 'addPorts').mockResolvedValueOnce({ added: [], noteKey: 'limit-reached' });
     fireEvent.click(await screen.findByTestId('add-port-hma:JP-TOKYO'));
     expect(await screen.findByTestId('notice-toast')).toHaveTextContent(
-      'Added 0 of 1 ports in Tokyo — HMA reached its port limit.',
+      'Added 0 of 1 port in Tokyo — HMA reached its port limit.',
+    );
+  });
+
+  it('pluralises the shortfall note by the number of ports asked for', async () => {
+    const api = await renderMain();
+    vi.spyOn(api, 'addPorts').mockResolvedValueOnce({ added: [], noteKey: 'no-free-server' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add locations' }));
+    const picker = await screen.findByTestId('location-picker');
+    const tokyo = within(picker).getByTestId('pick-hma:JP-TOKYO');
+    fireEvent.click(within(tokyo).getByRole('checkbox'));
+    fireEvent.click(within(tokyo).getByRole('button', { name: 'One more port in Tokyo' }));
+    fireEvent.click(within(picker).getByTestId('picker-submit'));
+    expect(await screen.findByTestId('notice-toast')).toHaveTextContent(
+      'Added 0 of 2 ports in Tokyo — no more free servers there.',
     );
   });
 
@@ -110,7 +124,7 @@ describe('MainScreen', () => {
     const row = screen.getByTestId(`port-row-${TOKYO_1}`);
     fireEvent.click(within(row).getByRole('checkbox'));
 
-    expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('1 ports selected');
+    expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('1 port selected');
     fireEvent.click(screen.getByText('Export'));
 
     await waitFor(() =>

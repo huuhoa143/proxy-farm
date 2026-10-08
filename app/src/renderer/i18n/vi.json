@@ -177,7 +177,8 @@
       "every_other": "Xoay mỗi {{count}} phút."
     },
     "bulk": {
-      "selectedCount": "Đã chọn {{count}} cổng",
+      "selectedCount_one": "Đã chọn {{count}} cổng",
+      "selectedCount_other": "Đã chọn {{count}} cổng",
       "start": "Bật",
       "stop": "Tắt",
       "rotate": "Đổi IP",
@@ -294,9 +295,12 @@
       "pick": "Chuyển cổng này sang {{server}}"
     },
     "addResult": {
-      "no-free-server": "Đã thêm {{added}}/{{requested}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
-      "limit-reached": "Đã thêm {{added}}/{{requested}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
-      "other": "Đã thêm {{added}}/{{requested}} cổng ở {{location}}."
+      "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
+      "no-free-server_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
+      "limit-reached_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
+      "limit-reached_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
+      "generic_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}}.",
+      "generic_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}}."
     }
   },
   "vpnNote": {

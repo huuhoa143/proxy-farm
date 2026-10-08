@@ -134,14 +134,15 @@ export function MainScreen({ api }: MainScreenProps) {
       const target = targets.find((t) => t.key === locationKey);
       const vars = {
         added: result.added.length,
-        requested: count,
+        // `count` (= ports asked for) selects the plural form: "1 port" / "2 ports".
+        count,
         location: locationName(locationKey),
         provider: target ? providerName(target.providerId, t) : '',
       };
       notes.push(
         result.noteKey === 'no-free-server' || result.noteKey === 'limit-reached'
           ? t(`main.addResult.${result.noteKey}`, vars)
-          : t('main.addResult.other', vars),
+          : t('main.addResult.generic', vars),
       );
     }
     setPorts(await api.listPorts());
