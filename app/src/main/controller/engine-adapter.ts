@@ -127,6 +127,8 @@ export interface CreateRealEngineOptions {
   /** Injectable proxy-port availability check. @default the real `isPortFree` (binds the
    * port to test it). Tests inject a fake so they never depend on a real free port. */
   isPortFreeFn?: typeof isPortFree;
+  /** Injectable clash_api port scan. @default the real `allocatePort` (binds to test). */
+  allocatePortFn?: typeof allocatePort;
   recordPidFn?: typeof recordPid;
   removePidFn?: typeof removePid;
   /** Injectable clock, used only for the pid registry's `startedAt`. */
@@ -214,6 +216,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   const doExitIpProbe = options.exitIpProbeFn ?? probeExitIp;
   const doClassifyLog = options.classifyLogFn ?? classifyLog;
   const doIsPortFree = options.isPortFreeFn ?? isPortFree;
+  const doAllocatePort = options.allocatePortFn ?? allocatePort;
   const doRecordPid = options.recordPidFn ?? recordPid;
   const doRemovePid = options.removePidFn ?? removePid;
   const now = options.now ?? Date.now;
@@ -258,16 +261,37 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     await doRemovePid(options.registryPath, key);
   }
 
-  /** Every proxy/clash port currently claimed by ANY entry (reviewer item 5): the
-   * `taken` set a clash-port bind-error reallocation must scan around, same spirit as
-   * `port-manager.ts`'s `takenProxyPorts()` for the proxy side. */
-  function allClaimedPorts(): Set<number> {
+  /** Ports a `start` in flight has picked but not yet registered in `entries`: without
+   * them, two overlapping starts (a credential probe while ports start, two ports of a
+   * bulk start) both saw the same port free and handed it to two sing-box processes,
+   * and the second one died on its bind. One reservation per start call. */
+  const reserved = new Set<{ key: string; ports: Set<number> }>();
+
+  /** Every proxy/clash port currently claimed by ANY entry or start in flight (reviewer
+   * item 5): the `taken` set a clash-port allocation must scan around, same spirit as
+   * `port-manager.ts`'s `takenProxyPorts()` for the proxy side. `exceptKey`'s own
+   * claims are left out (a restart of a key reuses its proxy port). */
+  function allClaimedPorts(exceptKey?: string): Set<number> {
     const taken = new Set<number>();
-    for (const e of entries.values()) {
+    for (const [k, e] of entries) {
+      if (k === exceptKey) continue;
       taken.add(e.proxyPort);
       taken.add(e.clashPort);
     }
+    for (const r of reserved) if (r.key !== exceptKey) for (const port of r.ports) taken.add(port);
     return taken;
+  }
+
+  /** A clash_api port no entry or start in flight holds, reserved for `key` before any
+   * other start can pick it: re-picked if one took it while this one was scanning. */
+  async function reserveClashPort(reservation: { key: string; ports: Set<number> }): Promise<number> {
+    for (;;) {
+      const port = await doAllocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts(reservation.key) });
+      // Synchronous from here: no other start can run between this check and the add.
+      if (allClaimedPorts(reservation.key).has(port)) continue;
+      reservation.ports.add(port);
+      return port;
+    }
   }
 
   /**
@@ -303,7 +327,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     }
 
     try {
-      const newClashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
+      const newClashPort = await doAllocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
 
       // `allocatePort` above is async — the port could have been stopped, or even
       // restarted under the same key (a brand-new `entries.get(key)` entry), while we
@@ -372,6 +396,26 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   }
 
   async function start(key: string, input: RenderInput, startOpts: EngineStartOptions = {}): Promise<void> {
+    // Another key's engine, running or starting, already listens there: two processes on
+    // one port can only end in a bind failure. Checked and reserved synchronously, so an
+    // overlapping start sees this one.
+    if (allClaimedPorts(key).has(input.listen.port)) throw new PortInUseError(input.listen.port);
+    const reservation = { key, ports: new Set([input.listen.port]) };
+    reserved.add(reservation);
+    try {
+      await startReserved(key, input, startOpts, reservation);
+    } finally {
+      // Registered in `entries` by now (or failed): the reservation has done its job.
+      reserved.delete(reservation);
+    }
+  }
+
+  async function startReserved(
+    key: string,
+    input: RenderInput,
+    startOpts: EngineStartOptions,
+    reservation: { key: string; ports: Set<number> },
+  ): Promise<void> {
     const existing = entries.get(key);
     if (existing) await teardown(key, existing);
 
@@ -383,7 +427,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       throw new PortInUseError(input.listen.port);
     }
 
-    const clashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
+    const clashPort = await reserveClashPort(reservation);
     const clashSecret = randomBytes(16).toString('hex');
     const finalInput: RenderInput = { ...input, clash: { port: clashPort, secret: clashSecret } };
     const config = renderConfig(finalInput);

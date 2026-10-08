@@ -30,6 +30,11 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Two engines starting at the same moment (a sign-in check while ports start, or
+  several ports at once) could be given the same control port, or the same proxy port,
+  and the second sing-box then exited at once on its bind. Ports picked by a start in
+  progress now count as taken for every other start, and a start on a port another
+  engine is starting on fails as "port in use" before anything is spawned.
 - The Change IP menu could list a server as free and untried when it was only another
   hostname of a machine that had already refused the account (`fr4` next to a refused
   `de7`), because that hostname had not been looked up yet. Opening the menu now looks
