@@ -150,7 +150,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     launchAtLogin: false,
     giveUpAfter: 0,
     webhook: { enabled: false, port: 29999, bearer: '' },
-    language: 'system',
+    language: 'vi',
     autoCheckUpdates: true,
   };
 

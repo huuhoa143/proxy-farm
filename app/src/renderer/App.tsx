@@ -13,7 +13,7 @@ import { Icon, type IconName } from './ui/Icon';
 type Screen = 'onboarding' | 'main' | 'settings';
 
 const api = getProxyFarmApi();
-// Initialise synchronously (system-locale guess) so the very first render —
+// Initialise synchronously (Vietnamese, the default) so the very first render —
 // including this loading screen — already has a working `t()`. The real
 // persisted language preference is applied once settings load, below.
 initI18n();

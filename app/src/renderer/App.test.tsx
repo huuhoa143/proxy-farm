@@ -15,14 +15,14 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByTestId('main-screen')).toBeInTheDocument());
   });
 
-  it('can navigate to Providers (onboarding) and Settings from the nav', async () => {
+  it('starts in Vietnamese, the default language, and can navigate from the nav', async () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('main-screen')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText('Providers'));
+    fireEvent.click(screen.getByText('VPN'));
     await waitFor(() => expect(screen.getByTestId('onboarding')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText('Settings'));
+    fireEvent.click(screen.getByText('Cài đặt'));
     await waitFor(() => expect(screen.getByTestId('settings-screen')).toBeInTheDocument());
   });
 
@@ -30,14 +30,14 @@ describe('App', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByTestId('main-screen')).toBeInTheDocument());
 
-    const headerSwitch = screen.getByLabelText('Language') as HTMLSelectElement;
-    fireEvent.change(headerSwitch, { target: { value: 'vi' } });
+    const headerSwitch = screen.getByLabelText('Ngôn ngữ') as HTMLSelectElement;
+    fireEvent.change(headerSwitch, { target: { value: 'en' } });
+    await waitFor(() => expect(screen.getByText('Providers')).toBeInTheDocument());
 
+    // Switch back so later tests in this file see the default (Vietnamese) again.
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'vi' } });
     // "Cài đặt" (Settings) is unambiguous — unlike "Cổng" (Ports), which
     // also labels the port-table's Port column.
     await waitFor(() => expect(screen.getByText('Cài đặt')).toBeInTheDocument());
-    // Switch back so later tests in this file see English again.
-    fireEvent.change(screen.getByLabelText('Ngôn ngữ'), { target: { value: 'en' } });
-    await waitFor(() => expect(screen.getByText('Providers')).toBeInTheDocument());
   });
 });

@@ -16,7 +16,7 @@ export interface LanguageSwitchProps {
  */
 export function LanguageSwitch({ api }: LanguageSwitchProps) {
   const { t } = useTranslation();
-  const [language, setLanguageState] = useState<Settings['language']>('system');
+  const [language, setLanguageState] = useState<Settings['language']>('vi');
 
   useEffect(() => {
     let cancelled = false;

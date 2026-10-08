@@ -115,10 +115,12 @@ describe('HMA local source (spec §5.1)', () => {
 });
 
 describe('main-process strings', () => {
-  it('resolves system language from the OS locale and reads the app.* keys', () => {
+  it('resolves system language from the OS locale (Vietnamese unless explicitly English) and reads the app.* keys', () => {
     expect(resolveMainLanguage('system', 'vi-VN')).toBe('vi');
     expect(resolveMainLanguage('system', 'en-US')).toBe('en');
+    expect(resolveMainLanguage('system', 'fr-FR')).toBe('vi');
     expect(resolveMainLanguage('en', 'vi')).toBe('en');
+    expect(resolveMainLanguage('vi', 'en-US')).toBe('vi');
     expect(mainStrings('vi').moveNow).not.toBe(mainStrings('en').moveNow);
   });
 });

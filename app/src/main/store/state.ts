@@ -65,7 +65,8 @@ export function defaultSettings(randomPass: () => string = defaultRandomPass): S
     launchAtLogin: false,
     giveUpAfter: 0,
     webhook: { enabled: false, port: 0, bearer: '' },
-    language: 'system',
+    // Vietnamese by default (owner decision); 'system' and 'en' remain user choices.
+    language: 'vi',
     autoCheckUpdates: true,
   };
 }

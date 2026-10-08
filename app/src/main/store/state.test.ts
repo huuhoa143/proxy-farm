@@ -45,8 +45,15 @@ describe('state store', () => {
     expect(state.settings.webhook).toEqual({ enabled: false, port: 0, bearer: '' });
     expect(state.settings.proxyUser).toBe('proxy');
     expect(state.settings.proxyPass).toBeTruthy();
-    expect(state.settings.language).toBe('system');
+    expect(state.settings.language).toBe('vi');
     expect(existsSync(filePath)).toBe(true);
+  });
+
+  it('keeps a language the user already picked, and defaults a file without one to Vietnamese', () => {
+    writeFileSync(filePath, JSON.stringify({ schemaVersion: SCHEMA_VERSION, settings: { language: 'en' } }));
+    expect(createStateStore(filePath, secrets()).getState().settings.language).toBe('en');
+    writeFileSync(filePath, JSON.stringify({ schemaVersion: SCHEMA_VERSION, settings: { basePort: 30001 } }));
+    expect(createStateStore(filePath, secrets()).getState().settings.language).toBe('vi');
   });
 
   it('never writes proxyPass or webhook.bearer in plaintext to state.json', () => {
@@ -127,7 +134,7 @@ describe('state store', () => {
       launchAtLogin: false,
       giveUpAfter: 0,
       webhook: { enabled: false, port: 0, bearer: '' },
-      language: 'system',
+      language: 'vi',
     });
   });
 

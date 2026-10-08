@@ -12,28 +12,29 @@ export const resources = {
 export type UiLanguage = 'en' | 'vi';
 
 /**
- * Settings.language is 'en' | 'vi' | 'system'. Resolve 'system' from the
- * host's reported locale (navigator.language in the renderer); everything
- * else (e.g. an unrecognised BCP-47 tag) falls back to English.
+ * Settings.language is 'en' | 'vi' | 'system'. Vietnamese is the app's default
+ * language: 'system' resolves to English only when the host's reported locale
+ * (navigator.language in the renderer) is explicitly English, and to
+ * Vietnamese for everything else (a Vietnamese or unrecognised locale).
  */
 export function resolveLanguage(setting: Settings['language'], systemLocale = detectSystemLocale()): UiLanguage {
   if (setting === 'en' || setting === 'vi') {
     return setting;
   }
-  return systemLocale.toLowerCase().startsWith('vi') ? 'vi' : 'en';
+  return systemLocale.toLowerCase().startsWith('en') ? 'en' : 'vi';
 }
 
 function detectSystemLocale(): string {
   if (typeof navigator !== 'undefined' && navigator.language) {
     return navigator.language;
   }
-  return 'en';
+  return 'vi';
 }
 
 let initialized = false;
 
 /** Initialise the shared i18next instance once. Safe to call repeatedly. */
-export function initI18n(initialSetting: Settings['language'] = 'system'): typeof i18next {
+export function initI18n(initialSetting: Settings['language'] = 'vi'): typeof i18next {
   if (!initialized) {
     void i18next.use(initReactI18next).init({
       resources,
