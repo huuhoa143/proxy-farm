@@ -113,6 +113,8 @@ export interface SurfsharkPoolsOptions {
   concurrency?: number;
   /** Longest `ensure()` waits for first rounds. */
   firstRoundBudgetMs?: number;
+  /** Once one resolver has answered, how long a lookup still waits for the other. */
+  answerGraceMs?: number;
 }
 
 export interface SurfsharkPools {
@@ -144,6 +146,7 @@ export function createSurfsharkPools(opts: SurfsharkPoolsOptions): SurfsharkPool
   const gapMs = opts.gapMs ?? 2000;
   const concurrency = opts.concurrency ?? 8;
   const firstRoundBudgetMs = opts.firstRoundBudgetMs ?? 4000;
+  const answerGraceMs = opts.answerGraceMs ?? 1000;
 
   let file: PoolFile = { version: 1, clusters: {} };
   let loaded: Promise<void> | undefined;
@@ -180,12 +183,38 @@ export function createSurfsharkPools(opts: SurfsharkPoolsOptions): SurfsharkPool
     return writing;
   }
 
-  /** One lookup through both resolvers; undefined if both failed. */
-  async function sampleOnce(host: string): Promise<string[] | undefined> {
-    const results = await Promise.allSettled([net.resolveSystem(host), net.resolveDoh(host)]);
-    const ok = results.filter((r): r is PromiseFulfilledResult<string[]> => r.status === 'fulfilled');
-    if (ok.length === 0) return undefined;
-    return [...new Set(ok.flatMap((r) => r.value).filter((ip) => IPV4_RE.test(ip)))];
+  /**
+   * One lookup through both resolvers; undefined if both failed. Returns as soon as
+   * one has answered and the other has either answered too or had `answerGraceMs`
+   * more: a black-holed resolver (DoH filtered, say) would otherwise hold every
+   * lookup to its own 5 s timeout and blow the first round's budget.
+   */
+  function sampleOnce(host: string): Promise<string[] | undefined> {
+    return new Promise((resolve) => {
+      const answers: string[][] = [];
+      let pending = 2;
+      let grace: ReturnType<typeof setTimeout> | undefined;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(grace);
+        resolve(answers.length === 0 ? undefined : [...new Set(answers.flat().filter((ip) => IPV4_RE.test(ip)))]);
+      };
+      for (const lookup of [net.resolveSystem(host), net.resolveDoh(host)]) {
+        lookup.then(
+          (ips) => {
+            if (done) return;
+            answers.push(ips);
+            grace ??= setTimeout(finish, answerGraceMs);
+            if (--pending === 0) finish();
+          },
+          () => {
+            if (--pending === 0) finish();
+          },
+        );
+      }
+    });
   }
 
   function record(host: string, ips: string[], at: number): void {

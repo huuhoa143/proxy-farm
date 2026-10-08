@@ -97,6 +97,33 @@ describe('surfshark pools: discovery', () => {
     expect(Date.now() - started).toBeLessThan(1000);
     expect(pools.servers(HOST)).toEqual([]);
   });
+
+  it('meets the first-round budget with whichever resolver answers when DoH is black-holed', async () => {
+    const never = () => new Promise<string[]>(() => {});
+    const pools = createSurfsharkPools({
+      poolPath,
+      net: { resolveSystem: async () => ['192.0.2.1', '192.0.2.2'], resolveDoh: never, sleep: () => new Promise(() => {}) },
+      now,
+      answerGraceMs: 50,
+      firstRoundBudgetMs: 4000,
+    });
+    const started = Date.now();
+    await pools.ensure([HOST]);
+    expect(Date.now() - started).toBeLessThan(1000); // the grace, not the budget or DoH's own timeout
+    expect(pools.servers(HOST)).toEqual(['192.0.2.1', '192.0.2.2']);
+  });
+
+  it('lets the slower resolver contribute when it answers within the grace', async () => {
+    const later = (ips: string[], ms: number) => () => new Promise<string[]>((r) => setTimeout(() => r(ips), ms));
+    const pools = createSurfsharkPools({
+      poolPath,
+      net: { resolveSystem: later(['192.0.2.1'], 1), resolveDoh: later(['198.51.100.1'], 30), sleep: () => new Promise(() => {}) },
+      now,
+      answerGraceMs: 2000,
+    });
+    await pools.ensure([HOST]);
+    expect(new Set(pools.servers(HOST))).toEqual(new Set(['192.0.2.1', '198.51.100.1']));
+  });
 });
 
 describe('surfshark pools: schedule', () => {
