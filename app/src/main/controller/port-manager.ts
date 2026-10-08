@@ -1020,12 +1020,13 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }
 
     const changed = !beforeIpUnverifiable && beforeIp !== undefined && afterIp !== undefined && afterIp !== beforeIp;
+    // A move to another city is reported whatever the IP check says: the row now lives
+    // in another location's group, and that must never go unnoticed.
+    if (fellBackToAnotherCity) return { changed, from: beforeIp, to: afterIp, noteKey: 'rotated-to-another-city', movedTo: target.city };
     const noteKey = beforeIpUnverifiable
       ? 'not-verified'
       : changed
-        ? fellBackToAnotherCity
-          ? 'rotated-to-another-city'
-          : undefined
+        ? undefined
         : !reachedOnline
           ? 'online-timeout'
           : afterIp === undefined

@@ -185,10 +185,10 @@ export function MainScreen({ api }: MainScreenProps) {
   }
 
   function describeRotateResult(result: RotateResult): string | undefined {
+    // A move to another city is always said, whether or not the new IP was confirmed.
+    if (result.movedTo) return t('main.rotateResult.movedToCityNote', { city: result.movedTo });
+    if (result.noteKey === SAME_CITY_NOTE) return t(SAME_CITY_NOTE);
     if (result.changed) {
-      if (result.noteKey === SAME_CITY_NOTE) {
-        return t(SAME_CITY_NOTE);
-      }
       return t('main.rotateResult.changedNote', { from: result.from, to: result.to });
     }
     if (result.noteKey) {
@@ -234,9 +234,10 @@ export function MainScreen({ api }: MainScreenProps) {
     // Ports that moved city changed key; drop the stale keys from the selection.
     const live = new Set(rows.map((r) => r.key));
     setSelected((prev) => new Set(Array.from(prev).filter((k) => live.has(k))));
-    const changed = results.filter((r) => r.changed && r.noteKey !== SAME_CITY_NOTE).length;
-    const moved = results.filter((r) => r.changed && r.noteKey === SAME_CITY_NOTE).length;
-    const unavailable = results.filter((r) => !r.changed).length;
+    const movedCity = (r: RotateResult) => Boolean(r.movedTo) || r.noteKey === SAME_CITY_NOTE;
+    const changed = results.filter((r) => r.changed && !movedCity(r)).length;
+    const moved = results.filter(movedCity).length;
+    const unavailable = results.filter((r) => !r.changed && !movedCity(r)).length;
     setBulkRotateSummary(t('main.bulk.rotateSummary', { changed, moved, unavailable }));
     schedule('bulk-rotate', () => setBulkRotateSummary(null), NOTE_MS);
   }

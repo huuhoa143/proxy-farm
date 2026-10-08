@@ -274,6 +274,17 @@ describe('port manager', () => {
       expect(serverOf(state, 'zoogvpn:nl-rot')).toBe('10.0.0.9');
     });
 
+    it('a move to another city is reported (movedTo) even when the new exit IP is not confirmed', async () => {
+      const targets: Target[] = [
+        { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] },
+        { key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] },
+      ];
+      const { manager, state } = setup({ targets, exitIpResults: [new Error('ip echo down')] });
+      const result = await manager.rotatePort('zoogvpn:nl-ams');
+      expect(result).toMatchObject({ changed: false, noteKey: 'rotated-to-another-city', movedTo: 'Rotterdam' });
+      expect(state.getState().ports[0].key).toBe('zoogvpn:nl-rot#1');
+    });
+
     it('{changed:false, noteKey:"no-server"} for an unknown port key', async () => {
       const { manager } = setup({ targets: [] });
       const result = await manager.rotatePort('does-not-exist');

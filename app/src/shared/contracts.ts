@@ -224,6 +224,10 @@ export interface RotateResult {
   to?: string;
   /** set when changed === false, or when rotation moved to another city (§6.5) */
   noteKey?: string;
+  /** Set whenever Change IP moved the port to another location of the same country
+   * (§6.5 step 2): that location's city. Reported even when `changed` is false (the new
+   * exit IP could not be confirmed), so the move is never silent. */
+  movedTo?: string;
 }
 
 export interface AppStatus {

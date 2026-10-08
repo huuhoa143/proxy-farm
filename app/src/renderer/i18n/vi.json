@@ -204,6 +204,7 @@
     "rotateResult": {
       "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
       "sameCityNote": "Thành phố đó không còn máy chủ trống — cổng đã chuyển sang thành phố khác cùng quốc gia.",
+      "movedToCityNote": "Ở đây không còn máy chủ trống — cổng đã chuyển sang {{city}}, cùng quốc gia.",
       "unchangedNote": "Vị trí này không còn máy chủ trống — IP giữ nguyên.",
       "serverTaken": "Máy chủ đó vừa có cổng khác dùng — hãy chọn máy chủ khác."
     },

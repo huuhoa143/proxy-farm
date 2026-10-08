@@ -165,7 +165,16 @@ describe('MainScreen', () => {
     await waitFor(() => expect(screen.getByTestId('port-row-hma:US-LA#1')).toBeInTheDocument());
     expect(screen.queryByTestId('port-row-hma:US-NYC#1')).toBeNull();
     expect(screen.getByTestId('group-hma:US-LA')).toBeInTheDocument();
-    expect(await screen.findByTestId('notice-toast')).toHaveTextContent('moved to another city in the same country');
+    expect(await screen.findByTestId('notice-toast')).toHaveTextContent('the port moved to Los Angeles, in the same country');
+  });
+
+  it('a move to another city is reported even when the new exit IP could not be confirmed', async () => {
+    const api = await renderMain();
+    vi.spyOn(api, 'rotatePort').mockResolvedValueOnce({ changed: false, noteKey: 'main.rotateResult.sameCityNote', movedTo: 'Osaka' });
+    await changeIp(TOKYO_1);
+    await waitFor(() =>
+      expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent('No free server left here — the port moved to Osaka, in the same country.'),
+    );
   });
 
   it('bulk Change IP summarises changed / moved-to-another-city / unavailable', async () => {

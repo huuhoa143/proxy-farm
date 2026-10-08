@@ -425,8 +425,8 @@ describe('controller facade', () => {
 
   it('rotatePort maps port-manager note keys to renderer i18n keys', async () => {
     const { facade, portManager } = setup();
-    portManager.setRotate({ changed: true, noteKey: 'rotated-to-another-city' });
-    expect((await facade.rotatePort('k')).noteKey).toBe('main.rotateResult.sameCityNote');
+    portManager.setRotate({ changed: false, noteKey: 'rotated-to-another-city', movedTo: 'Rotterdam' });
+    expect(await facade.rotatePort('k')).toEqual({ changed: false, noteKey: 'main.rotateResult.sameCityNote', movedTo: 'Rotterdam' });
     portManager.setRotate({ changed: false, noteKey: 'no-server' });
     expect((await facade.rotatePort('k')).noteKey).toBe('main.rotateResult.unchangedNote');
     portManager.setRotate({ changed: false, noteKey: 'server-unavailable' });

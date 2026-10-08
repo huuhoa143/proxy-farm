@@ -520,7 +520,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         ports.set(row.key, row);
         moveTo(server);
         emitPorts();
-        return { changed: true, from, to: row.serverIp, noteKey: 'main.rotateResult.sameCityNote' };
+        return { changed: true, from, to: row.serverIp, noteKey: 'main.rotateResult.sameCityNote', movedTo: row.city };
       }
 
       // §6.5 step 3: no other server available.

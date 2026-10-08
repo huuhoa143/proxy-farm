@@ -204,6 +204,7 @@
     "rotateResult": {
       "changedNote": "Exit IP changed: {{from}} → {{to}}",
       "sameCityNote": "No free server left in that city — the port moved to another city in the same country.",
+      "movedToCityNote": "No free server left here — the port moved to {{city}}, in the same country.",
       "unchangedNote": "No free server left for this location — the IP stays the same.",
       "serverTaken": "That server is no longer free — pick another one."
     },
