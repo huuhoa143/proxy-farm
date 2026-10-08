@@ -11,7 +11,7 @@ import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
-import type { AppStatus, PortRow, PortState, ProviderId, Settings, Target } from '../../shared/contracts';
+import { isTerminalState, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
@@ -162,10 +162,14 @@ export function runApp(): void {
     await translocationGuard(language);
 
     // A previous session's live states are meaningless now: enabled → queued (restarted
-    // below), everything else → stopped.
+    // below), everything else → stopped. A terminal failure (login refused, not in plan,
+    // key rejected) still holds: it stays, and is not restarted until the user acts.
     rawState.setState((s) => ({
       ...s,
-      ports: s.ports.map((p) => ({ ...p, state: p.enabled ? ({ kind: 'queued' } as const) : ({ kind: 'stopped' } as const) })),
+      ports: s.ports.map((p) => ({
+        ...p,
+        state: p.enabled ? (isTerminalState(p.state) ? p.state : ({ kind: 'queued' } as const)) : ({ kind: 'stopped' } as const),
+      })),
     }));
 
     // 4. sing-box present, runnable (not quarantined) and the pinned version — or a
@@ -205,10 +209,12 @@ export function runApp(): void {
     });
     const engine: Engine = {
       ...realEngine,
-      start: (key, input) => {
+      // `opts` carries the port's back-off attempt count: dropping it restarted every
+      // back-off at its first 30 s step, so a failing port never backed off.
+      start: (key, input, opts) => {
         if (shuttingDown) return Promise.reject(new Error('shutting down'));
         if (engineError) return Promise.reject(new Error(engineError));
-        return realEngine.start(key, input);
+        return realEngine.start(key, input, opts);
       },
     };
 
@@ -245,9 +251,13 @@ export function runApp(): void {
       pool,
     });
     const queue = createStartQueue({ onTaskError: (key, err) => log(`start ${key} failed`, err) });
-    const restartPort = (key: string) => {
+    /** An automatic restart (app start, resume, a settings change). A terminally failed
+     * port is left alone unless `retryTerminal` (its credentials were just replaced). */
+    const restartPort = (key: string, opts: { retryTerminal?: boolean } = {}) => {
+      const row = state.getState().ports.find((p) => p.key === key);
+      if (!row || (isTerminalState(row.state) && !opts.retryTerminal)) return;
       state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === key ? { ...p, state: { kind: 'queued' } } : p)) }));
-      queue.enqueue(key, () => portManager.startPort(key));
+      queue.enqueue(key, () => portManager.startPort(key, opts));
     };
     const onPortState = (cb: (key: string, st: PortState) => void) => engine.onStateChange(cb);
 
@@ -258,7 +268,8 @@ export function runApp(): void {
       state,
       secrets,
       onPortState,
-      restartPort,
+      // New device credentials: a port refused under the old ones may work now.
+      restartPort: (key) => restartPort(key, { retryTerminal: true }),
       onCredentialsChanged: (accountId) => portManager.credentialsChanged(accountId),
     });
     void hmaSync.check().catch((err) => log('hma credential check failed', err));
@@ -509,7 +520,10 @@ export function runApp(): void {
       listEnabledPortKeys: () => state.getState().ports.filter((p) => p.enabled).map((p) => p.key),
       stopAllPorts: async () => {
         await stopAllEngines();
-        state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.enabled ? { ...p, state: { kind: 'queued' } } : p)) }));
+        state.setState((s) => ({
+          ...s,
+          ports: s.ports.map((p) => (p.enabled && !isTerminalState(p.state) ? { ...p, state: { kind: 'queued' } } : p)),
+        }));
       },
       enqueueStart: (key) => restartPort(key),
     });

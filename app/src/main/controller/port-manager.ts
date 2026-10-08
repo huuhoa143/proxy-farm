@@ -2,6 +2,7 @@ import { lookup, resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import {
+  isTerminalState,
   makePortKey,
   splitPortKey,
   type Account,
@@ -103,9 +104,16 @@ export interface PortManagerDeps {
 }
 
 /** Who asked for a start/Change IP. A user action resets the port's back-off; an
- * automatic one (app start, resume, a due retry, auto-rotate, the webhook) never does. */
+ * automatic one (app start, resume, a due retry, auto-rotate, the webhook) never does.
+ *
+ * A port in a terminal failure (`isTerminalState`: login refused, not in plan, key
+ * rejected) is only ever restarted by a user action or by `retryTerminal`; every
+ * automatic start leaves it as it is, with no engine running. */
 export interface StartOptions {
   user?: boolean;
+  /** Start even a terminally failed port, without counting as a user action: its
+   * cause may be gone (the account's credentials were just replaced). */
+  retryTerminal?: boolean;
 }
 
 export interface PortManager {
@@ -287,6 +295,10 @@ interface SelectOptions {
   exclude?: Identity;
   /** Change IP: cycle through the pool from the current server instead of best-first. */
   roundRobinFrom?: string;
+  /** 'restart' only: may fall back to a server refused for the account. Only a user
+   * action may knock on a door that refused the account (spec §6.4): an automatic
+   * restart onto a refused server is a handshake that is known to fail. */
+  allowRefused?: boolean;
 }
 
 export function createPortManager(deps: PortManagerDeps): PortManager {
@@ -426,8 +438,17 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (opts.pinned !== undefined && order.includes(opts.pinned)) order = [opts.pinned, ...order.filter((s) => s !== opts.pinned)];
     // Stable sort: usable first, keeping the order above within each tier.
     const ranked = order.map((s) => ({ s, t: tier(opts.accountId, s) }));
-    const allowed = opts.mode === 'strict' ? ranked.filter((r) => r.t === 0) : ranked;
-    return allowed.sort((a, b) => a.t - b.t).map((r) => r.s);
+    const maxTier = opts.mode === 'strict' ? 0 : opts.allowRefused ? 2 : 1;
+    return ranked
+      .filter((r) => r.t <= maxTier)
+      .sort((a, b) => a.t - b.t)
+      .map((r) => r.s);
+  }
+
+  /** Some server of the location that no other port holds is refused for the account:
+   * with no pick, the location has nothing left but servers that refused it. */
+  function freeRefusedExists(opts: SelectOptions): boolean {
+    return opts.target.servers.some((s) => health.isRefused(opts.accountId, s) && !heldBy(opts.target.providerId, identityOf(s), opts.portKey));
   }
 
   /**
@@ -436,7 +457,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * first. Resolves hostnames on the way; a host that no longer resolves is marked dead.
    * Must run under `withClaimLock`, together with writing the pick to the row.
    */
-  async function selectServer(opts: SelectOptions): Promise<{ pick?: ServerPick; dnsFailed: boolean }> {
+  async function selectServer(opts: SelectOptions): Promise<{ pick?: ServerPick; dnsFailed: boolean; onlyRefused?: boolean }> {
     let dnsFailed = false;
     for (const server of orderCandidates(opts)) {
       // An IP literal is its own identity; a hostname is judged on what it resolves to now.
@@ -460,7 +481,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         return { pick: { server, ip }, dnsFailed };
       }
     }
-    return { dnsFailed };
+    return { dnsFailed, onlyRefused: !dnsFailed && freeRefusedExists(opts) };
   }
 
   /** Synchronous "is there somewhere else to go" check for failover, on cached IPs. */
@@ -554,6 +575,22 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }, 0);
   }
 
+  /**
+   * Leaves `key` in a terminal failure (spec §6.4): no local retry, no timer, and its
+   * engine stopped, so nothing knocks on the provider's door again until the user acts.
+   * The stop is deferred (callers run inside the engine's state-change callback) and
+   * skipped if the user restarted the port in between.
+   */
+  function failTerminal(key: string, reason: FailReason, from?: Extract<PortState, { kind: 'failed' }>): void {
+    cancelLocalRetry(key);
+    const attempt = from?.attempt ?? Math.max(1, backoffAttempts.get(key) ?? 0);
+    updatePort(key, { state: { kind: 'failed', reason, untilMs: from?.untilMs ?? Date.now(), attempt } });
+    setTimeout(() => {
+      const row = findPort(key);
+      if (row && isTerminalState(row.state)) void deps.engine.stop(key).catch(() => undefined);
+    }, 0);
+  }
+
   /** Moves an enabled port off its current server if a usable free one remains for its
    * account (spec §6.8 failover). False when there is nowhere to go. */
   function failOver(key: string, reasonKey: string): boolean {
@@ -598,14 +635,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return 'credentials';
   }
 
-  /** A `failed(auth)` from the engine (spec §6.8 "server refused"). */
+  /** A `failed(auth)` from the engine (spec §6.8 "server refused"). Every outcome either
+   * moves the port to another server or leaves it terminally failed. */
   function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     const verdict = authVerdict(port);
-    if (verdict === 'credentials') return; // stays failed(auth), long back-off
+    if (verdict === 'credentials') return failTerminal(port.key, 'auth', state);
     if (verdict === 'unproven') {
       // Stays failed(auth) only if there is nowhere else to gather evidence.
       health.markDead(port.accountId, port.server);
-      failOver(port.key, 'server-refused');
+      if (!failOver(port.key, 'server-refused')) failTerminal(port.key, 'auth', state);
       return;
     }
     health.markRefused(port.accountId, port.server);
@@ -613,7 +651,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (failOver(port.key, 'server-refused')) return;
     if (moveToAnotherAccount(port.key)) return;
     // Nothing left: failed(auth) for HMA, failed(not-in-plan) for a plan refusal.
-    if (port.providerId === 'zoogvpn') updatePort(port.key, { state: { ...state, reason: 'not-in-plan' } });
+    failTerminal(port.key, port.providerId === 'zoogvpn' ? 'not-in-plan' : 'auth', state);
   }
 
   // Bookkeeping for `onConnectivityFailure` (spec §6.4 "a port's exit IP is sticky").
@@ -791,6 +829,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // in flight already does its own stop+start, so skip the retry then.
   deps.engine.onRetryDue?.((key) => {
     if (rotatingKeys.has(key)) return;
+    const row = findPort(key);
+    if (row && isTerminalState(row.state)) return; // terminal: only the user restarts it
     void startPort(key).catch(() => undefined);
   });
 
@@ -883,6 +923,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       // Removed, or renamed by a Change IP to another city, since this start was due:
       // nothing to start, and nothing to retry (a retry would only find it gone again).
       if (!port) return;
+      // A terminal failure waits for the user (or new credentials), whatever asked.
+      const mayRetryTerminal = opts.user === true || opts.retryTerminal === true;
+      if (isTerminalState(port.state) && !mayRetryTerminal) return;
       // The user stopped the port while this start was awaiting: it must not come back on.
       // (Only for a start that began on an enabled row — a direct start of a stopped row
       // is what turns it on.)
@@ -930,7 +973,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       const selected = await withClaimLock(async () => {
         const fresh = findPort(key);
         if (!fresh || stoppedMeanwhile()) return undefined;
-        const result = await selectServer({ target, accountId: fresh.accountId, portKey: key, mode: 'restart', pinned: fresh.server });
+        const result = await selectServer({
+          target,
+          accountId: fresh.accountId,
+          portKey: key,
+          mode: 'restart',
+          pinned: fresh.server,
+          allowRefused: mayRetryTerminal,
+        });
         if (stoppedMeanwhile()) return undefined; // stopped while resolving
         // Claimed together with `enabled`, so the next selection already sees it held.
         const { pick } = result;
@@ -941,6 +991,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       });
       if (!selected) return; // removed or stopped meanwhile
       if (!selected.pick) {
+        // Nothing free but servers that refused the account: retrying cannot help.
+        if (selected.onlyRefused) return failTerminal(key, port.providerId === 'zoogvpn' ? 'not-in-plan' : 'auth');
         failWithRetry(key, selected.dnsFailed ? { kind: 'retrying', reasonKey: 'dns-failed' } : { kind: 'failed', reason: 'no-server' });
         return;
       }
@@ -1042,6 +1094,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       wgGuard.rearm(account.id);
       persistLockouts();
     }
+    // Auto-rotate and the webhook never revive a terminally failed port; the button does.
+    if (isTerminalState(port.state) && !opts.user) return { changed: false, noteKey: 'needs-attention' };
     // A Change IP is a handshake attempt like any other (spec §6.4 "Provider safety").
     if (limiter.take(account.id) > 0) return { changed: false, noteKey: 'rate-limited' };
 

@@ -476,6 +476,7 @@
     "port-disabled": "Start the port before rotating it.",
     "decrypt-failed": "Your saved credentials couldn't be read.",
     "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly.",
+    "needs-attention": "This port needs your attention first — start it again to retry.",
     "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
   },
   "hma": {

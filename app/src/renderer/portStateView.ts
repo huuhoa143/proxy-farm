@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { FailReason, PortState, ProviderId } from '../shared/contracts';
+import { isTerminalFailure, type FailReason, type PortState, type ProviderId } from '../shared/contracts';
 
 export type StatusTone = 'neutral' | 'progress' | 'online' | 'warn' | 'bad';
 
@@ -17,14 +17,8 @@ export interface PortStateView {
   terminal?: boolean;
 }
 
-/**
- * Failures retrying can't fix — the user must change something (credentials, plan).
- * `port-in-use` and `no-server` are transient (the engine keeps retrying), so they
- * are NOT terminal and still show a countdown.
- */
-export function isTerminalFailure(reason: FailReason): boolean {
-  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
-}
+/** Failures retrying can't fix — the user must change something (credentials, plan). */
+export { isTerminalFailure };
 
 function authGuidanceKey(providerId: ProviderId): string {
   if (providerId === 'hma') return 'portState.failed.auth.guidance.hma';

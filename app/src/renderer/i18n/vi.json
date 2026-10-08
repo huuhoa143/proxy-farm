@@ -476,6 +476,7 @@
     "port-disabled": "Hãy bật cổng trước khi đổi IP.",
     "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu.",
     "rate-limited": "Tài khoản này đã thử kết nối quá nhiều lần trong một phút qua — hãy thử lại sau ít phút.",
+    "needs-attention": "Cổng này cần bạn xử lý trước — hãy bật lại cổng để thử lại.",
     "key-rejected": "Proxy Farm đã ngừng thử lại khóa WireGuard này vì không nhận được phản hồi. Hãy bật cổng trong ứng dụng để thử thêm một lần."
   },
   "hma": {

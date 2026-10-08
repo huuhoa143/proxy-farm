@@ -7,6 +7,15 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A port that failed for good (sign-in rejected, location not in the plan, WireGuard key
+  not answered) kept starting a new engine about every 41 s against a server that had
+  just refused it, while the row said it would not retry. Such a port now stops its
+  engine and stays failed until you start it, change its IP or enter new credentials;
+  app start, wake from sleep, auto-rotate and the webhook leave it alone.
+- The retry back-off restarted at 30 s on every attempt instead of growing to 30 min.
+
 ## [0.1.0] — 2026-10-08
 
 First release of the desktop app. It replaces the Docker edition (v1, archived at the

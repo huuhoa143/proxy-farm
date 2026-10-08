@@ -1731,7 +1731,7 @@ describe('port manager', () => {
       });
       await manager.startPort('zoogvpn:nl-ams');
       expect(engine.started[0].attempt).toBe(0);
-      engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 99, attempt: 3 });
+      engine.fireState('zoogvpn:nl-ams', { kind: 'retrying', untilMs: 99, attempt: 3, reasonKey: 'exited' });
       engine.fireRetryDue('zoogvpn:nl-ams');
       await vi.waitFor(() => expect(engine.started).toHaveLength(2));
       expect(engine.started[1].attempt).toBe(3); // not back to the 30 s step
@@ -1897,7 +1897,7 @@ describe('port manager', () => {
         expect(row.state).toMatchObject({ kind: 'failed', reason: 'auth' });
       });
 
-      it('stops failing over once every server of the location has refused; the long back-off still retries', async () => {
+      it('stops failing over once every server of the location has refused; nothing restarts it, not even a due retry', async () => {
         const serverHealth = createServerHealth();
         serverHealth.markRefused('z1', '10.9.0.2'); // already refused earlier
         const { manager, engine, state } = hmaSetup(['10.9.0.1', '10.9.0.2'], serverHealth);
@@ -1908,8 +1908,14 @@ describe('port manager', () => {
         await new Promise((r) => setTimeout(r, 20));
         expect(engine.started).toHaveLength(1);
         expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI#1')!.state).toMatchObject({ kind: 'failed', reason: 'auth' });
+        expect(engine.stopped).toContain('hma:VN-51-HANOI#1');
         engine.fireRetryDue('hma:VN-51-HANOI#1');
-        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        await manager.startPort('hma:VN-51-HANOI#1'); // an automatic start (resume, app start)
+        await new Promise((r) => setTimeout(r, 20));
+        expect(engine.started).toHaveLength(1);
+        // The user's Start tries again, refused servers included.
+        await manager.startPort('hma:VN-51-HANOI#1', { user: true });
+        expect(engine.started).toHaveLength(2);
       });
 
       it('with no proof the device creds work anywhere, an auth failure is a credential problem: nothing marked, no pool walk', async () => {

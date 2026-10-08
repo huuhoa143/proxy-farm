@@ -171,6 +171,21 @@ export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 50
  */
 export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server' | 'key-rejected';
 
+/**
+ * Failures retrying cannot fix: the provider refused the login, the plan does not
+ * include the location's servers, or a WireGuard key got no answer. Nothing restarts
+ * such a port automatically (no timer, no engine) until the user acts: Start, Change
+ * IP, or new credentials. `port-in-use` and `no-server` are transient and keep retrying.
+ */
+export function isTerminalFailure(reason: FailReason): boolean {
+  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
+}
+
+/** True for a `failed` state that is terminal (see `isTerminalFailure`). */
+export function isTerminalState(state: PortState): boolean {
+  return state.kind === 'failed' && isTerminalFailure(state.reason);
+}
+
 export type PortState =
   | { kind: 'queued' }
   | { kind: 'connecting'; since: number }
