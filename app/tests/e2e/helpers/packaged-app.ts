@@ -3,10 +3,16 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
+export const IS_WIN = process.platform === 'win32';
 export const APP_ROOT = path.resolve(__dirname, '../../..');
-export const APP_BUNDLE = path.join(APP_ROOT, 'out', `Proxy Farm-darwin-${process.arch}`, 'Proxy Farm.app');
-export const APP_EXE = path.join(APP_BUNDLE, 'Contents', 'MacOS', 'Proxy Farm');
-export const BUNDLED_SINGBOX = path.join(APP_BUNDLE, 'Contents', 'Resources', 'sing-box', process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-amd64', 'sing-box');
+/** The packaged app: `Proxy Farm.app` on macOS, the unpacked folder on Windows. */
+export const APP_BUNDLE = IS_WIN
+  ? path.join(APP_ROOT, 'out', 'Proxy Farm-win32-x64')
+  : path.join(APP_ROOT, 'out', `Proxy Farm-darwin-${process.arch}`, 'Proxy Farm.app');
+export const APP_EXE = IS_WIN ? path.join(APP_BUNDLE, 'Proxy Farm.exe') : path.join(APP_BUNDLE, 'Contents', 'MacOS', 'Proxy Farm');
+export const BUNDLED_SINGBOX = IS_WIN
+  ? path.join(APP_BUNDLE, 'resources', 'sing-box', 'windows-amd64', 'sing-box.exe')
+  : path.join(APP_BUNDLE, 'Contents', 'Resources', 'sing-box', process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-amd64', 'sing-box');
 
 export interface RunningApp {
   proc: ChildProcess;
@@ -14,7 +20,8 @@ export interface RunningApp {
   browser: Browser;
   page: Page;
   output: () => string;
-  /** Graceful quit (SIGTERM → app.quit → before-quit stops every engine); resolves on exit. */
+  /** Graceful quit (SIGTERM, or `--quit` on Windows → app.quit → before-quit stops every
+   * engine); resolves on exit. */
   quit(): Promise<number | null>;
 }
 
@@ -70,7 +77,10 @@ export async function launchPackagedApp(userDataDir: string): Promise<RunningApp
     output: () => log,
     async quit() {
       await browser.close().catch(() => undefined);
-      proc.kill('SIGTERM');
+      // Windows has no SIGTERM for a GUI app (proc.kill terminates it outright): ask the
+      // running instance to quit through a second launch instead.
+      if (IS_WIN) spawn(APP_EXE, ['--quit'], { env: { ...process.env, PROXYFARM_USER_DATA_DIR: userDataDir }, stdio: 'ignore' });
+      else proc.kill('SIGTERM');
       return exited;
     },
   };
