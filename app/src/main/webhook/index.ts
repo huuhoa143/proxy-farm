@@ -21,20 +21,32 @@ export interface WebhookOptions {
   resolveKey?(key: string): string;
 }
 
+/** Longest alias chain followed (a location retired twice), and a guard against a cycle. */
+const MAX_ALIAS_HOPS = 4;
+
 /**
  * spec §6.6: a bare location key (pre-rev-3 scripts) means that location's
- * lowest-numbered port. Port keys, and keys matching nothing, pass through unchanged
- * (the latter then rotate nothing and report `no-server`).
+ * lowest-numbered port. A bare key of a location that a provider has since retired is
+ * followed through `aliases` (old location key → new one, written by the boot-time
+ * re-attach) to where its ports moved. Port keys, and keys matching nothing, pass
+ * through unchanged (the latter then rotate nothing and report `no-server`).
  */
-export function resolveRotateKey(key: string, ports: PortRow[]): string {
+export function resolveRotateKey(key: string, ports: PortRow[], aliases: Record<string, string> = {}): string {
   if (ports.some((p) => p.key === key)) return key;
-  let best: { key: string; n: number } | undefined;
-  for (const p of ports) {
-    const parts = splitPortKey(p.key);
-    if (p.locationKey !== key || !parts) continue;
-    if (!best || parts.n < best.n) best = { key: p.key, n: parts.n };
+  let location = key;
+  for (let hop = 0; hop <= MAX_ALIAS_HOPS; hop++) {
+    let best: { key: string; n: number } | undefined;
+    for (const p of ports) {
+      const parts = splitPortKey(p.key);
+      if (p.locationKey !== location || !parts) continue;
+      if (!best || parts.n < best.n) best = { key: p.key, n: parts.n };
+    }
+    if (best) return best.key;
+    const next = Object.prototype.hasOwnProperty.call(aliases, location) ? aliases[location] : undefined;
+    if (next === undefined) break;
+    location = next;
   }
-  return best?.key ?? key;
+  return key;
 }
 
 export interface Webhook {

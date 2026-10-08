@@ -19,7 +19,12 @@ import { makePortKey, splitPortKey, type PortRow, type ProviderId, type Target }
  * Providers absent from `targetsByProvider` (no accounts, or their catalog failed to
  * load) are skipped, so a transient failure never detaches anything.
  */
-export function reattachPorts(ports: PortRow[], targetsByProvider: Map<ProviderId, Target[]>): PortRow[] {
+export function reattachPorts(
+  ports: PortRow[],
+  targetsByProvider: Map<ProviderId, Target[]>,
+  /** Called for each row moved: the row as it was, and its new location key. */
+  onMove?: (row: PortRow, toLocationKey: string) => void,
+): PortRow[] {
   const used = new Map<string, Set<number>>();
   for (const p of ports) {
     const parts = splitPortKey(p.key);
@@ -39,6 +44,7 @@ export function reattachPorts(ports: PortRow[], targetsByProvider: Map<ProviderI
     while (set.has(n)) n += 1;
     set.add(n);
     used.set(match.target.key, set);
+    onMove?.(p, match.target.key);
     const { serverIp: _staleIp, server: _staleServer, ...rest } = p;
     return {
       ...rest,
@@ -52,6 +58,29 @@ export function reattachPorts(ports: PortRow[], targetsByProvider: Map<ProviderI
       city: match.target.city,
     };
   });
+}
+
+/**
+ * `reattachPorts`, plus the persisted alias map old location key → new location key
+ * (`AppState.locationAliases`), so a script still posting a retired bare location key to
+ * the webhook (`zoogvpn:JP-JP3`) reaches the port that moved (spec §6.6). Where one old
+ * location's rows went to several targets, its lowest-numbered row decides (that is the
+ * port a bare key means); an alias written by an earlier run is replaced.
+ */
+export function reattachWithAliases(
+  ports: PortRow[],
+  targetsByProvider: Map<ProviderId, Target[]>,
+  aliases: Record<string, string>,
+): { ports: PortRow[]; aliases: Record<string, string> } {
+  const best = new Map<string, { n: number; to: string }>();
+  const out = reattachPorts(ports, targetsByProvider, (row, to) => {
+    const n = splitPortKey(row.key)?.n ?? 0;
+    const prev = best.get(row.locationKey);
+    if (!prev || n < prev.n) best.set(row.locationKey, { n, to });
+  });
+  const next = { ...aliases };
+  for (const [from, { to }] of best) next[from] = to;
+  return { ports: out, aliases: next };
 }
 
 interface Match {

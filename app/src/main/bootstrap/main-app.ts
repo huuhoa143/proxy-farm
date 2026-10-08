@@ -17,7 +17,7 @@ import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
 import { createHostVpnMonitor } from '../controller/host-vpn';
 import { createPortManager } from '../controller/port-manager';
-import { reattachPorts } from '../controller/reattach';
+import { reattachWithAliases } from '../controller/reattach';
 import type { Engine } from '../controller/ports';
 import { createRealExitIpProber, createRealPortAllocator } from '../controller/real-bindings';
 import { createStartQueue } from '../controller/start-queue';
@@ -278,7 +278,7 @@ export function runApp(): void {
           bearer: s.webhook.bearer,
           hostAllowlist: ['127.0.0.1', 'localhost', ...(lanIp ? [lanIp] : [])],
           rotate: (key) => facadeRotate(key),
-          resolveKey: (key) => resolveRotateKey(key, state.getState().ports),
+          resolveKey: (key) => resolveRotateKey(key, state.getState().ports, state.getState().locationAliases),
         });
       } catch (err) {
         log('webhook failed to start', err);
@@ -494,7 +494,10 @@ export function runApp(): void {
     try {
       const byProvider = new Map<ProviderId, Target[]>();
       for (const t of await facade.listTargets()) byProvider.set(t.providerId, [...(byProvider.get(t.providerId) ?? []), t]);
-      state.setState((s) => ({ ...s, ports: reattachPorts(s.ports, byProvider) }));
+      state.setState((s) => {
+        const { ports, aliases } = reattachWithAliases(s.ports, byProvider, s.locationAliases);
+        return { ...s, ports, locationAliases: aliases };
+      });
     } catch (err) {
       log('re-attaching ports failed', err);
     }

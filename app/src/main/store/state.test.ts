@@ -401,6 +401,13 @@ describe('state store', () => {
       expect(store.takeSecretNotice()).toContain('state.json.v1.bak');
     });
 
+    it('persists the webhook location-alias map, defaulting to empty', () => {
+      const store = createStateStore(filePath, secrets());
+      expect(store.getState().locationAliases).toEqual({});
+      store.setState((s) => ({ ...s, locationAliases: { 'zoogvpn:JP-JP3': 'zoogvpn:JP' } }));
+      expect(createStateStore(filePath, secrets()).getState().locationAliases).toEqual({ 'zoogvpn:JP-JP3': 'zoogvpn:JP' });
+    });
+
     it('loads a v2 file as is (no second migration)', () => {
       writeFileSync(
         filePath,

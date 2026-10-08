@@ -40,6 +40,9 @@ export interface AppState {
   limits: Record<ProviderId, number>;
   refusals: RefusalsState;
   serverHealth: ServerHealthState;
+  /** Old location key → the location its ports were re-attached to at boot (spec §6.8),
+   * so the webhook still resolves a retired bare location key (spec §6.6). */
+  locationAliases: Record<string, string>;
 }
 
 /** Secret-store ids `settings.proxyPass` / `settings.webhook.bearer` are kept under —
@@ -80,6 +83,7 @@ export function defaultState(randomPass?: () => string): AppState {
     limits: {} as Record<ProviderId, number>,
     refusals: { failures: {}, online: {} },
     serverHealth: { refused: {}, lastOk: {} },
+    locationAliases: {},
   };
 }
 
@@ -179,6 +183,10 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
       rawHealth && typeof rawHealth === 'object'
         ? { refused: nestedRecord(rawHealth.refused), lastOk: nestedRecord(rawHealth.lastOk) }
         : defaults.serverHealth,
+    locationAliases:
+      raw?.locationAliases && typeof raw.locationAliases === 'object' && !Array.isArray(raw.locationAliases)
+        ? raw.locationAliases
+        : defaults.locationAliases,
     settings: {
       ...defaults.settings,
       ...rawSettings,

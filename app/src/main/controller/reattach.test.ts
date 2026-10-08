@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PortRow, ProviderId, Target } from '../../shared/contracts';
-import { reattachPorts } from './reattach';
+import { resolveRotateKey } from '../webhook/index';
+import { reattachPorts, reattachWithAliases } from './reattach';
 
 function row(key: string, extra: Partial<PortRow> = {}): PortRow {
   return {
@@ -90,5 +91,31 @@ describe('reattachPorts (spec §6.8 boot-time re-attach)', () => {
     const current = row('zoogvpn:JP#1', { locationKey: 'zoogvpn:JP', server: 'jp2.webunlim.com' });
     const hma = row('hma:VN-51-HANOI#1', { providerId: 'hma', server: '1.1.1.1' });
     expect(reattachPorts([current, hma], zoog)).toEqual([current, hma]);
+  });
+});
+
+describe('reattachWithAliases (webhook old keys, spec §6.6)', () => {
+  it('records old location → new location for each moved location, merged into the existing map', () => {
+    const { ports, aliases } = reattachWithAliases(
+      [row('zoogvpn:JP-JP3#1', { server: 'jp3.webunlim.com' }), row('zoogvpn:JP#1', { locationKey: 'zoogvpn:JP' })],
+      zoog,
+      { 'zoogvpn:OLD': 'zoogvpn:DE' },
+    );
+    expect(ports.map((p) => p.key)).toEqual(['zoogvpn:JP#2', 'zoogvpn:JP#1']);
+    expect(aliases).toEqual({ 'zoogvpn:OLD': 'zoogvpn:DE', 'zoogvpn:JP-JP3': 'zoogvpn:JP' });
+  });
+
+  it("an old location split across targets is aliased to where its lowest port went", () => {
+    const { aliases } = reattachWithAliases(
+      [row('zoogvpn:US-OLD#2', { server: 'us2.west.webunlim.com' }), row('zoogvpn:US-OLD#1', { server: 'us5.east.webunlim.com' })],
+      zoog,
+      {},
+    );
+    expect(aliases).toEqual({ 'zoogvpn:US-OLD': 'zoogvpn:US-EAST' });
+  });
+
+  it('after a reattach, the webhook resolves a bare old ZoogVPN key to the moved port', () => {
+    const { ports, aliases } = reattachWithAliases([row('zoogvpn:JP-JP3#1', { server: 'jp3.webunlim.com' })], zoog, {});
+    expect(resolveRotateKey('zoogvpn:JP-JP3', ports, aliases)).toBe('zoogvpn:JP#1');
   });
 });

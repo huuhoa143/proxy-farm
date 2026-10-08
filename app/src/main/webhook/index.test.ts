@@ -150,6 +150,20 @@ describe('resolveRotateKey (spec §6.6 bare-location alias)', () => {
     expect(resolveRotateKey('hma:jp-tok#9', ports)).toBe('hma:jp-tok#9');
     expect(resolveRotateKey('hma:nowhere', ports)).toBe('hma:nowhere');
   });
+
+  it("a retired bare location key follows the alias map to its new location's lowest port", () => {
+    const ports = [row('zoogvpn:JP#3'), row('zoogvpn:JP#2')];
+    expect(resolveRotateKey('zoogvpn:JP-JP3', ports, { 'zoogvpn:JP-JP3': 'zoogvpn:JP' })).toBe('zoogvpn:JP#2');
+    // Retired twice: the chain is followed.
+    expect(resolveRotateKey('zoogvpn:jp3', ports, { 'zoogvpn:jp3': 'zoogvpn:JP-JP3', 'zoogvpn:JP-JP3': 'zoogvpn:JP' })).toBe('zoogvpn:JP#2');
+  });
+
+  it('a live location wins over an alias, and a cycle or dead end passes the key through', () => {
+    expect(resolveRotateKey('hma:a', [row('hma:a#1'), row('hma:b#1')], { 'hma:a': 'hma:b' })).toBe('hma:a#1');
+    expect(resolveRotateKey('hma:a', [], { 'hma:a': 'hma:b', 'hma:b': 'hma:a' })).toBe('hma:a');
+    expect(resolveRotateKey('hma:a', [], { 'hma:a': 'hma:gone' })).toBe('hma:a');
+    expect(resolveRotateKey('constructor', [], {})).toBe('constructor'); // no prototype keys
+  });
 });
 
 describe('generateBearer / MIN_BEARER_LENGTH', () => {
