@@ -1,5 +1,5 @@
 {
- "fetched": 1791300208,
+ "fetched": 1791448383,
  "locations": [
   {
    "key": "AE-1-ABU-DHABI",
@@ -7,6 +7,9 @@
    "countryName": "United Arab Emirates",
    "city": "Abu Dhabi",
    "ip": "5.62.19.134",
+   "ips": [
+    "5.62.19.134"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -16,6 +19,10 @@
    "countryName": "Albania",
    "city": "Tirana",
    "ip": "31.171.154.229",
+   "ips": [
+    "31.171.154.229",
+    "31.171.154.102"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -25,6 +32,12 @@
    "countryName": "Argentina",
    "city": "Buenos Aires",
    "ip": "149.22.83.214",
+   "ips": [
+    "149.22.83.214",
+    "149.22.83.194",
+    "149.22.83.215",
+    "149.22.83.228"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -34,6 +47,9 @@
    "countryName": "Austria",
    "city": "Vienna",
    "ip": "95.177.87.72",
+   "ips": [
+    "95.177.87.72"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -43,6 +59,9 @@
    "countryName": "Australia",
    "city": "Sydney",
    "ip": "3.107.26.236",
+   "ips": [
+    "3.107.26.236"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -52,6 +71,12 @@
    "countryName": "Australia",
    "city": "Melbourne",
    "ip": "79.127.155.167",
+   "ips": [
+    "79.127.155.167",
+    "79.127.155.170",
+    "79.127.155.178",
+    "79.127.155.180"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -61,6 +86,12 @@
    "countryName": "Australia",
    "city": "Perth",
    "ip": "96.0.0.252",
+   "ips": [
+    "96.0.0.252",
+    "96.0.0.51",
+    "96.0.0.112",
+    "96.0.0.145"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -70,6 +101,9 @@
    "countryName": "Azerbaijan",
    "city": "Baku",
    "ip": "95.142.115.7",
+   "ips": [
+    "95.142.115.7"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -79,6 +113,12 @@
    "countryName": "Bosnia & Herzegovina",
    "city": "Novi Travnik",
    "ip": "45.156.248.109",
+   "ips": [
+    "45.156.248.109",
+    "45.156.248.92",
+    "45.156.248.94",
+    "45.156.248.107"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -88,6 +128,12 @@
    "countryName": "Belgium",
    "city": "Brussel",
    "ip": "79.127.164.220",
+   "ips": [
+    "79.127.164.220",
+    "79.127.164.131",
+    "79.127.164.142",
+    "79.127.164.154"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -97,6 +143,10 @@
    "countryName": "Bulgaria",
    "city": "Sofia",
    "ip": "169.150.237.129",
+   "ips": [
+    "169.150.237.129",
+    "169.150.237.141"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -106,6 +156,9 @@
    "countryName": "Brunei",
    "city": "Bandar Seri Begawan",
    "ip": "5.62.18.134",
+   "ips": [
+    "5.62.18.134"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -115,6 +168,12 @@
    "countryName": "Brazil",
    "city": "Sao Paulo",
    "ip": "149.102.233.138",
+   "ips": [
+    "149.102.233.138",
+    "149.102.233.48",
+    "149.102.233.49",
+    "149.102.233.149"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -124,6 +183,9 @@
    "countryName": "Canada",
    "city": "Calgary",
    "ip": "16.174.48.176",
+   "ips": [
+    "16.174.48.176"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -133,6 +195,11 @@
    "countryName": "Canada",
    "city": "Vancouver",
    "ip": "209.121.189.6",
+   "ips": [
+    "209.121.189.6",
+    "209.121.189.15",
+    "209.121.189.16"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -142,6 +209,12 @@
    "countryName": "Canada",
    "city": "Toronto",
    "ip": "217.79.118.130",
+   "ips": [
+    "217.79.118.130",
+    "217.79.118.142",
+    "217.79.118.166",
+    "217.79.118.178"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -151,6 +224,9 @@
    "countryName": "Canada",
    "city": "Montreal",
    "ip": "16.52.160.194",
+   "ips": [
+    "16.52.160.194"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -160,6 +236,9 @@
    "countryName": "Switzerland",
    "city": "Zurich",
    "ip": "51.34.18.107",
+   "ips": [
+    "51.34.18.107"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -169,6 +248,10 @@
    "countryName": "Chile",
    "city": "Santiago",
    "ip": "79.127.152.49",
+   "ips": [
+    "79.127.152.49",
+    "79.127.152.38"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -178,6 +261,10 @@
    "countryName": "Colombia",
    "city": "Bogota",
    "ip": "79.127.214.197",
+   "ips": [
+    "79.127.214.197",
+    "79.127.214.211"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -187,6 +274,9 @@
    "countryName": "Costa Rica",
    "city": "San Jose",
    "ip": "179.48.251.182",
+   "ips": [
+    "179.48.251.182"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -196,6 +286,10 @@
    "countryName": "Cyprus",
    "city": "Nicosia",
    "ip": "185.191.206.213",
+   "ips": [
+    "185.191.206.213",
+    "185.191.206.8"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -205,6 +299,11 @@
    "countryName": "Czech Republic",
    "city": "Prague",
    "ip": "152.233.16.90",
+   "ips": [
+    "152.233.16.90",
+    "152.233.16.26",
+    "152.233.16.38"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -214,6 +313,9 @@
    "countryName": "Germany",
    "city": "Frankfurt",
    "ip": "63.180.54.213",
+   "ips": [
+    "63.180.54.213"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -223,6 +325,11 @@
    "countryName": "Germany",
    "city": "Berlin",
    "ip": "152.233.20.98",
+   "ips": [
+    "152.233.20.98",
+    "152.233.20.18",
+    "152.233.20.34"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -232,6 +339,10 @@
    "countryName": "Germany",
    "city": "Hamburg",
    "ip": "15.220.152.239",
+   "ips": [
+    "15.220.152.239",
+    "15.220.152.242"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -241,6 +352,9 @@
    "countryName": "Germany",
    "city": "Dusseldorf",
    "ip": "5.199.133.230",
+   "ips": [
+    "5.199.133.230"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -250,6 +364,10 @@
    "countryName": "Denmark",
    "city": "Copenhagen",
    "ip": "13.154.16.67",
+   "ips": [
+    "13.154.16.67",
+    "13.154.16.82"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -259,6 +377,10 @@
    "countryName": "Ecuador",
    "city": "Quito",
    "ip": "38.165.231.196",
+   "ips": [
+    "38.165.231.196",
+    "38.165.231.212"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -268,6 +390,9 @@
    "countryName": "Estonia",
    "city": "Tallinn",
    "ip": "77.247.111.124",
+   "ips": [
+    "77.247.111.124"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -277,6 +402,9 @@
    "countryName": "Spain",
    "city": "Madrid",
    "ip": "15.216.177.229",
+   "ips": [
+    "15.216.177.229"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -286,6 +414,9 @@
    "countryName": "Finland",
    "city": "Helsinki",
    "ip": "15.220.168.189",
+   "ips": [
+    "15.220.168.189"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -295,6 +426,9 @@
    "countryName": "France",
    "city": "Paris",
    "ip": "15.188.90.58",
+   "ips": [
+    "15.188.90.58"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -304,6 +438,9 @@
    "countryName": "France",
    "city": "Marseille",
    "ip": "138.199.14.152",
+   "ips": [
+    "138.199.14.152"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -313,6 +450,9 @@
    "countryName": "United Kingdom",
    "city": "London",
    "ip": "3.9.191.15",
+   "ips": [
+    "3.9.191.15"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -322,6 +462,12 @@
    "countryName": "United Kingdom",
    "city": "Manchester",
    "ip": "84.233.178.205",
+   "ips": [
+    "84.233.178.205",
+    "84.233.178.135",
+    "84.233.178.175",
+    "84.233.178.192"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -331,6 +477,9 @@
    "countryName": "United Kingdom",
    "city": "Nottingham",
    "ip": "78.129.136.73",
+   "ips": [
+    "78.129.136.73"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -340,6 +489,12 @@
    "countryName": "United Kingdom",
    "city": "Edinburgh",
    "ip": "185.3.237.164",
+   "ips": [
+    "185.3.237.164",
+    "185.3.237.39",
+    "185.3.237.68",
+    "185.3.237.117"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -349,6 +504,12 @@
    "countryName": "United Kingdom",
    "city": "Glasgow",
    "ip": "185.28.254.182",
+   "ips": [
+    "185.28.254.182",
+    "185.28.254.166",
+    "185.28.254.197",
+    "185.28.254.229"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -358,6 +519,10 @@
    "countryName": "Greece",
    "city": "Athens",
    "ip": "79.127.218.149",
+   "ips": [
+    "79.127.218.149",
+    "79.127.218.162"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -367,6 +532,11 @@
    "countryName": "Hong Kong",
    "city": "Hong kong",
    "ip": "95.173.197.66",
+   "ips": [
+    "95.173.197.66",
+    "95.173.197.75",
+    "95.173.197.87"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -376,6 +546,10 @@
    "countryName": "Croatia",
    "city": "Zagreb",
    "ip": "79.127.144.111",
+   "ips": [
+    "79.127.144.111",
+    "79.127.144.97"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -385,6 +559,10 @@
    "countryName": "Hungary",
    "city": "Budapest",
    "ip": "152.233.4.158",
+   "ips": [
+    "152.233.4.158",
+    "152.233.4.142"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -394,6 +572,9 @@
    "countryName": "Indonesia",
    "city": "Jakarta",
    "ip": "16.78.225.12",
+   "ips": [
+    "16.78.225.12"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -403,6 +584,9 @@
    "countryName": "Ireland",
    "city": "Dublin",
    "ip": "34.241.210.34",
+   "ips": [
+    "34.241.210.34"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -412,6 +596,10 @@
    "countryName": "Israel",
    "city": "Tel Aviv",
    "ip": "169.150.235.106",
+   "ips": [
+    "169.150.235.106",
+    "169.150.235.37"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -421,6 +609,9 @@
    "countryName": "India",
    "city": "New Delhi",
    "ip": "31.14.72.135",
+   "ips": [
+    "31.14.72.135"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -430,6 +621,9 @@
    "countryName": "Iceland",
    "city": "Reykjavik",
    "ip": "5.62.20.130",
+   "ips": [
+    "5.62.20.130"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -439,6 +633,9 @@
    "countryName": "Italy",
    "city": "Palermo",
    "ip": "79.127.246.207",
+   "ips": [
+    "79.127.246.207"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -448,6 +645,9 @@
    "countryName": "Italy",
    "city": "Florence",
    "ip": "95.141.42.102",
+   "ips": [
+    "95.141.42.102"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -457,6 +657,10 @@
    "countryName": "Italy",
    "city": "Rome",
    "ip": "185.217.71.87",
+   "ips": [
+    "185.217.71.87",
+    "185.217.71.197"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -466,6 +670,9 @@
    "countryName": "Italy",
    "city": "Milano",
    "ip": "51.118.115.8",
+   "ips": [
+    "51.118.115.8"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -475,6 +682,9 @@
    "countryName": "Japan",
    "city": "Tokyo",
    "ip": "18.182.20.247",
+   "ips": [
+    "18.182.20.247"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -484,6 +694,9 @@
    "countryName": "Cambodia",
    "city": "Phnom Penh",
    "ip": "5.62.33.9",
+   "ips": [
+    "5.62.33.9"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -493,6 +706,9 @@
    "countryName": "South Korea",
    "city": "Seoul",
    "ip": "84.233.167.46",
+   "ips": [
+    "84.233.167.46"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -502,6 +718,9 @@
    "countryName": "Laos",
    "city": "Vientiane",
    "ip": "5.62.16.8",
+   "ips": [
+    "5.62.16.8"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -538,6 +757,9 @@
    "countryName": "Libya",
    "city": "Tripoli",
    "ip": "102.213.180.16",
+   "ips": [
+    "102.213.180.16"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -547,6 +769,9 @@
    "countryName": "Morocco",
    "city": "Fez",
    "ip": "154.70.205.168",
+   "ips": [
+    "154.70.205.168"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -556,6 +781,9 @@
    "countryName": "Moldova",
    "city": "Chisinau",
    "ip": "178.175.144.88",
+   "ips": [
+    "178.175.144.88"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -565,6 +793,9 @@
    "countryName": "Mexico",
    "city": "Queretaro",
    "ip": "15.220.188.156",
+   "ips": [
+    "15.220.188.156"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -574,6 +805,9 @@
    "countryName": "Malaysia",
    "city": "Kuala Lumpur",
    "ip": "152.233.3.130",
+   "ips": [
+    "152.233.3.130"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -583,6 +817,9 @@
    "countryName": "Nigeria",
    "city": "Lagos",
    "ip": "185.111.108.133",
+   "ips": [
+    "185.111.108.133"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -592,6 +829,9 @@
    "countryName": "Netherlands",
    "city": "Amsterdam",
    "ip": "89.222.112.68",
+   "ips": [
+    "89.222.112.68"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -601,6 +841,9 @@
    "countryName": "Norway",
    "city": "Oslo",
    "ip": "217.79.117.154",
+   "ips": [
+    "217.79.117.154"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -610,6 +853,9 @@
    "countryName": "New Zealand",
    "city": "Auckland",
    "ip": "96.0.73.211",
+   "ips": [
+    "96.0.73.211"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -619,6 +865,10 @@
    "countryName": "Panama",
    "city": "Panama City",
    "ip": "38.165.237.99",
+   "ips": [
+    "38.165.237.99",
+    "38.165.237.118"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -628,6 +878,9 @@
    "countryName": "Peru",
    "city": "Lima",
    "ip": "95.173.223.230",
+   "ips": [
+    "95.173.223.230"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -637,6 +890,9 @@
    "countryName": "Philippines",
    "city": "Manila",
    "ip": "96.0.146.65",
+   "ips": [
+    "96.0.146.65"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -646,6 +902,9 @@
    "countryName": "Pakistan",
    "city": "Islamabad",
    "ip": "5.62.35.133",
+   "ips": [
+    "5.62.35.133"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -655,6 +914,9 @@
    "countryName": "Poland",
    "city": "Warsaw",
    "ip": "15.220.65.167",
+   "ips": [
+    "15.220.65.167"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -664,6 +926,9 @@
    "countryName": "Portugal",
    "city": "Lisbon",
    "ip": "149.88.20.2",
+   "ips": [
+    "149.88.20.2"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -673,6 +938,10 @@
    "countryName": "Portugal",
    "city": "Porto",
    "ip": "194.39.127.166",
+   "ips": [
+    "194.39.127.166",
+    "194.39.127.135"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -682,6 +951,9 @@
    "countryName": "Qatar",
    "city": "Doha",
    "ip": "5.62.23.5",
+   "ips": [
+    "5.62.23.5"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -691,6 +963,11 @@
    "countryName": "Romania",
    "city": "Bucharest",
    "ip": "149.102.239.90",
+   "ips": [
+    "149.102.239.90",
+    "149.102.239.67",
+    "149.102.239.84"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -700,6 +977,10 @@
    "countryName": "Serbia",
    "city": "Belgrade",
    "ip": "146.70.111.135",
+   "ips": [
+    "146.70.111.135",
+    "146.70.111.151"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -709,6 +990,9 @@
    "countryName": "Saudi Arabia",
    "city": "Riyadh",
    "ip": "5.62.22.131",
+   "ips": [
+    "5.62.22.131"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -718,6 +1002,9 @@
    "countryName": "Sweden",
    "city": "Stockholm",
    "ip": "13.48.131.118",
+   "ips": [
+    "13.48.131.118"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -727,6 +1014,9 @@
    "countryName": "Singapore",
    "city": "Singapore",
    "ip": "18.142.181.58",
+   "ips": [
+    "18.142.181.58"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -736,6 +1026,9 @@
    "countryName": "Slovenia",
    "city": "Ljubljana",
    "ip": "212.44.121.19",
+   "ips": [
+    "212.44.121.19"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -745,6 +1038,10 @@
    "countryName": "Slovakia",
    "city": "Bratislava",
    "ip": "46.151.198.7",
+   "ips": [
+    "46.151.198.7",
+    "46.151.198.15"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -754,6 +1051,9 @@
    "countryName": "Thailand",
    "city": "Bangkok",
    "ip": "43.208.21.32",
+   "ips": [
+    "43.208.21.32"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -763,6 +1063,9 @@
    "countryName": "Tunisia",
    "city": "Tunis",
    "ip": "102.208.225.103",
+   "ips": [
+    "102.208.225.103"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -772,6 +1075,10 @@
    "countryName": "Türkiye",
    "city": "Istanbul",
    "ip": "37.19.208.81",
+   "ips": [
+    "37.19.208.81",
+    "37.19.208.111"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -781,6 +1088,10 @@
    "countryName": "Taiwan",
    "city": "Taipei",
    "ip": "15.220.83.138",
+   "ips": [
+    "15.220.83.138",
+    "15.220.83.59"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -790,6 +1101,9 @@
    "countryName": "Ukraine",
    "city": "Kyiv",
    "ip": "143.244.45.239",
+   "ips": [
+    "143.244.45.239"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -799,6 +1113,10 @@
    "countryName": "United States",
    "city": "Phoenix",
    "ip": "18.88.138.188",
+   "ips": [
+    "18.88.138.188",
+    "18.88.138.145"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -808,6 +1126,9 @@
    "countryName": "United States",
    "city": "Los Angeles",
    "ip": "70.224.227.105",
+   "ips": [
+    "70.224.227.105"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -817,6 +1138,9 @@
    "countryName": "United States",
    "city": "Palo Alto",
    "ip": "54.67.44.239",
+   "ips": [
+    "54.67.44.239"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -826,6 +1150,10 @@
    "countryName": "United States",
    "city": "Denver",
    "ip": "15.181.16.240",
+   "ips": [
+    "15.181.16.240",
+    "15.181.16.180"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -834,7 +1162,10 @@
    "country": "US",
    "countryName": "United States",
    "city": "Washington, DC",
-   "ip": "38.248.95.219",
+   "ip": "38.248.95.229",
+   "ips": [
+    "38.248.95.229"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -844,6 +1175,12 @@
    "countryName": "United States",
    "city": "Miami",
    "ip": "161.193.7.32",
+   "ips": [
+    "161.193.7.32",
+    "161.193.7.24",
+    "161.193.7.63",
+    "161.193.7.191"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -853,6 +1190,10 @@
    "countryName": "United States",
    "city": "Tampa",
    "ip": "38.95.10.105",
+   "ips": [
+    "38.95.10.105",
+    "38.95.10.55"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -862,6 +1203,9 @@
    "countryName": "United States",
    "city": "Atlanta",
    "ip": "16.56.11.176",
+   "ips": [
+    "16.56.11.176"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -871,6 +1215,9 @@
    "countryName": "United States",
    "city": "Honolulu",
    "ip": "96.0.161.172",
+   "ips": [
+    "96.0.161.172"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -880,6 +1227,12 @@
    "countryName": "United States",
    "city": "Chicago",
    "ip": "161.178.3.167",
+   "ips": [
+    "161.178.3.167",
+    "161.178.3.156",
+    "161.178.3.201",
+    "161.178.3.207"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -889,6 +1242,9 @@
    "countryName": "United States",
    "city": "Boston",
    "ip": "68.66.118.149",
+   "ips": [
+    "68.66.118.149"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -898,6 +1254,10 @@
    "countryName": "United States",
    "city": "Minneapolis",
    "ip": "15.181.49.119",
+   "ips": [
+    "15.181.49.119",
+    "15.181.49.132"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -907,6 +1267,12 @@
    "countryName": "United States",
    "city": "Kansas City",
    "ip": "15.181.97.51",
+   "ips": [
+    "15.181.97.51",
+    "15.181.97.37",
+    "15.181.97.61",
+    "15.181.97.138"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -916,6 +1282,10 @@
    "countryName": "United States",
    "city": "Charlotte",
    "ip": "154.16.171.61",
+   "ips": [
+    "154.16.171.61",
+    "154.16.171.78"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -925,6 +1295,9 @@
    "countryName": "United States",
    "city": "Las Vegas",
    "ip": "15.220.17.249",
+   "ips": [
+    "15.220.17.249"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -934,6 +1307,9 @@
    "countryName": "United States",
    "city": "New York",
    "ip": "161.178.134.243",
+   "ips": [
+    "161.178.134.243"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -943,6 +1319,9 @@
    "countryName": "United States",
    "city": "Columbus",
    "ip": "18.219.3.248",
+   "ips": [
+    "18.219.3.248"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -952,6 +1331,9 @@
    "countryName": "United States",
    "city": "Boardman",
    "ip": "35.88.123.170",
+   "ips": [
+    "35.88.123.170"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -961,6 +1343,10 @@
    "countryName": "United States",
    "city": "Portland",
    "ip": "15.220.1.219",
+   "ips": [
+    "15.220.1.219",
+    "15.220.1.191"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -970,6 +1356,11 @@
    "countryName": "United States",
    "city": "Philadelphia",
    "ip": "15.181.145.51",
+   "ips": [
+    "15.181.145.51",
+    "15.181.145.9",
+    "15.181.145.70"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -979,6 +1370,9 @@
    "countryName": "United States",
    "city": "Dallas",
    "ip": "18.88.47.189",
+   "ips": [
+    "18.88.47.189"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -988,6 +1382,9 @@
    "countryName": "United States",
    "city": "Houston",
    "ip": "18.89.140.134",
+   "ips": [
+    "18.89.140.134"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -997,6 +1394,11 @@
    "countryName": "United States",
    "city": "McAllen",
    "ip": "109.204.74.37",
+   "ips": [
+    "109.204.74.37",
+    "109.204.74.12",
+    "109.204.74.26"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -1006,6 +1408,9 @@
    "countryName": "United States",
    "city": "Ashburn",
    "ip": "13.221.132.186",
+   "ips": [
+    "13.221.132.186"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -1015,6 +1420,10 @@
    "countryName": "United States",
    "city": "Seattle",
    "ip": "15.181.1.104",
+   "ips": [
+    "15.181.1.104",
+    "15.181.1.114"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -1024,6 +1433,9 @@
    "countryName": "Vietnam",
    "city": "Hanoi",
    "ip": "156.59.140.19",
+   "ips": [
+    "156.59.140.19"
+   ],
    "port": 1194,
    "proto": "udp"
   },
@@ -1033,6 +1445,10 @@
    "countryName": "South Africa",
    "city": "Johannesburg",
    "ip": "109.204.67.18",
+   "ips": [
+    "109.204.67.18",
+    "109.204.67.19"
+   ],
    "port": 1194,
    "proto": "udp"
   }
