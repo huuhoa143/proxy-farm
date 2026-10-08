@@ -260,14 +260,18 @@ export interface SurfsharkCardProps {
 export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps) {
   const { t } = useTranslation();
   const [key, setKey] = useState('');
+  const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  // A pasted/imported .conf carries its own Address, so the field would be ignored.
+  const isConf = /\[\s*interface\s*\]/i.test(key);
 
   async function add() {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await api.addAccount('surfshark', { privateKey: key });
+      const input: Record<string, string> = isConf ? { config: key } : { privateKey: key.trim(), address: address.trim() };
+      const result = await api.addAccount('surfshark', input);
       setMessage(resultMessage(t, result));
       if (result.ok) onAdded();
     } catch (err) {
@@ -293,8 +297,39 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
           <span className="path">{t('onboarding.providers.surfshark.hintPath')}</span>
         </p>
       </div>
+      <div className="field">
+        <label htmlFor="surfshark-address">{t('onboarding.providers.surfshark.addressLabel')}</label>
+        <input
+          id="surfshark-address"
+          type="text"
+          inputMode="decimal"
+          spellCheck={false}
+          placeholder={t('onboarding.providers.surfshark.addressPlaceholder') as string}
+          value={isConf ? '' : address}
+          disabled={isConf}
+          onChange={(e) => setAddress(e.target.value)}
+        />
+        <p className="hint" data-testid="surfshark-address-hint">
+          {isConf ? t('onboarding.providers.surfshark.addressFromConf') : t('onboarding.providers.surfshark.addressHint')}
+        </p>
+      </div>
       <div className="pc-actions">
-        <button className="btn primary" onClick={add} disabled={busy || key.length < 10}>
+        <label className="btn sm">
+          <Icon name="upload" />
+          {t('onboarding.providers.surfshark.importConf')}
+          <input
+            type="file"
+            accept=".conf"
+            className="sr-only"
+            data-testid="surfshark-conf-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void file.text().then(setKey);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <button className="btn primary" onClick={add} disabled={busy || key.trim().length < 10}>
           <Icon name="key" />
           {t('onboarding.providers.surfshark.add')}
         </button>

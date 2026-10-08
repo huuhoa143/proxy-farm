@@ -246,6 +246,22 @@ describe('controller facade', () => {
     expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:hma-1', 'creds:zoogvpn-1']);
   });
 
+  it('re-adding a Surfshark key with a corrected address updates the account meta and counts as new credentials', async () => {
+    const surfshark: Provider = {
+      ...fakeProvider('surfshark', () => []),
+      check: (input) => ({ ok: true, label: 'key …abcdef', secret: { kind: 'wgkey', privateKey: 'k' }, meta: { address: input.address } }),
+    };
+    const { facade, state, portManager } = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+    await facade.addAccount('surfshark', { privateKey: 'k', address: '10.14.0.2/16' });
+    await facade.addAccount('surfshark', { privateKey: 'k', address: '10.14.0.2/16' }); // nothing changed
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual([]);
+    const r = await facade.addAccount('surfshark', { privateKey: 'k', address: '10.64.1.2/16' });
+    expect(r.account?.meta).toEqual({ address: '10.64.1.2/16' });
+    expect(state.getState().accounts).toHaveLength(1);
+    expect(state.getState().accounts[0].meta).toEqual({ address: '10.64.1.2/16' });
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
+  });
+
   it('connectHma: not installed → hma.notFound; not macOS → hma.windowsLater', async () => {
     hmaRead = { status: 'missing' };
     expect(await setup().facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.notFound' });

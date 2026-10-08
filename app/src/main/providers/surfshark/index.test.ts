@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createSurfsharkProvider } from './index';
+import { createSurfsharkProvider, parseIpv4Cidr, parseSurfsharkConf } from './index';
 import type { Account, AccountSecret } from '../types';
 import type { SurfsharkCluster } from './clusters';
 import type { PoolNet } from './pool';
@@ -72,6 +72,71 @@ describe('surfshark provider: check', () => {
   it('rejects a key with invalid base64 characters', () => {
     const provider = makeProvider();
     expect(provider.check({ privateKey: '!!!!5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=' }).ok).toBe(false);
+  });
+});
+
+/** Shaped like the config Surfshark's dashboard downloads for a key (dummy values). */
+const DOWNLOADED_CONF = `[Interface]
+PrivateKey = ${DUMMY_PRIVATE_KEY}
+Address = 10.64.12.34/16, fd00:1234::2/128
+DNS = 162.252.172.57, 149.154.159.92
+
+[Peer]
+PublicKey = l8EOWPyzt/njrb74CADY4VOhns/TbUN6KFTbytHcFQw=
+AllowedIPs = 0.0.0.0/0
+Endpoint = jp-tok.prod.surfshark.com:51820
+`;
+
+describe('surfshark provider: per-key interface address', () => {
+  it('defaults the address to 10.14.0.2/16 when none is given', () => {
+    expect(makeProvider().check({ privateKey: DUMMY_PRIVATE_KEY }).meta).toEqual({ address: '10.14.0.2/16' });
+  });
+
+  it('takes a typed address, normalised, and rejects one that is not an IPv4 CIDR', () => {
+    const provider = makeProvider();
+    expect(provider.check({ privateKey: DUMMY_PRIVATE_KEY, address: ' 10.64.7.9/16 ' }).meta).toEqual({ address: '10.64.7.9/16' });
+    for (const bad of ['10.64.7.9', '10.64.7.300/16', '10.64.7.9/33', 'fd00::2/128', 'nope']) {
+      expect(provider.check({ privateKey: DUMMY_PRIVATE_KEY, address: bad })).toEqual({ ok: false, reasonKey: 'surfshark.check.invalidAddress' });
+    }
+  });
+
+  it('extracts PrivateKey and the first IPv4 Address from a pasted or imported .conf, ignoring the rest', () => {
+    const provider = makeProvider();
+    const inputs: Array<Record<string, string>> = [{ privateKey: DOWNLOADED_CONF }, { config: DOWNLOADED_CONF }, { config: DOWNLOADED_CONF, address: '10.14.0.2/16' }];
+    for (const input of inputs) {
+      const result = provider.check(input);
+      expect(result.ok).toBe(true);
+      expect(result.secret).toEqual({ kind: 'wgkey', privateKey: DUMMY_PRIVATE_KEY });
+      expect(result.meta).toEqual({ address: '10.64.12.34/16' });
+    }
+  });
+
+  it('a .conf without a PrivateKey is rejected; one without an Address falls back to the field/default', () => {
+    const provider = makeProvider();
+    expect(provider.check({ config: '[Interface]\nAddress = 10.64.1.2/16\n' })).toEqual({ ok: false, reasonKey: 'surfshark.check.invalidConfig' });
+    const noAddress = `[Interface]\nPrivateKey = ${DUMMY_PRIVATE_KEY}\n`;
+    expect(provider.check({ config: noAddress }).meta).toEqual({ address: '10.14.0.2/16' });
+    expect(provider.check({ config: noAddress, address: '10.64.3.4/16' }).meta).toEqual({ address: '10.64.3.4/16' });
+  });
+
+  it('parseSurfsharkConf: only [Interface] counts, comments are ignored, a bare address is /32', () => {
+    expect(parseSurfsharkConf('[Peer]\nAddress = 10.1.1.1/16\n[Interface]\n# Address = 9.9.9.9/8\nAddress = 10.64.0.5\n')).toEqual({ address: '10.64.0.5/32' });
+    expect(parseIpv4Cidr('010.14.0.2/16')).toBe('10.14.0.2/16');
+  });
+
+  it('bind() uses the account address, and the old default for an account that has none', () => {
+    writeCacheFile(fakeClusters());
+    const provider = createSurfsharkProvider({ cachePath });
+    const secret: AccountSecret = { kind: 'wgkey', privateKey: DUMMY_PRIVATE_KEY };
+    const target = { key: 'surfshark:jp-tok', providerId: 'surfshark' as const, country: 'JP', city: 'Tokyo', label: '', servers: [] };
+    const acc = (meta: Record<string, string>): Account => ({ id: 'ss-1', providerId: 'surfshark', label: 'S', meta, secretRef: 'ss-1' });
+    const addr = (meta: Record<string, string>) => {
+      const ep = provider.bind(target, '203.0.113.50', acc(meta), secret);
+      return ep.type === 'wireguard' ? ep.address : undefined;
+    };
+    expect(addr({ address: '10.64.12.34/16' })).toEqual(['10.64.12.34/16']);
+    expect(addr({})).toEqual(['10.14.0.2/16']);
+    expect(addr({ address: 'garbage' })).toEqual(['10.14.0.2/16']);
   });
 });
 

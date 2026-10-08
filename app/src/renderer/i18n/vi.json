@@ -66,13 +66,18 @@
       },
       "surfshark": {
         "name": "Surfshark",
-        "description": "Dán khoá riêng WireGuard từ tài khoản Surfshark của bạn.",
+        "description": "Dán khóa riêng WireGuard từ tài khoản Surfshark của bạn, hoặc nhập tệp cấu hình WireGuard đã tải về cùng khóa đó.",
         "keyLabel": "Khoá riêng WireGuard",
-        "keyPlaceholder": "Dán khoá riêng vào đây",
+        "keyPlaceholder": "Dán khóa riêng, hoặc toàn bộ tệp cấu hình WireGuard",
         "add": "Thêm",
         "initials": "S",
         "hintLead": "Tìm tại",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard"
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
+        "addressLabel": "Địa chỉ giao diện (không bắt buộc)",
+        "addressPlaceholder": "10.14.0.2/16",
+        "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
+        "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
+        "importConf": "Nhập tệp .conf…"
       },
       "file": {
         "name": "Tệp cấu hình",
@@ -337,7 +342,7 @@
       "key-rejected": {
         "label": "Khóa không được phản hồi",
         "guidance": {
-          "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
+          "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark, địa chỉ khớp với tệp cấu hình của chính khóa đó, và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
           "generic": "Máy chủ không phản hồi khóa WireGuard này sau 3 lần thử. Hãy kiểm tra khóa và địa chỉ trong tệp vẫn còn hợp lệ với nhà cung cấp. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần."
         }
       },
@@ -483,7 +488,9 @@
   },
   "surfshark": {
     "check": {
-      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =)."
+      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
+      "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
+      "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
     }
   },
   "file": {

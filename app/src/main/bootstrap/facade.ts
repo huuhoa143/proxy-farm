@@ -284,7 +284,14 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       const duplicate = accounts().find((a) => a.providerId === providerId && a.label === (check.label ?? ''));
       if (duplicate) {
         replaceAccountSecret(duplicate, check.secret);
-        return { ok: true, label: duplicate.label, account: duplicate };
+        // Re-adding the same key with a corrected interface address (Surfshark) is a
+        // credentials change too: what failed under the old address proves nothing.
+        const meta = { ...duplicate.meta, ...(check.meta ?? {}) };
+        if (JSON.stringify(meta) === JSON.stringify(duplicate.meta)) return { ok: true, label: duplicate.label, account: duplicate };
+        const updated: Account = { ...duplicate, meta };
+        deps.state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === duplicate.id ? updated : a)) }));
+        deps.portManager.credentialsChanged(duplicate.id);
+        return { ok: true, label: updated.label, account: updated };
       }
       const account = createAccount(providerId, check.label ?? providerId, check.secret, check.meta ?? {});
       return { ok: true, label: account.label, account };

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
+import { FileCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
 
@@ -83,5 +83,32 @@ describe('ZoogVpnCard', () => {
     await waitFor(() =>
       expect(screen.getByTestId('zoogvpn-message')).toHaveTextContent('Enter your ZoogVPN password.'),
     );
+  });
+});
+
+describe('SurfsharkCard', () => {
+  const KEY = 'yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=';
+
+  it('sends the key with the optional interface address', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'addAccount');
+    render(<SurfsharkCard api={api} onAdded={() => {}} />);
+    fireEvent.change(screen.getByLabelText('WireGuard private key'), { target: { value: KEY } });
+    fireEvent.change(screen.getByLabelText('Interface address (optional)'), { target: { value: '10.64.1.2/16' } });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('surfshark', { privateKey: KEY, address: '10.64.1.2/16' }));
+  });
+
+  it('an imported .conf is sent whole and the address field steps aside', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'addAccount');
+    render(<SurfsharkCard api={api} onAdded={() => {}} />);
+    const conf = `[Interface]\nPrivateKey = ${KEY}\nAddress = 10.64.1.2/16\n`;
+    fireEvent.change(screen.getByTestId('surfshark-conf-input'), { target: { files: [makeFile('jp-tok.conf', conf)] } });
+    await waitFor(() => expect(screen.getByLabelText('WireGuard private key')).toHaveValue(conf));
+    expect(screen.getByLabelText('Interface address (optional)')).toBeDisabled();
+    expect(screen.getByTestId('surfshark-address-hint')).toHaveTextContent('Taken from the config');
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('surfshark', { config: conf }));
   });
 });

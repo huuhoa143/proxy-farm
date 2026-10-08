@@ -334,17 +334,19 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         return { ok: true, account, label: input.email };
       }
       if (providerId === 'surfshark') {
-        if (!input.privateKey || input.privateKey.length < 10) {
+        // The real provider also accepts a whole `.conf` (`config`); the fake keeps it as is.
+        const privateKey = input.privateKey ?? input.config;
+        if (!privateKey || privateKey.length < 10) {
           return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
         }
         const account: Account = {
           id: `surfshark-${accounts.length + 1}`,
           providerId,
-          label: `key …${input.privateKey.slice(-4)}`,
-          meta: {},
+          label: `key …${privateKey.slice(-4)}`,
+          meta: { address: input.address || '10.14.0.2/16' },
           secretRef: `surfshark-${accounts.length + 1}`,
         };
-        accounts.push({ account, secret: { kind: 'wgkey', privateKey: input.privateKey } });
+        accounts.push({ account, secret: { kind: 'wgkey', privateKey } });
         return { ok: true, account, label: account.label };
       }
       return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };

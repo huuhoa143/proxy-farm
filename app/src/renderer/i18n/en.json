@@ -66,13 +66,18 @@
       },
       "surfshark": {
         "name": "Surfshark",
-        "description": "Paste the WireGuard private key from your Surfshark account.",
+        "description": "Paste the WireGuard private key from your Surfshark account, or import the WireGuard config you downloaded with it.",
         "keyLabel": "WireGuard private key",
-        "keyPlaceholder": "Paste the private key here",
+        "keyPlaceholder": "Paste the private key, or the whole WireGuard config",
         "add": "Add",
         "initials": "S",
         "hintLead": "Find it at",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard"
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
+        "addressLabel": "Interface address (optional)",
+        "addressPlaceholder": "10.14.0.2/16",
+        "addressHint": "The Address line of the config Surfshark gave you with this key, e.g. 10.14.0.2/16 or 10.64.x.y/16. Each key has its own. Empty means 10.14.0.2/16.",
+        "addressFromConf": "Taken from the config you pasted.",
+        "importConf": "Import .conf…"
       },
       "file": {
         "name": "Config file",
@@ -337,7 +342,7 @@
       "key-rejected": {
         "label": "Key not answered",
         "guidance": {
-          "surfshark": "Surfshark didn't answer this key on 3 servers. Check the key is listed under Manual setup → WireGuard in your Surfshark account, and that your subscription is active. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
+          "surfshark": "Surfshark didn't answer this key on 3 servers. Check the key is listed under Manual setup → WireGuard in your Surfshark account, that the address matches the key's own config, and that your subscription is active. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
           "generic": "The server didn't answer this WireGuard key on 3 attempts. Check that the key and address in the file are still valid with your provider. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more."
         }
       },
@@ -483,7 +488,9 @@
   },
   "surfshark": {
     "check": {
-      "invalidKey": "That isn't a WireGuard private key (44 characters ending in =)."
+      "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
+      "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",
+      "invalidConfig": "That WireGuard config has no PrivateKey line under [Interface]."
     }
   },
   "file": {
