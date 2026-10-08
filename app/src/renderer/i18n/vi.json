@@ -1,0 +1,586 @@
+{
+  "common": {
+    "appName": "Proxy Farm",
+    "language": "Ngôn ngữ",
+    "languageEnglish": "Tiếng Anh",
+    "languageVietnamese": "Tiếng Việt",
+    "languageSystem": "Theo hệ điều hành",
+    "cancel": "Huỷ",
+    "save": "Lưu",
+    "saved": "Đã lưu",
+    "close": "Đóng",
+    "back": "Quay lại",
+    "continue": "Tiếp tục",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "loading": "Đang tải…",
+    "yes": "Có",
+    "no": "Không",
+    "theme": {
+      "light": "Sáng",
+      "dark": "Tối",
+      "toggle": "Đổi sáng / tối"
+    },
+    "nav": {
+      "main": "Cổng",
+      "providers": "VPN",
+      "settings": "Cài đặt"
+    },
+    "showPassword": "Hiện mật khẩu",
+    "hidePassword": "Ẩn mật khẩu"
+  },
+  "onboarding": {
+    "title": "Thêm nhà cung cấp",
+    "subtitle": "Kết nối một gói VPN để bắt đầu chạy các cổng proxy cục bộ.",
+    "addAnother": "Thêm nhà cung cấp khác",
+    "continueToApp": "Đến trang Cổng",
+    "providers": {
+      "hma": {
+        "name": "HMA",
+        "description": "Dùng thông tin đăng nhập thiết bị HMA VPN có sẵn — không cần mật khẩu.",
+        "detectedTitle": "Đã tìm thấy HMA trên máy này",
+        "detectedSubtitle": "Thông tin đăng nhập thiết bị đã sẵn sàng sử dụng.",
+        "notDetectedTitle": "Chưa tìm thấy HMA",
+        "helperMissingTitle": "HMA cần thêm một bước trên Windows",
+        "step1": "Cài đặt HMA VPN",
+        "step2": "Đăng nhập và kết nối một lần",
+        "step3": "Quay lại đây — ứng dụng sẽ tự nhận ra",
+        "connect": "Kết nối",
+        "connecting": "Đang kết nối…",
+        "enableSupport": "Bật hỗ trợ HMA",
+        "enablingSupport": "Đang bật…",
+        "windowsHelperNote": "Thao tác này cài một dịch vụ hỗ trợ nhỏ và cần xác nhận quản trị viên một lần. Các lần cập nhật sau không cần xác nhận lại.",
+        "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…",
+        "initials": "H"
+      },
+      "zoogvpn": {
+        "name": "ZoogVPN",
+        "description": "Đăng nhập bằng email và mật khẩu tài khoản ZoogVPN của bạn.",
+        "email": "Email",
+        "emailPlaceholder": "ban@vidu.com",
+        "password": "Mật khẩu",
+        "passwordPlaceholder": "Mật khẩu",
+        "check": "Kiểm tra",
+        "checking": "Đang kiểm tra…",
+        "initials": "Z"
+      },
+      "surfshark": {
+        "name": "Surfshark",
+        "description": "Dán khóa riêng WireGuard từ tài khoản Surfshark của bạn, hoặc nhập tệp cấu hình WireGuard đã tải về cùng khóa đó.",
+        "keyLabel": "Khoá riêng WireGuard",
+        "keyPlaceholder": "Dán khóa riêng, hoặc toàn bộ tệp cấu hình WireGuard",
+        "add": "Thêm",
+        "initials": "S",
+        "hintLead": "Tìm tại",
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
+        "addressLabel": "Địa chỉ giao diện (không bắt buộc)",
+        "addressPlaceholder": "10.14.0.2/16",
+        "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
+        "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
+        "importConf": "Nhập tệp .conf…"
+      },
+      "file": {
+        "name": "Tệp cấu hình",
+        "description": "Nhập tệp .ovpn hoặc .conf (WireGuard).",
+        "dragHint": "Thả tệp .ovpn hoặc .conf vào đây",
+        "browse": "Chọn tệp…",
+        "countryLabel": "Quốc gia",
+        "countryGuessedNote": "Đoán từ tên tệp — sửa lại nếu sai.",
+        "countryInvalid": "Nhập mã quốc gia 2 chữ cái (ví dụ US, DE).",
+        "import": "Nhập",
+        "initials": "T",
+        "chooseAnother": "Chọn tệp khác"
+      }
+    },
+    "portLimit": {
+      "label": "Giới hạn số cổng",
+      "unlimited": "0 = không giới hạn",
+      "save": "Lưu",
+      "title": "Giới hạn cổng",
+      "note": "Giới hạn số cổng mỗi nhà cung cấp được chạy cùng lúc.",
+      "fieldLabel": "Giới hạn cổng — {{provider}}",
+      "ports_one": "tối đa {{count}} cổng",
+      "ports_other": "tối đa {{count}} cổng"
+    },
+    "continueHint": "Kết nối ít nhất một nhà cung cấp để tiếp tục.",
+    "status": {
+      "connected_one": "{{count}} tài khoản",
+      "connected_other": "{{count}} tài khoản",
+      "total_one": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào.",
+      "total_other": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào."
+    }
+  },
+  "checkResult": {
+    "ok": "Hợp lệ.",
+    "reason": {
+      "auth": "Đăng nhập bị từ chối. Kiểm tra lại thông tin của bạn.",
+      "not-in-plan": "Gói của bạn không bao gồm máy chủ này.",
+      "port-in-use": "Cổng này đang được dùng.",
+      "no-server": "Hiện không có máy chủ khả dụng.",
+      "invalid-format": "Thông tin chưa đúng định dạng — kiểm tra lại và thử lại."
+    }
+  },
+  "main": {
+    "title": "Cổng",
+    "pickLocation": "Chọn vị trí",
+    "country": "Quốc gia",
+    "city": "Thành phố",
+    "allCountries": "Tất cả quốc gia",
+    "start": "Bật",
+    "noTargetsSelected": "Chọn ít nhất một vị trí để bắt đầu.",
+    "selectedCount": "Đã chọn {{count}}",
+    "emptyState": "Chọn vị trí và số cổng — mỗi cổng dùng một máy chủ riêng, nên có một IP thoát cố định riêng.",
+    "table": {
+      "status": "Trạng thái",
+      "location": "Vị trí",
+      "port": "Cổng",
+      "exitIp": "IP thoát",
+      "latency": "Độ trễ",
+      "actions": "Thao tác",
+      "provider": "Nhà cung cấp",
+      "account": "Tài khoản",
+      "server": "Máy chủ"
+    },
+    "copyPort": "Sao chép địa chỉ",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được — đã mở Xuất để bạn tự sao chép.",
+    "rotate": "Đổi IP",
+    "rotating": "Đang đổi…",
+    "rotateDisabledHint": "Hãy bật cổng (hoặc chờ kết nối xong) rồi mới đổi IP.",
+    "stop": "Tắt",
+    "stopDisabledHint": "Cổng này đã dừng.",
+    "remove": "Xoá",
+    "details": "Chi tiết",
+    "selectAll": "Chọn tất cả",
+    "confirmRemove": {
+      "title": "Xoá cổng?",
+      "message_one": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách.",
+      "message_other": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách."
+    },
+    "logs": {
+      "title": "Nhật ký",
+      "refresh": "Làm mới",
+      "close": "Đóng",
+      "empty": "Chưa có dòng nhật ký nào."
+    },
+    "test": {
+      "run": "Kiểm tra",
+      "running": "Đang kiểm tra…",
+      "speedRun": "Kiểm tra tốc độ",
+      "speedRunning": "Đang đo tốc độ…",
+      "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
+      "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
+      "failed": "Kiểm tra thất bại — cổng này chưa hoạt động.",
+      "title": "Kiểm tra kết nối"
+    },
+    "autoRotate": {
+      "label": "Tự xoay mỗi",
+      "off": "Tắt",
+      "minutesSuffix": "phút",
+      "title": "Tự xoay IP",
+      "every_one": "Xoay mỗi phút.",
+      "every_other": "Xoay mỗi {{count}} phút."
+    },
+    "bulk": {
+      "selectedCount_one": "Đã chọn {{count}} cổng",
+      "selectedCount_other": "Đã chọn {{count}} cổng",
+      "start": "Bật",
+      "stop": "Tắt",
+      "rotate": "Đổi IP",
+      "remove": "Xoá",
+      "export": "Xuất",
+      "clear": "Bỏ chọn",
+      "autoRotate": "Tự xoay…",
+      "rotateSummary": "{{changed}} đã đổi IP, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ trống"
+    },
+    "export": {
+      "title": "Xuất danh sách cổng",
+      "format": {
+        "hostPortUserPass": "host:port:user:pass",
+        "socks5Url": "socks5://…",
+        "hostPort": "host:port",
+        "curl": "lệnh curl"
+      },
+      "copyAll": "Sao chép tất cả",
+      "copyFailed": "Không sao chép được vào bộ nhớ tạm — hãy bôi đen đoạn trên và tự sao chép.",
+      "close": "Đóng",
+      "count_one": "{{count}} cổng",
+      "count_other": "{{count}} cổng"
+    },
+    "rotateResult": {
+      "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
+      "sameCityNote": "Thành phố đó không còn máy chủ trống — cổng đã chuyển sang thành phố khác cùng quốc gia.",
+      "movedToCityNote": "Ở đây không còn máy chủ trống — cổng đã chuyển sang {{city}}, cùng quốc gia.",
+      "movedFromToNote": "Đã chuyển từ {{from}} sang {{to}}, cùng quốc gia: {{from}} không còn máy chủ trống.",
+      "unchangedNote": "Vị trí này không còn máy chủ trống — IP giữ nguyên.",
+      "serverTaken": "Máy chủ đó vừa có cổng khác dùng — hãy chọn máy chủ khác."
+    },
+    "emptyTitle": "Chưa có cổng nào",
+    "addLocations": "Thêm vị trí",
+    "exportAll": "Xuất tất cả",
+    "credentials": "Đăng nhập proxy",
+    "stats": {
+      "label": "Tóm tắt cổng",
+      "online": "Đang chạy",
+      "ofTotal": "trên {{total}}",
+      "locations": "Vị trí",
+      "countries": "Quốc gia",
+      "avgLatency": "Độ trễ TB"
+    },
+    "picker": {
+      "title": "Thêm vị trí",
+      "subtitle": "Mỗi cổng dùng một máy chủ riêng — một IP thoát cố định riêng. Chọn số cổng cho từng vị trí.",
+      "searchPlaceholder": "Tìm quốc gia hoặc thành phố",
+      "allProviders": "Tất cả",
+      "noResults": "Không có vị trí nào khớp “{{query}}”.",
+      "clear": "Bỏ chọn",
+      "selectCountry": "Chọn mọi thành phố ở {{country}}",
+      "cities_one": "{{count}} thành phố",
+      "cities_other": "{{count}} thành phố",
+      "servers_one": "{{count}} máy chủ · {{free}} trống",
+      "servers_other": "{{count}} máy chủ · {{free}} trống",
+      "noFree": "Hết máy chủ trống",
+      "limitReached": "Đã đạt giới hạn cổng",
+      "portsHere_one": "{{count}} cổng",
+      "portsHere_other": "{{count}} cổng",
+      "qty": "Số cổng ở {{location}}",
+      "fewer": "Bớt một cổng ở {{location}}",
+      "more": "Thêm một cổng ở {{location}}",
+      "maxHint": "Tối đa {{max}} — mỗi máy chủ trống một cổng",
+      "addN_one": "Thêm {{count}} cổng",
+      "addN_other": "Thêm {{count}} cổng",
+      "picked": "Vị trí đã chọn",
+      "unpick": "Bỏ chọn {{location}}"
+    },
+    "group": {
+      "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",
+      "select": "Chọn mọi cổng ở {{location}}",
+      "ports_one": "{{count}} cổng",
+      "ports_other": "{{count}} cổng",
+      "online": "{{count}} đang chạy",
+      "servers_one": "{{count}} máy chủ",
+      "servers_other": "{{count}} máy chủ",
+      "free": "{{count}} trống",
+      "addPort": "Thêm cổng",
+      "addPortLabel": "Thêm một cổng ở {{location}}",
+      "addPortHint": "Thêm một cổng trên một máy chủ trống — thêm một IP thoát ở {{location}}.",
+      "noFreeServer": "Mọi máy chủ ở {{location}} đều đang được dùng hoặc không khả dụng.",
+      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng trong Cài đặt."
+    },
+    "port": {
+      "label": "{{location}} · cổng #{{n}}",
+      "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
+      "noServer": "Chọn khi bật lần đầu"
+    },
+    "changeIp": {
+      "menuLabel": "Đổi IP cho cổng #{{n}}",
+      "next": "Máy chủ trống tiếp theo",
+      "nextHint": "Tự chọn máy chủ trống tốt nhất",
+      "noneFreeHint": "Ở đây hết chỗ — sẽ thử thành phố khác cùng quốc gia",
+      "heading": "Máy chủ ở {{city}}",
+      "loading": "Đang tải danh sách máy chủ…",
+      "loadFailed": "Không tải được danh sách máy chủ.",
+      "empty": "Vị trí này không có máy chủ nào.",
+      "current": "Cổng này",
+      "heldBy": "Cổng :{{port}} đang dùng",
+      "heldByOther": "Cổng khác đang dùng",
+      "free": "Trống",
+      "health": {
+        "ok": "Hoạt động",
+        "unknown": "Chưa thử",
+        "refused": "Bị từ chối",
+        "dead": "Không phản hồi"
+      },
+      "reason": {
+        "current": "Cổng này đang dùng máy chủ này rồi.",
+        "held": "Cổng :{{port}} đang dùng máy chủ này — hai cổng không bao giờ dùng chung một IP thoát.",
+        "heldOther": "Một cổng khác đang dùng máy chủ này — hai cổng không bao giờ dùng chung một IP thoát.",
+        "refused": "Máy chủ này đã từ chối tài khoản của bạn nên tạm bỏ qua 7 ngày.",
+        "dead": "Máy chủ này không phản hồi nên tạm bỏ qua 2 giờ."
+      },
+      "pick": "Chuyển cổng này sang {{server}}"
+    },
+    "addResult": {
+      "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
+      "no-free-server_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
+      "limit-reached_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
+      "limit-reached_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
+      "generic_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}}.",
+      "generic_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}}."
+    }
+  },
+  "vpnNote": {
+    "message": "Một VPN khác đang hoạt động trên máy này — Proxy Farm vẫn hoạt động bình thường."
+  },
+  "portState": {
+    "queued": "Đang chờ",
+    "connecting": "Đang kết nối…",
+    "verifying": "Đang xác minh…",
+    "online": "Đang chạy",
+    "retrying": "Thử lại sau {{seconds}}s",
+    "stopped": "Đã dừng",
+    "failed": {
+      "auth": {
+        "label": "Đăng nhập bị từ chối",
+        "labelLocation": "Vị trí không khả dụng",
+        "guidance": {
+          "hma": "HMA từ chối thông tin đăng nhập thiết bị — mở ứng dụng HMA và kiểm tra bạn đã đăng nhập chưa.",
+          "zoogvpn": "ZoogVPN từ chối mật khẩu tài khoản này — kiểm tra lại trong ứng dụng hoặc trang web ZoogVPN.",
+          "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập.",
+          "locationRejected": "Tài khoản của bạn hoạt động ở vị trí khác, nhưng vị trí này từ chối — hãy thử vị trí khác."
+        }
+      },
+      "not-in-plan": {
+        "label": "Không thuộc gói",
+        "guidance": "Gói hiện tại của bạn không bao gồm máy chủ này. Hãy thử vị trí khác."
+      },
+      "port-in-use": {
+        "label": "Cổng đang bị dùng",
+        "guidance": "Một ứng dụng khác đang dùng cổng này.",
+        "action": "Chuyển sang cổng khác"
+      },
+      "key-rejected": {
+        "label": "Khóa không được phản hồi",
+        "guidance": {
+          "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark, địa chỉ khớp với tệp cấu hình của chính khóa đó, và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
+          "generic": "Máy chủ không phản hồi khóa WireGuard này sau 3 lần thử. Hãy kiểm tra khóa và địa chỉ trong tệp vẫn còn hợp lệ với nhà cung cấp. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần."
+        }
+      },
+      "no-server": {
+        "label": "Không có máy chủ khả dụng",
+        "guidance": "Chưa kết nối được máy chủ nào hoạt động cho vị trí này. Hệ thống sẽ tiếp tục thử lại."
+      }
+    },
+    "attempt": "lần {{n}}",
+    "nextTry": "Thử lại sau {{time}}",
+    "actionNeeded": "Cần bạn xử lý — sẽ không tự thử lại",
+    "reason": {
+      "timeout": "Kết nối không lên kịp.",
+      "unreachable": "Máy chủ không phản hồi.",
+      "unresponsive": "Kết nối ngừng phản hồi — đang khởi động lại.",
+      "verify-failed": "Đã kết nối nhưng không kiểm tra được IP ra.",
+      "exited": "Bộ máy dừng bất ngờ.",
+      "secret-unavailable": "Không đọc được thông tin đăng nhập đã lưu.",
+      "start-error": "Khởi động cổng thất bại.",
+      "rotate-error": "Đổi IP thất bại.",
+      "dns-failed": "Không tra được địa chỉ máy chủ.",
+      "server-rejected": "Máy chủ này từ chối thiết bị — đang chuyển sang máy chủ khác cùng vị trí.",
+      "server-refused": "Máy chủ này từ chối đăng nhập — đang chuyển sang máy chủ khác cùng vị trí.",
+      "server-dead": "Máy chủ này không còn phản hồi — đang chuyển sang máy chủ khác cùng vị trí.",
+      "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác.",
+      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên."
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "proxyAuth": {
+      "title": "Thông tin đăng nhập proxy",
+      "username": "Tên đăng nhập",
+      "password": "Mật khẩu",
+      "note": "Áp dụng cho mọi cổng proxy cục bộ."
+    },
+    "basePort": {
+      "label": "Cổng gốc",
+      "note": "Cổng proxy đầu tiên. Mỗi vị trí mới sẽ nhận cổng trống kế tiếp.",
+      "invalid": "Nhập một số nguyên từ {{min}} đến {{max}}."
+    },
+    "lanSharing": {
+      "label": "Chia sẻ trong mạng nội bộ",
+      "warning": "Bất kỳ ai trong mạng của bạn cũng có thể truy cập các cổng proxy này. Thông tin đăng nhập proxy trở thành bắt buộc khi bật mục này.",
+      "firewallNote": "Windows có thể hỏi bạn cho phép một lần.",
+      "offNote": "Tắt: cổng chỉ nhận kết nối từ chính máy này (127.0.0.1)."
+    },
+    "keepAwake": {
+      "label": "Giữ máy không ngủ khi còn cổng đang bật",
+      "note": "Chỉ khi có ít nhất một cổng đang bật."
+    },
+    "launchAtLogin": {
+      "label": "Khởi chạy cùng lúc đăng nhập"
+    },
+    "giveUpAfter": {
+      "label": "Ngừng thử lại sau",
+      "never": "Không bao giờ",
+      "minutes": "{{count}} phút",
+      "neverNote": "0 = không bao giờ bỏ cuộc; luôn thử lại.",
+      "unit": "phút",
+      "invalid": "Nhập số phút nguyên ({{min}} trở lên)."
+    },
+    "webhook": {
+      "title": "Webhook xoay IP",
+      "enable": "Bật webhook xoay IP",
+      "offByDefaultNote": "Mặc định tắt. Chỉ mở một cổng lắng nghe cục bộ riêng khi được bật.",
+      "port": "Cổng",
+      "portInvalid": "Nhập số cổng nguyên từ {{min}} đến {{max}}.",
+      "bearer": "Mã bearer"
+    },
+    "language": {
+      "label": "Ngôn ngữ",
+      "appLanguage": "Ngôn ngữ ứng dụng"
+    },
+    "subtitle": "Thay đổi được lưu ngay khi bạn chỉnh.",
+    "sections": {
+      "network": "Mạng",
+      "system": "Máy tính này"
+    },
+    "lanSharingRequiresAuth": "Chia sẻ LAN cần tên đăng nhập và mật khẩu proxy.",
+    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự.",
+    "update": {
+      "title": "Cập nhật",
+      "currentVersion": "Phiên bản hiện tại",
+      "check": "Kiểm tra cập nhật",
+      "checking": "Đang kiểm tra cập nhật…",
+      "upToDate": "Bạn đang dùng phiên bản mới nhất.",
+      "available": "Đã có phiên bản {{version}}.",
+      "downloadInstall": "Tải và cài đặt",
+      "downloading": "Đang tải… {{percent}}%",
+      "downloaded": "Đã tải xong bản cập nhật.",
+      "restartInstall": "Khởi động lại & cài đặt",
+      "errors": {
+        "no-releases": "Chưa có phiên bản nào được phát hành trên GitHub.",
+        "network": "Không kết nối được tới GitHub. Kiểm tra kết nối mạng rồi thử lại.",
+        "no-auto-update": "Bản này không tự cập nhật được. Hãy tải bản mới nhất thủ công.",
+        "generic": "Cập nhật thất bại. Hãy thử lại hoặc tải bản mới nhất thủ công."
+      },
+      "errorDetails": "Chi tiết: {{message}}",
+      "openReleases": "Mở trang phát hành",
+      "autoCheck": "Tự động kiểm tra cập nhật",
+      "autoCheckNote": "Kiểm tra khi khởi động và mỗi ngày một lần. Chỉ cài đặt khi bạn chọn."
+    }
+  },
+  "tray": {
+    "onlineCount_zero": "Không có cổng nào đang bật",
+    "onlineCount_one": "{{count}} cổng đang bật",
+    "onlineCount_other": "{{count}} cổng đang bật",
+    "show": "Hiện Proxy Farm",
+    "stopAll": "Tắt tất cả cổng",
+    "quit": "Thoát Proxy Farm"
+  },
+  "app": {
+    "moveTitle": "Chuyển Proxy Farm vào Applications?",
+    "moveMessage": "Proxy Farm đang chạy từ file ảnh đĩa hoặc một vị trí tạm. Ở đây ứng dụng không tự cập nhật được.",
+    "moveDetail": "Chuyển vào thư mục Applications ngay? Ứng dụng sẽ khởi động lại.",
+    "moveNow": "Chuyển vào Applications",
+    "moveLater": "Để sau",
+    "moveFailed": "Không chuyển được ứng dụng. Hãy tự kéo Proxy Farm vào Applications rồi mở lại từ đó.",
+    "engineErrorTitle": "Bộ máy proxy không khởi động được",
+    "engineErrorBody": "Bộ máy tích hợp của Proxy Farm bị thiếu hoặc bị macOS chặn. Hãy cài lại Proxy Farm từ bản tải chính thức rồi mở lại.",
+    "engineErrorDetails": "Chi tiết kỹ thuật",
+    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khoá chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
+  },
+  "rotate": {
+    "not-verified": "Đã đổi, nhưng không biết IP cũ nên không xác nhận được thay đổi.",
+    "online-timeout": "Máy chủ mới không lên kịp.",
+    "probe-failed": "Đã đổi, nhưng không kiểm tra được IP mới.",
+    "exit-ip-unchanged": "Đã kết nối lại nhưng IP ra không đổi.",
+    "rotate-in-progress": "Cổng này đang được đổi IP.",
+    "port-disabled": "Hãy bật cổng trước khi đổi IP.",
+    "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu.",
+    "rate-limited": "Tài khoản này đã thử kết nối quá nhiều lần trong một phút qua — hãy thử lại sau ít phút.",
+    "key-rejected": "Proxy Farm đã ngừng thử lại khóa WireGuard này vì không nhận được phản hồi. Hãy bật cổng trong ứng dụng để thử thêm một lần."
+  },
+  "hma": {
+    "deviceLabel": "Thiết bị …{{suffix}}",
+    "windowsLater": "Hỗ trợ HMA trên Windows sẽ có ở phiên bản sau.",
+    "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
+    "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
+    "check": {
+      "invalidUdid": "Mã thiết bị HMA không hợp lệ.",
+      "invalidPassword": "Mật khẩu thiết bị HMA không hợp lệ."
+    }
+  },
+  "zoogvpn": {
+    "check": {
+      "missingUsername": "Nhập email ZoogVPN.",
+      "missingPassword": "Nhập mật khẩu ZoogVPN."
+    }
+  },
+  "surfshark": {
+    "keyLabel": "Khoá …{{suffix}}",
+    "check": {
+      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
+      "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
+      "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
+    }
+  },
+  "file": {
+    "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
+    "check": {
+      "needsCredentials": "File .ovpn này cần tên đăng nhập và mật khẩu, hiện chưa được hỗ trợ.",
+      "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
+      "parseError": "Không đọc được file này."
+    }
+  },
+  "about": {
+    "title": "Giới thiệu & trợ giúp",
+    "tagline": "Một gói VPN, nhiều cổng proxy trên máy.",
+    "license": "Giấy phép MIT",
+    "supportTitle": "Trợ giúp & góp ý",
+    "getHelp": "Nhận trợ giúp",
+    "getHelpNote": "Đặt câu hỏi hoặc nhờ hỗ trợ trên GitHub Discussions.",
+    "reportBug": "Báo lỗi",
+    "reportBugNote": "Tạo issue trên GitHub. Hãy sao chép thông tin chẩn đoán bên dưới và dán vào.",
+    "reportSecurity": "Báo lỗi bảo mật",
+    "reportSecurityNote": "Gửi riêng qua GitHub security advisory. Vui lòng không mở issue công khai cho lỗi bảo mật.",
+    "docsTitle": "Chính sách & giấy phép",
+    "privacy": "Quyền riêng tư",
+    "privacyNote": "Proxy Farm không thu thập gì. Xem ứng dụng kết nối tới dịch vụ nào và vì sao.",
+    "disclaimer": "Miễn trừ trách nhiệm",
+    "disclaimerNote": "Trách nhiệm của bạn, và những gì phần mềm không cam kết.",
+    "thirdParty": "Giấy phép bên thứ ba",
+    "thirdPartyNote": "sing-box, Electron và các thành phần mã nguồn mở khác đi kèm Proxy Farm.",
+    "source": "Mã nguồn",
+    "releaseNotes": "Ghi chú phát hành",
+    "read": "Xem",
+    "open": "Mở",
+    "diagnostics": "Sao chép thông tin chẩn đoán",
+    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khoá, mật khẩu, địa chỉ IP hay tên tài khoản.",
+    "diagnosticsCopied": "Đã sao chép",
+    "diagnosticsFailed": "Không sao chép được vào bộ nhớ tạm. Hãy thử lại."
+  },
+  "privacy": {
+    "title": "Quyền riêng tư",
+    "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
+    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khoá và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
+    "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
+    "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
+    "fullPolicy": "Chính sách quyền riêng tư đầy đủ"
+  },
+  "disclaimer": {
+    "title": "Miễn trừ trách nhiệm",
+    "asIs": "Phần mềm được cung cấp “nguyên trạng” (AS IS), không kèm bất kỳ bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở khả năng bán được, sự phù hợp cho một mục đích cụ thể, hay không vi phạm. Bạn dùng công cụ này với rủi ro của chính mình.",
+    "liability": "Dự án và những người đóng góp không chịu trách nhiệm cho bất kỳ thiệt hại, mất mát dữ liệu, gián đoạn dịch vụ, chi phí hay hậu quả nào phát sinh từ việc dùng hoặc không dùng được phần mềm.",
+    "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
+    "suspension": "Nhà cung cấp có thể tạm khoá hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
+    "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "full": "Bản miễn trừ trách nhiệm đầy đủ"
+  },
+  "firstRun": {
+    "title": "Trước khi bắt đầu",
+    "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn.",
+    "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
+    "suspension": "Nhà cung cấp có thể khoá tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
+    "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
+    "acknowledge": "Tôi đã hiểu",
+    "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
+  },
+  "menu": {
+    "file": "Tệp",
+    "edit": "Sửa",
+    "view": "Xem",
+    "window": "Cửa sổ",
+    "help": "Trợ giúp",
+    "getHelp": "Nhận trợ giúp",
+    "reportBug": "Báo lỗi",
+    "reportSecurity": "Báo lỗi bảo mật",
+    "privacy": "Chính sách quyền riêng tư",
+    "disclaimer": "Miễn trừ trách nhiệm",
+    "thirdParty": "Giấy phép bên thứ ba",
+    "source": "Mã nguồn",
+    "releaseNotes": "Ghi chú phát hành",
+    "about": "Giới thiệu {{name}}"
+  }
+}

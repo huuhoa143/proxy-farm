@@ -1,0 +1,85 @@
+name: Bug report
+description: The app does something wrong and you can describe how to reproduce it.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Questions and setup help go to [Discussions](https://github.com/huuhoa143/proxy-farm/discussions), security problems to a [private advisory](https://github.com/huuhoa143/proxy-farm/security/advisories/new).
+        If your VPN provider rejects your account or plan, contact the provider first. See [SUPPORT.md](https://github.com/huuhoa143/proxy-farm/blob/main/SUPPORT.md).
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Before you post
+      options:
+        - label: I removed all secrets from this report, its logs and screenshots (passwords, private keys, HMA device ids, config files, proxy and webhook credentials).
+          required: true
+        - label: I searched existing issues and discussions.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings → About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows x64
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "macOS 15.3 / Windows 11 24H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      multiple: true
+      options:
+        - HMA
+        - ZoogVPN
+        - Surfshark
+        - Config file (OpenVPN)
+        - Config file (WireGuard)
+        - Not provider-specific
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a location …
+        2. Click Change IP …
+    validations:
+      required: true
+  - type: input
+    id: port-state
+    attributes:
+      label: Port state
+      description: What the status column shows for the affected port, and its location.
+      placeholder: "Retrying in 18s: No working server could be reached (Tokyo)"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from the port's Details drawer. Read them again and remove anything secret.
+      render: text

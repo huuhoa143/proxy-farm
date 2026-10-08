@@ -1,0 +1,4 @@
+# Fetched by scripts/prebuild-singbox.mjs, pinned in scripts/singbox.pins.json.
+# Never commit the binaries themselves — only the pins are source of truth.
+/sing-box/
+/sing-box-src/

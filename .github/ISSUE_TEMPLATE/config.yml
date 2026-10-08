@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and help
+    url: https://github.com/huuhoa143/proxy-farm/discussions
+    about: Ask setup and usage questions in GitHub Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/huuhoa143/proxy-farm/security/advisories/new
+    about: Report vulnerabilities privately. Never in a public issue.
+  - name: Support guide
+    url: https://github.com/huuhoa143/proxy-farm/blob/main/SUPPORT.md
+    about: What to include in a report, and what never to post.

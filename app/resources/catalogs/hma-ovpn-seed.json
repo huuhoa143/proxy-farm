@@ -1,0 +1,1456 @@
+{
+ "fetched": 1791448383,
+ "locations": [
+  {
+   "key": "AE-1-ABU-DHABI",
+   "country": "AE",
+   "countryName": "United Arab Emirates",
+   "city": "Abu Dhabi",
+   "ip": "5.62.19.134",
+   "ips": [
+    "5.62.19.134"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AL-50-TIRANA",
+   "country": "AL",
+   "countryName": "Albania",
+   "city": "Tirana",
+   "ip": "31.171.154.229",
+   "ips": [
+    "31.171.154.229",
+    "31.171.154.102"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AR-1-BUENOS-AIRES",
+   "country": "AR",
+   "countryName": "Argentina",
+   "city": "Buenos Aires",
+   "ip": "149.22.83.214",
+   "ips": [
+    "149.22.83.214",
+    "149.22.83.194",
+    "149.22.83.215",
+    "149.22.83.228"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AT-1-VIENNA",
+   "country": "AT",
+   "countryName": "Austria",
+   "city": "Vienna",
+   "ip": "95.177.87.72",
+   "ips": [
+    "95.177.87.72"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AU-2-SYDNEY-ULT",
+   "country": "AU",
+   "countryName": "Australia",
+   "city": "Sydney",
+   "ip": "3.107.26.236",
+   "ips": [
+    "3.107.26.236"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AU-7-MELBOURNE",
+   "country": "AU",
+   "countryName": "Australia",
+   "city": "Melbourne",
+   "ip": "79.127.155.167",
+   "ips": [
+    "79.127.155.167",
+    "79.127.155.170",
+    "79.127.155.178",
+    "79.127.155.180"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AU-8-PERTH-ULT",
+   "country": "AU",
+   "countryName": "Australia",
+   "city": "Perth",
+   "ip": "96.0.0.252",
+   "ips": [
+    "96.0.0.252",
+    "96.0.0.51",
+    "96.0.0.112",
+    "96.0.0.145"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "AZ-9-BAKU",
+   "country": "AZ",
+   "countryName": "Azerbaijan",
+   "city": "Baku",
+   "ip": "95.142.115.7",
+   "ips": [
+    "95.142.115.7"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "BA-1-NOVI-TRAVNIK",
+   "country": "BA",
+   "countryName": "Bosnia & Herzegovina",
+   "city": "Novi Travnik",
+   "ip": "45.156.248.109",
+   "ips": [
+    "45.156.248.109",
+    "45.156.248.92",
+    "45.156.248.94",
+    "45.156.248.107"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "BE-1-BRUSSEL",
+   "country": "BE",
+   "countryName": "Belgium",
+   "city": "Brussel",
+   "ip": "79.127.164.220",
+   "ips": [
+    "79.127.164.220",
+    "79.127.164.131",
+    "79.127.164.142",
+    "79.127.164.154"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "BG-58-SOFIA",
+   "country": "BG",
+   "countryName": "Bulgaria",
+   "city": "Sofia",
+   "ip": "169.150.237.129",
+   "ips": [
+    "169.150.237.129",
+    "169.150.237.141"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "BN-0-BANDAR-SERI-BEGAWAN",
+   "country": "BN",
+   "countryName": "Brunei",
+   "city": "Bandar Seri Begawan",
+   "ip": "5.62.18.134",
+   "ips": [
+    "5.62.18.134"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "BR-27-SAO-PAULO",
+   "country": "BR",
+   "countryName": "Brazil",
+   "city": "Sao Paulo",
+   "ip": "149.102.233.138",
+   "ips": [
+    "149.102.233.138",
+    "149.102.233.48",
+    "149.102.233.49",
+    "149.102.233.149"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CA-AB-CALGARY",
+   "country": "CA",
+   "countryName": "Canada",
+   "city": "Calgary",
+   "ip": "16.174.48.176",
+   "ips": [
+    "16.174.48.176"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CA-BC-VANCOUVER",
+   "country": "CA",
+   "countryName": "Canada",
+   "city": "Vancouver",
+   "ip": "209.121.189.6",
+   "ips": [
+    "209.121.189.6",
+    "209.121.189.15",
+    "209.121.189.16"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CA-ON-TORONTO",
+   "country": "CA",
+   "countryName": "Canada",
+   "city": "Toronto",
+   "ip": "217.79.118.130",
+   "ips": [
+    "217.79.118.130",
+    "217.79.118.142",
+    "217.79.118.166",
+    "217.79.118.178"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CA-QC-MONTREAL-ULT",
+   "country": "CA",
+   "countryName": "Canada",
+   "city": "Montreal",
+   "ip": "16.52.160.194",
+   "ips": [
+    "16.52.160.194"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CH-25-ZURICH",
+   "country": "CH",
+   "countryName": "Switzerland",
+   "city": "Zurich",
+   "ip": "51.34.18.107",
+   "ips": [
+    "51.34.18.107"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CL-12-SANTIAGO",
+   "country": "CL",
+   "countryName": "Chile",
+   "city": "Santiago",
+   "ip": "79.127.152.49",
+   "ips": [
+    "79.127.152.49",
+    "79.127.152.38"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CO-34-BOGOTA",
+   "country": "CO",
+   "countryName": "Colombia",
+   "city": "Bogota",
+   "ip": "79.127.214.197",
+   "ips": [
+    "79.127.214.197",
+    "79.127.214.211"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CR-8-SAN-JOSE",
+   "country": "CR",
+   "countryName": "Costa Rica",
+   "city": "San Jose",
+   "ip": "179.48.251.182",
+   "ips": [
+    "179.48.251.182"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CY-4-NICOSIA",
+   "country": "CY",
+   "countryName": "Cyprus",
+   "city": "Nicosia",
+   "ip": "185.191.206.213",
+   "ips": [
+    "185.191.206.213",
+    "185.191.206.8"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "CZ-52-PRAGUE",
+   "country": "CZ",
+   "countryName": "Czech Republic",
+   "city": "Prague",
+   "ip": "152.233.16.90",
+   "ips": [
+    "152.233.16.90",
+    "152.233.16.26",
+    "152.233.16.38"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "DE-1-FRANKFURT-ULT",
+   "country": "DE",
+   "countryName": "Germany",
+   "city": "Frankfurt",
+   "ip": "63.180.54.213",
+   "ips": [
+    "63.180.54.213"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "DE-16-BERLIN",
+   "country": "DE",
+   "countryName": "Germany",
+   "city": "Berlin",
+   "ip": "152.233.20.98",
+   "ips": [
+    "152.233.20.98",
+    "152.233.20.18",
+    "152.233.20.34"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "DE-4-HAMBURG",
+   "country": "DE",
+   "countryName": "Germany",
+   "city": "Hamburg",
+   "ip": "15.220.152.239",
+   "ips": [
+    "15.220.152.239",
+    "15.220.152.242"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "DE-7-DUSSELDORF",
+   "country": "DE",
+   "countryName": "Germany",
+   "city": "Dusseldorf",
+   "ip": "5.199.133.230",
+   "ips": [
+    "5.199.133.230"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "DK-17-COPENHAGEN",
+   "country": "DK",
+   "countryName": "Denmark",
+   "city": "Copenhagen",
+   "ip": "13.154.16.67",
+   "ips": [
+    "13.154.16.67",
+    "13.154.16.82"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "EC-18-QUITO",
+   "country": "EC",
+   "countryName": "Ecuador",
+   "city": "Quito",
+   "ip": "38.165.231.196",
+   "ips": [
+    "38.165.231.196",
+    "38.165.231.212"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "EE-1-TALLINN",
+   "country": "EE",
+   "countryName": "Estonia",
+   "city": "Tallinn",
+   "ip": "77.247.111.124",
+   "ips": [
+    "77.247.111.124"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "ES-29-MADRID",
+   "country": "ES",
+   "countryName": "Spain",
+   "city": "Madrid",
+   "ip": "15.216.177.229",
+   "ips": [
+    "15.216.177.229"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "FI-13-HELSINKI",
+   "country": "FI",
+   "countryName": "Finland",
+   "city": "Helsinki",
+   "ip": "15.220.168.189",
+   "ips": [
+    "15.220.168.189"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "FR-A8-PARIS",
+   "country": "FR",
+   "countryName": "France",
+   "city": "Paris",
+   "ip": "15.188.90.58",
+   "ips": [
+    "15.188.90.58"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "FR-B8-MARSEILLE",
+   "country": "FR",
+   "countryName": "France",
+   "city": "Marseille",
+   "ip": "138.199.14.152",
+   "ips": [
+    "138.199.14.152"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GB-H9-LONDON-ULT",
+   "country": "GB",
+   "countryName": "United Kingdom",
+   "city": "London",
+   "ip": "3.9.191.15",
+   "ips": [
+    "3.9.191.15"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GB-I2-MANCHESTER",
+   "country": "GB",
+   "countryName": "United Kingdom",
+   "city": "Manchester",
+   "ip": "84.233.178.205",
+   "ips": [
+    "84.233.178.205",
+    "84.233.178.135",
+    "84.233.178.175",
+    "84.233.178.192"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GB-J8-NOTTINGHAM",
+   "country": "GB",
+   "countryName": "United Kingdom",
+   "city": "Nottingham",
+   "ip": "78.129.136.73",
+   "ips": [
+    "78.129.136.73"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GB-U8-EDINBURGH",
+   "country": "GB",
+   "countryName": "United Kingdom",
+   "city": "Edinburgh",
+   "ip": "185.3.237.164",
+   "ips": [
+    "185.3.237.164",
+    "185.3.237.39",
+    "185.3.237.68",
+    "185.3.237.117"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GB-V2-GLASGOW",
+   "country": "GB",
+   "countryName": "United Kingdom",
+   "city": "Glasgow",
+   "ip": "185.28.254.182",
+   "ips": [
+    "185.28.254.182",
+    "185.28.254.166",
+    "185.28.254.197",
+    "185.28.254.229"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "GR-35-ATHENS",
+   "country": "GR",
+   "countryName": "Greece",
+   "city": "Athens",
+   "ip": "79.127.218.149",
+   "ips": [
+    "79.127.218.149",
+    "79.127.218.162"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "HK-0-HONGKONG",
+   "country": "HK",
+   "countryName": "Hong Kong",
+   "city": "Hong kong",
+   "ip": "95.173.197.66",
+   "ips": [
+    "95.173.197.66",
+    "95.173.197.75",
+    "95.173.197.87"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "HR-21-ZAGREB",
+   "country": "HR",
+   "countryName": "Croatia",
+   "city": "Zagreb",
+   "ip": "79.127.144.111",
+   "ips": [
+    "79.127.144.111",
+    "79.127.144.97"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "HU-5-BUDAPEST",
+   "country": "HU",
+   "countryName": "Hungary",
+   "city": "Budapest",
+   "ip": "152.233.4.158",
+   "ips": [
+    "152.233.4.158",
+    "152.233.4.142"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "ID-4-JAKARTA",
+   "country": "ID",
+   "countryName": "Indonesia",
+   "city": "Jakarta",
+   "ip": "16.78.225.12",
+   "ips": [
+    "16.78.225.12"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IE-1-DUBLIN",
+   "country": "IE",
+   "countryName": "Ireland",
+   "city": "Dublin",
+   "ip": "34.241.210.34",
+   "ips": [
+    "34.241.210.34"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IL-5-TEL-AVIV",
+   "country": "IL",
+   "countryName": "Israel",
+   "city": "Tel Aviv",
+   "ip": "169.150.235.106",
+   "ips": [
+    "169.150.235.106",
+    "169.150.235.37"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IN-7-NEW-DELHI",
+   "country": "IN",
+   "countryName": "India",
+   "city": "New Delhi",
+   "ip": "31.14.72.135",
+   "ips": [
+    "31.14.72.135"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IS-10-REYKJAVIK",
+   "country": "IS",
+   "countryName": "Iceland",
+   "city": "Reykjavik",
+   "ip": "5.62.20.130",
+   "ips": [
+    "5.62.20.130"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IT-15-PALERMO",
+   "country": "IT",
+   "countryName": "Italy",
+   "city": "Palermo",
+   "ip": "79.127.246.207",
+   "ips": [
+    "79.127.246.207"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IT-16-FLORENCE",
+   "country": "IT",
+   "countryName": "Italy",
+   "city": "Florence",
+   "ip": "95.141.42.102",
+   "ips": [
+    "95.141.42.102"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IT-7-ROME",
+   "country": "IT",
+   "countryName": "Italy",
+   "city": "Rome",
+   "ip": "185.217.71.87",
+   "ips": [
+    "185.217.71.87",
+    "185.217.71.197"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "IT-9-MILANO",
+   "country": "IT",
+   "countryName": "Italy",
+   "city": "Milano",
+   "ip": "51.118.115.8",
+   "ips": [
+    "51.118.115.8"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "JP-40-TOKYO-ULT",
+   "country": "JP",
+   "countryName": "Japan",
+   "city": "Tokyo",
+   "ip": "18.182.20.247",
+   "ips": [
+    "18.182.20.247"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "KH-11-PHNOM-PENH",
+   "country": "KH",
+   "countryName": "Cambodia",
+   "city": "Phnom Penh",
+   "ip": "5.62.33.9",
+   "ips": [
+    "5.62.33.9"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "KR-11-SEOUL",
+   "country": "KR",
+   "countryName": "South Korea",
+   "city": "Seoul",
+   "ip": "84.233.167.46",
+   "ips": [
+    "84.233.167.46"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "LA-11-VIENTIANE",
+   "country": "LA",
+   "countryName": "Laos",
+   "city": "Vientiane",
+   "ip": "5.62.16.8",
+   "ips": [
+    "5.62.16.8"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "LT-60-VILNIUS",
+   "country": "LT",
+   "countryName": "Lithuania",
+   "city": "Vilnius",
+   "ip": "85.206.168.6",
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "LU-3-LUXEMBOURG",
+   "country": "LU",
+   "countryName": "Luxembourg",
+   "city": "Luxembourg City",
+   "ip": "95.85.66.198",
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "LV-25-RIGA",
+   "country": "LV",
+   "countryName": "Latvia",
+   "city": "Riga",
+   "ip": "109.248.149.115",
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "LY-61-TRIPOLI",
+   "country": "LY",
+   "countryName": "Libya",
+   "city": "Tripoli",
+   "ip": "102.213.180.16",
+   "ips": [
+    "102.213.180.16"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "MA-46-FEZ",
+   "country": "MA",
+   "countryName": "Morocco",
+   "city": "Fez",
+   "ip": "154.70.205.168",
+   "ips": [
+    "154.70.205.168"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "MD-57-CHISINAU",
+   "country": "MD",
+   "countryName": "Moldova",
+   "city": "Chisinau",
+   "ip": "178.175.144.88",
+   "ips": [
+    "178.175.144.88"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "MX-22-QUERETARO",
+   "country": "MX",
+   "countryName": "Mexico",
+   "city": "Queretaro",
+   "ip": "15.220.188.156",
+   "ips": [
+    "15.220.188.156"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "MY-14-KUALA-LUMPUR",
+   "country": "MY",
+   "countryName": "Malaysia",
+   "city": "Kuala Lumpur",
+   "ip": "152.233.3.130",
+   "ips": [
+    "152.233.3.130"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "NG-5-LAGOS",
+   "country": "NG",
+   "countryName": "Nigeria",
+   "city": "Lagos",
+   "ip": "185.111.108.133",
+   "ips": [
+    "185.111.108.133"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "NL-7-AMSTERDAM",
+   "country": "NL",
+   "countryName": "Netherlands",
+   "city": "Amsterdam",
+   "ip": "89.222.112.68",
+   "ips": [
+    "89.222.112.68"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "NO-12-OSLO",
+   "country": "NO",
+   "countryName": "Norway",
+   "city": "Oslo",
+   "ip": "217.79.117.154",
+   "ips": [
+    "217.79.117.154"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "NZ-E7-AUCKLAND",
+   "country": "NZ",
+   "countryName": "New Zealand",
+   "city": "Auckland",
+   "ip": "96.0.73.211",
+   "ips": [
+    "96.0.73.211"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PA-8-PANAMA-CITY",
+   "country": "PA",
+   "countryName": "Panama",
+   "city": "Panama City",
+   "ip": "38.165.237.99",
+   "ips": [
+    "38.165.237.99",
+    "38.165.237.118"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PE-15-LIMA",
+   "country": "PE",
+   "countryName": "Peru",
+   "city": "Lima",
+   "ip": "95.173.223.230",
+   "ips": [
+    "95.173.223.230"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PH-D9-MANILA",
+   "country": "PH",
+   "countryName": "Philippines",
+   "city": "Manila",
+   "ip": "96.0.146.65",
+   "ips": [
+    "96.0.146.65"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PK-8-ISLAMABAD",
+   "country": "PK",
+   "countryName": "Pakistan",
+   "city": "Islamabad",
+   "ip": "5.62.35.133",
+   "ips": [
+    "5.62.35.133"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PL-78-WARSAW",
+   "country": "PL",
+   "countryName": "Poland",
+   "city": "Warsaw",
+   "ip": "15.220.65.167",
+   "ips": [
+    "15.220.65.167"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PT-14-LISBON",
+   "country": "PT",
+   "countryName": "Portugal",
+   "city": "Lisbon",
+   "ip": "149.88.20.2",
+   "ips": [
+    "149.88.20.2"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "PT-17-PORTO",
+   "country": "PT",
+   "countryName": "Portugal",
+   "city": "Porto",
+   "ip": "194.39.127.166",
+   "ips": [
+    "194.39.127.166",
+    "194.39.127.135"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "QA-1-DOHA",
+   "country": "QA",
+   "countryName": "Qatar",
+   "city": "Doha",
+   "ip": "5.62.23.5",
+   "ips": [
+    "5.62.23.5"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "RO-10-BUCHAREST",
+   "country": "RO",
+   "countryName": "Romania",
+   "city": "Bucharest",
+   "ip": "149.102.239.90",
+   "ips": [
+    "149.102.239.90",
+    "149.102.239.67",
+    "149.102.239.84"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "RS-0-BELGRADE",
+   "country": "RS",
+   "countryName": "Serbia",
+   "city": "Belgrade",
+   "ip": "146.70.111.135",
+   "ips": [
+    "146.70.111.135",
+    "146.70.111.151"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "SA-10-RIYADH",
+   "country": "SA",
+   "countryName": "Saudi Arabia",
+   "city": "Riyadh",
+   "ip": "5.62.22.131",
+   "ips": [
+    "5.62.22.131"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "SE-26-STOCKHOLM",
+   "country": "SE",
+   "countryName": "Sweden",
+   "city": "Stockholm",
+   "ip": "13.48.131.118",
+   "ips": [
+    "13.48.131.118"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "SG-0-SINGAPORE-ULT",
+   "country": "SG",
+   "countryName": "Singapore",
+   "city": "Singapore",
+   "ip": "18.142.181.58",
+   "ips": [
+    "18.142.181.58"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "SI-61-LJUBLJANA",
+   "country": "SI",
+   "countryName": "Slovenia",
+   "city": "Ljubljana",
+   "ip": "212.44.121.19",
+   "ips": [
+    "212.44.121.19"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "SK-2-BRATISLAVA",
+   "country": "SK",
+   "countryName": "Slovakia",
+   "city": "Bratislava",
+   "ip": "46.151.198.7",
+   "ips": [
+    "46.151.198.7",
+    "46.151.198.15"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "TH-40-BANGKOK",
+   "country": "TH",
+   "countryName": "Thailand",
+   "city": "Bangkok",
+   "ip": "43.208.21.32",
+   "ips": [
+    "43.208.21.32"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "TN-36-TUNIS",
+   "country": "TN",
+   "countryName": "Tunisia",
+   "city": "Tunis",
+   "ip": "102.208.225.103",
+   "ips": [
+    "102.208.225.103"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "TR-87-ISTANBUL",
+   "country": "TR",
+   "countryName": "Türkiye",
+   "city": "Istanbul",
+   "ip": "37.19.208.81",
+   "ips": [
+    "37.19.208.81",
+    "37.19.208.111"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "TW-3-TAIPEI",
+   "country": "TW",
+   "countryName": "Taiwan",
+   "city": "Taipei",
+   "ip": "15.220.83.138",
+   "ips": [
+    "15.220.83.138",
+    "15.220.83.59"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "UA-12-KYIV",
+   "country": "UA",
+   "countryName": "Ukraine",
+   "city": "Kyiv",
+   "ip": "143.244.45.239",
+   "ips": [
+    "143.244.45.239"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-AZ-PHOENIX",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Phoenix",
+   "ip": "18.88.138.188",
+   "ips": [
+    "18.88.138.188",
+    "18.88.138.145"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-CA-LOS-ANGELES-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Los Angeles",
+   "ip": "70.224.227.105",
+   "ips": [
+    "70.224.227.105"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-CA-PALO-ALTO-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Palo Alto",
+   "ip": "54.67.44.239",
+   "ips": [
+    "54.67.44.239"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-CO-DENVER-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Denver",
+   "ip": "15.181.16.240",
+   "ips": [
+    "15.181.16.240",
+    "15.181.16.180"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-DC-WASHINGTON",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Washington, DC",
+   "ip": "38.248.95.229",
+   "ips": [
+    "38.248.95.229"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-FL-MIAMI",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Miami",
+   "ip": "161.193.7.32",
+   "ips": [
+    "161.193.7.32",
+    "161.193.7.24",
+    "161.193.7.63",
+    "161.193.7.191"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-FL-TAMPA",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Tampa",
+   "ip": "38.95.10.105",
+   "ips": [
+    "38.95.10.105",
+    "38.95.10.55"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-GA-ATLANTA",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Atlanta",
+   "ip": "16.56.11.176",
+   "ips": [
+    "16.56.11.176"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-HI-HONOLULU",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Honolulu",
+   "ip": "96.0.161.172",
+   "ips": [
+    "96.0.161.172"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-IL-CHICAGO-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Chicago",
+   "ip": "161.178.3.167",
+   "ips": [
+    "161.178.3.167",
+    "161.178.3.156",
+    "161.178.3.201",
+    "161.178.3.207"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-MA-BOSTON-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Boston",
+   "ip": "68.66.118.149",
+   "ips": [
+    "68.66.118.149"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-MN-MINNEAPOLIS",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Minneapolis",
+   "ip": "15.181.49.119",
+   "ips": [
+    "15.181.49.119",
+    "15.181.49.132"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-MO-KANSAS-CITY-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Kansas City",
+   "ip": "15.181.97.51",
+   "ips": [
+    "15.181.97.51",
+    "15.181.97.37",
+    "15.181.97.61",
+    "15.181.97.138"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-NC-CHARLOTTE",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Charlotte",
+   "ip": "154.16.171.61",
+   "ips": [
+    "154.16.171.61",
+    "154.16.171.78"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-NV-LAS-VEGAS",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Las Vegas",
+   "ip": "15.220.17.249",
+   "ips": [
+    "15.220.17.249"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-NY-NEW-YORK",
+   "country": "US",
+   "countryName": "United States",
+   "city": "New York",
+   "ip": "161.178.134.243",
+   "ips": [
+    "161.178.134.243"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-OH-COLUMBUS-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Columbus",
+   "ip": "18.219.3.248",
+   "ips": [
+    "18.219.3.248"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-OR-BOARDMAN-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Boardman",
+   "ip": "35.88.123.170",
+   "ips": [
+    "35.88.123.170"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-OR-PORTLAND",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Portland",
+   "ip": "15.220.1.219",
+   "ips": [
+    "15.220.1.219",
+    "15.220.1.191"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-PA-PHILADELPHIA-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Philadelphia",
+   "ip": "15.181.145.51",
+   "ips": [
+    "15.181.145.51",
+    "15.181.145.9",
+    "15.181.145.70"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-TX-DALLAS",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Dallas",
+   "ip": "18.88.47.189",
+   "ips": [
+    "18.88.47.189"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-TX-HOUSTON",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Houston",
+   "ip": "18.89.140.134",
+   "ips": [
+    "18.89.140.134"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-TX-MCALLEN",
+   "country": "US",
+   "countryName": "United States",
+   "city": "McAllen",
+   "ip": "109.204.74.37",
+   "ips": [
+    "109.204.74.37",
+    "109.204.74.12",
+    "109.204.74.26"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-VA-ASHBURN-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Ashburn",
+   "ip": "13.221.132.186",
+   "ips": [
+    "13.221.132.186"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "US-WA-SEATTLE-ULT",
+   "country": "US",
+   "countryName": "United States",
+   "city": "Seattle",
+   "ip": "15.181.1.104",
+   "ips": [
+    "15.181.1.104",
+    "15.181.1.114"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "VN-51-HANOI",
+   "country": "VN",
+   "countryName": "Vietnam",
+   "city": "Hanoi",
+   "ip": "156.59.140.19",
+   "ips": [
+    "156.59.140.19"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  },
+  {
+   "key": "ZA-6-JOHANNESBURG",
+   "country": "ZA",
+   "countryName": "South Africa",
+   "city": "Johannesburg",
+   "ip": "109.204.67.18",
+   "ips": [
+    "109.204.67.18",
+    "109.204.67.19"
+   ],
+   "port": 1194,
+   "proto": "udp"
+  }
+ ]
+}

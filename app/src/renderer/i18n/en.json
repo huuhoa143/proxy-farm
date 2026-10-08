@@ -1,0 +1,586 @@
+{
+  "common": {
+    "appName": "Proxy Farm",
+    "language": "Language",
+    "languageEnglish": "English",
+    "languageVietnamese": "Vietnamese",
+    "languageSystem": "System default",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saved": "Saved",
+    "close": "Close",
+    "back": "Back",
+    "continue": "Continue",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loading": "Loading…",
+    "yes": "Yes",
+    "no": "No",
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "toggle": "Switch light / dark"
+    },
+    "nav": {
+      "main": "Ports",
+      "providers": "Providers",
+      "settings": "Settings"
+    },
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "onboarding": {
+    "title": "Add a provider",
+    "subtitle": "Connect one VPN subscription to start running local proxy ports.",
+    "addAnother": "Add another provider",
+    "continueToApp": "Go to ports",
+    "providers": {
+      "hma": {
+        "name": "HMA",
+        "description": "Use your existing HMA VPN device credentials — no password needed.",
+        "detectedTitle": "HMA found on this computer",
+        "detectedSubtitle": "Device credentials are ready to use.",
+        "notDetectedTitle": "HMA not found",
+        "helperMissingTitle": "HMA needs one more step on Windows",
+        "step1": "Install HMA VPN",
+        "step2": "Sign in and connect once",
+        "step3": "Come back here — the app will pick it up automatically",
+        "connect": "Connect",
+        "connecting": "Connecting…",
+        "enableSupport": "Enable HMA support",
+        "enablingSupport": "Enabling…",
+        "windowsHelperNote": "This installs a small helper service and needs administrator approval once. Updates afterwards need no approval.",
+        "waiting": "Waiting for HMA — watching for credentials…",
+        "initials": "H"
+      },
+      "zoogvpn": {
+        "name": "ZoogVPN",
+        "description": "Sign in with your ZoogVPN account email and password.",
+        "email": "Email",
+        "emailPlaceholder": "you@example.com",
+        "password": "Password",
+        "passwordPlaceholder": "Password",
+        "check": "Check",
+        "checking": "Checking…",
+        "initials": "Z"
+      },
+      "surfshark": {
+        "name": "Surfshark",
+        "description": "Paste the WireGuard private key from your Surfshark account, or import the WireGuard config you downloaded with it.",
+        "keyLabel": "WireGuard private key",
+        "keyPlaceholder": "Paste the private key, or the whole WireGuard config",
+        "add": "Add",
+        "initials": "S",
+        "hintLead": "Find it at",
+        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
+        "addressLabel": "Interface address (optional)",
+        "addressPlaceholder": "10.14.0.2/16",
+        "addressHint": "The Address line of the config Surfshark gave you with this key, e.g. 10.14.0.2/16 or 10.64.x.y/16. Each key has its own. Empty means 10.14.0.2/16.",
+        "addressFromConf": "Taken from the config you pasted.",
+        "importConf": "Import .conf…"
+      },
+      "file": {
+        "name": "Config file",
+        "description": "Import an .ovpn or .conf (WireGuard) file.",
+        "dragHint": "Drop a .ovpn or .conf file here",
+        "browse": "Choose a file…",
+        "countryLabel": "Country",
+        "countryGuessedNote": "Guessed from the file name — edit if wrong.",
+        "countryInvalid": "Enter a 2-letter country code (e.g. US, DE).",
+        "import": "Import",
+        "initials": "F",
+        "chooseAnother": "Choose another"
+      }
+    },
+    "portLimit": {
+      "label": "Port limit",
+      "unlimited": "0 = unlimited",
+      "save": "Save",
+      "title": "Port limits",
+      "note": "Cap how many ports each provider may run at the same time.",
+      "fieldLabel": "Port limit — {{provider}}",
+      "ports_one": "at most {{count}} port",
+      "ports_other": "at most {{count}} ports"
+    },
+    "continueHint": "Connect at least one provider to continue.",
+    "status": {
+      "connected_one": "{{count}} account",
+      "connected_other": "{{count}} accounts",
+      "total_one": "{{count}} account connected — you can add more any time.",
+      "total_other": "{{count}} accounts connected — you can add more any time."
+    }
+  },
+  "checkResult": {
+    "ok": "Looks good.",
+    "reason": {
+      "auth": "That sign-in was rejected. Double-check your details.",
+      "not-in-plan": "Your plan doesn't include this server.",
+      "port-in-use": "That port is already in use.",
+      "no-server": "No server is available right now.",
+      "invalid-format": "That doesn't look right — check the format and try again."
+    }
+  },
+  "main": {
+    "title": "Ports",
+    "pickLocation": "Pick a location",
+    "country": "Country",
+    "city": "City",
+    "allCountries": "All countries",
+    "start": "Start",
+    "noTargetsSelected": "Select at least one location to start.",
+    "selectedCount": "{{count}} selected",
+    "emptyState": "Pick a location and how many ports — each port gets its own server, so its own fixed exit IP.",
+    "table": {
+      "status": "Status",
+      "location": "Location",
+      "port": "Port",
+      "exitIp": "Exit IP",
+      "latency": "Latency",
+      "actions": "Actions",
+      "provider": "Provider",
+      "account": "Account",
+      "server": "Server"
+    },
+    "copyPort": "Copy address",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy — opened Export so you can copy it by hand.",
+    "rotate": "Change IP",
+    "rotating": "Changing…",
+    "rotateDisabledHint": "Start this port (or wait until it finishes connecting) to change its IP.",
+    "stop": "Stop",
+    "stopDisabledHint": "This port is already stopped.",
+    "remove": "Remove",
+    "details": "Details",
+    "selectAll": "Select all",
+    "confirmRemove": {
+      "title": "Remove ports?",
+      "message_one": "Remove {{count}} port? This stops it and takes it off the list.",
+      "message_other": "Remove {{count}} ports? This stops them and takes them off the list."
+    },
+    "logs": {
+      "title": "Logs",
+      "refresh": "Refresh",
+      "close": "Close",
+      "empty": "No log lines yet."
+    },
+    "test": {
+      "run": "Test",
+      "running": "Testing…",
+      "speedRun": "Speed test",
+      "speedRunning": "Testing speed…",
+      "resultOnline": "{{exitIp}} · {{latencyMs}} ms",
+      "resultSpeed": "{{exitIp}} · {{latencyMs}} ms · {{mbps}} Mbps",
+      "failed": "Test failed — this port is not online.",
+      "title": "Connection check"
+    },
+    "autoRotate": {
+      "label": "Auto-rotate every",
+      "off": "Off",
+      "minutesSuffix": "min",
+      "title": "Auto-rotate",
+      "every_one": "Rotates every minute.",
+      "every_other": "Rotates every {{count}} minutes."
+    },
+    "bulk": {
+      "selectedCount_one": "{{count}} port selected",
+      "selectedCount_other": "{{count}} ports selected",
+      "start": "Start",
+      "stop": "Stop",
+      "rotate": "Change IP",
+      "remove": "Remove",
+      "export": "Export",
+      "clear": "Clear selection",
+      "autoRotate": "Auto-rotate…",
+      "rotateSummary": "{{changed}} changed IP, {{moved}} moved to another city, {{unavailable}} had no free server"
+    },
+    "export": {
+      "title": "Export ports",
+      "format": {
+        "hostPortUserPass": "host:port:user:pass",
+        "socks5Url": "socks5://…",
+        "hostPort": "host:port",
+        "curl": "curl command"
+      },
+      "copyAll": "Copy all",
+      "copyFailed": "Couldn't copy to the clipboard — select the text above and copy it manually.",
+      "close": "Close",
+      "count_one": "{{count}} port",
+      "count_other": "{{count}} ports"
+    },
+    "rotateResult": {
+      "changedNote": "Exit IP changed: {{from}} → {{to}}",
+      "sameCityNote": "No free server left in that city — the port moved to another city in the same country.",
+      "movedToCityNote": "No free server left here — the port moved to {{city}}, in the same country.",
+      "movedFromToNote": "Moved from {{from}} to {{to}}, in the same country: no free server was left in {{from}}.",
+      "unchangedNote": "No free server left for this location — the IP stays the same.",
+      "serverTaken": "That server is no longer free — pick another one."
+    },
+    "emptyTitle": "No ports yet",
+    "addLocations": "Add locations",
+    "exportAll": "Export all",
+    "credentials": "Proxy login",
+    "stats": {
+      "label": "Port summary",
+      "online": "Online",
+      "ofTotal": "of {{total}}",
+      "locations": "Locations",
+      "countries": "Countries",
+      "avgLatency": "Avg latency"
+    },
+    "picker": {
+      "title": "Add locations",
+      "subtitle": "Each port gets its own server — its own fixed exit IP. Pick how many per location.",
+      "searchPlaceholder": "Search country or city",
+      "allProviders": "All",
+      "noResults": "No locations match “{{query}}”.",
+      "clear": "Clear",
+      "selectCountry": "Select every city in {{country}}",
+      "cities_one": "{{count}} city",
+      "cities_other": "{{count}} cities",
+      "servers_one": "{{count}} server · {{free}} free",
+      "servers_other": "{{count}} servers · {{free}} free",
+      "noFree": "No free server",
+      "limitReached": "Port limit reached",
+      "portsHere_one": "{{count}} port",
+      "portsHere_other": "{{count}} ports",
+      "qty": "Ports in {{location}}",
+      "fewer": "One port fewer in {{location}}",
+      "more": "One more port in {{location}}",
+      "maxHint": "Up to {{max}} — one per free server",
+      "addN_one": "Add {{count}} port",
+      "addN_other": "Add {{count}} ports",
+      "picked": "Selected locations",
+      "unpick": "Remove {{location}} from the selection"
+    },
+    "group": {
+      "toggle": "Show or hide the ports in {{location}}",
+      "select": "Select every port in {{location}}",
+      "ports_one": "{{count}} port",
+      "ports_other": "{{count}} ports",
+      "online": "{{count}} online",
+      "servers_one": "{{count}} server",
+      "servers_other": "{{count}} servers",
+      "free": "{{count}} free",
+      "addPort": "Add port",
+      "addPortLabel": "Add a port in {{location}}",
+      "addPortHint": "Adds one port on a free server — a new exit IP in {{location}}.",
+      "noFreeServer": "Every server in {{location}} is already in use or unavailable.",
+      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it in Settings."
+    },
+    "port": {
+      "label": "{{location}} · port #{{n}}",
+      "serverTitle": "Pinned to server {{server}}. This port keeps this exit IP until you change it.",
+      "noServer": "Chosen on first start"
+    },
+    "changeIp": {
+      "menuLabel": "Change IP for port #{{n}}",
+      "next": "Next free server",
+      "nextHint": "Picks the best free server for you",
+      "noneFreeHint": "None free here — tries another city in the same country",
+      "heading": "Servers in {{city}}",
+      "loading": "Loading servers…",
+      "loadFailed": "Couldn't load the server list.",
+      "empty": "This location has no servers.",
+      "current": "This port",
+      "heldBy": "Used by :{{port}}",
+      "heldByOther": "Used by another port",
+      "free": "Free",
+      "health": {
+        "ok": "Working",
+        "unknown": "Not tried yet",
+        "refused": "Refused",
+        "dead": "Not responding"
+      },
+      "reason": {
+        "current": "This port is already on this server.",
+        "held": "Port :{{port}} uses this server — two ports never share an exit IP.",
+        "heldOther": "Another port uses this server — two ports never share an exit IP.",
+        "refused": "This server turned your account away, so it is skipped for 7 days.",
+        "dead": "This server didn't respond, so it is skipped for 2 hours."
+      },
+      "pick": "Move this port to {{server}}"
+    },
+    "addResult": {
+      "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",
+      "no-free-server_other": "Added {{added}} of {{count}} ports in {{location}} — no more free servers there.",
+      "limit-reached_one": "Added {{added}} of {{count}} port in {{location}} — {{provider}} reached its port limit.",
+      "limit-reached_other": "Added {{added}} of {{count}} ports in {{location}} — {{provider}} reached its port limit.",
+      "generic_one": "Added {{added}} of {{count}} port in {{location}}.",
+      "generic_other": "Added {{added}} of {{count}} ports in {{location}}."
+    }
+  },
+  "vpnNote": {
+    "message": "Another VPN is active on this computer — Proxy Farm keeps working normally."
+  },
+  "portState": {
+    "queued": "Queued",
+    "connecting": "Connecting…",
+    "verifying": "Verifying…",
+    "online": "Online",
+    "retrying": "Retrying in {{seconds}}s",
+    "stopped": "Stopped",
+    "failed": {
+      "auth": {
+        "label": "Sign-in rejected",
+        "labelLocation": "Location unavailable",
+        "guidance": {
+          "hma": "HMA rejected the device credentials — open the HMA app and check you're signed in.",
+          "zoogvpn": "ZoogVPN rejected this account's password — check it in the ZoogVPN app or website.",
+          "generic": "The provider rejected these credentials — check your sign-in details.",
+          "locationRejected": "Your account works at other locations, but this one refused it — try a different location."
+        }
+      },
+      "not-in-plan": {
+        "label": "Not in plan",
+        "guidance": "Your current plan doesn't include this server. Try another location."
+      },
+      "port-in-use": {
+        "label": "Port in use",
+        "guidance": "Another app is already using this port.",
+        "action": "Move to another port"
+      },
+      "key-rejected": {
+        "label": "Key not answered",
+        "guidance": {
+          "surfshark": "Surfshark didn't answer this key on 3 servers. Check the key is listed under Manual setup → WireGuard in your Surfshark account, that the address matches the key's own config, and that your subscription is active. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
+          "generic": "The server didn't answer this WireGuard key on 3 attempts. Check that the key and address in the file are still valid with your provider. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more."
+        }
+      },
+      "no-server": {
+        "label": "No server available",
+        "guidance": "No working server could be reached for this location yet. It will keep retrying."
+      }
+    },
+    "attempt": "attempt {{n}}",
+    "nextTry": "Next try in {{time}}",
+    "actionNeeded": "Needs your attention — not retrying",
+    "reason": {
+      "timeout": "The connection didn't come up in time.",
+      "unreachable": "The server isn't answering.",
+      "unresponsive": "The connection stopped responding — restarting it.",
+      "verify-failed": "Connected, but the exit IP couldn't be checked.",
+      "exited": "The engine stopped unexpectedly.",
+      "secret-unavailable": "Your saved credentials couldn't be read.",
+      "start-error": "Starting the port failed.",
+      "rotate-error": "Rotating failed.",
+      "dns-failed": "The server's address couldn't be looked up.",
+      "server-rejected": "This server refused the device — switching to another server in the same location.",
+      "server-refused": "This server refused the sign-in — moving to another server in the same location.",
+      "server-dead": "This server stopped answering — moving to another server in the same location.",
+      "duplicate-exit": "Another port already exits through this IP — moving to a different server.",
+      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "proxyAuth": {
+      "title": "Proxy credentials",
+      "username": "Username",
+      "password": "Password",
+      "note": "Used by every local proxy port."
+    },
+    "basePort": {
+      "label": "Base port",
+      "note": "First proxy port. Each new location gets the next free port after this one.",
+      "invalid": "Enter a whole number between {{min}} and {{max}}."
+    },
+    "lanSharing": {
+      "label": "Share on the local network",
+      "warning": "Anyone on your network could reach these proxy ports. Proxy credentials become mandatory when this is on.",
+      "firewallNote": "Windows may ask you to allow this once.",
+      "offNote": "Off: ports only accept connections from this computer (127.0.0.1)."
+    },
+    "keepAwake": {
+      "label": "Keep this computer awake while ports are on",
+      "note": "Only while at least one port is on."
+    },
+    "launchAtLogin": {
+      "label": "Launch at login"
+    },
+    "giveUpAfter": {
+      "label": "Give up retrying after",
+      "never": "Never",
+      "minutes": "{{count}} minutes",
+      "neverNote": "0 = never give up; keeps retrying.",
+      "unit": "min",
+      "invalid": "Enter a whole number of minutes ({{min}} or more)."
+    },
+    "webhook": {
+      "title": "Rotate webhook",
+      "enable": "Enable rotate webhook",
+      "offByDefaultNote": "Off by default. Opens a separate local listener only when enabled.",
+      "port": "Port",
+      "portInvalid": "Enter a whole port number between {{min}} and {{max}}.",
+      "bearer": "Bearer token"
+    },
+    "language": {
+      "label": "Language",
+      "appLanguage": "App language"
+    },
+    "subtitle": "Changes are saved as you make them.",
+    "sections": {
+      "network": "Network",
+      "system": "This computer"
+    },
+    "lanSharingRequiresAuth": "LAN sharing needs a proxy username and password.",
+    "webhookBearerTooShort": "The webhook key must be at least 16 characters.",
+    "update": {
+      "title": "Updates",
+      "currentVersion": "Current version",
+      "check": "Check for updates",
+      "checking": "Checking for updates…",
+      "upToDate": "You're on the latest version.",
+      "available": "Version {{version}} is available.",
+      "downloadInstall": "Download & install",
+      "downloading": "Downloading… {{percent}}%",
+      "downloaded": "Update downloaded.",
+      "restartInstall": "Restart & install",
+      "errors": {
+        "no-releases": "No version has been published on GitHub yet.",
+        "network": "Couldn't reach GitHub. Check your internet connection and try again.",
+        "no-auto-update": "This build can't update itself. Download the latest release manually.",
+        "generic": "The update failed. Try again, or download the latest release manually."
+      },
+      "errorDetails": "Details: {{message}}",
+      "openReleases": "Open releases page",
+      "autoCheck": "Check for updates automatically",
+      "autoCheckNote": "Checks on start and once a day. Updates install only when you choose."
+    }
+  },
+  "tray": {
+    "onlineCount_zero": "No ports online",
+    "onlineCount_one": "{{count}} port online",
+    "onlineCount_other": "{{count}} ports online",
+    "show": "Show Proxy Farm",
+    "stopAll": "Stop all ports",
+    "quit": "Quit Proxy Farm"
+  },
+  "app": {
+    "moveTitle": "Move Proxy Farm to Applications?",
+    "moveMessage": "Proxy Farm is running from the disk image or a temporary location. It can't update itself from here.",
+    "moveDetail": "Move it to your Applications folder now? The app will restart.",
+    "moveNow": "Move to Applications",
+    "moveLater": "Not now",
+    "moveFailed": "Couldn't move the app. Drag Proxy Farm into Applications yourself, then open it from there.",
+    "engineErrorTitle": "The proxy engine can't start",
+    "engineErrorBody": "Proxy Farm's built-in engine is missing or was blocked by macOS. Reinstall Proxy Farm from the official download, then open it again.",
+    "engineErrorDetails": "Technical details",
+    "secretsUnavailable": "This computer's secure storage isn't available, so your passwords and keys are kept in memory only. You'll need to add them again after you quit."
+  },
+  "rotate": {
+    "not-verified": "Rotated, but the old exit IP was unknown, so the change couldn't be confirmed.",
+    "online-timeout": "The new server didn't come online in time.",
+    "probe-failed": "Rotated, but the new exit IP couldn't be checked.",
+    "exit-ip-unchanged": "Reconnected, but the exit IP stayed the same.",
+    "rotate-in-progress": "This port is already rotating.",
+    "port-disabled": "Start the port before rotating it.",
+    "decrypt-failed": "Your saved credentials couldn't be read.",
+    "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly.",
+    "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
+  },
+  "hma": {
+    "deviceLabel": "Device …{{suffix}}",
+    "windowsLater": "HMA support on Windows is coming in a later version.",
+    "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
+    "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
+    "check": {
+      "invalidUdid": "HMA's device ID looks wrong.",
+      "invalidPassword": "HMA's device password looks wrong."
+    }
+  },
+  "zoogvpn": {
+    "check": {
+      "missingUsername": "Enter your ZoogVPN email.",
+      "missingPassword": "Enter your ZoogVPN password."
+    }
+  },
+  "surfshark": {
+    "keyLabel": "Key …{{suffix}}",
+    "check": {
+      "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
+      "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",
+      "invalidConfig": "That WireGuard config has no PrivateKey line under [Interface]."
+    }
+  },
+  "file": {
+    "unsupportedDirective": "This file uses a setting Proxy Farm doesn't support: {{label}}",
+    "check": {
+      "needsCredentials": "This .ovpn file needs a username and password, which isn't supported yet.",
+      "unknownExtension": "Only .ovpn and .conf files are supported.",
+      "parseError": "This file couldn't be read."
+    }
+  },
+  "about": {
+    "title": "About & help",
+    "tagline": "One VPN subscription, many local proxy ports.",
+    "license": "MIT License",
+    "supportTitle": "Help & feedback",
+    "getHelp": "Get help",
+    "getHelpNote": "Ask a question or ask for help in GitHub Discussions.",
+    "reportBug": "Report a bug",
+    "reportBugNote": "Open an issue on GitHub. Copy diagnostics below and paste them in.",
+    "reportSecurity": "Report a security issue",
+    "reportSecurityNote": "Privately, through a GitHub security advisory. Please don't open a public issue for it.",
+    "docsTitle": "Policies & licenses",
+    "privacy": "Privacy",
+    "privacyNote": "Proxy Farm collects nothing. See which services it contacts, and why.",
+    "disclaimer": "Disclaimer",
+    "disclaimerNote": "Your responsibilities, and what the software doesn't promise.",
+    "thirdParty": "Third-party licenses",
+    "thirdPartyNote": "sing-box, Electron and the other open-source parts Proxy Farm ships with.",
+    "source": "Source code",
+    "releaseNotes": "Release notes",
+    "read": "Read",
+    "open": "Open",
+    "diagnostics": "Copy diagnostics",
+    "diagnosticsNote": "App, OS, Electron and sing-box versions, plus account and port counts per provider. No keys, passwords, IP addresses or account names.",
+    "diagnosticsCopied": "Copied",
+    "diagnosticsFailed": "Couldn't copy to the clipboard. Try again."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "collectsNothing": "Proxy Farm collects nothing about you. There is no telemetry, no analytics and no crash reporting, and there is no Proxy Farm server.",
+    "local": "Your accounts, ports and settings stay on this computer. Passwords, keys and tokens are encrypted by your operating system (Keychain on macOS, DPAPI on Windows).",
+    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. These requests come from your own IP address.",
+    "ipCheck": "To confirm a tunnel works, Proxy Farm checks its exit IP and reachability through that tunnel, with api.ipify.org, ifconfig.co, ipinfo.io and www.gstatic.com. They see the tunnel's exit IP, not yours.",
+    "optional": "The speed test (only when you run it) downloads a test file from speed.cloudflare.com through the port. The update check asks GitHub for the latest release, on start and once a day; you can turn it off under Updates.",
+    "delete": "To delete all data: remove your accounts and ports, quit Proxy Farm, then delete its data folder: ~/Library/Application Support/Proxy Farm on macOS, %APPDATA%\\Proxy Farm on Windows.",
+    "fullPolicy": "Full privacy policy"
+  },
+  "disclaimer": {
+    "title": "Disclaimer",
+    "asIs": "Proxy Farm is provided “as is”, without warranty of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose and non-infringement. You use it at your own risk.",
+    "liability": "The project and its contributors are not liable for any damage, data loss, service interruption, cost or other consequence of using, or being unable to use, the software.",
+    "ownAccounts": "Use your own VPN accounts, on your own computer. How you use the tool is your decision and your responsibility: follow your VPN provider's terms of service and the laws where you live. Most providers forbid sharing or reselling a subscription.",
+    "suspension": "Providers may suspend or close accounts they consider abusive, including too many connections or reconnects in a short time. That risk is yours, not the project's.",
+    "noGuarantee": "There is no guarantee of availability, speed, number of IP addresses or compatibility with any provider. Providers can change their systems and stop the tool from working at any time.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
+    "full": "Full disclaimer"
+  },
+  "firstRun": {
+    "title": "Before you start",
+    "ownAccounts": "Use your own VPN accounts, on your own computer.",
+    "terms": "Follow your provider's terms: sharing or reselling a subscription is usually forbidden.",
+    "suspension": "Providers may suspend accounts for abuse, including excessive reconnects.",
+    "asIs": "Proxy Farm is provided as is, with no warranty.",
+    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark or ZoogVPN.",
+    "acknowledge": "I understand",
+    "readFull": "Read the full disclaimer"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "window": "Window",
+    "help": "Help",
+    "getHelp": "Get Help",
+    "reportBug": "Report a Bug",
+    "reportSecurity": "Report a Security Issue",
+    "privacy": "Privacy Policy",
+    "disclaimer": "Disclaimer",
+    "thirdParty": "Third-Party Licenses",
+    "source": "Source Code",
+    "releaseNotes": "Release Notes",
+    "about": "About {{name}}"
+  }
+}
