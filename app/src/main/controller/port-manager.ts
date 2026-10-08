@@ -89,12 +89,18 @@ export interface PortManagerDeps {
   pool?: Pick<AccountPool, 'pickAccount'>;
 }
 
+/** Who asked for a start/Change IP. A user action resets the port's back-off; an
+ * automatic one (app start, resume, a due retry, auto-rotate, the webhook) never does. */
+export interface StartOptions {
+  user?: boolean;
+}
+
 export interface PortManager {
-  startPort(key: string): Promise<void>;
+  startPort(key: string, opts?: StartOptions): Promise<void>;
   stopPort(key: string): Promise<void>;
   removePort(key: string): Promise<void>;
   /** Change IP (spec §6.5): to `toServer` when given, else the next free usable server. */
-  rotatePort(key: string, toServer?: string): Promise<RotateResult>;
+  rotatePort(key: string, toServer?: string, opts?: StartOptions): Promise<RotateResult>;
   /**
    * Adds one port to `target` for `accountId`, pinned to the best free usable server
    * (spec §6.8), with a restart-stable proxy port and the smallest free `#n`. The row is
@@ -441,6 +447,11 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return result;
   }
 
+  /** port key -> back-off attempts used since it was last online, as reported by the
+   * engine's health machine. Handed back on every engine (re)start so the back-off keeps
+   * growing towards 30 min instead of restarting at 30 s each time (spec §6.4). */
+  const backoffAttempts = new Map<string, number>();
+
   // Real retry-timer bookkeeping for the handful of failures port-manager itself owns
   // (reviewer item 7): pre-flight states that never reached `PortHealth`. `PortHealth`'s
   // OWN `retrying`/`failed` states already have their own backoff timer inside the
@@ -643,6 +654,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   deps.engine.onStateChange((key, state) => {
     updatePort(key, { state });
+    if (state.kind === 'retrying' || state.kind === 'failed') backoffAttempts.set(key, state.attempt);
+    else if (state.kind === 'online') backoffAttempts.delete(key);
     // An online port's periodic latency refresh is not a transition: nothing to learn.
     if (state.kind === 'online' && handledOnline.get(key) === state.since) return;
     if (state.kind === 'online') handledOnline.set(key, state.since);
@@ -763,7 +776,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     });
   }
 
-  async function startPort(key: string): Promise<void> {
+  async function startPort(key: string, opts: StartOptions = {}): Promise<void> {
+    if (opts.user) backoffAttempts.delete(key);
     try {
       const s = deps.state.getState();
       const port = s.ports.find((p) => p.key === key);
@@ -822,7 +836,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       const renderInput = buildRenderInput(findPort(key) ?? port, endpoint);
       onlineSinceStart.delete(key); // a fresh (re)connect from here on
       try {
-        await deps.engine.start(key, renderInput);
+        await deps.engine.start(key, renderInput, { attempt: backoffAttempts.get(key) ?? 0 });
       } catch (err) {
         if (err instanceof PortInUseError) {
           failWithRetry(key, { kind: 'failed', reason: 'port-in-use' });
@@ -843,6 +857,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function stopPort(key: string): Promise<void> {
     cancelLocalRetry(key); // the user explicitly stopped it — no surprise restarts later
+    backoffAttempts.delete(key);
     await deps.engine.stop(key);
     updatePort(key, { enabled: false, state: { kind: 'stopped' } });
     syncAutoRotate();
@@ -850,6 +865,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function removePort(key: string): Promise<void> {
     cancelLocalRetry(key);
+    backoffAttempts.delete(key);
     portTargets.delete(key);
     await deps.engine.stop(key).catch(() => undefined);
     deps.state.setState((s) => ({ ...s, ports: s.ports.filter((p) => p.key !== key) }));
@@ -858,8 +874,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   /** Change IP (spec §6.5): restarts only this port on another server, then confirms
    * the exit IP actually changed before reporting success. */
-  async function rotatePort(key: string, toServer?: string): Promise<RotateResult> {
+  async function rotatePort(key: string, toServer?: string, opts: StartOptions = {}): Promise<RotateResult> {
     if (rotatingKeys.has(key)) return { changed: false, noteKey: 'rotate-in-progress' };
+    if (opts.user) backoffAttempts.delete(key);
     rotatingKeys.add(key);
     // The row the user is looking at may be renamed partway (same-country fallback);
     // any throw after that must be attributed to the new key (reviewer round 3, item 2).
@@ -1017,7 +1034,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     await deps.engine.stop(key);
     onlineSinceStart.delete(key);
     onlineSinceStart.delete(finalKey);
-    await deps.engine.start(finalKey, renderInput);
+    const attempt = backoffAttempts.get(key) ?? 0;
+    backoffAttempts.delete(key);
+    if (attempt > 0) backoffAttempts.set(finalKey, attempt);
+    await deps.engine.start(finalKey, renderInput, { attempt });
 
     // Wait for `PortHealth` to confirm the tunnel before probing (reviewer item 1).
     const reachedOnline = await waitForOnlineOrTimeout(finalKey, rotateOnlineTimeoutMs);

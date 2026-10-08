@@ -38,13 +38,13 @@ function fakeSecretStore(): SecretStore {
  * themselves.
  */
 function fakeEngine(opts: { autoOnline?: boolean } = {}): Engine & {
-  started: Array<{ key: string; input: RenderInput }>;
+  started: Array<{ key: string; input: RenderInput; attempt?: number }>;
   stopped: string[];
   fireState: (key: string, state: PortState) => void;
   fireRetryDue: (key: string) => void;
 } {
   const autoOnline = opts.autoOnline ?? true;
-  const started: Array<{ key: string; input: RenderInput }> = [];
+  const started: Array<{ key: string; input: RenderInput; attempt?: number }> = [];
   const stopped: string[] = [];
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
   const retryDueCbs = new Set<(key: string) => void>();
@@ -59,8 +59,8 @@ function fakeEngine(opts: { autoOnline?: boolean } = {}): Engine & {
     stopped,
     fireState,
     fireRetryDue,
-    start: async (key, input) => {
-      started.push({ key, input });
+    start: async (key, input, startOpts) => {
+      started.push({ key, input, attempt: startOpts?.attempt });
       if (autoOnline) {
         // Exit IP = server IP (spec §6.5), so distinct servers never look like a clash.
         const ep = input.endpoint;
@@ -1698,6 +1698,35 @@ describe('port manager', () => {
       expect(state.getState().ports[0].state).toMatchObject({ kind: 'retrying', reasonKey: 'timeout' });
       engine.fireRetryDue('zoogvpn:nl-ams');
       await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // dead marks never strand a port
+    });
+
+    it('the back-off carries across engine restarts (spec §6.4) and a user Start resets it', async () => {
+      const { manager, engine } = setup({
+        targets: [{ ...twoServerTargets[0], servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        engine: fakeEngine({ autoOnline: false }),
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(engine.started[0].attempt).toBe(0);
+      engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 99, attempt: 3 });
+      engine.fireRetryDue('zoogvpn:nl-ams');
+      await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      expect(engine.started[1].attempt).toBe(3); // not back to the 30 s step
+      await manager.startPort('zoogvpn:nl-ams', { user: true });
+      expect(engine.started[2].attempt).toBe(0);
+    });
+
+    it('reaching online resets the carried back-off', async () => {
+      const { manager, engine } = setup({
+        targets: [{ ...twoServerTargets[0], servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        engine: fakeEngine({ autoOnline: false }),
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      engine.fireState('zoogvpn:nl-ams', { kind: 'retrying', untilMs: 99, attempt: 2, reasonKey: 'exited' });
+      engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 5, exitIp: '10.0.0.1', country: 'NL' });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(engine.started[1].attempt).toBe(0);
     });
 
     it('a ZoogVPN auth failure with no other evidence is undecided: the server is marked dead (not refused) and the port moves on', async () => {

@@ -202,6 +202,16 @@ describe('PortHealth', () => {
     }
   });
 
+  it('initialAttempt carries the back-off across a rebuilt PortHealth (spec §6.4: no reset per restart)', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule, initialAttempt: 5 });
+    health.start();
+    health.feedDelay(504);
+    expect(health.state).toMatchObject({ kind: 'retrying', attempt: 6 });
+    // attempt 5 of the schedule is 30 s * 2^5 = 16 min, ±20 % jitter — never the 30 s first step.
+    expect(clock.pendingDelayMs!).toBeGreaterThanOrEqual(0.8 * 16 * 60_000);
+  });
+
   it('stop() cancels any pending retry timer and moves to stopped', () => {
     const clock = fakeClock();
     const health = new PortHealth({ now: clock.now, schedule: clock.schedule });

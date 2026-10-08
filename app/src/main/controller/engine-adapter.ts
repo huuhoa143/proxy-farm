@@ -10,7 +10,7 @@ import { delayProbe } from '../health/delay';
 import { probeExitIp } from '../health/exit-ip';
 import { classifyLog } from '../health/signals';
 import { PortHealth, type PortHealthOptions } from '../health/state-machine';
-import { PortInUseError, type Engine } from './ports';
+import { PortInUseError, type Engine, type EngineStartOptions } from './ports';
 
 const CLASH_AUX_BASE = 40000;
 
@@ -166,6 +166,9 @@ interface PortEntry {
   /** True while a retry is stopping the old child before respawning it: that exit is
    * ours, not a crash, and must not be fed to PortHealth. */
   respawning?: boolean;
+  /** True while the child is being stopped because the port entered a back-off: that
+   * exit is ours too. */
+  quiescing?: boolean;
 }
 
 /**
@@ -324,7 +327,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     }
   }
 
-  async function start(key: string, input: RenderInput): Promise<void> {
+  async function start(key: string, input: RenderInput, startOpts: EngineStartOptions = {}): Promise<void> {
     const existing = entries.get(key);
     if (existing) await teardown(key, existing);
 
@@ -343,7 +346,10 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     assertConfigInvariants(JSON.parse(config));
 
     const engineProcess = (options.createEngineProcess ?? ((o) => new EngineProcess(o)))({ binPath });
-    const health = (options.createPortHealth ?? ((o) => new PortHealth(o)))({ giveUpAfter: options.giveUpAfter });
+    const health = (options.createPortHealth ?? ((o) => new PortHealth(o)))({
+      giveUpAfter: options.giveUpAfter,
+      initialAttempt: startOpts.attempt,
+    });
 
     const entry: PortEntry = {
       process: engineProcess,
@@ -373,6 +379,26 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       health.onStateChange((state) => {
         if (state.kind !== 'verifying') return;
         void verifyExitIp(key, entry, health);
+      }),
+    );
+
+    // A port waiting out its back-off must not keep talking to the provider. sing-box
+    // never exits on a 504 or a handshake timeout (spec §6.3): left running, a WireGuard
+    // endpoint re-sends a handshake initiation every few seconds for as long as the
+    // back-off lasts (keepalive and the /delay poll keep giving it traffic), which turns
+    // a 30-minute back-off into hundreds of failed handshakes. Stop the child now; the
+    // retry spawns a fresh one.
+    entry.unsubscribe.push(
+      health.onStateChange((state) => {
+        if (state.kind !== 'retrying' && state.kind !== 'failed' && state.kind !== 'stopped') return;
+        if (engineProcess.pid === undefined) return;
+        entry.quiescing = true;
+        void engineProcess
+          .stop()
+          .catch(() => undefined)
+          .finally(() => {
+            entry.quiescing = false;
+          });
       }),
     );
 
@@ -427,7 +453,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     entry.unsubscribe.push(
       engineProcess.onExit((info: ExitInfo) => {
-        if (entry.stopping || entry.respawning) return; // our own stop(), not a crash
+        if (entry.stopping || entry.respawning || entry.quiescing) return; // our own stop(), not a crash
         const collidedPort = detectBindErrorPort(entry.lastLogLine);
         if (collidedPort !== undefined) {
           void handleBindError(key, entry, collidedPort);

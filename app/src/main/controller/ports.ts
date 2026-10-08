@@ -14,9 +14,16 @@ import type { DelayResult, EndpointSpec, ExitIpResult, PortState, Provider, Prov
  * observes it via `onStateChange` and persists it; it never sets `connecting` /
  * `online` / `retrying` itself (reviewer item 6).
  */
+export interface EngineStartOptions {
+  /** Back-off attempts this port has already used since it was last online (spec §6.4).
+   * The engine's health machine continues the schedule from here instead of restarting
+   * it at 30 s, so a port that never connects backs off to 30 min. @default 0 */
+  attempt?: number;
+}
+
 export interface Engine {
   /** Spawn (or respawn) the process for `key` with this render input. */
-  start(key: string, input: RenderInput): Promise<void>;
+  start(key: string, input: RenderInput, opts?: EngineStartOptions): Promise<void>;
   /** Stop and wait for exit (SIGINT on macOS, hard terminate on Windows — §6.3). */
   stop(key: string): Promise<void>;
   /** clash_api `/proxies/<tag>/delay` health probe (§6.4). */

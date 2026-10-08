@@ -32,7 +32,7 @@ import { createTray, onlineCountLabel, trayLabels, type TrayHandle } from '../tr
 import { resolveRotateKey, startWebhook, type Webhook } from '../webhook/index';
 import { aboutPanelOptions, buildAppMenuTemplate, menuLabels } from './app-menu';
 import { openExternalIfAllowed } from './external-links';
-import { createControllerFacade } from './facade';
+import { createControllerFacade, rotateNoteKey } from './facade';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
 import { mainStrings, resolveMainLanguage, type MainLanguage } from './main-strings';
@@ -351,7 +351,12 @@ export function runApp(): void {
         }
       },
     });
-    facadeRotate = (key) => facade.rotatePort(key);
+    // The webhook is automation, not a user at the keyboard: it must not reset back-off
+    // or re-arm a stopped WireGuard key the way the Change-IP button does.
+    facadeRotate = async (key) => {
+      const result = await portManager.rotatePort(key);
+      return { ...result, noteKey: rotateNoteKey(result.noteKey) };
+    };
 
     // IPC: only the main window's own top frame may call in (reviewer item 9).
     registerIpcHandlers(ipcMain, facade, (frame) => Boolean(mainWindow && !mainWindow.isDestroyed() && frame === mainWindow.webContents.mainFrame));

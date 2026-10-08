@@ -23,6 +23,14 @@ export interface PortHealthOptions {
    * still accepted and treated as a constant.
    */
   giveUpAfter?: number | (() => number);
+  /**
+   * Back-off attempts already spent on this port before this instance existed. The
+   * controller builds a fresh `PortHealth` on every engine (re)start, so without this
+   * every retry would start over at the 30 s step and a port that never connects would
+   * hit the provider every ~30 s forever (spec §6.4: the back-off grows to 30 min).
+   * @default 0
+   */
+  initialAttempt?: number;
 }
 
 function defaultSchedule(ms: number, cb: () => void): () => void {
@@ -79,6 +87,7 @@ export class PortHealth {
     this.connectingDeadlineMs = opts.connectingDeadlineMs ?? DEFAULT_CONNECTING_DEADLINE_MS;
     const giveUpAfter = opts.giveUpAfter ?? 0;
     this.getGiveUpAfter = typeof giveUpAfter === 'function' ? giveUpAfter : () => giveUpAfter;
+    this.attempt = Math.max(0, Math.floor(opts.initialAttempt ?? 0));
   }
 
   get state(): PortState {

@@ -95,7 +95,8 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
 
   function enqueueStart(key: string): void {
     patchPort(key, { enabled: true, state: { kind: 'queued' } });
-    deps.queue.enqueue(key, () => deps.portManager.startPort(key));
+    // Only user actions come through here (Start, Add ports): they reset the back-off.
+    deps.queue.enqueue(key, () => deps.portManager.startPort(key, { user: true }));
   }
 
   function nextAccountId(providerId: ProviderId): string {
@@ -352,7 +353,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     },
 
     async rotatePort(key, toServer): Promise<RotateResult> {
-      const result = await deps.portManager.rotatePort(key, toServer);
+      const result = await deps.portManager.rotatePort(key, toServer, { user: true });
       return { ...result, noteKey: rotateNoteKey(result.noteKey) };
     },
 

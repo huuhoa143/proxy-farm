@@ -144,6 +144,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
   function setup(opts: { exitIpResult?: ExitIpResult | Error; delayResult?: DelayResult; isPortFree?: (port: number) => Promise<boolean> } = {}) {
     const processes: ReturnType<typeof fakeEngineProcess>[] = [];
     const healths: ReturnType<typeof fakePortHealth>[] = [];
+    const healthOpts: Array<{ initialAttempt?: number } | undefined> = [];
     const delayCalls: Array<{ clashPort: number; secret: string; tag: string }> = [];
     const exitIpCalls: Array<{ proxyPort: number; auth: unknown }> = [];
     let scheduledCb: (() => void) | undefined;
@@ -156,7 +157,8 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
         processes.push(p);
         return p;
       },
-      createPortHealth: () => {
+      createPortHealth: (o) => {
+        healthOpts.push(o);
         const h = fakePortHealth();
         healths.push(h);
         return h;
@@ -186,7 +188,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       },
     });
 
-    return { engine, processes, healths, delayCalls, exitIpCalls, fireDelayTick: () => scheduledCb?.() };
+    return { engine, processes, healths, healthOpts, delayCalls, exitIpCalls, fireDelayTick: () => scheduledCb?.() };
   }
 
   it('start() renders+validates the config, spawns via the process factory, and starts PortHealth', async () => {
@@ -305,6 +307,33 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     await vi.waitFor(() => expect(p.startedConfigs).toHaveLength(2));
     expect(p.stop).toHaveBeenCalledTimes(1);
     expect(healths[0].fedExit).toEqual([]);
+  });
+
+  it('start(key, input, {attempt}) hands the carried-over back-off attempt to the new PortHealth', async () => {
+    const { engine, healthOpts } = setup();
+    await engine.start('k1', sampleInput(45240), { attempt: 4 });
+    expect(healthOpts[0]).toMatchObject({ initialAttempt: 4 });
+  });
+
+  it('stops the child while the port waits out a back-off, so it sends no handshakes meanwhile; that exit is not a crash', async () => {
+    const { engine, processes, healths } = setup();
+    await engine.start('k1', sampleInput(45241));
+    const p = processes[0];
+    p.stop.mockImplementation(async () => {
+      p.emitExit({ code: 0, signal: null });
+    });
+    healths[0].setState({ kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' });
+    expect(p.stop).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(healths[0].fedExit).toEqual([]));
+  });
+
+  it('also stops the child on failed(auth); an online port keeps its child', async () => {
+    const { engine, processes, healths } = setup();
+    await engine.start('k1', sampleInput(45242));
+    healths[0].setState({ kind: 'online', since: 1, exitIp: '1.2.3.4', country: 'NL' });
+    expect(processes[0].stop).not.toHaveBeenCalled();
+    healths[0].setState({ kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+    expect(processes[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it('reviewer item 6: onRetryDue re-records the pid on every respawn, not just the first spawn', async () => {
