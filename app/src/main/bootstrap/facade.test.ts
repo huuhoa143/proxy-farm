@@ -262,14 +262,33 @@ describe('controller facade', () => {
     expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
   });
 
-  it('connectHma: not installed → hma.notFound; not macOS → hma.windowsLater', async () => {
+  it('connectHma: not installed → hma.notFound; Windows without HMA support → hma.helperMissing', async () => {
     hmaRead = { status: 'missing' };
     expect(await setup().facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.notFound' });
-    expect(await setup({ platform: 'win32' }).facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.windowsLater' });
+    expect(await setup({ platform: 'linux' }).facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.notFound' });
+    hmaRead = { status: 'helper-missing' };
+    expect(await setup({ platform: 'win32' }).facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.helperMissing' });
   });
 
-  it('enableHmaSupport is stubbed until the Windows track', async () => {
-    expect(await setup().facade.enableHmaSupport()).toEqual({ ok: false, reasonKey: 'hma.windowsLater' });
+  it('connectHma on Windows adds the account from the auth file credentials', async () => {
+    const udid = `U1.00000000-0000-4000-8000-000000000000.hma101.${'A'.repeat(64)}`;
+    hmaRead = { status: 'found', creds: { udid, password: 'B'.repeat(64) } };
+    const r = await setup({ platform: 'win32' }).facade.connectHma();
+    expect(r.ok).toBe(true);
+    expect(r.account?.meta).toMatchObject({ udid, source: 'local' });
+  });
+
+  it('enableHmaSupport: nothing to do off Windows; on Windows maps the setup outcome', async () => {
+    expect(await setup().facade.enableHmaSupport()).toEqual({ ok: true });
+    for (const [result, expected] of [
+      [{ ok: true }, { ok: true }],
+      [{ ok: false, reason: 'cancelled' }, { ok: false, reasonKey: 'hma.enable.cancelled' }],
+      [{ ok: false, reason: 'no-credentials' }, { ok: false, reasonKey: 'hma.enable.no-credentials' }],
+      [{ ok: false, reason: 'failed' }, { ok: false, reasonKey: 'hma.enable.failed' }],
+    ] as const) {
+      const hmaWindows = { enable: async () => result, refresh: async () => undefined };
+      expect(await setup({ platform: 'win32', hmaWindows }).facade.enableHmaSupport()).toEqual(expected);
+    }
   });
 
   it('addAccount(zoogvpn) maps the card\'s "email" field to the provider\'s username', async () => {

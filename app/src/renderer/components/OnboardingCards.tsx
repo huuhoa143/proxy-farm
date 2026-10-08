@@ -110,6 +110,8 @@ export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) 
     try {
       const result = await api.enableHmaSupport();
       setMessage(resultMessage(t, result));
+      // The card flips to "HMA found" once detection sees the credentials copy.
+      if (result.ok) onAdded();
     } catch (err) {
       setMessage(errorMessage(t, err));
     } finally {

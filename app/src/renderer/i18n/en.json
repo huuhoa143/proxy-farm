@@ -49,7 +49,7 @@
         "connecting": "Connecting…",
         "enableSupport": "Enable HMA support",
         "enablingSupport": "Enabling…",
-        "windowsHelperNote": "This installs a small helper service and needs administrator approval once. Updates afterwards need no approval.",
+        "windowsHelperNote": "This sets up a small Windows task that keeps a copy of HMA's device credentials that only you and administrators can read. It needs administrator approval once; updates afterwards need none.",
         "waiting": "Waiting for HMA — watching for credentials…",
         "initials": "H"
       },
@@ -480,9 +480,14 @@
   },
   "hma": {
     "deviceLabel": "Device …{{suffix}}",
-    "windowsLater": "HMA support on Windows is coming in a later version.",
     "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
     "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
+    "helperMissing": "HMA support isn't enabled on this computer yet. Click \"Enable HMA support\" first.",
+    "enable": {
+      "cancelled": "Administrator approval was cancelled, so HMA support wasn't enabled.",
+      "no-credentials": "HMA support is on, but HMA has no device credentials yet. Open HMA, sign in, connect once, then try again.",
+      "failed": "Couldn't enable HMA support. Try again, or run Proxy Farm as administrator once."
+    },
     "check": {
       "invalidUdid": "HMA's device ID looks wrong.",
       "invalidPassword": "HMA's device password looks wrong."

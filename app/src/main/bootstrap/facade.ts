@@ -25,6 +25,7 @@ import type { StateStore } from '../store/state';
 import type { UpdateStatus } from '../../shared/contracts';
 import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
+import type { HmaWindowsSupport } from './hma-windows';
 
 export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
 
@@ -46,6 +47,8 @@ export interface FacadeDeps {
   engineLogs(key: string): string[];
   hostVpn: HostVpnDetector;
   hma: HmaLocalSource;
+  /** Windows only: turns on HMA support (spec §7); absent elsewhere. */
+  hmaWindows?: HmaWindowsSupport;
   platform: NodeJS.Platform;
   /** Throughput through a port's own proxy (spec §4.2 speed test). */
   speedTest(proxyPort: number, auth?: { username: string; password: string }): Promise<number>;
@@ -229,8 +232,9 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   }
 
   async function connectHma(): Promise<CheckResult & { account?: Account }> {
-    if (deps.platform !== 'darwin') return { ok: false, reasonKey: 'hma.windowsLater' };
+    if (deps.platform !== 'darwin' && deps.platform !== 'win32') return { ok: false, reasonKey: 'hma.notFound' };
     const r = await deps.hma.read();
+    if (r.status === 'helper-missing') return { ok: false, reasonKey: 'hma.helperMissing' };
     if (r.status === 'missing') return { ok: false, reasonKey: 'hma.notFound' };
     if (r.status !== 'found') return { ok: false, reasonKey: 'hma.notSignedIn' };
     const provider = deps.providers.get('hma');
@@ -311,8 +315,11 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     connectHma,
 
     async enableHmaSupport() {
-      // spec §7: the Windows helper installer is a later track.
-      return { ok: false, reasonKey: 'hma.windowsLater' };
+      // spec §7: only Windows needs it (macOS reads HMA's file directly).
+      if (!deps.hmaWindows) return { ok: true };
+      const r = await deps.hmaWindows.enable();
+      if (r.ok) return { ok: true };
+      return { ok: false, reasonKey: `hma.enable.${r.reason}` };
     },
 
     importConfigFile,

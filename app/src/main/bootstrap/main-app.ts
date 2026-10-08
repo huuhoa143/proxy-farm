@@ -35,6 +35,7 @@ import { openExternalIfAllowed } from './external-links';
 import { createControllerFacade, rotateNoteKey } from './facade';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
+import { createHmaWindowsSupport } from './hma-windows';
 import { mainStrings, resolveMainLanguage, type MainLanguage } from './main-strings';
 import { observeStateStore } from './observed-state';
 import { createSessionSecretStore } from './session-secrets';
@@ -253,6 +254,8 @@ export function runApp(): void {
 
     // HMA local credentials: detection, connect, lazy apply on change (spec §5.1).
     const hma = createHmaLocalSource();
+    // Windows: HMA support's task refreshes the readable copy of HMA's credentials (spec §7).
+    const hmaWindows = process.platform === 'win32' ? createHmaWindowsSupport({ appExe: process.execPath }) : undefined;
     const hmaSync = createHmaCredsSync({
       source: hma,
       state,
@@ -261,7 +264,9 @@ export function runApp(): void {
       restartPort,
       onCredentialsChanged: (accountId) => portManager.credentialsChanged(accountId),
     });
-    void hmaSync.check().catch((err) => log('hma credential check failed', err));
+    void (hmaWindows?.refresh() ?? Promise.resolve())
+      .then(() => hmaSync.check())
+      .catch((err) => log('hma credential check failed', err));
 
     // Webhook (spec §6.6): only while enabled; rebuilt on LAN/webhook changes.
     let webhook: Webhook | undefined;
@@ -322,6 +327,7 @@ export function runApp(): void {
       engineLogs: (key) => engine.getLogs(key),
       hostVpn,
       hma,
+      hmaWindows,
       platform: process.platform,
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
       appStatus,

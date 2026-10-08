@@ -65,3 +65,21 @@ export function parseDeviceCreds(fileText: string): DeviceCreds {
 
   return { udid, password };
 }
+
+/**
+ * Parse HMA's Windows OpenVPN credentials file,
+ * `%ProgramData%\Privax\HMA VPN\HmaProVpn\auth` (spec §5.1): line 1 the username
+ * (`U1.<device id>.hma101.<64 hex>`), line 2 the 64-hex password. Verified 2026-10-09:
+ * the pair authenticates exactly like the macOS `udid`/`password`, so it maps onto the
+ * same `DeviceCreds` and the provider's `check()` validates it unchanged.
+ */
+export function parseAuthFile(fileText: string): DeviceCreds {
+  const lines = fileText
+    .replace(/^﻿/, '')
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+  const [udid = '', password = ''] = lines;
+  if (udid.length === 0) throw new Error('hma: auth file has no username line');
+  if (password.length === 0) throw new Error('hma: auth file has no password line');
+  return { udid, password };
+}

@@ -37,6 +37,15 @@ describe('hma provider: check', () => {
     expect(result.meta).toEqual({ udid: DUMMY_UDID });
   });
 
+  it("accepts the Windows auth file's pair (hma101 username, upper-case hex password)", () => {
+    const provider = makeProvider();
+    const udid = 'U1.00000000-0000-4000-8000-000000000000.hma101.DEADBEEFCAFEF00DFEEDFACEDEADBEEFCAFEF00DFEEDFACEDEADBEEFCAFE0000';
+    const password = 'A1B2C3D4E5F60718293A4B5C6D7E8F90'.repeat(2);
+    const result = provider.check({ udid, password });
+    expect(result.ok).toBe(true);
+    expect(result.secret).toEqual({ kind: 'userpass', username: udid, password });
+  });
+
   it('rejects a udid without the U1. prefix', () => {
     const provider = makeProvider();
     const result = provider.check({ udid: 'bogus', password: DUMMY_PASSWORD });

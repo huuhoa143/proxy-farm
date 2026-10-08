@@ -8,7 +8,7 @@ function fakeController(): ControllerFacade {
     addAccount: vi.fn(async () => ({ ok: true })),
     removeAccount: vi.fn(async () => undefined),
     connectHma: vi.fn(async () => ({ ok: true })),
-    enableHmaSupport: vi.fn(async () => ({ ok: false, reasonKey: 'hma.windowsLater' })),
+    enableHmaSupport: vi.fn(async () => ({ ok: false, reasonKey: 'hma.enable.cancelled' })),
     importConfigFile: vi.fn(async () => ({ ok: true })),
     listTargets: vi.fn(async () => []),
     listServers: vi.fn(async () => []),

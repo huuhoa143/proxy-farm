@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -109,8 +109,47 @@ describe('HMA local source (spec §5.1)', () => {
     const p = join(dir, 'bad.json');
     writeFileSync(p, '{}');
     expect((await createHmaLocalSource({ platform: 'darwin', tokenPath: p }).read()).status).toBe('invalid');
-    expect(await createHmaLocalSource({ platform: 'win32', winHmaDir: dir }).read()).toEqual({ status: 'helper-missing' });
-    expect(await createHmaLocalSource({ platform: 'win32', winHmaDir: join(dir, 'x') }).read()).toEqual({ status: 'missing' });
+  });
+
+  describe('on Windows', () => {
+    const USER = `U1.00000000-0000-4000-8000-000000000000.hma101.${'A'.repeat(64)}`;
+    const PASS = 'B'.repeat(64);
+    // Every path injected: the real ones would read this machine's HMA install.
+    const win = (o: { hma?: string; auth?: string; mirrorDir?: string }) =>
+      createHmaLocalSource({
+        platform: 'win32',
+        winHmaDir: o.hma ?? join(dir, 'no-hma'),
+        winAuthPath: o.auth ?? join(dir, 'no-hma', 'auth'),
+        winMirrorDir: o.mirrorDir ?? join(dir, 'no-mirror'),
+        winMirrorPath: join(o.mirrorDir ?? join(dir, 'no-mirror'), 'auth'),
+      });
+
+    it('reads the HMA support copy of the auth file', async () => {
+      mkdirSync(join(dir, 'mirror'));
+      writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
+      expect(await win({ hma: dir, mirrorDir: join(dir, 'mirror') }).read()).toEqual({ status: 'found', creds: { udid: USER, password: PASS } });
+    });
+
+    it("reads HMA's own auth file when it is readable (the app runs elevated)", async () => {
+      writeFileSync(join(dir, 'auth'), `${USER}\r\n${PASS}\r\n`);
+      expect(await win({ hma: dir, auth: join(dir, 'auth') }).read()).toEqual({ status: 'found', creds: { udid: USER, password: PASS } });
+    });
+
+    it('reports helper-missing when HMA is installed but HMA support is not enabled', async () => {
+      expect(await win({ hma: dir }).read()).toEqual({ status: 'helper-missing' });
+    });
+
+    it('reports missing when HMA support is on but HMA has no credentials, or HMA is absent', async () => {
+      mkdirSync(join(dir, 'empty-mirror'));
+      expect(await win({ hma: dir, mirrorDir: join(dir, 'empty-mirror') }).read()).toEqual({ status: 'missing' });
+      expect(await win({}).read()).toEqual({ status: 'missing' });
+    });
+
+    it('reports an unreadable copy as invalid', async () => {
+      mkdirSync(join(dir, 'bad-mirror'));
+      writeFileSync(join(dir, 'bad-mirror', 'auth'), '');
+      expect((await win({ hma: dir, mirrorDir: join(dir, 'bad-mirror') }).read()).status).toBe('invalid');
+    });
   });
 });
 
