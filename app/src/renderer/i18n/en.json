@@ -483,5 +483,52 @@
       "unknownExtension": "Only .ovpn and .conf files are supported.",
       "parseError": "This file couldn't be read."
     }
+  },
+  "about": {
+    "title": "About & help",
+    "tagline": "One VPN subscription, many local proxy ports.",
+    "license": "MIT License",
+    "supportTitle": "Help & feedback",
+    "getHelp": "Get help",
+    "getHelpNote": "Ask a question or ask for help in GitHub Discussions.",
+    "reportBug": "Report a bug",
+    "reportBugNote": "Open an issue on GitHub. Copy diagnostics below and paste them in.",
+    "reportSecurity": "Report a security issue",
+    "reportSecurityNote": "Privately, through a GitHub security advisory. Please don't open a public issue for it.",
+    "docsTitle": "Policies & licenses",
+    "privacy": "Privacy",
+    "privacyNote": "Proxy Farm collects nothing. See which services it contacts, and why.",
+    "disclaimer": "Disclaimer",
+    "disclaimerNote": "Your responsibilities, and what the software doesn't promise.",
+    "thirdParty": "Third-party licenses",
+    "thirdPartyNote": "sing-box, Electron and the other open-source parts Proxy Farm ships with.",
+    "source": "Source code",
+    "releaseNotes": "Release notes",
+    "read": "Read",
+    "open": "Open",
+    "diagnostics": "Copy diagnostics",
+    "diagnosticsNote": "App, OS, Electron and sing-box versions, plus account and port counts per provider. No keys, passwords, IP addresses or account names.",
+    "diagnosticsCopied": "Copied",
+    "diagnosticsFailed": "Couldn't copy to the clipboard. Try again."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "collectsNothing": "Proxy Farm collects nothing about you. There is no telemetry, no analytics and no crash reporting, and there is no Proxy Farm server.",
+    "local": "Your accounts, ports and settings stay on this computer. Passwords, keys and tokens are encrypted by your operating system (Keychain on macOS, DPAPI on Windows).",
+    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. These requests come from your own IP address.",
+    "ipCheck": "To confirm a tunnel works, Proxy Farm checks its exit IP and reachability through that tunnel, with api.ipify.org, ifconfig.co, ipinfo.io and www.gstatic.com. They see the tunnel's exit IP, not yours.",
+    "optional": "The speed test (only when you run it) downloads a test file from speed.cloudflare.com through the port. The update check asks GitHub for the latest release, on start and once a day; you can turn it off under Updates.",
+    "delete": "To delete all data: remove your accounts and ports, quit Proxy Farm, then delete its data folder: ~/Library/Application Support/Proxy Farm on macOS, %APPDATA%\\Proxy Farm on Windows.",
+    "fullPolicy": "Full privacy policy"
+  },
+  "disclaimer": {
+    "title": "Disclaimer",
+    "asIs": "Proxy Farm is provided “as is”, without warranty of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose and non-infringement. You use it at your own risk.",
+    "liability": "The project and its contributors are not liable for any damage, data loss, service interruption, cost or other consequence of using, or being unable to use, the software.",
+    "ownAccounts": "Use your own VPN accounts, on your own computer. How you use the tool is your decision and your responsibility: follow your VPN provider's terms of service and the laws where you live. Most providers forbid sharing or reselling a subscription.",
+    "suspension": "Providers may suspend or close accounts they consider abusive, including too many connections or reconnects in a short time. That risk is yours, not the project's.",
+    "noGuarantee": "There is no guarantee of availability, speed, number of IP addresses or compatibility with any provider. Providers can change their systems and stop the tool from working at any time.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
+    "full": "Full disclaimer"
   }
 }

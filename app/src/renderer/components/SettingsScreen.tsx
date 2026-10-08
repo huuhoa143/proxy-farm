@@ -4,6 +4,7 @@ import type { ProxyFarmApi, Settings, UpdateStatus } from '../../shared/contract
 import { changeLanguage } from '../i18n';
 import { Icon, type IconName } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
+import { AboutSection } from './AboutSection';
 
 /**
  * A text/number input that commits on blur or Enter rather than on every
@@ -391,6 +392,8 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
             />
           </Row>
         </Section>
+
+        <AboutSection api={api} version={APP_VERSION} />
       </div>
       {error && (
         <div className="callout warn app-banner" data-testid="settings-error" role="alert">

@@ -483,5 +483,52 @@
       "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
       "parseError": "Không đọc được file này."
     }
+  },
+  "about": {
+    "title": "Giới thiệu & trợ giúp",
+    "tagline": "Một gói VPN, nhiều cổng proxy trên máy.",
+    "license": "Giấy phép MIT",
+    "supportTitle": "Trợ giúp & góp ý",
+    "getHelp": "Nhận trợ giúp",
+    "getHelpNote": "Đặt câu hỏi hoặc nhờ hỗ trợ trên GitHub Discussions.",
+    "reportBug": "Báo lỗi",
+    "reportBugNote": "Tạo issue trên GitHub. Hãy sao chép thông tin chẩn đoán bên dưới và dán vào.",
+    "reportSecurity": "Báo lỗi bảo mật",
+    "reportSecurityNote": "Gửi riêng qua GitHub security advisory. Vui lòng không mở issue công khai cho lỗi bảo mật.",
+    "docsTitle": "Chính sách & giấy phép",
+    "privacy": "Quyền riêng tư",
+    "privacyNote": "Proxy Farm không thu thập gì. Xem ứng dụng kết nối tới dịch vụ nào và vì sao.",
+    "disclaimer": "Miễn trừ trách nhiệm",
+    "disclaimerNote": "Trách nhiệm của bạn, và những gì phần mềm không cam kết.",
+    "thirdParty": "Giấy phép bên thứ ba",
+    "thirdPartyNote": "sing-box, Electron và các thành phần mã nguồn mở khác đi kèm Proxy Farm.",
+    "source": "Mã nguồn",
+    "releaseNotes": "Ghi chú phát hành",
+    "read": "Xem",
+    "open": "Mở",
+    "diagnostics": "Sao chép thông tin chẩn đoán",
+    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khoá, mật khẩu, địa chỉ IP hay tên tài khoản.",
+    "diagnosticsCopied": "Đã sao chép",
+    "diagnosticsFailed": "Không sao chép được vào bộ nhớ tạm. Hãy thử lại."
+  },
+  "privacy": {
+    "title": "Quyền riêng tư",
+    "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
+    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khoá và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
+    "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
+    "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
+    "fullPolicy": "Chính sách quyền riêng tư đầy đủ"
+  },
+  "disclaimer": {
+    "title": "Miễn trừ trách nhiệm",
+    "asIs": "Phần mềm được cung cấp “nguyên trạng” (AS IS), không kèm bất kỳ bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở khả năng bán được, sự phù hợp cho một mục đích cụ thể, hay không vi phạm. Bạn dùng công cụ này với rủi ro của chính mình.",
+    "liability": "Dự án và những người đóng góp không chịu trách nhiệm cho bất kỳ thiệt hại, mất mát dữ liệu, gián đoạn dịch vụ, chi phí hay hậu quả nào phát sinh từ việc dùng hoặc không dùng được phần mềm.",
+    "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
+    "suspension": "Nhà cung cấp có thể tạm khoá hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
+    "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "full": "Bản miễn trừ trách nhiệm đầy đủ"
   }
 }
