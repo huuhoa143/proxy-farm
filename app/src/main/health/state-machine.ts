@@ -13,8 +13,16 @@ export interface PortHealthOptions {
   schedule?: Scheduler;
   /** @default 90_000 (spec §6.4) */
   connectingDeadlineMs?: number;
-  /** Consecutive failed attempts (since last `online`) before giving up entirely. 0 = never (spec `Settings.giveUpAfter`). @default 0 */
-  giveUpAfter?: number;
+  /**
+   * Consecutive failed attempts (since last `online`) before giving up entirely.
+   * 0 = never (spec `Settings.giveUpAfter`). @default 0
+   *
+   * May be a function so the live `Settings.giveUpAfter` is read on each retry tick
+   * rather than captured once at construction (reviewer M-5): a user raising/lowering
+   * it in Settings then takes effect without rebuilding the port. A plain number is
+   * still accepted and treated as a constant.
+   */
+  giveUpAfter?: number | (() => number);
 }
 
 function defaultSchedule(ms: number, cb: () => void): () => void {
@@ -50,7 +58,8 @@ export class PortHealth {
   private readonly now: () => number;
   private readonly schedule: Scheduler;
   private readonly connectingDeadlineMs: number;
-  private readonly giveUpAfter: number;
+  /** Read live on each retry tick (reviewer M-5), never captured as a number. */
+  private readonly getGiveUpAfter: () => number;
 
   private _state: PortState = { kind: 'queued' };
   private attempt = 0;
@@ -66,7 +75,8 @@ export class PortHealth {
     this.now = opts.now ?? Date.now;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.connectingDeadlineMs = opts.connectingDeadlineMs ?? DEFAULT_CONNECTING_DEADLINE_MS;
-    this.giveUpAfter = opts.giveUpAfter ?? 0;
+    const giveUpAfter = opts.giveUpAfter ?? 0;
+    this.getGiveUpAfter = typeof giveUpAfter === 'function' ? giveUpAfter : () => giveUpAfter;
   }
 
   get state(): PortState {
@@ -214,7 +224,8 @@ export class PortHealth {
     const untilMs = this.now() + delayMs;
     this.attempt += 1;
 
-    if (this.giveUpAfter > 0 && this.attempt >= this.giveUpAfter) {
+    const giveUpAfter = this.getGiveUpAfter();
+    if (giveUpAfter > 0 && this.attempt >= giveUpAfter) {
       this.giveUpReason = partial.kind === 'failed' ? partial.reason : partial.reasonKey;
       this.setState({ kind: 'stopped' });
       return; // truly given up — no timer, no further auto-retry
