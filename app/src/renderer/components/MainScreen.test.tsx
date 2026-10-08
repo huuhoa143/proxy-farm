@@ -284,7 +284,10 @@ describe('MainScreen', () => {
     await waitFor(() =>
       expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent("de7.webunlim.com isn't in your plan — the port went back to de3.webunlim.com."),
     );
-  });
+    // Unlike a routine "IP changed" note, it stays: wait past the 6 s fade.
+    await new Promise((r) => setTimeout(r, 6500));
+    expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent("isn't in your plan");
+  }, 15_000);
 
   it('bulk Change IP summarises changed / moved-to-another-city / unavailable', async () => {
     await renderMain();

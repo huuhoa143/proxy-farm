@@ -268,7 +268,13 @@ export function MainScreen({ api }: MainScreenProps) {
       return;
     }
     setRotateNotes((prev) => ({ ...prev, [key]: note }));
-    schedule(`rotate:${key}`, () => setRotateNotes((prev) => removeKey(prev, key)), NOTE_MS);
+    // A refused pick is worth keeping, like a city move: the user asked for that
+    // server and should still see why the port is elsewhere after a glance away.
+    // Routine "IP changed a → b" notes fade.
+    // (Re-scheduling the key with a no-op drops any fade still pending from an
+    // earlier Change IP on this row.)
+    if (result.refusedServer) schedule(`rotate:${key}`, () => {}, 0);
+    else schedule(`rotate:${key}`, () => setRotateNotes((prev) => removeKey(prev, key)), NOTE_MS);
   }
 
   async function handleBulkRotate(keys: string[]) {
