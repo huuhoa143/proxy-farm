@@ -530,5 +530,15 @@
     "noGuarantee": "There is no guarantee of availability, speed, number of IP addresses or compatibility with any provider. Providers can change their systems and stop the tool from working at any time.",
     "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
     "full": "Full disclaimer"
+  },
+  "firstRun": {
+    "title": "Before you start",
+    "ownAccounts": "Use your own VPN accounts, on your own computer.",
+    "terms": "Follow your provider's terms: sharing or reselling a subscription is usually forbidden.",
+    "suspension": "Providers may suspend accounts for abuse, including excessive reconnects.",
+    "asIs": "Proxy Farm is provided as is, with no warranty.",
+    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark or ZoogVPN.",
+    "acknowledge": "I understand",
+    "readFull": "Read the full disclaimer"
   }
 }

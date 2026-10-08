@@ -49,6 +49,14 @@ describe('state store', () => {
     expect(existsSync(filePath)).toBe(true);
   });
 
+  it('a file from before the first-run disclaimer loads as not acknowledged, and an acknowledgement persists', () => {
+    writeFileSync(filePath, JSON.stringify({ schemaVersion: SCHEMA_VERSION, settings: { basePort: 30001 } }));
+    const store = createStateStore(filePath, secrets());
+    expect(store.getState().settings.acknowledgedDisclaimer).toBe(0);
+    store.setState((s) => ({ ...s, settings: { ...s.settings, acknowledgedDisclaimer: 1 } }));
+    expect(createStateStore(filePath, secrets()).getState().settings.acknowledgedDisclaimer).toBe(1);
+  });
+
   it('keeps a language the user already picked, and defaults a file without one to Vietnamese', () => {
     writeFileSync(filePath, JSON.stringify({ schemaVersion: SCHEMA_VERSION, settings: { language: 'en' } }));
     expect(createStateStore(filePath, secrets()).getState().settings.language).toBe('en');
@@ -135,6 +143,7 @@ describe('state store', () => {
       giveUpAfter: 0,
       webhook: { enabled: false, port: 0, bearer: '' },
       language: 'vi',
+      acknowledgedDisclaimer: 0,
     });
   });
 

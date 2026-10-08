@@ -2315,6 +2315,31 @@ a.btn {
   gap: 9px;
   padding-left: 18px;
 }
+.first-run {
+  align-items: flex-start;
+}
+.first-run .first-run-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.first-run strong {
+  font-weight: 700;
+}
+.first-run ul {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.first-run .btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 /* ───────── narrow windows ───────── */
 @media (max-width: 1240px) {
   /* row actions collapse to icons; the label stays for screen readers + tooltip */

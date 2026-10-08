@@ -68,6 +68,7 @@ export function defaultSettings(randomPass: () => string = defaultRandomPass): S
     // Vietnamese by default (owner decision); 'system' and 'en' remain user choices.
     language: 'vi',
     autoCheckUpdates: true,
+    acknowledgedDisclaimer: 0,
   };
 }
 

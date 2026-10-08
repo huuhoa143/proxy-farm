@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { AppStatus } from '../shared/contracts';
+import { DISCLAIMER_NOTICE_VERSION, type AppStatus } from '../shared/contracts';
 import { useTranslation } from 'react-i18next';
 import { getProxyFarmApi } from './api';
 import { initI18n, changeLanguage } from './i18n';
 import { Onboarding } from './components/Onboarding';
 import { MainScreen } from './components/MainScreen';
 import { SettingsScreen } from './components/SettingsScreen';
+import { FirstRunNotice } from './components/FirstRunNotice';
 import { ThemeToggle } from './components/ThemeToggle';
 import { LanguageSwitch } from './components/LanguageSwitch';
 import { Icon, type IconName } from './ui/Icon';
@@ -34,6 +35,7 @@ export function App() {
   const { t } = useTranslation();
   const [screen, setScreen] = useState<Screen | null>(null);
   const [status, setStatus] = useState<AppStatus>({ secretsUnavailable: false });
+  const [needsNotice, setNeedsNotice] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +58,11 @@ export function App() {
       clearTimeout(bootTimeout);
       const [settingsR, providersR, statusR] = results;
       if (statusR.status === 'fulfilled') setStatus(statusR.value);
-      if (settingsR.status === 'fulfilled') void changeLanguage(settingsR.value.language);
+      if (settingsR.status === 'fulfilled') {
+        void changeLanguage(settingsR.value.language);
+        // Not `<`: a missing field (an older main process) must still show the notice.
+        setNeedsNotice(!(settingsR.value.acknowledgedDisclaimer >= DISCLAIMER_NOTICE_VERSION));
+      }
       const hasAccount = providersR.status === 'fulfilled' && providersR.value.some((p) => p.accounts.length > 0);
       setScreen(hasAccount ? 'main' : 'onboarding');
     });
@@ -139,6 +145,7 @@ export function App() {
             <span>{status.notice}</span>
           </div>
         )}
+        {needsNotice && <FirstRunNotice api={api} onAcknowledged={() => setNeedsNotice(false)} />}
         {screen === 'onboarding' && <Onboarding api={api} onDone={() => setScreen('main')} />}
         {screen === 'main' && <MainScreen api={api} />}
         {screen === 'settings' && <SettingsScreen api={api} />}

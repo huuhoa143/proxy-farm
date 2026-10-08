@@ -530,5 +530,15 @@
     "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
     "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
     "full": "Bản miễn trừ trách nhiệm đầy đủ"
+  },
+  "firstRun": {
+    "title": "Trước khi bắt đầu",
+    "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn.",
+    "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
+    "suspension": "Nhà cung cấp có thể khoá tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
+    "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
+    "acknowledge": "Tôi đã hiểu",
+    "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
   }
 }

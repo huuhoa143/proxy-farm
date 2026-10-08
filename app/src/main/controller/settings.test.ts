@@ -15,6 +15,7 @@ function baseSettings(overrides: Partial<Settings> = {}): Settings {
     webhook: { enabled: false, port: 0, bearer: '' },
     language: 'system',
     autoCheckUpdates: true,
+    acknowledgedDisclaimer: 0,
     ...overrides,
   };
 }

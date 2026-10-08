@@ -152,6 +152,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     webhook: { enabled: false, port: 29999, bearer: '' },
     language: 'vi',
     autoCheckUpdates: true,
+    acknowledgedDisclaimer: 0,
   };
 
   let hostVpnActive = false;

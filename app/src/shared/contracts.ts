@@ -194,7 +194,15 @@ export interface Settings {
    * from the Settings screen. Download+install is always user-initiated (autoDownload is
    * off), so there is no separate auto-INSTALL toggle. */
   autoCheckUpdates: boolean;
+  /** The version of the first-run disclaimer notice the user acknowledged ("I
+   * understand"); 0 = never. The notice shows while this is below
+   * `DISCLAIMER_NOTICE_VERSION`, so bumping that constant re-shows it once. A state
+   * file from before this field existed loads as 0: existing users see it once too. */
+  acknowledgedDisclaimer: number;
 }
+
+/** Bump when the first-run disclaimer notice changes in substance. */
+export const DISCLAIMER_NOTICE_VERSION = 1;
 
 export interface PortRow {
   /** Port key `<locationKey>#<n>` (spec §6.8). Several ports may share a location. */
