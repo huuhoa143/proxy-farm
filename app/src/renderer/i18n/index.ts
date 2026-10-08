@@ -33,9 +33,18 @@ function detectSystemLocale(): string {
 
 let initialized = false;
 
+/** Mirrors the active UI language onto `<html lang>`, so screen readers, hyphenation
+ * and spell-check use the right language. Exported for tests. */
+export function syncDocumentLang(lng: string | undefined): void {
+  if (typeof document === 'undefined' || !lng) return;
+  document.documentElement.lang = lng;
+}
+
 /** Initialise the shared i18next instance once. Safe to call repeatedly. */
 export function initI18n(initialSetting: Settings['language'] = 'vi'): typeof i18next {
   if (!initialized) {
+    // Registered before init so the initial language is applied too.
+    i18next.on('languageChanged', syncDocumentLang);
     void i18next.use(initReactI18next).init({
       resources,
       lng: resolveLanguage(initialSetting),
@@ -44,6 +53,7 @@ export function initI18n(initialSetting: Settings['language'] = 'vi'): typeof i1
       returnNull: false,
     });
     initialized = true;
+    syncDocumentLang(i18next.language);
   }
   return i18next;
 }
