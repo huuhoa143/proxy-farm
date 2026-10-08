@@ -154,30 +154,104 @@ describe('createFakeProxyFarmApi', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('rotatePort moves to another city in the same country when the location has no other IP (§6.5 step 2)', async () => {
-    await api.startPorts(['hma:US-NYC']);
-    const result = await api.rotatePort('hma:US-NYC');
+  it('rotatePort moves to another city in the same country when the location has no free server (§6.5 step 2)', async () => {
+    const result = await api.rotatePort('hma:US-NYC#1');
     expect(result.changed).toBe(true);
     expect(result.to).toBe('203.0.113.21');
     expect(result.noteKey).toBe('main.rotateResult.sameCityNote');
-    const row = (await api.listPorts()).find((p) => p.key === 'hma:US-NYC');
-    expect(row?.city).toBe('Los Angeles');
+    const ports = await api.listPorts();
+    expect(ports.find((p) => p.key === 'hma:US-NYC#1')).toBeUndefined();
+    const moved = ports.find((p) => p.key === 'hma:US-LA#1');
+    expect(moved?.city).toBe('Los Angeles');
+    expect(moved?.locationKey).toBe('hma:US-LA');
   });
 
   it('rotatePort reports no server available when there is truly no alternative (§6.5 step 3)', async () => {
-    await api.startPorts(['zoogvpn:NL-AMS']);
-    const result = await api.rotatePort('zoogvpn:NL-AMS');
+    const result = await api.rotatePort('zoogvpn:NL-AMS#1');
     expect(result.changed).toBe(false);
     expect(result.noteKey).toBe('main.rotateResult.unchangedNote');
   });
 
   it('getLogs returns fresh content on every call so a Refresh action is observable', async () => {
-    const first = await api.getLogs('hma:JP-TOKYO');
-    const second = await api.getLogs('hma:JP-TOKYO');
+    const first = await api.getLogs('hma:JP-TOKYO#1');
+    const second = await api.getLogs('hma:JP-TOKYO#1');
     expect(first[0]).not.toBe(second[0]);
   });
 
   it('setLimit accepts a per-provider limit without throwing', async () => {
     await expect(api.setLimit('hma', 5)).resolves.toBeUndefined();
+  });
+});
+
+describe('fake server pools (spec §6.8)', () => {
+  let api: ReturnType<typeof createFakeProxyFarmApi>;
+
+  beforeEach(() => {
+    api = createFakeProxyFarmApi();
+  });
+
+  it('keys ports `<location>#<n>` and pins each to a distinct server', async () => {
+    const ports = await api.listPorts();
+    const tokyo = ports.filter((p) => p.locationKey === 'hma:JP-TOKYO');
+    expect(tokyo.map((p) => p.key).sort()).toEqual(['hma:JP-TOKYO#1', 'hma:JP-TOKYO#2']);
+    expect(new Set(tokyo.map((p) => p.server)).size).toBe(2);
+  });
+
+  it('listTargets fills freeServers: usable and not held', async () => {
+    const tokyo = (await api.listTargets()).find((t) => t.key === 'hma:JP-TOKYO')!;
+    // 6 servers − 2 held − 1 refused − 1 dead.
+    expect(tokyo.servers).toHaveLength(6);
+    expect(tokyo.freeServers).toBe(2);
+  });
+
+  it('listServers reports health and which port holds each server', async () => {
+    const servers = await api.listServers('hma:JP-TOKYO');
+    const by = Object.fromEntries(servers.map((s) => [s.server, s]));
+    expect(by['203.0.113.10'].heldBy).toBe('hma:JP-TOKYO#1');
+    expect(by['203.0.113.13'].health).toBe('refused');
+    expect(by['203.0.113.14'].health).toBe('dead');
+    expect(by['203.0.113.12'].heldBy).toBeUndefined();
+  });
+
+  it('addPorts takes the smallest free n and a free server, and says when it ran out', async () => {
+    const result = await api.addPorts('hma:JP-TOKYO', 5);
+    expect(result.added.map((p) => p.key)).toEqual(['hma:JP-TOKYO#3', 'hma:JP-TOKYO#4']);
+    expect(result.noteKey).toBe('no-free-server');
+    const servers = new Set((await api.listPorts()).filter((p) => p.locationKey === 'hma:JP-TOKYO').map((p) => p.server));
+    expect(servers.size).toBe(4);
+    expect((await api.listTargets()).find((t) => t.key === 'hma:JP-TOKYO')?.freeServers).toBe(0);
+  });
+
+  it('addPorts reuses a freed port number', async () => {
+    await api.removePorts(['hma:JP-TOKYO#1']);
+    const result = await api.addPorts('hma:JP-TOKYO', 1);
+    expect(result.added[0].key).toBe('hma:JP-TOKYO#1');
+  });
+
+  it("addPorts stops at the provider's port limit", async () => {
+    await api.setLimit('hma', 3); // 2 Tokyo ports + 1 New York are enabled already
+    const result = await api.addPorts('hma:SG-SIN', 2);
+    expect(result.added).toHaveLength(0);
+    expect(result.noteKey).toBe('limit-reached');
+  });
+
+  it('rotatePort(toServer) moves the port to the chosen free server', async () => {
+    const result = await api.rotatePort('hma:JP-TOKYO#1', '203.0.113.15');
+    expect(result).toMatchObject({ changed: true, from: '203.0.113.10', to: '203.0.113.15' });
+    const row = (await api.listPorts()).find((p) => p.key === 'hma:JP-TOKYO#1')!;
+    expect(row.server).toBe('203.0.113.15');
+    expect(row.state.kind === 'online' && row.state.exitIp).toBe('203.0.113.15');
+  });
+
+  it('rotatePort(toServer) refuses a held, refused or dead server', async () => {
+    for (const server of ['203.0.113.11', '203.0.113.13', '203.0.113.14']) {
+      const result = await api.rotatePort('hma:JP-TOKYO#1', server);
+      expect(result).toMatchObject({ changed: false, noteKey: 'main.rotateResult.serverTaken' });
+    }
+  });
+
+  it('a bare location key in startPorts adds one port to that location', async () => {
+    await api.startPorts(['hma:SG-SIN']);
+    expect((await api.listPorts()).some((p) => p.key === 'hma:SG-SIN#1')).toBe(true);
   });
 });

@@ -15,10 +15,12 @@ import type {
   ProviderId,
   ProxyFarmApi,
   RotateResult,
+  ServerHealth,
   Settings,
   Target,
   UpdateStatus,
 } from '../shared/contracts';
+import { makePortKey, splitPortKey } from '../shared/contracts';
 
 export function getProxyFarmApi(): ProxyFarmApi {
   const injected = typeof window !== 'undefined' ? window.proxyFarm : undefined;
@@ -50,23 +52,58 @@ function makeTarget(key: string, providerId: ProviderId, country: string, city: 
   return { key, providerId, country, city, label: `${city}, ${COUNTRY_LABEL[country] ?? country}`, servers };
 }
 
+/**
+ * Sample locations, each with a pool of servers (spec §6.8): one server = one
+ * fixed exit IP. ZoogVPN pools are hostnames (resolved via SAMPLE_RESOLVE), the
+ * others are IP literals. Tokyo is deliberately the richest pool, with one
+ * refused and one dead server, so the Change-IP menu shows every health state.
+ */
 const SAMPLE_TARGETS: Target[] = [
-  makeTarget('hma:JP-TOKYO', 'hma', 'JP', 'Tokyo', ['203.0.113.10', '203.0.113.11']),
+  makeTarget('hma:JP-TOKYO', 'hma', 'JP', 'Tokyo', [
+    '203.0.113.10',
+    '203.0.113.11',
+    '203.0.113.12',
+    '203.0.113.13',
+    '203.0.113.14',
+    '203.0.113.15',
+  ]),
   makeTarget('hma:US-NYC', 'hma', 'US', 'New York', ['203.0.113.20']),
-  makeTarget('hma:SG-SIN', 'hma', 'SG', 'Singapore', ['203.0.113.30']),
-  makeTarget('zoogvpn:NL-AMS', 'zoogvpn', 'NL', 'Amsterdam', ['198.51.100.10']),
-  makeTarget('zoogvpn:VN-HAN', 'zoogvpn', 'VN', 'Hanoi', ['198.51.100.20']),
-  makeTarget('surfshark:DE-FRA', 'surfshark', 'DE', 'Frankfurt', ['192.0.2.10', '192.0.2.11']),
-  // Appended (not inserted) so the index-based sample-port wiring below keeps
-  // pointing at the same targets. Gives hma:US-NYC a same-country sibling to
-  // exercise rotate's "moved to another city" path (spec §6.5 step 2).
+  makeTarget('hma:SG-SIN', 'hma', 'SG', 'Singapore', ['203.0.113.30', '203.0.113.31']),
+  makeTarget('zoogvpn:NL-AMS', 'zoogvpn', 'NL', 'Amsterdam', ['nl1.zoog.example']),
+  makeTarget('zoogvpn:VN-HAN', 'zoogvpn', 'VN', 'Hanoi', ['vn1.zoog.example', 'vn2.zoog.example']),
+  makeTarget('surfshark:DE-FRA', 'surfshark', 'DE', 'Frankfurt', ['192.0.2.10', '192.0.2.11', '192.0.2.12']),
+  // Same-country sibling of hma:US-NYC: exercises Change IP's "moved to another
+  // city" path (spec §6.5 step 2) once New York's only server is taken.
   makeTarget('hma:US-LA', 'hma', 'US', 'Los Angeles', ['203.0.113.21']),
 ];
 
-function samplePortRow(target: Target, accountId: string, proxyPort: number, state: PortRow['state']): PortRow {
+const SAMPLE_RESOLVE: Record<string, string> = {
+  'nl1.zoog.example': '198.51.100.10',
+  'vn1.zoog.example': '198.51.100.20',
+  'vn2.zoog.example': '198.51.100.21',
+};
+
+function resolveServer(server: string): string {
+  return SAMPLE_RESOLVE[server] ?? server;
+}
+
+function findTarget(locationKey: string): Target | undefined {
+  return SAMPLE_TARGETS.find((t) => t.key === locationKey);
+}
+
+function samplePortRow(
+  target: Target,
+  n: number,
+  server: string | undefined,
+  accountId: string,
+  proxyPort: number,
+  state: PortRow['state'],
+): PortRow {
   return {
-    key: target.key,
+    key: makePortKey(target.key, n),
     locationKey: target.key,
+    server,
+    serverIp: server ? resolveServer(server) : undefined,
     providerId: target.providerId,
     accountId,
     label: target.label,
@@ -121,28 +158,50 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
   const limits = new Map<ProviderId, number>();
   const logCounters = new Map<string, number>();
 
-  const ports = new Map<string, PortRow>([
-    [SAMPLE_TARGETS[0].key, samplePortRow(SAMPLE_TARGETS[0], 'hma-1', 29001, {
-      kind: 'online',
-      since: now - 5 * 60_000,
-      exitIp: SAMPLE_TARGETS[0].servers[0],
-      country: SAMPLE_TARGETS[0].country,
-      latencyMs: 42,
-    })],
-    [SAMPLE_TARGETS[1].key, samplePortRow(SAMPLE_TARGETS[1], 'hma-1', 29002, {
-      kind: 'retrying',
-      untilMs: now + 30_000,
-      attempt: 2,
-      reasonKey: 'portState.failed.no-server.guidance',
-    })],
-    [SAMPLE_TARGETS[3].key, samplePortRow(SAMPLE_TARGETS[3], 'zoogvpn-1', 29003, {
-      kind: 'failed',
-      reason: 'auth',
-      untilMs: now + 30 * 60_000,
-      attempt: 5,
-    })],
-    [SAMPLE_TARGETS[5].key, samplePortRow(SAMPLE_TARGETS[5], 'zoogvpn-1', 29004, { kind: 'stopped' })],
-  ]);
+  const surfsharkAccountId = 'surfshark-demo';
+  const ports = new Map<string, PortRow>(
+    [
+      samplePortRow(SAMPLE_TARGETS[0], 1, '203.0.113.10', 'hma-1', 29001, {
+        kind: 'online',
+        since: now - 5 * 60_000,
+        exitIp: '203.0.113.10',
+        country: 'JP',
+        latencyMs: 42,
+      }),
+      samplePortRow(SAMPLE_TARGETS[1], 1, '203.0.113.20', 'hma-1', 29002, {
+        kind: 'retrying',
+        untilMs: now + 30_000,
+        attempt: 2,
+        reasonKey: 'portState.failed.no-server.guidance',
+      }),
+      samplePortRow(SAMPLE_TARGETS[3], 1, 'nl1.zoog.example', 'zoogvpn-1', 29003, {
+        kind: 'failed',
+        reason: 'auth',
+        untilMs: now + 30 * 60_000,
+        attempt: 5,
+      }),
+      samplePortRow(SAMPLE_TARGETS[5], 1, '192.0.2.10', surfsharkAccountId, 29004, { kind: 'stopped' }),
+      samplePortRow(SAMPLE_TARGETS[0], 2, '203.0.113.11', 'hma-1', 29005, {
+        kind: 'online',
+        since: now - 2 * 60_000,
+        exitIp: '203.0.113.11',
+        country: 'JP',
+        latencyMs: 51,
+      }),
+    ].map((row) => [row.key, row]),
+  );
+
+  // Server health per pool token (spec §6.8). The fake has one account per
+  // provider, so health is per server rather than per (account, server).
+  const health = new Map<string, { health: ServerHealth; lastOk?: number }>();
+  for (const target of SAMPLE_TARGETS) {
+    for (const server of target.servers) health.set(server, { health: 'unknown' });
+  }
+  for (const server of ['203.0.113.10', '203.0.113.11', '203.0.113.12', '203.0.113.20', 'nl1.zoog.example']) {
+    health.set(server, { health: 'ok', lastOk: now - 60_000 });
+  }
+  health.set('203.0.113.13', { health: 'refused' });
+  health.set('203.0.113.14', { health: 'dead', lastOk: now - 3 * 3_600_000 });
 
   const portsListeners = new Set<Listener<PortRow[]>>();
   const hostVpnListeners = new Set<Listener<boolean>>();
@@ -155,8 +214,13 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     for (const listener of updateStatusListeners) listener(next);
   }
 
+  /** Copies, like rows that crossed IPC: the UI must never share the fake's live objects. */
+  function snapshot(): PortRow[] {
+    return Array.from(ports.values(), (row) => ({ ...row }));
+  }
+
   function emitPorts(): void {
-    const rows = Array.from(ports.values());
+    const rows = snapshot();
     for (const listener of portsListeners) listener(rows);
   }
 
@@ -171,6 +235,59 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     return candidate;
   }
 
+  function usable(server: string): boolean {
+    const h = health.get(server)?.health ?? 'unknown';
+    return h !== 'refused' && h !== 'dead';
+  }
+
+  /** Port key holding `server`, comparing resolved IPs (spec §6.8 allocation invariant). */
+  function holderOf(server: string): string | undefined {
+    const ip = resolveServer(server);
+    for (const row of ports.values()) {
+      if (row.server && resolveServer(row.server) === ip) return row.key;
+    }
+    return undefined;
+  }
+
+  /** Usable, unheld servers of a location, best first (most recent OK, then pool order). */
+  function freeServersOf(target: Target): string[] {
+    return target.servers
+      .filter((s) => usable(s) && !holderOf(s))
+      .map((server, index) => ({ server, index, lastOk: health.get(server)?.lastOk ?? 0 }))
+      .sort((a, b) => b.lastOk - a.lastOk || a.index - b.index)
+      .map((entry) => entry.server);
+  }
+
+  /** Smallest free port number n ≥ 1 in a location (spec §6.8). */
+  function nextN(locationKey: string): number {
+    const used = new Set(
+      Array.from(ports.values())
+        .filter((p) => p.locationKey === locationKey)
+        .map((p) => splitPortKey(p.key)?.n ?? 0),
+    );
+    let n = 1;
+    while (used.has(n)) n += 1;
+    return n;
+  }
+
+  /** Enabled ports this provider may still add; Infinity when unlimited (limit 0). */
+  function remainingFor(providerId: ProviderId): number {
+    const limit = limits.get(providerId) ?? 0;
+    if (!limit) return Infinity;
+    const enabled = Array.from(ports.values()).filter((p) => p.providerId === providerId && p.enabled).length;
+    return Math.max(0, limit - enabled);
+  }
+
+  function accountFor(providerId: ProviderId): string {
+    if (providerId === 'surfshark') return surfsharkAccountId;
+    return accounts.find((a) => a.account.providerId === providerId)?.account.id ?? 'unknown';
+  }
+
+  function pin(row: PortRow, server: string): void {
+    row.server = server;
+    row.serverIp = resolveServer(server);
+  }
+
   async function simulateConnect(key: string): Promise<void> {
     const row = ports.get(key);
     if (!row) return;
@@ -179,11 +296,11 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     emitPorts();
     row.state = { kind: 'verifying', since: Date.now() };
     emitPorts();
-    const target = SAMPLE_TARGETS.find((t) => t.key === key);
+    if (row.server) health.set(row.server, { health: 'ok', lastOk: Date.now() });
     row.state = {
       kind: 'online',
       since: Date.now(),
-      exitIp: target?.servers[0] ?? '203.0.113.99',
+      exitIp: row.serverIp ?? '203.0.113.99',
       country: row.country,
       latencyMs: 55,
     };
@@ -270,39 +387,64 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     },
 
     async listTargets(providerId) {
-      return providerId ? SAMPLE_TARGETS.filter((t) => t.providerId === providerId) : SAMPLE_TARGETS;
-    },
-
-    async listServers(locationKey) {
-      const target = SAMPLE_TARGETS.find((t) => t.key === locationKey);
-      const held = new Map(Array.from(ports.values()).filter((p) => p.server).map((p) => [p.server!, p.key]));
-      return (target?.servers ?? []).map((server) => ({
-        server,
-        ip: server,
-        health: 'ok' as const,
-        heldBy: held.get(server),
+      return SAMPLE_TARGETS.filter((t) => !providerId || t.providerId === providerId).map((t) => ({
+        ...t,
+        servers: [...t.servers],
+        freeServers: freeServersOf(t).length,
       }));
     },
 
+    async listServers(locationKey) {
+      const target = findTarget(locationKey);
+      return (target?.servers ?? []).map((server) => {
+        const h = health.get(server) ?? { health: 'unknown' as const };
+        return { server, ip: resolveServer(server), health: h.health, lastOk: h.lastOk, heldBy: holderOf(server) };
+      });
+    },
+
     async listPorts() {
-      return Array.from(ports.values());
+      return snapshot();
     },
 
     async addPorts(locationKey, count) {
-      const before = new Set(ports.keys());
-      for (let i = 0; i < count; i++) await api.startPorts([locationKey]);
-      return { added: Array.from(ports.values()).filter((p) => !before.has(p.key)) };
+      const target = findTarget(locationKey);
+      if (!target || count < 1) return { added: [] };
+      const free = freeServersOf(target);
+      const remaining = remainingFor(target.providerId);
+      const n = Math.min(count, free.length, remaining);
+      const added: PortRow[] = [];
+      for (let i = 0; i < n; i++) {
+        const row = samplePortRow(target, nextN(locationKey), free[i], accountFor(target.providerId), nextPort(), {
+          kind: 'queued',
+        });
+        ports.set(row.key, row);
+        added.push(row);
+      }
+      emitPorts();
+      for (const row of added) await simulateConnect(row.key);
+      const result = added.map((row) => ({ ...(ports.get(row.key) ?? row) }));
+      if (n === count) return { added: result };
+      // The tighter of the two caps explains the shortfall.
+      return {
+        added: result,
+        noteKey: remaining < Math.min(count, free.length) ? 'limit-reached' : 'no-free-server',
+      };
     },
 
-    async startPorts(targetKeys) {
-      for (const key of targetKeys) {
-        let row = ports.get(key);
-        if (!row) {
-          const target = SAMPLE_TARGETS.find((t) => t.key === key);
-          if (!target) continue;
-          const account = accounts.find((a) => a.account.providerId === target.providerId)?.account;
-          row = samplePortRow(target, account?.id ?? 'unknown', nextPort(), { kind: 'queued' });
-          ports.set(key, row);
+    async startPorts(portKeys) {
+      for (const key of portKeys) {
+        // A bare location key means "add one port to that location" (contracts).
+        if (!splitPortKey(key) && findTarget(key)) {
+          await api.addPorts(key, 1);
+          continue;
+        }
+        const row = ports.get(key);
+        if (!row) continue;
+        // Re-select instead of reusing a stale choice (spec §6.8 failover).
+        if (!row.server || !usable(row.server) || (holderOf(row.server) ?? row.key) !== row.key) {
+          const target = findTarget(row.locationKey);
+          const next = target ? freeServersOf(target)[0] : undefined;
+          if (next) pin(row, next);
         }
         row.state = { kind: 'queued' };
         emitPorts();
@@ -310,8 +452,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       }
     },
 
-    async stopPorts(targetKeys) {
-      for (const key of targetKeys) {
+    async stopPorts(portKeys) {
+      for (const key of portKeys) {
         const row = ports.get(key);
         if (row) {
           row.state = { kind: 'stopped' };
@@ -321,38 +463,63 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       emitPorts();
     },
 
-    async removePorts(targetKeys) {
-      for (const key of targetKeys) ports.delete(key);
+    async removePorts(portKeys) {
+      for (const key of portKeys) ports.delete(key);
       emitPorts();
     },
 
-    async rotatePort(targetKey): Promise<RotateResult> {
-      const row = ports.get(targetKey);
-      if (!row || row.state.kind !== 'online') {
-        return { changed: false, noteKey: 'main.rotateResult.unchangedNote' };
-      }
-      const target = SAMPLE_TARGETS.find((t) => t.key === targetKey);
-      const from = row.state.exitIp;
+    async rotatePort(portKey, toServer): Promise<RotateResult> {
+      const row = ports.get(portKey);
+      if (!row) return { changed: false, noteKey: 'main.rotateResult.unchangedNote' };
+      const target = findTarget(row.locationKey);
+      const from = row.state.kind === 'online' ? row.state.exitIp : row.serverIp;
 
-      // §6.5 step 1: another IP of the same location.
-      const sameLocationIp = target?.servers.find((ip) => ip !== from);
-      if (sameLocationIp) {
-        row.state = { kind: 'online', since: Date.now(), exitIp: sameLocationIp, country: row.country, latencyMs: 48 };
+      const moveTo = (server: string) => {
+        pin(row, server);
+        row.enabled = true;
+        health.set(server, { health: 'ok', lastOk: Date.now() });
+        row.state = { kind: 'online', since: Date.now(), exitIp: row.serverIp!, country: row.country, latencyMs: 48 };
+      };
+
+      // An explicit pick from the Change-IP menu must be a free usable server of this location.
+      if (toServer !== undefined) {
+        const ok = target?.servers.includes(toServer) && usable(toServer) && !holderOf(toServer);
+        if (!ok) return { changed: false, from, noteKey: 'main.rotateResult.serverTaken' };
+        moveTo(toServer);
         emitPorts();
-        return { changed: true, from, to: sameLocationIp };
+        return { changed: true, from, to: row.serverIp };
       }
 
-      // §6.5 step 2: otherwise another location in the same country.
+      // §6.5 step 1: the best free server of the same location.
+      const next = target ? freeServersOf(target)[0] : undefined;
+      if (next) {
+        moveTo(next);
+        emitPorts();
+        return { changed: true, from, to: row.serverIp };
+      }
+
+      // §6.5 step 2: otherwise another location in the same country; the port
+      // moves to that location's group (and so gets a key there).
       const sibling = target
-        ? SAMPLE_TARGETS.find((t) => t.providerId === target.providerId && t.country === target.country && t.key !== target.key)
+        ? SAMPLE_TARGETS.find(
+            (t) =>
+              t.providerId === target.providerId &&
+              t.country === target.country &&
+              t.key !== target.key &&
+              freeServersOf(t).length > 0,
+          )
         : undefined;
       if (sibling) {
-        const to = sibling.servers[0];
+        const server = freeServersOf(sibling)[0];
+        ports.delete(row.key);
+        row.key = makePortKey(sibling.key, nextN(sibling.key));
+        row.locationKey = sibling.key;
         row.city = sibling.city;
         row.label = sibling.label;
-        row.state = { kind: 'online', since: Date.now(), exitIp: to, country: row.country, latencyMs: 48 };
+        ports.set(row.key, row);
+        moveTo(server);
         emitPorts();
-        return { changed: true, from, to, noteKey: 'main.rotateResult.sameCityNote' };
+        return { changed: true, from, to: row.serverIp, noteKey: 'main.rotateResult.sameCityNote' };
       }
 
       // §6.5 step 3: no other server available.
