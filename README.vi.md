@@ -61,7 +61,7 @@ nên mỗi cổng có một IP lối ra riêng và ổn định.
 
 | Nhà cung cấp | Giao thức | Bạn nhập gì | Ghi chú |
 |---|---|---|---|
-| **HMA** | OpenVPN | Không cần nhập: app đọc thông tin thiết bị từ app HMA cài trên cùng máy | Hiện chỉ macOS. Windows cần một dịch vụ trợ giúp chưa được làm. |
+| **HMA** | OpenVPN | Không cần nhập: app đọc thông tin thiết bị từ app HMA cài trên cùng máy | Trên Windows, bấm **Bật hỗ trợ HMA** một lần (xác nhận quản trị viên một lần); xem bên dưới. |
 | **ZoogVPN** | OpenVPN | Email và mật khẩu tài khoản | Gói của bạn quyết định máy chủ nào cho vào; máy chủ từ chối sẽ được bỏ qua. |
 | **Surfshark** | WireGuard | Private key WireGuard (trang thiết lập thủ công của Surfshark) | Danh sách máy chủ lấy từ API công khai của Surfshark. |
 | **File cấu hình** | OpenVPN hoặc WireGuard | File `.ovpn` hoặc `.conf` WireGuard | Dùng được với nhà cung cấp khác hoặc máy chủ của riêng bạn. |
@@ -79,14 +79,18 @@ Tải bản mới nhất ở
   Applications. Hãy chạy app từ Applications, không chạy từ ổ đĩa ảnh, nếu không app
   không tự cập nhật được.
 - **Windows (x64)**: chạy `Setup.exe`. Bản Windows **chưa được ký số**, nên SmartScreen sẽ
-  cảnh báo: bấm *More info* → *Run anyway*. Bản Windows vẫn đang được kiểm chứng; gặp lỗi
-  xin hãy báo lại.
+  cảnh báo: bấm *More info* → *Run anyway*. App chỉ cài cho tài khoản của bạn và không cần
+  quyền quản trị viên.
 
 ## Bắt đầu nhanh
 
 1. Mở Proxy Farm và chọn nhà cung cấp ở màn hình đầu tiên (HMA, ZoogVPN, Surfshark hoặc
    File cấu hình). Với HMA: cài app HMA, đăng nhập và kết nối một lần; Proxy Farm sẽ tự
    lấy thông tin thiết bị.
+   Trên Windows, HMA cất thông tin này trong một file chỉ quản trị viên đọc được, nên thẻ HMA
+   sẽ hiện **Bật hỗ trợ HMA** trước. Nút này xin xác nhận quản trị viên một lần và tạo một tác
+   vụ nhỏ của Windows giữ bản sao mà chỉ bạn và quản trị viên đọc được; các lần cập nhật không
+   cần xác nhận lại. Tác vụ tự gỡ khi bạn gỡ Proxy Farm.
 2. Bấm **Thêm vị trí**, chọn các vị trí và số cổng cho mỗi vị trí.
 3. Khi cổng hiện **Online**, dùng nó:
 

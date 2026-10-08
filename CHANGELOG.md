@@ -7,6 +7,26 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Windows x64 support, checked end to end on Windows 10: per-user NSIS installer, the
+  engine, health checks, Change IP and the packaged e2e suite.
+- HMA on Windows: **Enable HMA support** (one administrator prompt) sets up a SYSTEM
+  scheduled task that keeps a copy of HMA's device credentials only the enabling user and
+  administrators can read. No service stays running; the task removes itself once Proxy
+  Farm is uninstalled.
+- "Other VPN on this computer" detection on Windows.
+- `Proxy Farm --quit` stops the engines of a running instance and exits it (Windows has
+  no SIGTERM for GUI apps).
+
+### Fixed
+
+- Fresh clones build and test on Windows: text files check out with LF, and pnpm 10+
+  installs Electron and lays out `node_modules` the way electron-forge needs.
+- The packaged e2e suite matches the current UI and port model again.
+- The Windows release script runs under Windows PowerShell 5.1 and smoke-tests the
+  build before uploading.
+
 ## [0.1.0] — 2026-10-08
 
 First release of the desktop app. It replaces the Docker edition (v1, archived at the

@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 2026-10-08. Applies to the Proxy Farm desktop app (macOS and Windows).
+Last updated: 2026-10-09. Applies to the Proxy Farm desktop app (macOS and Windows).
 
 ## Summary
 
@@ -39,6 +39,14 @@ that session only and are never written to disk in plain text; the app shows a w
 (`/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json`) to get the device
 id and password. It does not change that file. The credentials are saved in the
 encrypted secret store.
+
+On Windows, HMA keeps them in `%ProgramData%\Privax\HMA VPN\HmaProVpn\auth`, which only
+administrators can read. **Enable HMA support** (one administrator prompt) creates a
+scheduled task, *ProxyFarm\HMA credentials*, that runs as SYSTEM at startup, every 5
+minutes and when Proxy Farm asks, and copies that file to
+`%ProgramData%\ProxyFarm\hma\auth`. Only you (the user who enabled it), SYSTEM and
+administrators can read the copy; nothing is sent anywhere. The task deletes itself and the
+copy once Proxy Farm is uninstalled.
 
 **Tunnel configs.** sing-box configs, keys and certificates are passed to sing-box on
 standard input and never written to disk.
@@ -83,7 +91,9 @@ installed only when you choose.
    - macOS: `~/Library/Application Support/Proxy Farm/`
    - Windows: `%APPDATA%\Proxy Farm\`
 3. Uninstall the app: on macOS, move Proxy Farm from Applications to the Trash; on
-   Windows, use *Settings → Apps*.
+   Windows, use *Settings → Apps*. If you enabled HMA support, its task removes
+   `%ProgramData%\ProxyFarm\` and itself within 5 minutes; an administrator can also run
+   `schtasks /delete /tn "\ProxyFarm\HMA credentials" /f` and delete that folder.
 
 On macOS, `safeStorage` also keeps one encryption key in your login keychain (an entry
 named after the app, such as "Proxy Farm Safe Storage"). You can delete it in Keychain

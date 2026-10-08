@@ -5,7 +5,7 @@
 - **Evidence:**
   - Spike 1 and spike 2, 2026-10-07, **macOS arm64 only** (§11).
   - ✅ = run for real on macOS. ⚠️ = not verified yet.
-  - Nothing has been tested on Windows. Windows behaviour is a design target until the Windows spike (§12) runs.
+  - Windows spike, 2026-10-09, Windows 10 x64 (§11): HMA's `auth` file, the engine, process stop, host-VPN detection and the packaged app were run for real; §7 was revised from its results.
 
 ## 1. Goal
 
@@ -32,7 +32,7 @@ Success criteria:
 | **One sing-box process per port** | sing-box has no runtime add/remove; a reload rebuilds every tunnel. Rotation is frequent, so isolation matters more than RAM. ✅ Measured physical footprint per process: ~15 MB for HMA OpenVPN, ~20 MB for WireGuard. 20 ports ≈ 300–400 MB. |
 | **Electron (Forge + Vite), modelled on lingoreup** | Same toolchain, release pipeline and updater the team already runs. |
 | **Controller in TypeScript in Electron main** | Replaces `farm.py`/`vendors.py`. No Python runtime is shipped. |
-| **Windows HMA: privileged helper service installed at setup** | HMA's Windows credential file is admin-only and its password rotates. The app is installed per-user and the helper separately, so auto-updates need no UAC. |
+| **Windows HMA: a SYSTEM scheduled task keeps a user-readable copy** (revised 2026-10-09, §7) | HMA's Windows credential file is admin-only and rotates. One UAC registers the task; no privileged Proxy Farm process stays running, the app stays per-user, and auto-updates need no UAC. |
 | **Location → server pool → one fixed exit IP per server; a port pins one server** (rev 3) | ✅ Measured on all three providers: the exit IP belongs to the server (HMA: = server IP, for OpenVPN, IPSec and Mimic alike; Surfshark: = server IP + 1; ZoogVPN: = server IP), reconnecting to the same server never changes it, and a location is many servers (HMA: several clusters; Surfshark: a DNS pool of 20+; ZoogVPN: numbered hosts). So "rotate" is really "change server", and pinning servers turns one location into many stable IPs. |
 | **sing-box shipped unmodified** (GPL-3, separate process) | Keeps the app MIT. Every release attaches the matching sing-box source tarball and license (GPLv3 §6). The product name must not contain "sing-box". |
 
@@ -86,7 +86,7 @@ Each unit is independently testable:
    - **HMA** — the app auto-detects the local HMA install.
      - Found → "✅ HMA found — Connect".
      - Not found / no credentials → steps: "Install HMA, sign in, connect once, then come back". The app watches for the file and continues by itself.
-     - Windows without the helper → "Enable HMA support" button. This runs the elevated helper installer: one UAC.
+     - Windows without HMA support → "Enable HMA support" button. It runs the elevated setup of §7: one UAC.
    - **ZoogVPN** — email + password → "Check" (one test connection).
    - **Surfshark** — paste the WireGuard private key. An illustrated guide points to my.surfshark.com → Manual setup.
    - **File** — drag & drop `.ovpn` / `.conf`. Country is guessed from the file name and editable.
@@ -159,14 +159,15 @@ Each unit is independently testable:
     - It is world-readable; the device data is base64 JSON under `DeviceManager.device`. No admin needed.
     - ✅ Session renewal rewrites the file, but only the token changes; `udid` and `password` stay identical.
     - The app watches the file. When `udid` or `password` really changes, new credentials are applied **lazily**, on each port's next (re)connect. Ports are not mass-restarted.
-  - **Windows** ⚠️: `%ProgramData%\Privax\HMA VPN\HmaProVpn\auth` (line 1 user, line 2 pass; per PR #2 `sync-hma.ps1`).
-    - Admin-only and rotated periodically. Read by the Helper (§7).
-    - Whether it holds the same udid/password form is **unverified**; the Windows spike checks it first.
+  - **Windows** ✅ 2026-10-09 (HMA 26.9): `%ProgramData%\Privax\HMA VPN\HmaProVpn\auth`, line 1 the username, line 2 the password.
+    - Same form as macOS: the username is `U1.<device id>.hma101.<64 hex>` (the macOS udid is `U1.<device id>.hma201.<64 hex>`), the password 64 hex (upper case). The pair established tunnels to VN, JP, US and DE with the unchanged provider config.
+    - SYSTEM + Administrators only (the `HmaProVpn` folder has a protected ACL); `HmaProVpn.ini` records a validity (`MimicCredentialsValidity`) about a week ahead. Read through HMA support (§7).
+    - HMA's own `ca.crt.pem` there is `CN=openvpn-ca` and expired 2026-09-06; it is not needed, the bundled R46 validates the servers.
 - **Server**:
   - UDP 1194 to a per-location IP from the catalog.
   - ✅ macOS: TLS server cert `CN=openvpn.gen-vpn.com`, chain Sectigo OV R36 → **Sectigo Public Server Authentication Root R46**.
   - Config: inline CA (`tls.certificate`), `server_name: openvpn.gen-vpn.com`, `remote_certificate_tls: server`.
-  - Bundle R46 **and**, on Windows, also accept the app's own `ca.crt.pem` (PR #2 used it), read via the Helper.
+  - Bundle R46. ✅ Windows uses the same bundled CA.
 - **Pushed by server** ✅: AES-256-GCM, `compress migrate`, `ping 10`, `ping-restart 60`.
 - **Endpoint settings**: `data_ciphers: ["AES-256-GCM"]`, `route_no_pull: true`, `explicit_exit_notify: 2`, `mtu: 1400`.
 - **Concurrency** ✅: 12 separate processes on one device, all with correct exits, stable for 17 min, one handshake each (no kicks). Default port limit: **12**. ✅ 2026-10-08: 20 concurrent tunnels on one device all established, one handshake each, no auth failures or kicks over a 60 s hold; 12 stays the default for headroom against abuse detection. The user can raise it.
@@ -395,34 +396,20 @@ Each unit is independently testable:
 - Auto-rotate settings carry over.
 - The webhook keeps accepting bare location keys (§6.6).
 
-## 7. Windows helper (HMA only) ⚠️ whole section unverified on Windows
+## 7. Windows HMA support (revised 2026-10-09 after the Windows spike) ✅
 
-- **Install**:
-  - The NSIS installer is **per-user**, so updates need no UAC.
-  - The "HMA support" option is pre-ticked when an HMA install is detected. This needs `oneClick: false` and a custom NSIS include — **a deviation from lingoreup's default NSIS maker config**.
-  - If ticked, it runs `ProxyFarmHelper-install.exe` elevated (one UAC). The installer exe is extracted to a temp directory created with an admin-only ACL, not to user-writable `%LOCALAPPDATA%`.
-  - It copies the helper to `%ProgramFiles%\ProxyFarm\helper\` (ACL: SYSTEM + Administrators) and registers a LocalSystem service (own process, per-service SID).
-  - It records the **unelevated** user's SID: the token of the user who launched the installer, not the elevated admin.
-  - Silent update runs skip this step (`${isUpdated}`).
-- **Additional UAC prompts (the full list)**:
-  1. Enabling HMA support later from the app.
-  2. A helper protocol or security update — prompted in-app with an explanation.
-  3. Uninstalling the helper. A per-user uninstall can't remove a LocalSystem service, so it launches the elevated helper uninstaller.
-  4. The LAN-sharing firewall rule.
-- **Pipe protocol** (message mode, versioned):
-  - `GetVersion`
-  - `GetHmaCredentials` → `{user, pass, ca, mtime}`
-  - `Subscribe` → the server pushes `CredentialsChanged` when the file changes.
-  - Nothing else: no paths, no commands.
-- **Pipe security**:
-  - `PIPE_REJECT_REMOTE_CLIENTS`.
-  - DACL: SYSTEM full; read/write only for the recorded user SID; deny `FILE_CREATE_PIPE_INSTANCE` to others; deny Anonymous.
-  - The server impersonates the client and checks the token user against the recorded SID.
-  - The client checks that the pipe server PID equals the registered service's PID (via SCM) and that the service runs as LocalSystem. This defeats pipe-name squatting.
-  - **No shared secret in code.** Models: WireGuard-windows, OpenVPN interactive service, `clash-verge-service-ipc`. Anti-model: the archived `clash-verge-service`.
-  - Once Windows builds are signed, also verify the client's Authenticode signature. (HMA's own `api.xpc` does the macOS equivalent ✅.)
-- **Accepted risk**: any process running as that user can read HMA's credentials through the pipe. That is the point of the helper, and it is equivalent to macOS, where the file is world-readable.
-- macOS needs no helper.
+The earlier design (a Go LocalSystem service serving the credentials over a secured named pipe, installed by a custom NSIS step) is dropped. The spike showed a simpler design reaches the same goal with no resident privileged code: HMA's `auth` file only needs to be **copied** to a place the user can read, and Windows can do that on a schedule.
+
+- **Enable** (in-app "Enable HMA support", shown while HMA is installed and the copy is absent): one UAC prompt runs a setup script that travels in memory (`Start-Process -Verb RunAs`, the script as UTF-8 base64 inside `-Command`; never a user-writable file, and one encoding layer so it fits the 32,767-character command line). It:
+  - (re)creates `%ProgramData%\ProxyFarm` and `…\hma` owned by Administrators with protected ACLs: SYSTEM and Administrators full control, the enabling user's SID read only (inherited in `hma`). A pre-existing folder with any other owner (anyone may create folders in ProgramData) is deleted first with `rd /s /q`, which never follows junctions. Users who enabled it before keep their access.
+  - writes `hma-sync.ps1` there and sets its owner to Administrators (a file's owner may always rewrite its ACL, and an elevated user can end up owning new files).
+  - registers the task `\ProxyFarm\HMA credentials` as SYSTEM, triggers at boot and every 5 minutes, with the security descriptor `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGX;;;<user SID>)` so the user may start it, then runs it once and waits for the copy.
+- **The task** copies `HmaProVpn\auth` to `ProxyFarm\hma\auth` only when it changed (temp file + rename), deletes the copy when HMA has none (signed out), and unregisters itself and deletes `ProxyFarm\` once Proxy Farm's executable is gone (uninstalled). No uninstaller hook or extra UAC is needed.
+- **The app** asks the task for a fresh copy at startup (`schtasks /run`, no prompt), reads the copy (or HMA's file directly when it runs elevated), and watches it like `tokenCoreSE.json` on macOS (§5.1 lazy apply).
+- **Additional UAC prompts (the full list)**: enabling HMA support; the LAN-sharing firewall rule. Updates and uninstalling need none.
+- **Accepted risk** (unchanged): any process running as that user can read HMA's credentials; equivalent to macOS, where the file is world-readable.
+- ✅ Verified 2026-10-09 on Windows 10 x64 with a de-elevated token: the copy is readable; HMA's file is not; the ProxyFarm folder, the script and their ACLs are not writable; the task can be started. An unelevated packaged app detected HMA, connected and brought up VN and JP ports with their server IPs as exit IPs. Self-removal after the executable disappears removed the task and the folder.
+- macOS needs none of this.
 
 ## 8. Repo layout (branch `feat/desktop-v2` → v2)
 
@@ -430,14 +417,13 @@ Each unit is independently testable:
 proxy-farm/
   app/                    Electron (Forge + Vite + TS)
     src/main/             controller: providers/, catalogs/, accounts/, engine/ (renderer, supervisor),
-                          health/, power/, store/, ipc/, webhook/, helper-client/
+                          health/, power/, store/, ipc/, webhook/
     src/preload/          contextBridge IPC surface
     src/renderer/         UI (redesigned from v1 ui.html), i18n/{en,vi}.json
     resources/            sing-box/<platform-arch>/ (fetched by prebuild), ca/, catalogs/
     scripts/              prebuild-singbox.mjs (pinned version + sha256 + source tarball),
                           local-release.sh, release-with-x64.sh, local-release.ps1,
                           sign-proxyfarm-bundle.sh
-  helper/                 Go Windows service + installer/uninstaller exe
   catalog/                hma.json + hma.json.sha256 (feed)
   docs/                   specs, user guides (en/vi)
   (v1 docker files stay on tag v1-docker; removed from main when v2 ships)
@@ -458,9 +444,10 @@ proxy-farm/
 - **Minimum macOS 12** (Go 1.26 floor for sing-box).
 - **App translocation**: if launched from the DMG or a translocated path, prompt the user to move the app to Applications (updates fail otherwise).
 - **Windows** — `app/scripts/local-release.ps1` on the maintainer's Windows machine:
-  1. Build the helper.
-  2. `electron-forge make` → NSIS, **unsigned** like lingoreup, with a signing hook kept in the maker config.
-  3. Upload `Setup.exe` + `latest.yml` + `.blockmap` + the sing-box source tarball.
+  1. Release gate: type check + unit tests.
+  2. `electron-forge make` → per-user NSIS, **unsigned** like lingoreup, with a signing hook kept in the maker config.
+  3. Smoke: packaged sing-box version and tags, the app starts and quits through `--quit` with no engine left, `latest.yml` carries the installer sha512.
+  4. Upload `Setup.exe` + `latest.yml` + `.blockmap` + the sing-box source tarball. `-DryRun` stops before git and GitHub.
 - **Updates**: electron-updater against GitHub Releases.
 - **sing-box**: version, per-platform sha256 and source-tarball sha256 are pinned in `prebuild-singbox.mjs`. Upgrade only after the live smoke (§10) passes.
 
@@ -487,14 +474,7 @@ proxy-farm/
 - **Live smoke** (opt-in flag, real accounts, ≤ 1 attempt per location per 10 min): HMA ×3, ZoogVPN ×2, Surfshark ×5. Asserts the exit IP differs from the host IP and the country matches. Rev 3 adds: 3 ports on one Surfshark location and 2 on one HMA location, all with distinct exit IPs.
 - **Soak** (rev 3): 20 Surfshark ports pinned to pool servers + 12 HMA ports for 24 h; records how long pinned servers stay usable and how often failover moves a port.
 - **E2E**: Playwright against the packaged app (onboarding → start → copy → rotate → stop), as in lingoreup.
-- **Helper**:
-  - Go unit tests for the pipe ACL and identity checks.
-  - Manual Windows checklist:
-    - install with exactly one UAC;
-    - update shows no UAC;
-    - an HMA password rotation is picked up automatically;
-    - a squatted pipe name is refused;
-    - the uninstaller removes the service.
+- **Windows HMA support** (§7): unit tests for the setup and task scripts (SID validation, quoting, ACL owner, command-line length) and the read order; manual checklist: enabling shows exactly one UAC; a de-elevated token can read the copy and start the task but not write the folder, the script or their ACLs; an HMA rotation reaches the copy within 5 minutes; removing the app executable removes the task and the folder.
 - **Release gate**: signatures, notarization, smoke-launch, live smoke on the pinned sing-box.
 
 ## 11. Spike evidence (2026-10-07 and 2026-10-08, macOS arm64, no sudo, no Docker)
@@ -541,11 +521,24 @@ proxy-farm/
 | HMA full scan (`scan:hma-servers --write --max 4`) | ✅ 115/115 locations verified; 192 servers; 68 with 1, 27 with 2, 7 with 3, 13 with 4 |
 | ZoogVPN unlisted hosts with the test account | `sg2` ✅ exit = server IP; `jp4`, `vn2`, `de5` `AUTH_FAILED` (plan); `jp1`, `jp2` timed out |
 
+**Windows spike, 2026-10-09, Windows 10 22H2 x64, HMA 26.9 installed:**
+
+| Check | Result |
+|---|---|
+| HMA `HmaProVpn\auth` shape and ACL | ✅ `U1.<device>.hma101.<64 hex>` / 64 hex; SYSTEM + Administrators only; HMA's `ca.crt.pem` expired 2026-09-06 |
+| Those credentials through the unchanged provider + bundled R46 | ✅ VN `156.59.140.19`, JP `18.182.20.247`, US `70.224.227.105`, DE `63.180.54.213` established, exit = server IP |
+| HMA support (§7) under a de-elevated token | ✅ copy readable; HMA's file denied; folder, script and ACL not writable; task startable; self-removal works |
+| Unelevated packaged app, HMA end to end | ✅ detected → Connect → 2 ports online with distinct exits, curl through each |
+| Engine stop and a killed app | ✅ `taskkill` ends the engine; a hard-killed app takes its engines with it (Node's kill-on-close job object), so nothing is orphaned |
+| Host-VPN detection | ✅ `netsh` route table; adapters that are down keep routes and are ignored |
+| Firewall | ✅ no prompt for the app's engines (they listen on 127.0.0.1 and only dial out); only the e2e suite's WireGuard test peers (listening on every interface) prompt |
+| Packaged e2e suite, release dry-run, NSIS install/launch/`--quit`/uninstall | ✅ 11/11; gate + make + smoke pass; per-user install and silent uninstall clean |
+
 ## 12. Risks & open items
 
 | Item | Plan |
 |---|---|
-| **Windows untested** (auth format, CA, process stop, helper, detection, UAC flows) | **Windows spike before planning the Windows tasks** |
+| Windows spike ✅ 2026-10-09: auth format, CA, process stop, HMA support, host-VPN detection | Done (§5.1, §7, §11). Open: an HMA credential rotation observed live; signed builds |
 | HMA server discovery | Rev 3: maintainer scan (seed /24s + CT clusters + OpenVPN hello + device-cred verify) → seed + feed (§5.1). Some servers refuse the device (other tenants); refusal failover handles them (§6.8) |
 | Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
 | **Failed WireGuard handshakes get an account suspended** ✅ happened 2026-10-08: a Surfshark account's VPN access was suspended after mass failed WireGuard handshakes; the official app then failed on all protocols with "The VPN credentials are invalid" (cf. gluetun #2595) | §6.4 "Provider safety": per-port back-off persists across restarts, engines are stopped during back-off, ≤ 6 attempts/min per account, an unproven WireGuard key is stopped after 3 silent attempts until the user acts. Live experiments are rate-limited (CONTRIBUTING) |

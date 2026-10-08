@@ -60,7 +60,7 @@ so each port has its own stable exit IP.
 
 | Provider | Protocol | What you enter | Notes |
 |---|---|---|---|
-| **HMA** | OpenVPN | Nothing: the app reads the device credentials of the HMA app installed on the same computer | macOS only for now. Windows needs a helper service that is not built yet. |
+| **HMA** | OpenVPN | Nothing: the app reads the device credentials of the HMA app installed on the same computer | On Windows, click **Enable HMA support** once (one administrator prompt); see below. |
 | **ZoogVPN** | OpenVPN | Account email and password | Your plan decides which servers accept you; refused servers are skipped. |
 | **Surfshark** | WireGuard | Your WireGuard private key (Surfshark manual setup page) | The server list comes from Surfshark's public API. |
 | **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server. |
@@ -77,14 +77,18 @@ Download the latest build from
   Applications. Run it from Applications, not from the disk image, or it cannot update
   itself.
 - **Windows (x64)**: run `Setup.exe`. The Windows build is **unsigned**, so SmartScreen
-  shows a warning: click *More info* → *Run anyway*. Windows support is still being
-  verified; please report problems.
+  shows a warning: click *More info* → *Run anyway*. It installs for your user only and
+  needs no administrator rights.
 
 ## Quick start
 
 1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark or
    Config file). For HMA, install the HMA app, sign in and connect once; Proxy Farm
    picks up its credentials.
+   On Windows, HMA keeps those credentials in a file only administrators can read, so the
+   HMA card first shows **Enable HMA support**. It asks for administrator approval once and
+   sets up a small Windows task that keeps a copy only you and administrators can read;
+   updates need no approval. The task removes itself when Proxy Farm is uninstalled.
 2. Click **Add locations**, choose locations and how many ports each.
 3. When a port shows **Online**, use it:
 
