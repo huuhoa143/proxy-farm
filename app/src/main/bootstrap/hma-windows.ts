@@ -90,8 +90,10 @@ function Test-Trusted([string]$p) {
   if (($it.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
   return $trusted -contains (Get-Acl -LiteralPath $p).GetOwner([Security.Principal.SecurityIdentifier]).Value
 }
-if (-not $app.StartsWith($env:SystemDrive, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $app -PathType Leaf)) {
-  # Proxy Farm was uninstalled (or the recorded path is not local): remove the copy and self.
+$isLocalDrive = $app.Length -ge 3 -and [char]::IsLetter($app[0]) -and $app[1] -eq ':' -and $app[2] -eq '\\'
+if (-not $isLocalDrive -or -not (Test-Path -LiteralPath $app -PathType Leaf)) {
+  # Proxy Farm was uninstalled (or the recorded path is not a local drive path, e.g. UNC):
+  # remove the copy and self. Any local drive is fine; a per-user install may be on D:.
   Unregister-ScheduledTask -TaskPath ${psQuote(HMA_TASK_FOLDER)} -TaskName ${psQuote(HMA_TASK_NAME)} -Confirm:$false -ErrorAction SilentlyContinue
   try { $svc = New-Object -ComObject 'Schedule.Service'; $svc.Connect(); $svc.GetFolder('\\').DeleteFolder(${psQuote(HMA_TASK_FOLDER.replace(/\\/g, ''))}, 0) } catch { }
   cmd.exe /d /c rd /s /q "$root" | Out-Null

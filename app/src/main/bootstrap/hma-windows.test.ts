@@ -55,7 +55,11 @@ describe('HMA support on Windows (spec §7)', () => {
     // TrustedInstaller, SYSTEM and Administrators are the only accepted owners.
     expect(sync).toContain('S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464');
     expect(sync).toContain('ReparsePoint');
-    expect(sync).toContain('$app.StartsWith($env:SystemDrive');
+    // The runtime self-removal guard accepts any local drive (not UNC), so a per-user
+    // install on D: is not mistaken for an uninstall. Non-regex to dodge backslash escaping.
+    expect(sync).toContain("$app[1] -eq ':' -and $app[2] -eq '\\'");
+    const onD = buildSyncScript('D:\\Apps\\proxy-farm\\Proxy Farm.exe');
+    expect(onD).toContain("$app = 'D:\\Apps\\proxy-farm\\Proxy Farm.exe'");
   });
 
   it('the setup embeds the sync script in the task action, grants the user read + run only, and never writes a script file', () => {
