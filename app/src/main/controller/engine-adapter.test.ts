@@ -227,9 +227,20 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     expect(healths[0].fedVerify[0]).toEqual({ ok: true, info: { exitIp: '7.7.7.7', country: 'NL' } });
   });
 
-  it('a failed exit-IP probe during verifying reports feedEstablishedThenVerify(false)', async () => {
-    const { engine, healths } = setup({ exitIpResult: new Error('probe failed') });
+  it('reviewer I-2: exit-IP probe keeps failing but /delay is 200 -> online with unknown geo, not an endless retry', async () => {
+    // Tunnel genuinely up (clash_api /delay returns 200), every IP-echo service
+    // unreachable: the port must become usable rather than oscillating forever.
+    const { engine, healths, exitIpCalls } = setup({ exitIpResult: new Error('probe failed'), delayResult: { code: 200, ms: 5 } });
     await engine.start('k1', sampleInput(45206));
+    healths[0].setState({ kind: 'verifying', since: 2 });
+    await vi.waitFor(() => expect(healths[0].fedVerify).toHaveLength(1));
+    expect(healths[0].fedVerify[0]).toEqual({ ok: true, info: { exitIp: 'unknown', country: 'unknown' } });
+    expect(exitIpCalls.length).toBe(3); // bounded by MAX_EXIT_IP_ATTEMPTS, not infinite
+  });
+
+  it('reviewer I-2: exit-IP probe fails AND /delay is not 200 -> still a retry (a truly dead tunnel is not force-onlined)', async () => {
+    const { engine, healths } = setup({ exitIpResult: new Error('probe failed'), delayResult: { code: 504 } });
+    await engine.start('k1', sampleInput(45216));
     healths[0].setState({ kind: 'verifying', since: 2 });
     await vi.waitFor(() => expect(healths[0].fedVerify).toHaveLength(1));
     expect(healths[0].fedVerify[0]).toEqual({ ok: false, info: undefined });
@@ -250,13 +261,26 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     expect(healths[0].fedExit).toEqual([]);
   });
 
-  it('onRetryDue respawns the process with the exact same rendered config', async () => {
+  it('onRetryDue respawns the process with the exact same rendered config (no external retry handler)', async () => {
     const { engine, processes, healths } = setup();
     await engine.start('k1', sampleInput(45209));
     expect(processes[0].startedConfigs).toHaveLength(1);
     healths[0].fireRetryDue();
     await vi.waitFor(() => expect(processes[0].startedConfigs).toHaveLength(2));
     expect(processes[0].startedConfigs[0]).toBe(processes[0].startedConfigs[1]);
+  });
+
+  it('reviewer I-1: with an onRetryDue listener, a due retry is delegated by key and NOT self-respawned in place', async () => {
+    const { engine, processes, healths } = setup();
+    const retried: string[] = [];
+    engine.onRetryDue?.((key) => retried.push(key));
+    await engine.start('k1', sampleInput(45229));
+    expect(processes[0].startedConfigs).toHaveLength(1);
+    healths[0].fireRetryDue();
+    // The listener (in practice port-manager) is told to re-resolve + re-start this key;
+    // the adapter must not also respawn its stale config, which would race onto the port.
+    await vi.waitFor(() => expect(retried).toEqual(['k1']));
+    expect(processes[0].startedConfigs).toHaveLength(1);
   });
 
   it('integration fix: onRetryDue stops a still-running child before respawning, and that exit is not fed as a crash', async () => {
@@ -306,6 +330,10 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       expect(healths[0].stopped).toBe(1);
       expect(healths[0].fedExit).toEqual([]);
       await vi.waitFor(() => expect(removedPids).toEqual([{ registryPath: '/tmp/pf-fake-registry.json', key: 'k1' }]));
+
+      // reviewer M-1: the torn-down entry is removed from the map, so it no longer
+      // reports as a running engine (nor keeps counting its ports in allClaimedPorts).
+      expect(await engine.probe('k1')).toEqual({ code: 'error', message: 'probe: no running engine for "k1"' });
     });
 
     it('a clash_api (aux) port bind collision reallocates and retries immediately, re-recording the pid, without touching PortHealth', async () => {

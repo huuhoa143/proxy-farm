@@ -45,6 +45,14 @@ function detectBindErrorPort(line: string | undefined): number | undefined {
  * (e.g. almost the entire ephemeral range externally occupied). */
 const MAX_CLASH_BIND_RETRIES = 5;
 
+/** How many times the exit-IP probe is retried, back to back, while `verifying` before
+ * the adapter stops treating unverifiable geo as a tunnel failure (reviewer I-2). If all
+ * attempts fail yet `/delay` still returns 200 — the tunnel is genuinely up, only the
+ * IP-echo services are unreachable — the port is reported `online` with an unknown exit
+ * IP/country instead of oscillating connecting→verifying→retrying forever. A tunnel that
+ * is actually dead fails these AND the `/delay` check, so it still drops to a retry. */
+const MAX_EXIT_IP_ATTEMPTS = 3;
+
 /** The slice of `EngineProcess`'s public API this adapter needs — a structural
  * interface (not the class itself) so tests can inject a plain-object fake; a class
  * with private fields can't otherwise satisfy a class-typed parameter. */
@@ -75,8 +83,10 @@ export interface CreateRealEngineOptions {
   registryPath: string;
   /** @default singboxPath() */
   binPath?: string;
-  /** Fed into every port's `PortHealth` (spec `Settings.giveUpAfter`). @default 0 (never) */
-  giveUpAfter?: number;
+  /** Fed into every port's `PortHealth` (spec `Settings.giveUpAfter`). @default 0 (never).
+   * May be a getter so a Settings change is read live on each retry tick (reviewer M-5);
+   * passed straight through to `PortHealth`. */
+  giveUpAfter?: number | (() => number);
   /** How often to poll clash_api `/delay` while a port is active. @default 30_000 (§6.4) */
   delayPollMs?: number;
   /**
@@ -177,6 +187,11 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
   const entries = new Map<string, PortEntry>();
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
+  // When anything is subscribed here (in practice `port-manager`), a due retry is
+  // delegated to it to re-resolve + re-select a server (reviewer I-1) instead of this
+  // adapter respawning its own stale `lastConfig` in place. With no subscriber the
+  // adapter falls back to the in-place respawn (keeps standalone use + existing tests).
+  const retryDueCbs = new Set<(key: string) => void>();
   // Survives `entries.delete(key)` (reviewer item 10): `getLogs` falls back to this so a
   // UI still open on a just-stopped/rotated-away port keeps showing its last known ring
   // instead of suddenly going blank.
@@ -220,6 +235,11 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   async function handleBindError(key: string, entry: PortEntry, collidedPort: number): Promise<void> {
     if (collidedPort === entry.proxyPort) {
       await teardown(key, entry);
+      // Drop the torn-down entry from the map (reviewer M-1): unlike `stop()`, this path
+      // never did, so its proxyPort/clashPort kept being counted by `allClaimedPorts()`
+      // and `entries.get(key)` still returned a dead entry. Guard against a fresh entry
+      // having replaced it during the `await teardown` above.
+      if (entries.get(key) === entry) entries.delete(key);
       const failedState: PortState = { kind: 'failed', reason: 'port-in-use', untilMs: now(), attempt: 1 };
       for (const cb of stateChangeCbs) cb(key, failedState);
       return;
@@ -263,6 +283,40 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       // PortHealth's own backoff, never an unhandled rejection out of this
       // fire-and-forget `void handleBindError(...)` call (reviewer round 3, item 3).
       entry.health.feedExit(null);
+    }
+  }
+
+  /**
+   * Runs while `verifying` (spec §6.4): confirms the exit IP actually changed and reports
+   * it back via `feedEstablishedThenVerify`. Retries the probe up to `MAX_EXIT_IP_ATTEMPTS`
+   * times back to back; if every attempt fails, it does NOT immediately treat the port as
+   * broken (reviewer I-2) — it first checks `/delay`. A 200 means the tunnel is genuinely
+   * up and only geo is unverifiable, so the port goes `online` with unknown IP/country; a
+   * non-200 (or clash_api unreachable) means the tunnel really is dead, so it drops to a
+   * retry as before. Bails out silently if the entry was torn down / replaced / left
+   * `verifying` underneath it.
+   */
+  async function verifyExitIp(key: string, entry: PortEntry, health: PortHealthLike): Promise<void> {
+    const stillVerifying = () => !entry.stopping && entries.get(key) === entry && health.state.kind === 'verifying';
+    for (let attempt = 1; attempt <= MAX_EXIT_IP_ATTEMPTS; attempt += 1) {
+      try {
+        const exit = await doExitIpProbe(entry.proxyPort, { auth: entry.auth });
+        if (!stillVerifying()) return;
+        health.feedEstablishedThenVerify(true, { exitIp: exit.ip, country: exit.country });
+        return;
+      } catch {
+        if (!stillVerifying()) return;
+        // else: fall through to the next attempt
+      }
+    }
+    // Every exit-IP probe failed. Is the tunnel itself up? If `/delay` is 200 the port is
+    // usable despite unverifiable geo (reviewer I-2) — go online with unknown IP/country.
+    const delay = await doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG).catch(() => undefined);
+    if (!stillVerifying()) return;
+    if (delay?.code === 200) {
+      health.feedEstablishedThenVerify(true, { exitIp: 'unknown', country: 'unknown' });
+    } else {
+      health.feedEstablishedThenVerify(false);
     }
   }
 
@@ -314,14 +368,20 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     entry.unsubscribe.push(
       health.onStateChange((state) => {
         if (state.kind !== 'verifying') return;
-        void doExitIpProbe(entry.proxyPort, { auth: entry.auth })
-          .then((exit) => health.feedEstablishedThenVerify(true, { exitIp: exit.ip, country: exit.country }))
-          .catch(() => health.feedEstablishedThenVerify(false));
+        void verifyExitIp(key, entry, health);
       }),
     );
 
     entry.unsubscribe.push(
       health.onRetryDue(() => {
+        // The controller (if wired) owns the retry: it re-resolves the host and advances
+        // to the next non-bad candidate before respawning via its own start path, so a
+        // dead/stale IP is not looped on forever (reviewer I-1). Delegate and do NOT also
+        // respawn `lastConfig` here, or the two would race onto the same port.
+        if (retryDueCbs.size > 0) {
+          for (const cb of retryDueCbs) cb(key);
+          return;
+        }
         void (async () => {
           // Integration fix: sing-box never exits by itself on a 504 / connect timeout
           // (spec §6.3), so the old child is usually STILL RUNNING when a retry is due.
@@ -425,5 +485,10 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     return () => stateChangeCbs.delete(cb);
   }
 
-  return { start, stop, probe, getLogs, onStateChange };
+  function onRetryDue(cb: (key: string) => void): () => void {
+    retryDueCbs.add(cb);
+    return () => retryDueCbs.delete(cb);
+  }
+
+  return { start, stop, probe, getLogs, onStateChange, onRetryDue };
 }
