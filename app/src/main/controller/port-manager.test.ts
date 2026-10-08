@@ -8,6 +8,7 @@ import { createStateStore, type StateStore } from '../store/state';
 import { createPortManager, type PortManagerDeps } from './port-manager';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator } from './ports';
 import { createServerHealth } from './server-health';
+import { createAttemptLimiter } from './provider-safety';
 
 function fakeSecretStore(): SecretStore {
   const map = new Map<string, string>();
@@ -1698,6 +1699,28 @@ describe('port manager', () => {
       expect(state.getState().ports[0].state).toMatchObject({ kind: 'retrying', reasonKey: 'timeout' });
       engine.fireRetryDue('zoogvpn:nl-ams');
       await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // dead marks never strand a port
+    });
+
+    it('an account over its attempt budget waits for a token: retrying(rate-limited), no engine start, retried later', async () => {
+      const timers: Array<{ ms: number; cb: () => void }> = [];
+      const { manager, engine, state } = setup({
+        targets: [{ ...twoServerTargets[0], servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: {
+          attemptLimiter: createAttemptLimiter({ now: () => 0, perMinute: 1 }),
+          scheduleRetry: (ms, cb) => {
+            timers.push({ ms, cb });
+            return () => undefined;
+          },
+        },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(engine.started).toHaveLength(1);
+      expect(state.getState().ports[0].state).toMatchObject({ kind: 'retrying', reasonKey: 'rate-limited' });
+      expect(timers.map((t) => t.ms)).toEqual([60_000]);
+      expect(await manager.rotatePort('zoogvpn:nl-ams')).toEqual({ changed: false, noteKey: 'rate-limited' });
     });
 
     it('the back-off carries across engine restarts (spec §6.4) and a user Start resets it', async () => {

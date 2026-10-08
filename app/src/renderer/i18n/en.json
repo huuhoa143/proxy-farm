@@ -354,7 +354,8 @@
       "server-rejected": "This server refused the device — switching to another server in the same location.",
       "server-refused": "This server refused the sign-in — moving to another server in the same location.",
       "server-dead": "This server stopped answering — moving to another server in the same location.",
-      "duplicate-exit": "Another port already exits through this IP — moving to a different server."
+      "duplicate-exit": "Another port already exits through this IP — moving to a different server.",
+      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often."
     }
   },
   "settings": {
@@ -454,7 +455,8 @@
     "exit-ip-unchanged": "Reconnected, but the exit IP stayed the same.",
     "rotate-in-progress": "This port is already rotating.",
     "port-disabled": "Start the port before rotating it.",
-    "decrypt-failed": "Your saved credentials couldn't be read."
+    "decrypt-failed": "Your saved credentials couldn't be read.",
+    "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly."
   },
   "hma": {
     "windowsLater": "HMA support on Windows is coming in a later version.",

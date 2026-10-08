@@ -354,7 +354,8 @@
       "server-rejected": "Máy chủ này từ chối thiết bị — đang chuyển sang máy chủ khác cùng vị trí.",
       "server-refused": "Máy chủ này từ chối đăng nhập — đang chuyển sang máy chủ khác cùng vị trí.",
       "server-dead": "Máy chủ này không còn phản hồi — đang chuyển sang máy chủ khác cùng vị trí.",
-      "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác."
+      "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác.",
+      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên."
     }
   },
   "settings": {
@@ -454,7 +455,8 @@
     "exit-ip-unchanged": "Đã kết nối lại nhưng IP ra không đổi.",
     "rotate-in-progress": "Cổng này đang được đổi IP.",
     "port-disabled": "Hãy bật cổng trước khi đổi IP.",
-    "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu."
+    "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu.",
+    "rate-limited": "Tài khoản này đã thử kết nối quá nhiều lần trong một phút qua — hãy thử lại sau ít phút."
   },
   "hma": {
     "windowsLater": "Hỗ trợ HMA trên Windows sẽ có ở phiên bản sau.",

@@ -25,6 +25,7 @@ import type { StateStore } from '../store/state';
 import { exportLines, type ExportCreds } from './export-format';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator, type ProviderRegistry } from './ports';
 import { createServerHealth, type ServerHealth } from './server-health';
+import { createAttemptLimiter, type AttemptLimiter } from './provider-safety';
 
 export interface PortManagerDeps {
   state: StateStore;
@@ -87,6 +88,12 @@ export interface PortManagerDeps {
    * the same provider that can still use one. Optional; without it the port just fails.
    */
   pool?: Pick<AccountPool, 'pickAccount'>;
+  /**
+   * Caps handshake attempts per account across all of its ports (spec §6.4 "Provider
+   * safety"): every engine start (start, retry, failover, Change IP) takes one.
+   * @default ≤ 6 per minute per account, on `now`
+   */
+  attemptLimiter?: AttemptLimiter;
 }
 
 /** Who asked for a start/Change IP. A user action resets the port's back-off; an
@@ -274,6 +281,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const now = deps.now ?? Date.now;
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
   const health = deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth });
+  const limiter = deps.attemptLimiter ?? createAttemptLimiter({ now });
   /** server token -> last resolved IPv4, for the invariant check and `listServers`. */
   const resolvedIp = new Map<string, string>();
   /** server IP -> exit IP observed through it; exit IP = server identity (§6.5). */
@@ -833,6 +841,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       }
 
       const endpoint = provider.bind(target, selected.pick.ip, account, secret);
+      // Over the account's attempt budget: wait for the next token rather than knock on
+      // the provider's door again now. Not a failure, so the back-off does not grow.
+      const accountId = findPort(key)?.accountId ?? port.accountId;
+      const waitMs = limiter.take(accountId);
+      if (waitMs > 0) {
+        updatePort(key, { state: { kind: 'retrying', untilMs: Date.now() + waitMs, attempt: Math.max(1, backoffAttempts.get(key) ?? 0), reasonKey: 'rate-limited' } });
+        armLocalRetry(key, waitMs);
+        return;
+      }
       const renderInput = buildRenderInput(findPort(key) ?? port, endpoint);
       onlineSinceStart.delete(key); // a fresh (re)connect from here on
       try {
@@ -912,6 +929,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     // Distinct from "no-server" (reviewer item 10): it's the stored credential that
     // couldn't be read back.
     if (!loadAccountSecret(deps.secrets, account.secretRef)) return { changed: false, noteKey: 'decrypt-failed' };
+    // A Change IP is a handshake attempt like any other (spec §6.4 "Provider safety").
+    if (limiter.take(account.id) > 0) return { changed: false, noteKey: 'rate-limited' };
 
     // Which account owns each candidate location. For catalog providers every account
     // sees the same locations, so Change IP stays on the port's account. An imported
