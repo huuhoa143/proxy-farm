@@ -343,7 +343,10 @@
       "start-error": "Starting the port failed.",
       "rotate-error": "Rotating failed.",
       "dns-failed": "The server's address couldn't be looked up.",
-      "server-rejected": "This server refused the device — switching to another server in the same location."
+      "server-rejected": "This server refused the device — switching to another server in the same location.",
+      "server-refused": "This server refused the sign-in — moving to another server in the same location.",
+      "server-dead": "This server stopped answering — moving to another server in the same location.",
+      "duplicate-exit": "Another port already exits through this IP — moving to a different server."
     }
   },
   "settings": {

@@ -343,7 +343,10 @@
       "start-error": "Khởi động cổng thất bại.",
       "rotate-error": "Đổi IP thất bại.",
       "dns-failed": "Không tra được địa chỉ máy chủ.",
-      "server-rejected": "Máy chủ này từ chối thiết bị — đang chuyển sang máy chủ khác cùng vị trí."
+      "server-rejected": "Máy chủ này từ chối thiết bị — đang chuyển sang máy chủ khác cùng vị trí.",
+      "server-refused": "Máy chủ này từ chối đăng nhập — đang chuyển sang máy chủ khác cùng vị trí.",
+      "server-dead": "Máy chủ này không còn phản hồi — đang chuyển sang máy chủ khác cùng vị trí.",
+      "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác."
     }
   },
   "settings": {
