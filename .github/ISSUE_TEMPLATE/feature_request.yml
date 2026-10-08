@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an improvement or a new provider.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For open-ended ideas, a [discussion](https://github.com/huuhoa143/proxy-farm/discussions) may be a better start.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you would like it to work.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: providers
+    attributes:
+      label: Provider requests
+      options:
+        - label: If this asks for a new VPN provider, I confirm its terms of service allow this kind of use, and I can test it with my own account.
