@@ -42,3 +42,4 @@ app/node_modules/
 app/out/
 app/.vite/
 app/test-results/
+app/.release-state-win.json

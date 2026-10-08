@@ -20,13 +20,17 @@ function keypair(singbox: string): { priv: string; pub: string } {
  * freshly generated per run (never committed). The binary is copied under a different
  * name so `pgrep sing-box` checks only ever see Proxy Farm's own engines.
  */
-/** This machine's first LAN IPv4 address: a second way to reach a local peer, so two peers
- * are two distinct servers (one port per server IP, spec §6.8). */
-export function lanAddress(): string {
+/**
+ * A second host address for the second local peer, so the two peers are two distinct
+ * servers (one port per server IP, spec §6.8). Prefers this machine's first LAN IPv4; on
+ * a host with no LAN address it falls back to `127.0.0.2`, which is loopback on Linux and
+ * Windows (on macOS without a LAN address the suite's caller must add the `lo0` alias).
+ */
+export function secondPeerHost(): string {
   for (const addrs of Object.values(os.networkInterfaces())) {
     for (const a of addrs ?? []) if (a.family === 'IPv4' && !a.internal) return a.address;
   }
-  throw new Error('no LAN IPv4 address for the second WireGuard peer');
+  return '127.0.0.2';
 }
 
 export function startLocalWgPeer(singbox: string, workDir: string, udpPort: number, host = '127.0.0.1'): WgPeer {

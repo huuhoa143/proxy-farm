@@ -72,9 +72,12 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
     if ('text' in mirror) return parsed(mirror.text, parseAuthFile);
     const direct = await readText(winAuthPath);
     if ('text' in direct) return parsed(direct.text, parseAuthFile);
-    // HMA support is on (its folder is readable) but there is no copy: HMA has no
-    // credentials right now.
-    if (mirror.error.code === 'ENOENT' && existsSync(winMirrorDir)) return { status: 'missing' };
+    // HMA support is on (its folder is readable) but there is no copy: HMA is installed and
+    // signed out (the task removes the copy when HMA has none), so point the user at HMA
+    // rather than telling them it isn't installed.
+    if (mirror.error.code === 'ENOENT' && existsSync(winMirrorDir)) {
+      return { status: 'invalid', message: 'hma: no credentials copy yet (sign in to HMA and connect once)' };
+    }
     return existsSync(winHmaDir) ? { status: 'helper-missing' } : { status: 'missing' };
   }
 

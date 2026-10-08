@@ -233,6 +233,9 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
 
   async function connectHma(): Promise<CheckResult & { account?: Account }> {
     if (deps.platform !== 'darwin' && deps.platform !== 'win32') return { ok: false, reasonKey: 'hma.notFound' };
+    // Windows: ask the task for a fresh copy first, so a Connect right after HMA rotated
+    // its credentials reads the new ones rather than the previous copy.
+    await deps.hmaWindows?.refresh().catch(() => undefined);
     const r = await deps.hma.read();
     if (r.status === 'helper-missing') return { ok: false, reasonKey: 'hma.helperMissing' };
     if (r.status === 'missing') return { ok: false, reasonKey: 'hma.notFound' };

@@ -16,7 +16,7 @@ import path from 'node:path';
 import { DISCLAIMER_NOTICE_VERSION, type PortRow, type Settings } from '../../src/shared/contracts';
 import { APP_ROOT, BUNDLED_SINGBOX, IS_WIN, launchPackagedApp, type RunningApp } from './helpers/packaged-app';
 import { curlThrough, isAlive, singboxProcesses } from './helpers/procs';
-import { lanAddress, startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
+import { secondPeerHost, startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
 
 const SHOTS = path.join(APP_ROOT, '..', 'docs', 'screenshots', 'v2');
 const HMA_TOKEN = '/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json';
@@ -51,7 +51,7 @@ test.describe.serial('packaged Proxy Farm', () => {
     expect(singboxProcesses(), 'no Proxy Farm engine may be running before the suite').toEqual([]);
     userData = mkdtempSync(path.join(tmpdir(), 'pf-e2e-userdata-'));
     work = mkdtempSync(path.join(tmpdir(), 'pf-e2e-wg-'));
-    peers = [startLocalWgPeer(BUNDLED_SINGBOX, work, 51991), startLocalWgPeer(BUNDLED_SINGBOX, work, 51992, lanAddress())];
+    peers = [startLocalWgPeer(BUNDLED_SINGBOX, work, 51991), startLocalWgPeer(BUNDLED_SINGBOX, work, 51992, secondPeerHost())];
     app = await launchPackagedApp(userData);
     // A fresh profile starts in Vietnamese with the first-run notice up; this suite
     // drives the English UI. Both settings persist, so relaunches below stay English.

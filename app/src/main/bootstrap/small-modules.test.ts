@@ -139,9 +139,10 @@ describe('HMA local source (spec §5.1)', () => {
       expect(await win({ hma: dir }).read()).toEqual({ status: 'helper-missing' });
     });
 
-    it('reports missing when HMA support is on but HMA has no credentials, or HMA is absent', async () => {
+    it('reports a signed-out HMA (support on, no copy) as invalid, and an absent HMA as missing', async () => {
       mkdirSync(join(dir, 'empty-mirror'));
-      expect(await win({ hma: dir, mirrorDir: join(dir, 'empty-mirror') }).read()).toEqual({ status: 'missing' });
+      // Support enabled but HMA has no credentials: point the user at HMA, not "not installed".
+      expect((await win({ hma: dir, mirrorDir: join(dir, 'empty-mirror') }).read()).status).toBe('invalid');
       expect(await win({}).read()).toEqual({ status: 'missing' });
     });
 
