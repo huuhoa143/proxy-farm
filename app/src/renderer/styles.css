@@ -2139,6 +2139,13 @@ table.port-table {
   bottom: 14px;
   z-index: 5;
 }
+/* The sticky footer (≈62px tall, 14px off the bottom) floats over whatever
+   scrolls beneath it — the Port limits rows above all. Reserve its height at
+   the bottom of the scrollport so focusing or scrolling to a row (Tab into a
+   limit field, find-in-page) stops above the footer instead of under it. */
+html:has(.onb-footer) {
+  scroll-padding-bottom: 96px;
+}
 .onb-footer .sum {
   flex: 1;
   font-size: 13px;
