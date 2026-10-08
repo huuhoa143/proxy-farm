@@ -89,7 +89,9 @@ Proxy Farm runs on other companies' VPN infrastructure. Do not make it look like
   this reason; do not bypass them.
 - **Rate-limit live experiments.** When you test against real servers by hand, keep it to
   a few connections and space attempts out (the project's own live checks use at most one
-  attempt per location per 10 minutes).
+  attempt per location per 10 minutes). A WireGuard key that gets no answer is not a dead
+  server: stop after two or three tries. Mass failed WireGuard handshakes got a Surfshark
+  account's VPN access suspended on 2026-10-08.
 - Server discovery that probes networks (`pnpm scan:hma-servers`,
   `pnpm scan:zoog-servers`) is a maintainer job, run rarely. Do not add probing to code
   that runs on users' machines.

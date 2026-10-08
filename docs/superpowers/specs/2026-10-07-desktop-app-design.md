@@ -212,8 +212,8 @@ Each unit is independently testable:
 
 ### 5.3 Surfshark — WireGuard ✅
 
-- Credential: the WireGuard private key.
-- Peer settings: inner address `10.14.0.2/16`, peer = the cluster pubKey, port 51820, `mtu: 1280`, keepalive 25.
+- Credential: the WireGuard private key, plus the key's interface address. Each key pair has its own: the `Address` line of the config Surfshark's dashboard downloads with the key (`10.14.0.2/16` for some keys, `10.64.x.y/16` for others). The user types it (optional, default `10.14.0.2/16`, validated as an IPv4 CIDR) or pastes/imports that `.conf`, from which `PrivateKey` and the first IPv4 `Address` are read and the rest ignored. The address is account metadata, not a secret.
+- Peer settings: inner address = the account's address, peer = the cluster pubKey, port 51820, `mtu: 1280`, keepalive 25.
 - Generic + `static` clusters from the public API, cached 12 h.
 - **Server pool** (rev 3) ✅ 2026-10-08:
   - A cluster hostname (`jp-tok.prod.surfshark.com`) is DNS round-robin over a large pool: 20–26 distinct IPs in 16 lookups for JP/US/DE/SG; 8 for VN.
@@ -223,7 +223,7 @@ Each unit is independently testable:
   - A pinned server that dies (`/delay` 504, no handshake) is marked dead for 2 h and the port moves to another free pool server (§6.8). This replaces rev 2's "re-resolve the host on probe failure" (✅ pool IPs went stale within minutes in spike 1).
   - ⚠️ How long a pinned Surfshark server stays usable is unmeasured; the 24 h soak (§10) checks it.
 - Exit country = the geo-IP result, not the label (virtual locations).
-- A wrong key produces no log line at all. It shows up only as `/delay` 504 (§6.4).
+- A wrong key produces no log line at all. It shows up only as `/delay` 504 (§6.4), exactly like an unreachable server. Retrying it is what got an account suspended (§6.4 "Provider safety").
 
 ### 5.4 Config file
 
@@ -292,7 +292,7 @@ Each unit is independently testable:
 - `verifying` (exit-IP probe)
 - `online`
 - `retrying(countdown, reason)`
-- `failed(reason)` — `auth`, `not in plan`, `port in use`, `no server`. Shown in red with guidance.
+- `failed(reason)` — `auth`, `not in plan`, `port in use`, `no server`, `key rejected` (see "Provider safety" below). Shown in red with guidance.
 - `stopped`
 
 `failed` is not "given up": with `give_up_after = 0` (the default), retries continue on the long back-off.
@@ -308,6 +308,15 @@ Each unit is independently testable:
 - A server is judged dead (remembered for 2 h, fail over to another server of the same location) only when it fails a **fresh reconnect**: at once for a server the port never got online on, after 2 failed reconnects in a row for the server it was online on.
 - Correlated drops are not dead servers: when another port of the same provider failed within the last 15 s, that provider has an incident; when ports of two providers did, the host has one. During an incident (2 min, extended by every further failure) nothing is marked and no port moves; every port retries its own server. (2026-10-08: every few minutes all HMA tunnels stalled together for 30–60 s while direct traffic was fine.)
 - Starts are queued at ≤ 3 concurrent, 2–5 s apart (also on resume and app start).
+- The back-off belongs to the **port**, not to one engine process: it carries across engine restarts (each retry spawns a fresh process) and resets only when the port reaches `online` or on a user Start, Stop, Remove or Change IP.
+- While a port waits out its back-off its sing-box process is **stopped**. sing-box never exits on a 504 or a handshake timeout, and a running WireGuard endpoint keeps sending handshake initiations (keepalive and the `/delay` poll give it traffic), so a "30 min back-off" with the process alive is hundreds of handshakes.
+
+**Provider safety** (2026-10-08 incident). The app hammered Surfshark with WireGuard handshakes that never completed: the back-off restarted at 30 s on every engine restart, and dead-server failover walked the pool. Surfshark suspended the account's VPN access; afterwards the official app failed on every protocol with "The VPN credentials are invalid". Same failure mode as gluetun issue #2595. WireGuard is silent: a rejected key looks exactly like an unreachable server, so the app must assume the worst. Rules:
+
+- **Per-account attempt cap.** Every engine start of a port (start, due retry, failover, Change IP) takes a token from a per-account bucket: at most 6, refilling one every 10 s (≤ 6 handshake attempts per minute per account, across all its ports). With no token the port shows `retrying(rate-limited)` until the next one is due; the back-off does not grow. Applies to every provider.
+- **Unproven WireGuard key.** For a WireGuard account (Surfshark, or an imported WireGuard `.conf`) that has **never** been confirmed online (no persisted `lastOk` for the account): 3 attempts in a row that end without a handshake (`/delay` 504 or the connecting deadline, before the first 200) stop the account. Every port of it goes to `failed(key-rejected)`: its engine is stopped, nothing retries automatically, and the UI shows it as action-needed (no countdown) with the provider's guidance (Surfshark: check the key is under Manual setup → WireGuard, the address matches the key's config, the subscription is active; retrying too often can get an account suspended). The lock is persisted (`AppState.wgLockouts`) so an app restart does not start over. A user Start or Change IP re-arms it for **one** attempt (a further failure locks it again at once); app start, resume, due retries, auto-rotate and the webhook never re-arm. A handshake or new credentials (a re-added key, a changed address) clear it. Failures during a host-wide incident are not counted.
+- **Proven WireGuard key** (has worked before): never locked, but its ports do not jump to the next server the moment one times out. The server is marked dead and the next attempt waits for the back-off (with jitter), which then moves the port. Attempts never come faster than the back-off.
+- OpenVPN auth failures (HMA, ZoogVPN) keep their refusal/failover rules (§6.8) and are bounded by the persistent back-off and the per-account cap.
 
 ### 6.5 Change IP (was "Rotate")
 
@@ -539,6 +548,7 @@ proxy-farm/
 | **Windows untested** (auth format, CA, process stop, helper, detection, UAC flows) | **Windows spike before planning the Windows tasks** |
 | HMA server discovery | Rev 3: maintainer scan (seed /24s + CT clusters + OpenVPN hello + device-cred verify) → seed + feed (§5.1). Some servers refuse the device (other tenants); refusal failover handles them (§6.8) |
 | Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
+| **Failed WireGuard handshakes get an account suspended** ✅ happened 2026-10-08: a Surfshark account's VPN access was suspended after mass failed WireGuard handshakes; the official app then failed on all protocols with "The VPN credentials are invalid" (cf. gluetun #2595) | §6.4 "Provider safety": per-port back-off persists across restarts, engines are stopped during back-off, ≤ 6 attempts/min per account, an unproven WireGuard key is stopped after 3 silent attempts until the user acts. Live experiments are rate-limited (CONTRIBUTING) |
 | Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
 | ZoogVPN plan limits per server ⚠️ | Per-(account, server) refusal memory. Connection count: ✅ ≥ 8 on one account, default 5 |
 | HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
