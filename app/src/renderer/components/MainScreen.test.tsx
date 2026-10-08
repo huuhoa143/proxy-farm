@@ -22,13 +22,23 @@ async function renderMain(api = createFakeProxyFarmApi()) {
   return api;
 }
 
+// Queries here avoid document-wide *ByRole: on the full port table it computes
+// the accessible name of every button, which took seconds per call under a
+// loaded full-suite run and pushed these tests past vitest's 5 s timeout.
+// Role queries stay, but scoped to a small subtree (the menu, a row).
+
+/** The header's "Add locations" button. */
+function addLocationsButton(): HTMLElement {
+  return screen.getByText('Add locations', { selector: 'button' });
+}
+
 /** Open a row's Change IP menu and pick "Next free server", or a given server. */
 async function changeIp(portKey: string, server?: string) {
   fireEvent.click(screen.getByTestId(`change-ip-${portKey}`));
-  await screen.findByRole('menu');
+  const menu = await screen.findByTestId('change-ip-menu');
   const item = server
-    ? await screen.findByTestId(`server-${server}`)
-    : screen.getByRole('menuitem', { name: /Next free server/ });
+    ? await within(menu).findByTestId(`server-${server}`)
+    : within(menu).getByRole('menuitem', { name: /Next free server/ });
   // The change resolves asynchronously; let React flush it inside act().
   await act(async () => {
     fireEvent.click(item);
@@ -86,7 +96,7 @@ describe('MainScreen', () => {
   it('pluralises the shortfall note by the number of ports asked for', async () => {
     const api = await renderMain();
     vi.spyOn(api, 'addPorts').mockResolvedValueOnce({ added: [], noteKey: 'no-free-server' });
-    fireEvent.click(screen.getByRole('button', { name: 'Add locations' }));
+    fireEvent.click(addLocationsButton());
     const picker = await screen.findByTestId('location-picker');
     const tokyo = within(picker).getByTestId('pick-hma:JP-TOKYO');
     fireEvent.click(within(tokyo).getByRole('checkbox'));
@@ -100,7 +110,7 @@ describe('MainScreen', () => {
   it('the location picker adds the chosen number of ports per location', async () => {
     const api = await renderMain();
     const addSpy = vi.spyOn(api, 'addPorts');
-    fireEvent.click(screen.getByRole('button', { name: 'Add locations' }));
+    fireEvent.click(addLocationsButton());
     const picker = await screen.findByTestId('location-picker');
 
     const tokyo = within(picker).getByTestId('pick-hma:JP-TOKYO');
