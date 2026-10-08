@@ -66,6 +66,16 @@ if (( DRY_RUN == 1 )); then
   exit 0
 fi
 
+# `electron-forge make` for x64 cleans out/, taking the arm64 artifacts with
+# it, but step 3 still needs the arm64 zip. Keep a copy outside out/ (and, on a
+# resume where even that is gone, fetch the one already on the release).
+A_ZIP_NAME="ProxyFarm-darwin-arm64-$VERSION.zip"
+A_ZIP_KEEP="$ROOT/.release-keep/$A_ZIP_NAME"
+mkdir -p "$ROOT/.release-keep"
+if [[ -f "$ROOT/out/make/zip/darwin/arm64/$A_ZIP_NAME" ]]; then
+  cp -f "$ROOT/out/make/zip/darwin/arm64/$A_ZIP_NAME" "$A_ZIP_KEEP"
+fi
+
 # ── 2. x64 build + sign + notarize + dist (own state file: .release-state-x64.json) ──
 if (( RESUME == 1 )) && [[ -f "$(state_path)" ]]; then
   PREV_VERSION="$(state_get version)"
@@ -82,7 +92,12 @@ X_DMG="$BSN_DMG"
 
 # ── 3. dual-arch latest-mac.yml ──────────────────────────────────────────
 bold "[dual] 3/4  dual-arch latest-mac.yml"
-A_ZIP="$ROOT/out/make/zip/darwin/arm64/ProxyFarm-darwin-arm64-$VERSION.zip"
+A_ZIP="$A_ZIP_KEEP"
+if [[ ! -f "$A_ZIP" ]]; then
+  ensure_gh_token || true
+  gh release download "v$VERSION" --repo "$GH_REPO" --pattern "$A_ZIP_NAME" --dir "$ROOT/.release-keep" --clobber \
+    || { red "[dual] arm64 zip neither kept nor on the v$VERSION release"; exit 1; }
+fi
 for f in "$A_ZIP" "$X_ZIP" "$X_DMG"; do
   [[ -f "$f" ]] || { red "[dual] missing artifact: $f"; exit 1; }
 done
@@ -116,5 +131,6 @@ ensure_gh_token || true
 gh release upload "v$VERSION" --repo "$GH_REPO" --clobber "$X_ZIP" "$X_DMG" "$YML"
 
 state_cleanup
+rm -rf "$ROOT/.release-keep"
 green "[dual] Dual-arch release v$VERSION complete (arm64 + x64)"
 echo "    https://github.com/$GH_REPO/releases/tag/v$VERSION"
