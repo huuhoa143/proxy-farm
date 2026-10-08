@@ -30,6 +30,12 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The location picker showed a location that had just turned out not to be in the plan
+  as "No free server" until the app was restarted: it re-read the locations only when a
+  port changed servers. The app now tells the window whenever a server is marked
+  refused, dead or working, and the picker and the group headers update within a
+  moment. A location group outside the plan now says "Not in your plan" in its header
+  instead of a free-server count.
 - A Change IP to a server outside the plan left the port failed on that server ("not in
   your plan, not retrying") and gave up the server it had been working on, although
   other servers of the location were free. The refused server is still remembered, but

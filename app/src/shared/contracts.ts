@@ -437,6 +437,10 @@ export interface ProxyFarmApi {
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
   onHostVpnChanged(cb: (active: boolean) => void): () => void;
+  /** A server health mark changed (refused, dead, confirmed online, or a hostname
+   * resolved onto a marked machine): the locations' `freeServers`/`notInPlan` from
+   * `listTargets` may be out of date. Carries nothing; re-read what you show. */
+  onTargetsChanged(cb: () => void): () => void;
   onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
 }
 
@@ -448,7 +452,12 @@ export const IPC = {
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',
   ] as const,
-  events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
+  events: {
+    portsChanged: 'pf:portsChanged',
+    hostVpnChanged: 'pf:hostVpnChanged',
+    targetsChanged: 'pf:targetsChanged',
+    updateStatus: 'pf:updateStatus',
+  } as const,
 } as const;
 
 declare global {

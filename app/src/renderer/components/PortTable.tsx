@@ -226,7 +226,14 @@ export function PortTable({
               {target && (
                 <span className="grp-pool">
                   {t('main.group.servers', { count: target.servers.length })}
-                  {target.freeServers != null && (
+                  {target.notInPlan ? (
+                    <>
+                      {' · '}
+                      <span className="free none not-in-plan" title={t('main.picker.notInPlanHint', { provider }) as string} data-testid={`not-in-plan-${group.locationKey}`}>
+                        {t('main.picker.notInPlan')}
+                      </span>
+                    </>
+                  ) : target.freeServers != null && (
                     <>
                       {' · '}
                       <span className={target.freeServers ? 'free' : 'free none'}>

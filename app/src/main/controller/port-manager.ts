@@ -94,6 +94,15 @@ export interface PortManagerDeps {
    */
   serverHealth?: ServerHealth;
   /**
+   * Called (coalesced, at most once per `healthChangedDelayMs`) after a server health mark
+   * changed: refused, dead, confirmed online, marks forgotten, or a hostname resolved onto
+   * another machine. What `listTargets` derives from them (`freeServers`, `notInPlan`)
+   * may differ now, with no port taking or releasing a server. Optional.
+   */
+  onHealthChanged?: () => void;
+  /** @default 100 */
+  healthChangedDelayMs?: number;
+  /**
    * The account pool (spec §4.2 "move a port on refusal"): when every free server of a
    * location has refused the port's account, the port may move to another account of
    * the same provider that can still use one. Optional; without it the port just fails.
@@ -329,6 +338,51 @@ interface SelectOptions {
 }
 
 export function createPortManager(deps: PortManagerDeps): PortManager {
+  let healthTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Tells `deps.onHealthChanged` once a burst of mark changes has settled. */
+  function healthChanged(): void {
+    if (!deps.onHealthChanged || healthTimer) return;
+    healthTimer = setTimeout(() => {
+      healthTimer = undefined;
+      deps.onHealthChanged?.();
+    }, deps.healthChangedDelayMs ?? 100);
+    healthTimer.unref?.();
+  }
+  /** `inner`, reporting every mutation to `healthChanged`. */
+  function observeHealth(inner: ServerHealth): ServerHealth {
+    return {
+      ...inner,
+      noteIp(server, ip) {
+        const changed = inner.noteIp(server, ip);
+        if (changed) healthChanged();
+        return changed;
+      },
+      markOk(accountId, server) {
+        const wasUsable = inner.isUsable(accountId, server);
+        const hadOk = inner.lastOk(accountId, server) !== undefined;
+        inner.markOk(accountId, server);
+        // Only a cleared mark or a first "ok" changes what the UI shows.
+        if (!wasUsable || !hadOk) healthChanged();
+      },
+      markRefused(accountId, server) {
+        inner.markRefused(accountId, server);
+        healthChanged();
+      },
+      markDead(accountId, server) {
+        inner.markDead(accountId, server);
+        healthChanged();
+      },
+      forgetMarks(accountId) {
+        inner.forgetMarks(accountId);
+        healthChanged();
+      },
+      forgetRefusalsSince(accountId, sinceMs) {
+        inner.forgetRefusalsSince(accountId, sinceMs);
+        healthChanged();
+      },
+    };
+  }
+
   const getLanIPv4 = deps.getLanIPv4 ?? firstLanIPv4;
   const refusals = deps.refusals ?? createRefusalTracker({ initial: deps.state.getState().refusals });
   const rotateOnlineTimeoutMs = deps.rotateOnlineTimeoutMs ?? DEFAULT_ROTATE_ONLINE_TIMEOUT_MS;
@@ -336,7 +390,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const backoffRng = deps.backoffRng ?? Math.random;
   const now = deps.now ?? Date.now;
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
-  const health = deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth });
+  const health = observeHealth(deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth }));
   const limiter = deps.attemptLimiter ?? createAttemptLimiter({ now });
   const wgGuard = deps.wgKeyGuard ?? createWgKeyGuard({ now, initial: deps.state.getState().wgLockouts });
   const credentialProbe =

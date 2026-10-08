@@ -449,6 +449,15 @@ describe('PortTable', () => {
       expect(blocked).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
     });
 
+    it('the group header says "Not in your plan" instead of a free-server count', () => {
+      renderGrouped({ targets: [tokyo, { ...hanoi, freeServers: 0, notInPlan: true }] });
+      const stats = screen.getByTestId('group-stats-zoogvpn:VN-HAN');
+      expect(stats).toHaveTextContent('Not in your plan');
+      expect(stats).not.toHaveTextContent('free');
+      expect(screen.getByTestId('not-in-plan-zoogvpn:VN-HAN')).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+      expect(screen.queryByTestId('not-in-plan-hma:JP-TOKYO')).toBeNull();
+    });
+
     it("+ Add port is disabled at the provider's port limit", () => {
       renderGrouped({ limits: { hma: 2 } });
       const blocked = screen.getByTestId('add-port-hma:JP-TOKYO');

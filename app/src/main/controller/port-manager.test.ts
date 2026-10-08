@@ -2082,6 +2082,44 @@ describe('port manager', () => {
       });
     });
 
+    describe('health change events (the picker re-reads targets)', () => {
+      it('a refusal, a dead mark and a first ok each tell onHealthChanged once their burst settles', async () => {
+        const onHealthChanged = vi.fn();
+        const { engine, manager } = setup({
+          targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }, freeTier],
+          port: { enabled: false, state: { kind: 'stopped' } },
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { onHealthChanged, healthChangedDelayMs: 1 },
+        });
+        await manager.startPort('zoogvpn:nl-ams');
+        engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 5, exitIp: '10.0.0.1', country: 'NL' });
+        await vi.waitFor(() => expect(onHealthChanged).toHaveBeenCalledTimes(1)); // first ok
+        // A later online on the same, already-ok server changes nothing the UI shows.
+        engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 6, exitIp: '10.0.0.1', country: 'NL' });
+        await new Promise((r) => setTimeout(r, 10));
+        expect(onHealthChanged).toHaveBeenCalledTimes(1);
+        // A server refusing a port whose login is verified: marked, the port moves on.
+        engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        await vi.waitFor(() => expect(onHealthChanged).toHaveBeenCalledTimes(2));
+      });
+
+      it('a hostname resolving onto a refused machine tells it too', async () => {
+        const onHealthChanged = vi.fn();
+        const serverHealth = createServerHealth();
+        serverHealth.noteIp('de7.webunlim.com', '185.177.229.121');
+        serverHealth.markRefused('z1', 'de7.webunlim.com');
+        const fr: Target = { key: 'zoogvpn:FR', providerId: 'zoogvpn', country: 'FR', city: 'France', label: 'France', servers: ['fr4.webunlim.com'] };
+        const { manager } = setup({
+          targets: [fr],
+          port: { key: 'zoogvpn:FR#1', locationKey: 'zoogvpn:FR', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          depsOverrides: { serverHealth, onHealthChanged, healthChangedDelayMs: 1, resolveServer: async () => '185.177.229.121' },
+        });
+        expect(await manager.addPort(fr, 'z1')).toBeUndefined(); // fr4 = de7, refused
+        await vi.waitFor(() => expect(onHealthChanged).toHaveBeenCalledTimes(1));
+      });
+    });
+
     describe('a mark follows the machine behind every hostname (spec §6.8)', () => {
       // ✅ 2026-10-08: de7.webunlim.com and fr4.webunlim.com both resolve to 185.177.229.121.
       const dns: Record<string, string> = {

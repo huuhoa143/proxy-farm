@@ -23,7 +23,7 @@ import { createRealExitIpProber, createRealPortAllocator } from '../controller/r
 import { createStartQueue } from '../controller/start-queue';
 import { assertSingboxVersion, SINGBOX_PINNED_VERSION, singboxPath } from '../engine/singbox-path';
 import { PortHealth } from '../health/state-machine';
-import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
+import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastTargetsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
 import { installPowerHooks, type PowerManager } from '../power/index';
 import { getProvider, registerAllProviders } from '../providers/index';
 import { setResourcesRoot } from '../resources-root';
@@ -257,6 +257,10 @@ export function runApp(): void {
       allocator,
       refusals,
       pool,
+      // Health marks changed: the picker's "not in your plan" / free counts may be stale.
+      onHealthChanged: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) broadcastTargetsChanged([mainWindow.webContents]);
+      },
     });
     const queue = createStartQueue({ onTaskError: (key, err) => log(`start ${key} failed`, err) });
     /** An automatic restart (app start, resume, a settings change). A terminally failed

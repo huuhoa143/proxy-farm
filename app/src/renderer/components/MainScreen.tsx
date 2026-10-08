@@ -80,6 +80,10 @@ export function MainScreen({ api }: MainScreenProps) {
     };
   }, [api, loadTargets]);
 
+  // Server health changed in main (a server refused, died or came back): free counts
+  // and "not in your plan" may have changed with no port taking or releasing a server.
+  useEffect(() => api.onTargetsChanged(refreshTargets), [api, refreshTargets]);
+
   // A location's free-server count changes whenever a port takes or releases a
   // server, so re-read the targets when the set of (port, server) pairs changes
   // — not on every state tick. The handlers below also re-read once their call

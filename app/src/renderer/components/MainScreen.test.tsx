@@ -153,6 +153,15 @@ describe('MainScreen', () => {
     expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('2 ports selected');
   });
 
+  it('re-reads the locations when main says server health changed, with no port change', async () => {
+    const api = (await renderMain()) as ReturnType<typeof createFakeProxyFarmApi>;
+    const real = await api.listTargets();
+    const tokyo = real.find((t) => t.key === 'hma:JP-TOKYO')!;
+    vi.spyOn(api, 'listTargets').mockResolvedValue(real.map((t) => (t === tokyo ? { ...t, freeServers: 0, notInPlan: true } : t)));
+    act(() => api.__emitTargetsChanged());
+    await waitFor(() => expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('Not in your plan'));
+  });
+
   it('Change IP → next free server moves the port to the best free server', async () => {
     await renderMain();
     expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toHaveTextContent('203.0.113.10');
