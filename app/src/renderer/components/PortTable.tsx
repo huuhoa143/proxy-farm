@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi } from '../../shared/contracts';
-import { describePortState } from '../portStateView';
+import { describePortState, isTerminalFailure } from '../portStateView';
 import { StatusDot } from './StatusDot';
 import { PortDetailsDrawer } from './PortDetailsDrawer';
 import { Flag } from '../ui/Flag';
@@ -16,6 +16,8 @@ export interface PortTableProps {
   onToggleSelectAll: () => void;
   onCopy: (row: PortRow) => void;
   onRotate: (row: PortRow) => void;
+  onStop?: (row: PortRow) => void;
+  onRemove?: (row: PortRow) => void;
   onMovePort?: (row: PortRow) => void;
   /** The real/fake ProxyFarmApi, used by the per-row Details drawer (logs/test/auto-rotate). */
   api: ProxyFarmApi;
@@ -49,6 +51,8 @@ export function PortTable({
   onToggleSelectAll,
   onCopy,
   onRotate,
+  onStop,
+  onRemove,
   onMovePort,
   api,
   notes,
@@ -65,7 +69,9 @@ export function PortTable({
   // by the whole table (not one per row).
   const [, setTick] = useState(0);
   useEffect(() => {
-    const hasCountdown = rows.some((r) => r.state.kind === 'retrying' || r.state.kind === 'failed');
+    const hasCountdown = rows.some(
+      (r) => r.state.kind === 'retrying' || (r.state.kind === 'failed' && !isTerminalFailure(r.state.reason)),
+    );
     if (!hasCountdown) return undefined;
     const id = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(id);
@@ -128,7 +134,9 @@ export function PortTable({
             const note = notes?.[row.key];
             const selected = selectedKeys.has(row.key);
             const isOpen = expanded.has(row.key);
-            const waiting = state.kind === 'retrying' || state.kind === 'failed';
+            // A terminal failure (bad credentials / not in plan) shows no progress
+            // ring — there is no next attempt to count down to.
+            const waiting = state.kind === 'retrying' || (state.kind === 'failed' && !view.terminal);
             const rowClass = ['row', selected ? 'is-selected' : '', state.kind === 'failed' ? 'is-failed' : '']
               .filter(Boolean)
               .join(' ');
@@ -177,12 +185,18 @@ export function PortTable({
                             </div>
                           )}
                         </div>
-                        <div className="st-sub">
-                          <span className="when">
-                            {t('portState.nextTry', { time: clock(view.countdownSeconds ?? 0) })}
-                          </span>{' '}
-                          · {t('portState.attempt', { n: state.attempt })}
-                        </div>
+                        {view.terminal ? (
+                          <div className="st-sub" data-testid={`terminal-${row.key}`}>
+                            {t('portState.actionNeeded')} · {t('portState.attempt', { n: state.attempt })}
+                          </div>
+                        ) : (
+                          <div className="st-sub">
+                            <span className="when">
+                              {t('portState.nextTry', { time: clock(view.countdownSeconds ?? 0) })}
+                            </span>{' '}
+                            · {t('portState.attempt', { n: state.attempt })}
+                          </div>
+                        )}
                       </>
                     )}
                     {note && (
@@ -242,13 +256,34 @@ export function PortTable({
                     <div className="rowact">
                       <button
                         className="btn ghost sm"
-                        title={t('main.rotate') as string}
+                        title={(state.kind === 'online' ? t('main.rotate') : t('main.rotateDisabledHint')) as string}
                         disabled={state.kind !== 'online'}
                         onClick={() => onRotate(row)}
                       >
                         <Icon name="rotate" />
                         <span>{t('main.rotate')}</span>
                       </button>
+                      {onStop && (
+                        <button
+                          className="btn ghost sm"
+                          title={(state.kind === 'stopped' ? t('main.stopDisabledHint') : t('main.stop')) as string}
+                          disabled={state.kind === 'stopped'}
+                          onClick={() => onStop(row)}
+                        >
+                          <Icon name="power" />
+                          <span>{t('main.stop')}</span>
+                        </button>
+                      )}
+                      {onRemove && (
+                        <button
+                          className="btn ghost sm danger"
+                          title={t('main.remove') as string}
+                          onClick={() => onRemove(row)}
+                        >
+                          <Icon name="trash" />
+                          <span>{t('main.remove')}</span>
+                        </button>
+                      )}
                       <button
                         className="btn ghost sm"
                         aria-expanded={isOpen}

@@ -1,9 +1,40 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProxyFarmApi, Settings, UpdateStatus } from '../../shared/contracts';
 import { changeLanguage } from '../i18n';
 import { Icon, type IconName } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
+
+/**
+ * A text/number input that commits on blur or Enter rather than on every
+ * keystroke — so settings (including the proxy password) aren't persisted
+ * one character at a time. `value` is the committed value; local edits live
+ * in a draft until the field is left.
+ */
+function CommitInput({
+  value,
+  onCommit,
+  ...rest
+}: { value: string; onCommit: (value: string) => void } & Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'value' | 'onChange' | 'onBlur'
+>) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      {...rest}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export interface SettingsScreenProps {
   api: ProxyFarmApi;
@@ -128,6 +159,22 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
     schedule('saved', () => setSaved(false), 2000);
   }
 
+  function flashError(message: string) {
+    setError(message);
+    schedule('settings-error', () => setError(null), 5000);
+  }
+
+  /** Parse an integer text field, validating an inclusive range; shows an inline
+   * error and skips the write when the value is blank, non-integer, or out of range. */
+  function commitInt(raw: string, min: number, max: number, errorKey: string, apply: (n: number) => void) {
+    const n = Number(raw);
+    if (raw.trim() === '' || !Number.isInteger(n) || n < min || n > max) {
+      flashError(t(errorKey, { min, max }) as string);
+      return;
+    }
+    apply(n);
+  }
+
   if (!settings) return <p className="screen muted">{t('common.loading')}</p>;
 
   const passLabel = (showPass ? t('common.hidePassword') : t('common.showPassword')) as string;
@@ -137,34 +184,36 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
       <div className="settings">
         <Section icon="key" title={t('settings.proxyAuth.title')} note={t('settings.proxyAuth.note')}>
           <Row id="set-user" label={t('settings.proxyAuth.username')}>
-            <input
+            <CommitInput
               id="set-user"
               className="mono-input"
               value={settings.proxyUser}
               spellCheck={false}
-              onChange={(e) => void patch({ proxyUser: e.target.value })}
+              onCommit={(v) => void patch({ proxyUser: v })}
             />
           </Row>
           <Row id="set-pass" label={t('settings.proxyAuth.password')}>
-            <input
+            <CommitInput
               id="set-pass"
               className="mono-input"
               type={showPass ? 'text' : 'password'}
               value={settings.proxyPass}
               spellCheck={false}
-              onChange={(e) => void patch({ proxyPass: e.target.value })}
+              onCommit={(v) => void patch({ proxyPass: v })}
             />
             <button className="iconbtn" onClick={() => setShowPass((v) => !v)} aria-label={passLabel} title={passLabel}>
               <Icon name="eye" />
             </button>
           </Row>
           <Row id="set-base" label={t('settings.basePort.label')} note={t('settings.basePort.note')}>
-            <input
+            <CommitInput
               id="set-base"
               className="num-input"
               type="number"
-              value={settings.basePort}
-              onChange={(e) => void patch({ basePort: Number(e.target.value) })}
+              min={1024}
+              max={65535}
+              value={String(settings.basePort)}
+              onCommit={(v) => commitInt(v, 1024, 65535, 'settings.basePort.invalid', (n) => void patch({ basePort: n }))}
             />
           </Row>
         </Section>
@@ -222,13 +271,13 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
                 : t('settings.giveUpAfter.minutes', { count: settings.giveUpAfter })
             }
           >
-            <input
+            <CommitInput
               id="set-giveup"
               className="num-input"
               type="number"
               min={0}
-              value={settings.giveUpAfter}
-              onChange={(e) => void patch({ giveUpAfter: Math.max(0, Number(e.target.value) || 0) })}
+              value={String(settings.giveUpAfter)}
+              onCommit={(v) => commitInt(v, 0, 100000, 'settings.giveUpAfter.invalid', (n) => void patch({ giveUpAfter: n }))}
             />
             <span className="unit">{t('settings.giveUpAfter.unit')}</span>
           </Row>
@@ -248,21 +297,27 @@ export function SettingsScreen({ api }: SettingsScreenProps) {
           {settings.webhook.enabled && (
             <>
               <Row id="set-hook-port" label={t('settings.webhook.port')}>
-                <input
+                <CommitInput
                   id="set-hook-port"
                   className="num-input"
                   type="number"
-                  value={settings.webhook.port}
-                  onChange={(e) => void patch({ webhook: { ...settings.webhook, port: Number(e.target.value) } })}
+                  min={1}
+                  max={65535}
+                  value={String(settings.webhook.port)}
+                  onCommit={(v) =>
+                    commitInt(v, 1, 65535, 'settings.webhook.portInvalid', (n) =>
+                      void patch({ webhook: { ...settings.webhook, port: n } }),
+                    )
+                  }
                 />
               </Row>
               <Row id="set-hook-bearer" label={t('settings.webhook.bearer')}>
-                <input
+                <CommitInput
                   id="set-hook-bearer"
                   className="mono-input"
                   value={settings.webhook.bearer}
                   spellCheck={false}
-                  onChange={(e) => void patch({ webhook: { ...settings.webhook, bearer: e.target.value } })}
+                  onCommit={(v) => void patch({ webhook: { ...settings.webhook, bearer: v } })}
                 />
               </Row>
             </>

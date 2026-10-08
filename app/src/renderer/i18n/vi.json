@@ -33,7 +33,7 @@
     "title": "Thêm nhà cung cấp",
     "subtitle": "Kết nối một gói VPN để bắt đầu chạy các cổng proxy cục bộ.",
     "addAnother": "Thêm nhà cung cấp khác",
-    "continueToApp": "Tiếp tục",
+    "continueToApp": "Đến trang Cổng",
     "providers": {
       "hma": {
         "name": "HMA",
@@ -81,6 +81,7 @@
         "browse": "Chọn tệp…",
         "countryLabel": "Quốc gia",
         "countryGuessedNote": "Đoán từ tên tệp — sửa lại nếu sai.",
+        "countryInvalid": "Nhập mã quốc gia 2 chữ cái (ví dụ US, DE).",
         "import": "Nhập",
         "initials": "T",
         "chooseAnother": "Chọn tệp khác"
@@ -136,10 +137,20 @@
     },
     "copyPort": "Sao chép địa chỉ",
     "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được — đã mở Xuất để bạn tự sao chép.",
     "rotate": "Xoay IP",
     "rotating": "Đang xoay…",
+    "rotateDisabledHint": "Chỉ cổng đang hoạt động mới xoay được IP.",
+    "stop": "Tắt",
+    "stopDisabledHint": "Cổng này đã dừng.",
+    "remove": "Xoá",
     "details": "Chi tiết",
     "selectAll": "Chọn tất cả",
+    "confirmRemove": {
+      "title": "Xoá cổng?",
+      "message_one": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách.",
+      "message_other": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách."
+    },
     "logs": {
       "title": "Nhật ký",
       "refresh": "Làm mới",
@@ -184,6 +195,7 @@
         "curl": "lệnh curl"
       },
       "copyAll": "Sao chép tất cả",
+      "copyFailed": "Không sao chép được vào bộ nhớ tạm — hãy bôi đen đoạn trên và tự sao chép.",
       "close": "Đóng",
       "count_one": "{{count}} cổng",
       "count_other": "{{count}} cổng"
@@ -255,6 +267,7 @@
     },
     "attempt": "lần {{n}}",
     "nextTry": "Thử lại sau {{time}}",
+    "actionNeeded": "Cần bạn xử lý — sẽ không tự thử lại",
     "reason": {
       "timeout": "Kết nối không lên kịp.",
       "unreachable": "Máy chủ không phản hồi.",
@@ -276,7 +289,8 @@
     },
     "basePort": {
       "label": "Cổng gốc",
-      "note": "Cổng proxy đầu tiên. Mỗi vị trí mới sẽ nhận cổng trống kế tiếp."
+      "note": "Cổng proxy đầu tiên. Mỗi vị trí mới sẽ nhận cổng trống kế tiếp.",
+      "invalid": "Nhập một số nguyên từ {{min}} đến {{max}}."
     },
     "lanSharing": {
       "label": "Chia sẻ trong mạng nội bộ",
@@ -296,13 +310,15 @@
       "never": "Không bao giờ",
       "minutes": "{{count}} phút",
       "neverNote": "0 = không bao giờ bỏ cuộc; luôn thử lại.",
-      "unit": "phút"
+      "unit": "phút",
+      "invalid": "Nhập số phút nguyên ({{min}} trở lên)."
     },
     "webhook": {
       "title": "Webhook xoay IP",
       "enable": "Bật webhook xoay IP",
       "offByDefaultNote": "Mặc định tắt. Chỉ mở một cổng lắng nghe cục bộ riêng khi được bật.",
       "port": "Cổng",
+      "portInvalid": "Nhập số cổng nguyên từ {{min}} đến {{max}}.",
       "bearer": "Mã bearer"
     },
     "language": {

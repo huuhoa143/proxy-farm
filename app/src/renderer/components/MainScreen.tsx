@@ -6,6 +6,7 @@ import { LocationPicker } from './LocationPicker';
 import { PortTable } from './PortTable';
 import { BulkActionBar } from './BulkActionBar';
 import { ExportModal } from './ExportModal';
+import { ConfirmDialog } from './ConfirmDialog';
 import { StatRail } from './StatRail';
 import { CredentialsChip } from './CredentialsChip';
 import { Icon } from '../ui/Icon';
@@ -33,6 +34,8 @@ export function MainScreen({ api }: MainScreenProps) {
   const [exporting, setExporting] = useState<string[] | null>(null);
   const [picking, setPicking] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string[] | null>(null);
   const [rotateNotes, setRotateNotes] = useState<Record<string, string>>({});
   const [bulkRotateSummary, setBulkRotateSummary] = useState<string | null>(null);
   const schedule = useKeyedTimeouts();
@@ -73,10 +76,38 @@ export function MainScreen({ api }: MainScreenProps) {
   }
 
   async function handleCopy(row: PortRow) {
-    const text = await api.exportPorts([row.key], 'hostPort');
-    await navigator.clipboard?.writeText(text);
-    setCopiedKey(row.key);
-    schedule('copied', () => setCopiedKey(null), COPIED_MS);
+    // Proxy auth is mandatory, so copy the authenticated host:port:user:pass
+    // form (the Export modal's default) — a bare host:port never authenticates.
+    const text = await api.exportPorts([row.key], 'hostPortUserPass');
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(text);
+      setCopyError(false);
+      setCopiedKey(row.key);
+      schedule('copied', () => setCopiedKey(null), COPIED_MS);
+    } catch {
+      // Clipboard blocked (no permission / non-secure context): surface it and
+      // fall back to the Export modal, whose textarea can be selected by hand.
+      setCopiedKey(null);
+      setCopyError(true);
+      schedule('copy-error', () => setCopyError(false), NOTE_MS);
+      setExporting([row.key]);
+    }
+  }
+
+  async function handleStop(keys: string[]) {
+    await api.stopPorts(keys);
+    setPorts(await api.listPorts());
+  }
+
+  async function handleRemove(keys: string[]) {
+    await api.removePorts(keys);
+    setPorts(await api.listPorts());
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const key of keys) next.delete(key);
+      return next;
+    });
   }
 
   function describeRotateResult(result: RotateResult): string | undefined {
@@ -143,14 +174,9 @@ export function MainScreen({ api }: MainScreenProps) {
       <BulkActionBar
         count={selected.size}
         onStart={() => void handleStart(selectedKeys).then(() => setSelected(new Set()))}
-        onStop={() => void api.stopPorts(selectedKeys).then(async () => setPorts(await api.listPorts()))}
+        onStop={() => void handleStop(selectedKeys)}
         onRotate={() => void handleBulkRotate(selectedKeys)}
-        onRemove={() =>
-          void api
-            .removePorts(selectedKeys)
-            .then(async () => setPorts(await api.listPorts()))
-            .then(() => setSelected(new Set()))
-        }
+        onRemove={() => setConfirmRemove(selectedKeys)}
         onExport={() => setExporting(selectedKeys)}
         onClear={() => setSelected(new Set())}
       />
@@ -182,6 +208,8 @@ export function MainScreen({ api }: MainScreenProps) {
           onToggleSelectAll={toggleSelectAll}
           onCopy={handleCopy}
           onRotate={handleRotate}
+          onStop={(row) => void handleStop([row.key])}
+          onRemove={(row) => setConfirmRemove([row.key])}
           onMovePort={handleMovePort}
           api={api}
           notes={rotateNotes}
@@ -193,6 +221,26 @@ export function MainScreen({ api }: MainScreenProps) {
           <Icon name="check" />
           {t('main.copied')}
         </div>
+      )}
+      {copyError && (
+        <div className="toast bad" data-testid="copy-error-toast" role="alert">
+          <Icon name="alert" />
+          {t('main.copyFailed')}
+        </div>
+      )}
+      {confirmRemove && (
+        <ConfirmDialog
+          title={t('main.confirmRemove.title')}
+          message={t('main.confirmRemove.message', { count: confirmRemove.length })}
+          confirmLabel={t('main.bulk.remove')}
+          danger
+          onCancel={() => setConfirmRemove(null)}
+          onConfirm={() => {
+            const keys = confirmRemove;
+            setConfirmRemove(null);
+            void handleRemove(keys);
+          }}
+        />
       )}
       {picking && (
         <LocationPicker

@@ -5,6 +5,7 @@ import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
 import { providerName } from '../ui/providerName';
+import { useModalFocusTrap } from '../ui/useModalFocusTrap';
 
 export interface LocationPickerProps {
   targets: Target[];
@@ -39,16 +40,14 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
   const language = i18n.language || 'en';
+
+  useModalFocusTrap(drawerRef, onClose);
 
   useEffect(() => {
     searchRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const providers = useMemo(() => {
     const counts = new Map<ProviderId, number>();
@@ -109,6 +108,8 @@ export function LocationPicker({ targets, runningKeys, onStart, onClose }: Locat
         aria-modal="true"
         aria-labelledby="picker-title"
         data-testid="location-picker"
+        ref={drawerRef}
+        tabIndex={-1}
       >
         <div className="drawer-h">
           <div className="t">

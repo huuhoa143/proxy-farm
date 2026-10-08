@@ -1246,6 +1246,12 @@ table.port-table {
   height: 16px;
   color: var(--acc);
 }
+.toast.bad {
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.toast.bad svg {
+  color: var(--bad);
+}
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -1490,6 +1496,14 @@ table.port-table {
   flex-direction: column;
   overflow: hidden;
   animation: rise 0.25s var(--ease) both;
+}
+.modal-box.confirm-box {
+  width: min(440px, 96vw);
+}
+.modal-box.confirm-box .mb {
+  color: var(--dim);
+  line-height: 1.55;
+  font-size: 13.5px;
 }
 .modal-box .mh {
   display: flex;
@@ -1770,6 +1784,9 @@ table.port-table {
   font-size: 12px;
   color: var(--mut);
   line-height: 1.5;
+}
+.hint.bad {
+  color: var(--bad);
 }
 .path {
   display: inline-block;
