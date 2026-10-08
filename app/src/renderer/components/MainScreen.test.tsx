@@ -263,6 +263,20 @@ describe('MainScreen', () => {
     );
   });
 
+  it('a picked server that refused the account says so, and where the port went back to', async () => {
+    const api = await renderMain();
+    vi.spyOn(api, 'rotatePort').mockResolvedValueOnce({
+      changed: false,
+      noteKey: 'rotate.server-refused-returned',
+      refusedServer: 'de7.webunlim.com',
+      landedOn: 'de3.webunlim.com',
+    });
+    await changeIp(TOKYO_1);
+    await waitFor(() =>
+      expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent("de7.webunlim.com isn't in your plan — the port went back to de3.webunlim.com."),
+    );
+  });
+
   it('bulk Change IP summarises changed / moved-to-another-city / unavailable', async () => {
     await renderMain();
     for (const key of [TOKYO_1, 'hma:US-NYC#1', 'zoogvpn:NL#1']) {

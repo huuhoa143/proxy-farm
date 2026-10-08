@@ -30,6 +30,15 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A Change IP to a server outside the plan left the port failed on that server ("not in
+  your plan, not retrying") and gave up the server it had been working on, although
+  other servers of the location were free. The refused server is still remembered, but
+  the port now goes back to the server it was on before, or, if that one is no longer
+  usable, to the next free usable server of the location. The row says which server
+  refused and where the port went. It fails for good only when no usable server is
+  left. Any other refusal of a port that was online follows the same rule, during a
+  Change IP too, and a login that a server accepted moments ago is no longer re-checked
+  with an extra connection.
 - A port that failed for good (sign-in rejected, location not in the plan, WireGuard key
   not answered) kept starting a new engine about every 41 s against a server that had
   just refused it, while the row said it would not retry. Such a port now stops its

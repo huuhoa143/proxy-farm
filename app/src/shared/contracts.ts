@@ -290,6 +290,12 @@ export interface RotateResult {
    * (§6.5 step 2): that location's city. Reported even when `changed` is false (the new
    * exit IP could not be confirmed), so the move is never silent. */
   movedTo?: string;
+  /** Set when the server Change IP moved the port to refused its account (not in the
+   * plan, another tenant's server): that server. The port does not stay on it. */
+  refusedServer?: string;
+  /** With `refusedServer`: the server the port went to instead, once it was online
+   * again (the one it was on before when still usable). Absent when it found none. */
+  landedOn?: string;
 }
 
 export interface AppStatus {

@@ -490,6 +490,9 @@
     "secretsUnavailable": "This computer's secure storage isn't available, so your passwords and keys are kept in memory only. You'll need to add them again after you quit."
   },
   "rotate": {
+    "server-refused": "{{server}} isn't in your plan, and no other server here is free and usable — the port can't connect.",
+    "server-refused-returned": "{{server}} isn't in your plan — the port went back to {{to}}.",
+    "server-refused-moved": "{{server}} isn't in your plan — the port moved to {{to}} instead.",
     "not-verified": "Rotated, but the old exit IP was unknown, so the change couldn't be confirmed.",
     "online-timeout": "The new server didn't come online in time.",
     "probe-failed": "Rotated, but the new exit IP couldn't be checked.",

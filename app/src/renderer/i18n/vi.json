@@ -490,6 +490,9 @@
     "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khoá chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
   },
   "rotate": {
+    "server-refused": "{{server}} không có trong gói của bạn, và ở đây không còn máy chủ trống nào dùng được — cổng không kết nối được.",
+    "server-refused-returned": "{{server}} không có trong gói của bạn — cổng đã quay lại {{to}}.",
+    "server-refused-moved": "{{server}} không có trong gói của bạn — cổng đã chuyển sang {{to}}.",
     "not-verified": "Đã đổi, nhưng không biết IP cũ nên không xác nhận được thay đổi.",
     "online-timeout": "Máy chủ mới không lên kịp.",
     "probe-failed": "Đã đổi, nhưng không kiểm tra được IP mới.",

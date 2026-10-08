@@ -218,6 +218,10 @@ export function MainScreen({ api }: MainScreenProps) {
     // A move to another city is always said, whether or not the new IP was confirmed.
     if (result.movedTo) return t('main.rotateResult.movedToCityNote', { city: result.movedTo });
     if (result.noteKey === SAME_CITY_NOTE) return t(SAME_CITY_NOTE);
+    // The picked server refused the account: say so, and where the port is now.
+    if (result.refusedServer && result.noteKey) {
+      return t(result.noteKey, { server: result.refusedServer, to: result.landedOn, defaultValue: result.noteKey });
+    }
     if (result.changed) {
       return t('main.rotateResult.changedNote', { from: result.from, to: result.to });
     }

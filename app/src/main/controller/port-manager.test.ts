@@ -1998,6 +1998,90 @@ describe('port manager', () => {
       });
     });
 
+    describe('a Change IP onto a server that refuses the account (spec §6.5, §6.8)', () => {
+      const de = (servers: string[]): Target => ({ key: 'zoogvpn:DE', providerId: 'zoogvpn', country: 'DE', city: 'Germany', label: 'Germany', countryWide: true, servers });
+      const pool = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4', '10.0.0.5', '10.0.0.6'];
+      const refusing = new Set(['10.0.0.5', '10.0.0.6']);
+
+      /** One port online on 10.0.0.3 (so its login is verified). The fake engine refuses
+       * the login on `refusing` servers and brings every other server online. */
+      function rotateSetup(servers = pool) {
+        const serverHealth = createServerHealth();
+        const engine = fakeEngine({ autoOnline: false });
+        const start = engine.start;
+        engine.start = async (key, input, o) => {
+          await start(key, input, o);
+          const ip = boundIp(input);
+          setTimeout(() => {
+            if (refusing.has(ip)) engine.fireState(key, { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+            else engine.fireState(key, { kind: 'online', since: Date.now(), exitIp: ip, country: 'DE' });
+          }, 0);
+        };
+        const ctx = setup({
+          targets: [de(servers), freeTier],
+          port: { key: 'zoogvpn:DE#1', locationKey: 'zoogvpn:DE', country: 'DE', city: 'Germany', serverIp: '10.0.0.3', state: { kind: 'queued' } },
+          portServers: { 'zoogvpn:DE': '10.0.0.3' },
+          engine,
+          exitIpResults: Array.from({ length: 4 }, (_, i) => ({ ip: ['10.0.0.3', '10.0.0.1', '10.0.0.3', '10.0.0.3'][i], country: 'DE' })),
+          depsOverrides: { serverHealth, rotateOnlineTimeoutMs: 2000 },
+        });
+        return { ...ctx, engine, serverHealth };
+      }
+
+      /** Starts the port on 10.0.0.3 and waits for it online: its login is now verified. */
+      async function online(ctx: ReturnType<typeof rotateSetup>) {
+        await ctx.manager.startPort('zoogvpn:DE#1');
+        await vi.waitFor(() => expect(ctx.state.getState().ports[0].state.kind).toBe('online'));
+        expect(ctx.state.getState().credentials?.z1?.state).toBe('verified');
+        ctx.engine.started.length = 0;
+        return ctx;
+      }
+
+      it('a refused pick is marked and the port goes back to the server it was on, saying so', async () => {
+        const { manager, engine, state, serverHealth } = await online(rotateSetup());
+        const result = await manager.rotatePort('zoogvpn:DE#1', '10.0.0.5', { user: true });
+        expect(serverHealth.isRefused('z1', '10.0.0.5')).toBe(true);
+        expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.5', '10.0.0.3']);
+        expect(state.getState().ports[0]).toMatchObject({ server: '10.0.0.3', state: { kind: 'online' } });
+        expect(result).toMatchObject({ changed: false, noteKey: 'server-refused-returned', refusedServer: '10.0.0.5', landedOn: '10.0.0.3' });
+      });
+
+      it('with its old server no longer usable, it moves to the next free usable one instead', async () => {
+        const { manager, engine, state, serverHealth } = await online(rotateSetup());
+        serverHealth.markDead('z1', '10.0.0.3'); // went down meanwhile
+        const result = await manager.rotatePort('zoogvpn:DE#1', '10.0.0.5', { user: true });
+        expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.5', '10.0.0.1']);
+        expect(state.getState().ports[0]).toMatchObject({ server: '10.0.0.1', state: { kind: 'online' } });
+        expect(result).toMatchObject({ noteKey: 'server-refused-moved', refusedServer: '10.0.0.5', landedOn: '10.0.0.1' });
+      });
+
+      it('fails for good only when no usable server is left in the location', async () => {
+        const { manager, engine, state, serverHealth } = await online(rotateSetup(['10.0.0.3', '10.0.0.5']));
+        serverHealth.markDead('z1', '10.0.0.3');
+        const result = await manager.rotatePort('zoogvpn:DE#1', '10.0.0.5', { user: true });
+        await new Promise((r) => setTimeout(r, 10));
+        expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.5']);
+        expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'not-in-plan' });
+        expect(result).toMatchObject({ changed: false, noteKey: 'server-refused', refusedServer: '10.0.0.5' });
+        expect(result.landedOn).toBeUndefined();
+      });
+
+      it('an automatic Change IP that lands on a refusing server returns too, past other refusals', async () => {
+        const { manager, engine, state } = await online(rotateSetup(['10.0.0.3', '10.0.0.5', '10.0.0.6']));
+        const result = await manager.rotatePort('zoogvpn:DE#1');
+        // Round-robin from .3 picks .5 (refused); the failover goes straight back to .3.
+        expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.5', '10.0.0.3']);
+        expect(state.getState().ports[0]).toMatchObject({ server: '10.0.0.3', state: { kind: 'online' } });
+        expect(result).toMatchObject({ noteKey: 'server-refused-returned', landedOn: '10.0.0.3' });
+      });
+
+      it('the Change IP lock is released while it waits, so a later Change IP works', async () => {
+        const { manager } = await online(rotateSetup());
+        await manager.rotatePort('zoogvpn:DE#1', '10.0.0.5', { user: true });
+        expect((await manager.rotatePort('zoogvpn:DE#1', '10.0.0.2', { user: true })).noteKey).not.toBe('rotate-in-progress');
+      });
+    });
+
     describe('a mark follows the machine behind every hostname (spec §6.8)', () => {
       // ✅ 2026-10-08: de7.webunlim.com and fr4.webunlim.com both resolve to 185.177.229.121.
       const dns: Record<string, string> = {

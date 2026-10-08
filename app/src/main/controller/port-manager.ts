@@ -319,6 +319,9 @@ interface SelectOptions {
   exclude?: Identity;
   /** Change IP: cycle through the pool from the current server instead of best-first. */
   roundRobinFrom?: string;
+  /** Tried right after `pinned` (before the best-first order): the server the port should
+   * go back to when it has to leave `pinned`, e.g. the one it was on before a Change IP. */
+  preferred?: string;
   /** 'restart' only: may fall back to a server refused for the account. Only a user
    * action may knock on a door that refused the account (spec §6.4): an automatic
    * restart onto a refused server is a handshake that is known to fail. */
@@ -370,6 +373,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // can never run concurrently against the same port (reviewer item 10). A rotate that
   // moves the port to another location holds its new key here too.
   const rotatingKeys = new Set<string>();
+  /** port key -> the server it was on before its last Change IP within its location,
+   * until it is online again. If the new server refuses it, the failover goes back
+   * there first (spec §6.5: a refused pick must not cost the port its working server). */
+  const returnTo = new Map<string, string>();
 
   function persistRefusals(): void {
     deps.state.setState((st) => ({ ...st, refusals: refusals.serialize() }));
@@ -492,7 +499,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         return okA !== okB ? okB - okA : index.get(a)! - index.get(b)!;
       });
     }
-    if (opts.pinned !== undefined && order.includes(opts.pinned)) order = [opts.pinned, ...order.filter((s) => s !== opts.pinned)];
+    for (const first of [opts.preferred, opts.pinned]) if (first !== undefined && order.includes(first)) order = [first, ...order.filter((s) => s !== first)];
     // Stable sort: usable first, keeping the order above within each tier.
     const ranked = order.map((s) => ({ s, t: tier(opts.accountId, s) }));
     const maxTier = maxTierOf(opts);
@@ -657,10 +664,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   }
 
   /** Moves an enabled port off its current server if a usable free one remains for its
-   * account (spec §6.8 failover). False when there is nowhere to go. */
-  function failOver(key: string, reasonKey: string): boolean {
+   * account (spec §6.8 failover). False when there is nowhere to go.
+   *
+   * A refusal (`refusal: true`) fails over even while a Change IP is in flight: the
+   * refused server is the one the Change IP just moved the port to, and the rotate has
+   * already stopped waiting on it (a `failed` state ends its wait). Leaving the port
+   * there would strand it on a server that refused it while usable ones are free. */
+  function failOver(key: string, reasonKey: string, opts: { refusal?: boolean } = {}): boolean {
     const port = findPort(key);
-    if (!port || !port.enabled || rotatingKeys.has(key)) return false;
+    if (!port || !port.enabled || (rotatingKeys.has(key) && !opts.refusal)) return false;
     if (!hasUsableAlternative(port, port.accountId, false)) return false;
     restartElsewhere(key, reasonKey);
     return true;
@@ -671,7 +683,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * by another — spec §6.8). Never for files: a file IS its account. */
   function moveToAnotherAccount(key: string): boolean {
     const port = findPort(key);
-    if (!port || !port.enabled || rotatingKeys.has(key) || !deps.pool || port.providerId === 'file') return false;
+    // Called only on a refusal: like `failOver`'s, it may act during a Change IP.
+    if (!port || !port.enabled || !deps.pool || port.providerId === 'file') return false;
     const next = deps.pool.pickAccount(port.providerId, { exclude: port.accountId, forPortKey: key });
     if (!next || !hasUsableAlternative(port, next.id, true)) return false;
     restartElsewhere(key, 'server-refused', { accountId: next.id });
@@ -778,12 +791,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   function planRefusal(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     health.markRefused(port.accountId, port.server);
     persistHealth();
-    if (failOver(port.key, 'server-not-in-plan')) return;
+    if (failOver(port.key, 'server-not-in-plan', { refusal: true })) return;
     if (moveToAnotherAccount(port.key)) return;
     failTerminal(port.key, 'not-in-plan', state, locationRefusesAll(port) ? 'location-not-in-plan' : undefined);
     // Verified a while ago, and nothing of the account is up: the password may have been
-    // changed since. Check again (throttled) before blaming the plan for good.
-    if (!anyOnline(port.accountId)) void verifyStoredCredentials(port.accountId);
+    // changed since. Check again (throttled) before blaming the plan for good — but not
+    // when a server accepted the login moments ago (a Change IP off a working server).
+    const verifiedAt = credentialOf(port.accountId)?.verifiedAt;
+    const verifiedJustNow = verifiedAt !== undefined && now() - verifiedAt < CREDENTIAL_PROBE_INTERVAL_MS;
+    if (!anyOnline(port.accountId) && !verifiedJustNow) void verifyStoredCredentials(port.accountId);
   }
 
   /** No free-tier server could be reached, so nothing is known (spec §5.2, last resort):
@@ -793,7 +809,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   function unverifiedRefusal(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     if (refusals.suspectsBadLogin(port.accountId)) return failTerminal(port.key, 'auth', state, 'unverified-login');
     health.markDead(port.accountId, port.server);
-    if (!failOver(port.key, 'server-refused')) failTerminal(port.key, 'auth', state, 'unverified-login');
+    if (!failOver(port.key, 'server-refused', { refusal: true })) failTerminal(port.key, 'auth', state, 'unverified-login');
   }
 
   /** A `failed(auth)` from the engine (spec §5.1, §5.2, §6.8 "server refused"). Every
@@ -806,7 +822,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       if (!accountWorksElsewhere(port)) return failTerminal(port.key, 'auth', state);
       health.markRefused(port.accountId, port.server);
       persistHealth();
-      if (failOver(port.key, 'server-refused')) return;
+      if (failOver(port.key, 'server-refused', { refusal: true })) return;
       if (moveToAnotherAccount(port.key)) return;
       return failTerminal(port.key, 'auth', state);
     }
@@ -1001,6 +1017,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
     let incident: ProviderId | '*' | undefined;
     if (state.kind === 'online') {
+      returnTo.delete(key);
       onlineSinceStart.add(key);
       lastOnlineServer.set(key, port.server);
       stickyFailures.delete(key);
@@ -1172,6 +1189,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           portKey: key,
           mode: 'restart',
           pinned: fresh.server,
+          // Forced off its server (refused, dead): back to where it was before a Change
+          // IP, else where it was last online, before any untried server.
+          preferred: returnTo.get(key) ?? lastOnlineServer.get(key),
           allowRefused: mayRetryTerminal,
         });
         if (stoppedMeanwhile()) return undefined; // stopped while resolving
@@ -1225,6 +1245,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function stopPort(key: string): Promise<void> {
     cancelLocalRetry(key); // the user explicitly stopped it — no surprise restarts later
+    returnTo.delete(key);
     backoffAttempts.delete(key);
     await deps.engine.stop(key);
     updatePort(key, { enabled: false, state: { kind: 'stopped' } });
@@ -1233,6 +1254,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function removePort(key: string): Promise<void> {
     cancelLocalRetry(key);
+    returnTo.delete(key);
+    lastOnlineServer.delete(key);
     backoffAttempts.delete(key);
     portTargets.delete(key);
     await deps.engine.stop(key).catch(() => undefined);
@@ -1248,17 +1271,36 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     rotatingKeys.add(key);
     // The row the user is looking at may be renamed partway (same-country fallback);
     // any throw after that must be attributed to the new key (reviewer round 3, item 2).
-    const effectiveKey = { current: key };
+    const effectiveKey: RotateKeys = { current: key, released: false };
     try {
       return await doRotate(key, toServer, effectiveKey, opts);
     } catch (err) {
       failWithRetry(effectiveKey.current, { kind: 'retrying', reasonKey: 'rotate-error' });
       throw err;
     } finally {
-      rotatingKeys.delete(key);
-      rotatingKeys.delete(effectiveKey.current);
+      releaseRotate(key, effectiveKey);
       syncAutoRotate();
     }
+  }
+
+  /** The keys a Change IP locks: the port's, and the one it is renamed to. */
+  interface RotateKeys {
+    current: string;
+    /** Unlocked early (`releaseRotate`): a later Change IP may hold the keys now. */
+    released: boolean;
+  }
+
+  function releaseRotate(key: string, keys: RotateKeys): void {
+    if (keys.released) return;
+    keys.released = true;
+    rotatingKeys.delete(key);
+    rotatingKeys.delete(keys.current);
+  }
+
+  /** A Change IP within `target` is leaving `from`: remember it as the way back. */
+  function rememberReturn(key: string, target: Target, from: string | undefined): void {
+    if (from !== undefined && target.servers.includes(from)) returnTo.set(key, from);
+    else returnTo.delete(key);
   }
 
   interface RotateClaim {
@@ -1269,7 +1311,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     fellBackToAnotherCity: boolean;
   }
 
-  async function doRotate(key: string, toServer: string | undefined, effectiveKey: { current: string }, opts: StartOptions): Promise<RotateResult> {
+  async function doRotate(key: string, toServer: string | undefined, effectiveKey: RotateKeys, opts: StartOptions): Promise<RotateResult> {
     const s = deps.state.getState();
     const port = s.ports.find((p) => p.key === key);
     if (!port) return { changed: false, noteKey: 'no-server' };
@@ -1330,6 +1372,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         noteResolved(currentTarget, toServer, ip);
         if (!health.isUsable(fresh.accountId, toServer)) return { noteKey: 'server-unavailable' }; // another name of a marked machine
         if (heldBy(fresh.providerId, identityOf(toServer, ip), key)) return { noteKey: 'server-unavailable' };
+        rememberReturn(key, currentTarget, fresh.server);
         updatePort(key, onNewServer(toServer, ip));
         return { target: currentTarget, pick: { server: toServer, ip }, account, finalKey: key, fellBackToAnotherCity: false };
       }
@@ -1345,6 +1388,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           roundRobinFrom: fresh.server,
         });
         if (pick) {
+          rememberReturn(key, currentTarget, fresh.server);
           updatePort(key, onNewServer(pick.server, pick.ip));
           return { target: currentTarget, pick, account, finalKey: key, fellBackToAnotherCity: false };
         }
@@ -1357,6 +1401,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         const { pick } = await selectServer({ target: alt, accountId: altAccount.id, portKey: key, mode: 'strict', exclude: current });
         if (!pick) continue;
         const finalKey = makePortKey(alt.key, nextPortNumber(alt.key));
+        returnTo.delete(key); // its old server is in another location now
         // Rename NOW, before the engine is told about it (reviewer item 2): a state event
         // fired for `finalKey` must find its row. The old key's `online` must not carry
         // over: nothing reports for that key any more once it is renamed.
@@ -1424,6 +1469,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
     // Wait for `PortHealth` to confirm the tunnel before probing (reviewer item 1).
     const reachedOnline = await waitForOnlineOrTimeout(finalKey, rotateOnlineTimeoutMs);
+    if (!reachedOnline && !fellBackToAnotherCity && health.isRefused(claim.account.id, pick.server)) {
+      return settleAfterRefusal(key, effectiveKey, { refused: pick.server, previous: port.server, beforeIp, beforeIpUnverifiable, auth, proxyPort: port.proxyPort });
+    }
     let afterIp: string | undefined;
     if (reachedOnline) {
       try {
@@ -1448,6 +1496,66 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
             : 'exit-ip-unchanged';
 
     return { changed, from: beforeIp, to: afterIp, noteKey };
+  }
+
+  /**
+   * The server a Change IP moved the port to refused its account (spec §6.5, §6.8): the
+   * refusal path has marked it and is moving the port on, back to the server it came
+   * from when that is still usable, else to the next free usable one; it fails for good
+   * only with none left. Waits for where it lands and says so. The rotate lock is
+   * released first: what runs now is ordinary failover, whose own retries must not be
+   * held back by it.
+   */
+  async function settleAfterRefusal(
+    key: string,
+    keys: RotateKeys,
+    ctx: {
+      refused: string;
+      previous?: string;
+      beforeIp?: string;
+      beforeIpUnverifiable: boolean;
+      auth?: { username: string; password: string };
+      proxyPort: number;
+    },
+  ): Promise<RotateResult> {
+    const finalKey = keys.current;
+    releaseRotate(key, keys);
+    const deadline = Date.now() + rotateOnlineTimeoutMs;
+    let online = false;
+    for (;;) {
+      const row = findPort(finalKey);
+      if (!row || !row.enabled || isTerminalState(row.state)) break;
+      if (row.state.kind === 'online') {
+        online = true;
+        break;
+      }
+      const left = deadline - Date.now();
+      if (left <= 0) break;
+      // A `failed` that is not terminal (another refusal, moving on again) waits once more.
+      if (await waitForOnlineOrTimeout(finalKey, left)) {
+        online = true;
+        break;
+      }
+    }
+    const landedOn = online ? findPort(finalKey)?.server : undefined;
+    let afterIp: string | undefined;
+    if (landedOn !== undefined) {
+      try {
+        afterIp = (await deps.exitIp.probe(ctx.proxyPort, ctx.auth)).ip;
+      } catch {
+        afterIp = undefined;
+      }
+    }
+    const changed = !ctx.beforeIpUnverifiable && ctx.beforeIp !== undefined && afterIp !== undefined && afterIp !== ctx.beforeIp;
+    const noteKey = landedOn === undefined ? 'server-refused' : landedOn === ctx.previous ? 'server-refused-returned' : 'server-refused-moved';
+    return {
+      changed,
+      ...(ctx.beforeIp !== undefined ? { from: ctx.beforeIp } : {}),
+      ...(afterIp !== undefined ? { to: afterIp } : {}),
+      noteKey,
+      refusedServer: ctx.refused,
+      ...(landedOn !== undefined ? { landedOn } : {}),
+    };
   }
 
   function listServers(target: Target, portKey?: string): ServerInfo[] {
