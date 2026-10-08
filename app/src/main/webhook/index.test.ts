@@ -1,8 +1,8 @@
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RotateResult } from '../../shared/contracts';
-import { generateBearer, MIN_BEARER_LENGTH, startWebhook, type Webhook } from './index';
+import type { PortRow, RotateResult } from '../../shared/contracts';
+import { generateBearer, MIN_BEARER_LENGTH, resolveRotateKey, startWebhook, type Webhook } from './index';
 
 function call(
   port: number,
@@ -39,13 +39,17 @@ describe('rotate webhook (spec §6.6)', () => {
     webhook = undefined;
   });
 
-  async function start(rotate = vi.fn(async (): Promise<RotateResult> => ({ changed: true, from: '1.1.1.1', to: '2.2.2.2' }))) {
+  async function start(
+    rotate = vi.fn(async (): Promise<RotateResult> => ({ changed: true, from: '1.1.1.1', to: '2.2.2.2' })),
+    resolveKey?: (key: string) => string,
+  ) {
     webhook = await startWebhook({
       host: '127.0.0.1',
       port: 0,
       bearer: 'sekret-token-0123',
       hostAllowlist: ['127.0.0.1', 'proxyfarm.local'],
       rotate,
+      resolveKey,
     });
     const port = (webhook.server.address() as AddressInfo).port;
     return { port, rotate };
@@ -92,6 +96,14 @@ describe('rotate webhook (spec §6.6)', () => {
     expect(JSON.parse(res.body)).toEqual({ changed: true, from: '1.1.1.1', to: '2.2.2.2' });
   });
 
+  it('accepts a port key (with its # URL-encoded) and maps a bare location key through resolveKey', async () => {
+    const ports = [row('hma:jp-tok#3'), row('hma:jp-tok#2')];
+    const { port, rotate } = await start(undefined, (k) => resolveRotateKey(k, ports));
+    await call(port, { path: '/rotate/hma%3Ajp-tok%233', authorization: 'Bearer sekret-token-0123' });
+    await call(port, { path: '/rotate/hma%3Ajp-tok', authorization: 'Bearer sekret-token-0123' });
+    expect(rotate.mock.calls).toEqual([['hma:jp-tok#3'], ['hma:jp-tok#2']]);
+  });
+
   it('never sends CORS headers, success or failure', async () => {
     const { port } = await start();
     const ok = await call(port, { authorization: 'Bearer sekret-token-0123' });
@@ -120,6 +132,23 @@ describe('rotate webhook (spec §6.6)', () => {
     const port = (webhook.server.address() as AddressInfo).port;
     const res = await call(port, { host: `[::1]:${port}`, authorization: 'Bearer sekret-token-0123' });
     expect(res.status).toBe(200);
+  });
+});
+
+function row(key: string, locationKey = key.split('#')[0]): PortRow {
+  return { key, locationKey, providerId: 'hma', accountId: 'a', label: key, country: 'JP', city: 'Tokyo', proxyPort: 1, enabled: true, state: { kind: 'stopped' }, autoRotateMin: 0 };
+}
+
+describe('resolveRotateKey (spec §6.6 bare-location alias)', () => {
+  it('a bare location key means that location\'s lowest-numbered port', () => {
+    expect(resolveRotateKey('hma:jp-tok', [row('hma:jp-tok#4'), row('hma:jp-tok#2'), row('hma:vn#1')])).toBe('hma:jp-tok#2');
+  });
+
+  it('port keys and keys matching nothing pass through unchanged', () => {
+    const ports = [row('hma:jp-tok#2')];
+    expect(resolveRotateKey('hma:jp-tok#2', ports)).toBe('hma:jp-tok#2');
+    expect(resolveRotateKey('hma:jp-tok#9', ports)).toBe('hma:jp-tok#9');
+    expect(resolveRotateKey('hma:nowhere', ports)).toBe('hma:nowhere');
   });
 });
 

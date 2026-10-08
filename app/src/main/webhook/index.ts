@@ -1,13 +1,14 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { RotateResult } from '../../shared/contracts';
+import { splitPortKey, type PortRow, type RotateResult } from '../../shared/contracts';
 
 /**
  * Optional rotate webhook (spec §6.6), off by default: a separate `http` listener,
  * bound to `127.0.0.1` unless LAN sharing is also on (`0.0.0.0`). Only
- * `POST /rotate/<location-key>` is served. The bearer token is compared in constant
- * time, the `Host` header must be in an allowlist (anti DNS-rebinding), and no CORS
- * headers are ever sent.
+ * `POST /rotate/<port-key>` is served (the `#` of a port key URL-encoded as `%23`); a
+ * bare location key is an alias for that location's first port (see `resolveKey`). The
+ * bearer token is compared in constant time, the `Host` header must be in an allowlist
+ * (anti DNS-rebinding), and no CORS headers are ever sent.
  */
 export interface WebhookOptions {
   host: '127.0.0.1' | '0.0.0.0';
@@ -15,6 +16,25 @@ export interface WebhookOptions {
   bearer: string;
   hostAllowlist: string[];
   rotate(key: string): Promise<RotateResult>;
+  /** Maps the requested key to a port key before `rotate` (e.g. `resolveRotateKey`
+   * over the current rows). @default identity */
+  resolveKey?(key: string): string;
+}
+
+/**
+ * spec §6.6: a bare location key (pre-rev-3 scripts) means that location's
+ * lowest-numbered port. Port keys, and keys matching nothing, pass through unchanged
+ * (the latter then rotate nothing and report `no-server`).
+ */
+export function resolveRotateKey(key: string, ports: PortRow[]): string {
+  if (ports.some((p) => p.key === key)) return key;
+  let best: { key: string; n: number } | undefined;
+  for (const p of ports) {
+    const parts = splitPortKey(p.key);
+    if (p.locationKey !== key || !parts) continue;
+    if (!best || parts.n < best.n) best = { key: p.key, n: parts.n };
+  }
+  return best?.key ?? key;
 }
 
 export interface Webhook {
@@ -100,7 +120,8 @@ export function startWebhook(options: WebhookOptions): Promise<Webhook> {
       return;
     }
 
-    const key = decodeURIComponent(match[1]);
+    const requested = decodeURIComponent(match[1]);
+    const key = options.resolveKey ? options.resolveKey(requested) : requested;
     const result = await options.rotate(key);
     send(res, 200, JSON.stringify(result), 'application/json; charset=utf-8');
   }
