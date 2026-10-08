@@ -5,15 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 0.1.0
+## [Unreleased]
+
+## [0.1.0] — 2026-10-08
 
 First release of the desktop app. It replaces the Docker edition (v1, archived at the
 `v1-docker` tag) and does not import v1 data.
 
 ### Added
 
-- Desktop app for macOS 12+ (Apple silicon and Intel) and Windows x64, built with
-  Electron. No Docker, VM, Python, admin rights or terminal needed.
+- Desktop app for macOS 12+ (Apple silicon and Intel), built with Electron. The
+  Windows x64 build is code-complete but not released yet. No Docker, VM, Python,
+  admin rights or terminal needed.
 - One unmodified sing-box 1.14.2 process per proxy port, in userspace mode (no TUN, no
   driver, no routing changes). Configs are passed on stdin and never written to disk.
   Each port's only route out is its tunnel; DNS goes over DoH through the tunnel.
@@ -59,4 +62,5 @@ The Docker-based edition is archived at the
 [`v1-docker`](https://github.com/huuhoa143/proxy-farm/tree/v1-docker) tag and is no
 longer developed.
 
-[Unreleased]: https://github.com/huuhoa143/proxy-farm/compare/v1-docker...HEAD
+[Unreleased]: https://github.com/huuhoa143/proxy-farm/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/huuhoa143/proxy-farm/releases/tag/v0.1.0
