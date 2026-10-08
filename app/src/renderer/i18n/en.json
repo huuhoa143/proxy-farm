@@ -33,7 +33,7 @@
     "title": "Add a provider",
     "subtitle": "Connect one VPN subscription to start running local proxy ports.",
     "addAnother": "Add another provider",
-    "continueToApp": "Continue",
+    "continueToApp": "Go to ports",
     "providers": {
       "hma": {
         "name": "HMA",
@@ -81,6 +81,7 @@
         "browse": "Choose a file…",
         "countryLabel": "Country",
         "countryGuessedNote": "Guessed from the file name — edit if wrong.",
+        "countryInvalid": "Enter a 2-letter country code (e.g. US, DE).",
         "import": "Import",
         "initials": "F",
         "chooseAnother": "Choose another"
@@ -136,10 +137,20 @@
     },
     "copyPort": "Copy address",
     "copied": "Copied",
+    "copyFailed": "Couldn't copy — opened Export so you can copy it by hand.",
     "rotate": "Rotate IP",
     "rotating": "Rotating…",
+    "rotateDisabledHint": "Only an online port can rotate its IP.",
+    "stop": "Stop",
+    "stopDisabledHint": "This port is already stopped.",
+    "remove": "Remove",
     "details": "Details",
     "selectAll": "Select all",
+    "confirmRemove": {
+      "title": "Remove ports?",
+      "message_one": "Remove {{count}} port? This stops it and takes it off the list.",
+      "message_other": "Remove {{count}} ports? This stops them and takes them off the list."
+    },
     "logs": {
       "title": "Logs",
       "refresh": "Refresh",
@@ -184,6 +195,7 @@
         "curl": "curl command"
       },
       "copyAll": "Copy all",
+      "copyFailed": "Couldn't copy to the clipboard — select the text above and copy it manually.",
       "close": "Close",
       "count_one": "{{count}} port",
       "count_other": "{{count}} ports"
@@ -255,6 +267,7 @@
     },
     "attempt": "attempt {{n}}",
     "nextTry": "Next try in {{time}}",
+    "actionNeeded": "Needs your attention — not retrying",
     "reason": {
       "timeout": "The connection didn't come up in time.",
       "unreachable": "The server isn't answering.",
@@ -276,7 +289,8 @@
     },
     "basePort": {
       "label": "Base port",
-      "note": "First proxy port. Each new location gets the next free port after this one."
+      "note": "First proxy port. Each new location gets the next free port after this one.",
+      "invalid": "Enter a whole number between {{min}} and {{max}}."
     },
     "lanSharing": {
       "label": "Share on the local network",
@@ -296,13 +310,15 @@
       "never": "Never",
       "minutes": "{{count}} minutes",
       "neverNote": "0 = never give up; keeps retrying.",
-      "unit": "min"
+      "unit": "min",
+      "invalid": "Enter a whole number of minutes ({{min}} or more)."
     },
     "webhook": {
       "title": "Rotate webhook",
       "enable": "Enable rotate webhook",
       "offByDefaultNote": "Off by default. Opens a separate local listener only when enabled.",
       "port": "Port",
+      "portInvalid": "Enter a whole port number between {{min}} and {{max}}.",
       "bearer": "Bearer token"
     },
     "language": {

@@ -194,6 +194,62 @@ describe('PortTable', () => {
     expect(screen.getByTestId(resultId)).toHaveTextContent('42 ms');
   });
 
+  it('shows an action-needed line (not a retry countdown) for a terminal auth failure', () => {
+    const now = Date.now();
+    const rows: PortRow[] = [
+      row('failed-auth', { kind: 'failed', reason: 'auth', untilMs: now + 60_000, attempt: 4 }),
+      row('failed-noserver', { kind: 'failed', reason: 'no-server', untilMs: now + 60_000, attempt: 2 }),
+    ];
+    render(
+      <PortTable
+        rows={rows}
+        selectedKeys={new Set()}
+        onToggleSelect={noop}
+        onToggleSelectAll={noop}
+        onCopy={noop}
+        onRotate={noop}
+        api={defaultApi()}
+      />,
+    );
+    const authRow = screen.getByTestId('port-row-failed-auth');
+    expect(within(authRow).getByTestId('terminal-failed-auth')).toBeInTheDocument();
+    expect(authRow).not.toHaveTextContent('Next try in');
+    // A transient failure still counts down to its next attempt.
+    expect(screen.getByTestId('port-row-failed-noserver')).toHaveTextContent('Next try in');
+  });
+
+  it('renders per-row Stop and Remove that call the handlers (Stop disabled when stopped)', () => {
+    const onStop = vi.fn();
+    const onRemove = vi.fn();
+    const rows: PortRow[] = [
+      row('online', { kind: 'online', since: Date.now(), exitIp: '1.2.3.4', country: 'JP' }),
+      row('stopped', { kind: 'stopped' }),
+    ];
+    render(
+      <PortTable
+        rows={rows}
+        selectedKeys={new Set()}
+        onToggleSelect={noop}
+        onToggleSelectAll={noop}
+        onCopy={noop}
+        onRotate={noop}
+        onStop={onStop}
+        onRemove={onRemove}
+        api={defaultApi()}
+      />,
+    );
+    const onlineRow = screen.getByTestId('port-row-online');
+    fireEvent.click(within(onlineRow).getByText('Stop'));
+    expect(onStop).toHaveBeenCalledWith(rows[0]);
+    fireEvent.click(within(onlineRow).getByText('Remove'));
+    expect(onRemove).toHaveBeenCalledWith(rows[0]);
+
+    // Stop is disabled on an already-stopped port.
+    const stoppedRow = screen.getByTestId('port-row-stopped');
+    const stopBtn = within(stoppedRow).getByText('Stop').closest('button');
+    expect(stopBtn).toBeDisabled();
+  });
+
   it('ticks the retrying countdown every second', () => {
     vi.useFakeTimers();
     const now = Date.now();

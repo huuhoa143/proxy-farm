@@ -96,6 +96,69 @@ describe('MainScreen', () => {
     );
   });
 
+  it('per-row copy copies the authenticated host:port:user:pass form', async () => {
+    const api = createFakeProxyFarmApi();
+    const exportSpy = vi.spyOn(api, 'exportPorts');
+    const writeSpy = vi.spyOn(navigator.clipboard, 'writeText');
+    render(<MainScreen api={api} />);
+    await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+    fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Copy'));
+    await waitFor(() => expect(writeSpy).toHaveBeenCalledWith('127.0.0.1:29001:proxyfarm:demo-pass-1234'));
+    expect(exportSpy).toHaveBeenCalledWith(['hma:JP-TOKYO'], 'hostPortUserPass');
+  });
+
+  it('surfaces an error and opens Export as a manual fallback when the clipboard write rejects', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'));
+    render(<MainScreen api={api} />);
+    await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+    fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Copy'));
+    await waitFor(() => expect(screen.getByTestId('copy-error-toast')).toBeInTheDocument());
+    expect(screen.getByTestId('export-modal')).toBeInTheDocument();
+    expect(screen.queryByTestId('copied-toast')).toBeNull();
+  });
+
+  it('per-row Stop stops only that port', async () => {
+    const api = createFakeProxyFarmApi();
+    const stopSpy = vi.spyOn(api, 'stopPorts');
+    render(<MainScreen api={api} />);
+    await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+    fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Stop'));
+    await waitFor(() => expect(stopSpy).toHaveBeenCalledWith(['hma:JP-TOKYO']));
+  });
+
+  it('per-row Remove confirms first, then removes that port', async () => {
+    const api = createFakeProxyFarmApi();
+    const removeSpy = vi.spyOn(api, 'removePorts');
+    render(<MainScreen api={api} />);
+    await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+    fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByText('Remove'));
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() => expect(removeSpy).toHaveBeenCalledWith(['hma:JP-TOKYO']));
+  });
+
+  it('bulk Remove asks for confirmation before removing', async () => {
+    const api = createFakeProxyFarmApi();
+    const removeSpy = vi.spyOn(api, 'removePorts');
+    render(<MainScreen api={api} />);
+    await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO')).toBeInTheDocument());
+
+    fireEvent.click(within(screen.getByTestId('port-row-hma:JP-TOKYO')).getByRole('checkbox'));
+    fireEvent.click(within(screen.getByTestId('bulk-action-bar')).getByText('Remove'));
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() => expect(removeSpy).toHaveBeenCalledWith(['hma:JP-TOKYO']));
+  });
+
   describe('note timeouts', () => {
     afterEach(() => {
       vi.useRealTimers();

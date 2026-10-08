@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import i18next from 'i18next';
 import { initI18n } from './i18n';
-import { describePortState } from './portStateView';
+import { describePortState, isTerminalFailure } from './portStateView';
 import type { PortState } from '../shared/contracts';
 
 beforeAll(() => {
@@ -55,6 +55,29 @@ describe('describePortState', () => {
     const state: PortState = { kind: 'failed', reason: 'port-in-use', untilMs: Date.now() + 1000, attempt: 1 };
     const view = describePortState(state, 'surfshark', i18next.t.bind(i18next));
     expect(view.actionLabel).toBe('Move to another port');
+  });
+
+  it('marks auth/not-in-plan as terminal (no countdown) and port-in-use/no-server as transient', () => {
+    expect(isTerminalFailure('auth')).toBe(true);
+    expect(isTerminalFailure('not-in-plan')).toBe(true);
+    expect(isTerminalFailure('port-in-use')).toBe(false);
+    expect(isTerminalFailure('no-server')).toBe(false);
+
+    const auth = describePortState(
+      { kind: 'failed', reason: 'auth', untilMs: Date.now() + 60_000, attempt: 3 },
+      'hma',
+      i18next.t.bind(i18next),
+    );
+    expect(auth.terminal).toBe(true);
+    expect(auth.countdownSeconds).toBeUndefined();
+
+    const noServer = describePortState(
+      { kind: 'failed', reason: 'no-server', untilMs: Date.now() + 60_000, attempt: 3 },
+      'hma',
+      i18next.t.bind(i18next),
+    );
+    expect(noServer.terminal).toBe(false);
+    expect(noServer.countdownSeconds).toBeGreaterThan(0);
   });
 
   it('covers failed(not-in-plan) and failed(no-server) with distinct labels', () => {

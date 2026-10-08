@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ExportFormat, ProxyFarmApi } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
+import { useModalFocusTrap } from '../ui/useModalFocusTrap';
 
 const FORMATS: ExportFormat[] = ['hostPortUserPass', 'socks5Url', 'hostPort', 'curl'];
 
@@ -16,6 +17,10 @@ export function ExportModal({ api, targetKeys, onClose }: ExportModalProps) {
   const [format, setFormat] = useState<ExportFormat>('hostPortUserPass');
   const [text, setText] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  useModalFocusTrap(boxRef, onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,18 +33,25 @@ export function ExportModal({ api, targetKeys, onClose }: ExportModalProps) {
   }, [api, targetKeys, format]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  useEffect(() => {
     if (!copied) return undefined;
     const id = setTimeout(() => setCopied(false), 1600);
     return () => clearTimeout(id);
   }, [copied]);
+
+  async function copyAll() {
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(text);
+      setCopyError(false);
+      setCopied(true);
+    } catch {
+      // Clipboard blocked: tell the user and preselect the textarea so they can copy by hand.
+      setCopied(false);
+      setCopyError(true);
+      textRef.current?.focus();
+      textRef.current?.select();
+    }
+  }
 
   return (
     <div className="modal-scrim" data-testid="export-modal" onClick={onClose}>
@@ -48,6 +60,8 @@ export function ExportModal({ api, targetKeys, onClose }: ExportModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="export-title"
+        ref={boxRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mh">
@@ -66,25 +80,26 @@ export function ExportModal({ api, targetKeys, onClose }: ExportModalProps) {
             ))}
           </div>
           <textarea
+            ref={textRef}
             readOnly
             value={text}
             rows={Math.min(10, Math.max(3, targetKeys.length))}
             data-testid="export-text"
             spellCheck={false}
           />
+          {copyError && (
+            <p className="result bad" data-testid="export-copy-error" role="alert">
+              <Icon name="alert" />
+              <span>{t('main.export.copyFailed')}</span>
+            </p>
+          )}
         </div>
         <div className="mf">
           <span className="sum">{t('main.export.count', { count: targetKeys.length })}</span>
           <button className="btn ghost" onClick={onClose}>
             {t('main.export.close')}
           </button>
-          <button
-            className="btn primary"
-            onClick={() => {
-              void navigator.clipboard?.writeText(text);
-              setCopied(true);
-            }}
-          >
+          <button className="btn primary" onClick={() => void copyAll()}>
             <Icon name={copied ? 'check' : 'copy'} />
             {copied ? t('common.copied') : t('main.export.copyAll')}
           </button>

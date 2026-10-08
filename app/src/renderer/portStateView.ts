@@ -10,8 +10,20 @@ export interface PortStateView {
   guidance?: string;
   /** Extra inline action label (e.g. "Move to another port") for some failure reasons. */
   actionLabel?: string;
-  /** Present on `retrying`/`failed` states: seconds left until the next attempt. */
+  /** Present on `retrying`/transient `failed` states: seconds left until the next attempt. */
   countdownSeconds?: number;
+  /** A failure the user must act on (bad credentials / not in plan): retrying won't fix it,
+   * so the UI shows an actionable message instead of a retry countdown. */
+  terminal?: boolean;
+}
+
+/**
+ * Failures retrying can't fix — the user must change something (credentials, plan).
+ * `port-in-use` and `no-server` are transient (the engine keeps retrying), so they
+ * are NOT terminal and still show a countdown.
+ */
+export function isTerminalFailure(reason: FailReason): boolean {
+  return reason === 'auth' || reason === 'not-in-plan';
 }
 
 function authGuidanceKey(providerId: ProviderId): string {
@@ -73,6 +85,7 @@ export function describePortState(state: PortState, providerId: ProviderId, t: T
       };
     }
     case 'failed': {
+      const terminal = isTerminalFailure(state.reason);
       const seconds = Math.max(0, Math.round((state.untilMs - now) / 1000));
       return {
         tone: 'bad',
@@ -80,7 +93,9 @@ export function describePortState(state: PortState, providerId: ProviderId, t: T
         guidance: t(reasonGuidanceKey(state.reason, providerId)),
         actionLabel:
           state.reason === 'port-in-use' ? t('portState.failed.port-in-use.action') : undefined,
-        countdownSeconds: seconds,
+        // Terminal failures don't retry, so they carry no countdown.
+        countdownSeconds: terminal ? undefined : seconds,
+        terminal,
       };
     }
     case 'stopped':
