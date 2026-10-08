@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { LocationPicker } from './LocationPicker';
-import { initI18n } from '../i18n';
+import { changeLanguage, initI18n } from '../i18n';
 import type { Target } from '../../shared/contracts';
 
 beforeAll(() => {
@@ -134,5 +134,18 @@ describe('LocationPicker', () => {
     expect(screen.getByTestId('picker-submit')).toHaveTextContent('Add 1 port');
     fireEvent.click(screen.getByTestId('picker-submit'));
     expect(onSubmit).toHaveBeenCalledWith([{ locationKey: 'surfshark:JP-KYO', count: 1 }]);
+  });
+
+  it('names every country header in the UI language and sorts by that name', async () => {
+    const inCountry = (country: string, city: string): Target => ({ ...target(`hma:${country}-${city}`, city, 2, 2), country });
+    await act(() => changeLanguage('vi'));
+    try {
+      renderPicker({ targets: [inCountry('IT', 'Rome'), inCountry('JP', 'Tokyo'), inCountry('AT', 'Vienna'), inCountry('DE', 'Berlin')] });
+      const headers = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
+      // CLDR's Vietnamese keeps "Italy"; the header says Ý, and sorts as Ý.
+      expect(headers).toEqual(['Áo', 'Đức', 'Nhật Bản', 'Ý']);
+    } finally {
+      await act(() => changeLanguage('en'));
+    }
   });
 });
