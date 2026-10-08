@@ -80,6 +80,20 @@ describe('describePortState', () => {
     expect(noServer.countdownSeconds).toBeGreaterThan(0);
   });
 
+  it('shows a location-specific message for an auth failure when the account works elsewhere', () => {
+    const state = { kind: 'failed', reason: 'auth', untilMs: Date.now() + 60_000, attempt: 1 } as const;
+    const normal = describePortState(state, 'hma', i18next.t.bind(i18next));
+    const locationRejected = describePortState(state, 'hma', i18next.t.bind(i18next), { accountHasWorkingPeer: true });
+
+    // Still terminal (no retry), but the copy steers to another location, not "check your login".
+    expect(locationRejected.terminal).toBe(true);
+    expect(locationRejected.label).not.toBe(normal.label);
+    expect(locationRejected.guidance).not.toBe(normal.guidance);
+    expect(locationRejected.guidance).toMatch(/location/i);
+    // Without a working peer, keep the original "check sign-in" guidance.
+    expect(normal.guidance).toMatch(/signed in/i);
+  });
+
   it('covers failed(not-in-plan) and failed(no-server) with distinct labels', () => {
     const notInPlan = describePortState(
       { kind: 'failed', reason: 'not-in-plan', untilMs: Date.now(), attempt: 1 },

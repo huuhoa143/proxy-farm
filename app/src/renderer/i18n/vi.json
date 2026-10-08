@@ -245,10 +245,12 @@
     "failed": {
       "auth": {
         "label": "Đăng nhập bị từ chối",
+        "labelLocation": "Vị trí không khả dụng",
         "guidance": {
           "hma": "HMA từ chối thông tin đăng nhập thiết bị — mở ứng dụng HMA và kiểm tra bạn đã đăng nhập chưa.",
           "zoogvpn": "ZoogVPN từ chối mật khẩu tài khoản này — kiểm tra lại trong ứng dụng hoặc trang web ZoogVPN.",
-          "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập."
+          "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập.",
+          "locationRejected": "Tài khoản của bạn hoạt động ở vị trí khác, nhưng vị trí này từ chối — hãy thử vị trí khác."
         }
       },
       "not-in-plan": {

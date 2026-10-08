@@ -62,8 +62,21 @@ function reasonGuidanceKey(reason: FailReason, providerId: ProviderId): string {
   }
 }
 
+export interface DescribePortStateOptions {
+  /** True when ANOTHER port of the same account is currently online — i.e. the
+   * credentials demonstrably work. An `auth` rejection on THIS port is then
+   * location-specific (the server refused valid creds for that location), so the
+   * copy points the user at trying another location rather than at their sign-in. */
+  accountHasWorkingPeer?: boolean;
+}
+
 /** Map a contracts.PortState to copy + tone, pulling every string from i18n. */
-export function describePortState(state: PortState, providerId: ProviderId, t: TFunction): PortStateView {
+export function describePortState(
+  state: PortState,
+  providerId: ProviderId,
+  t: TFunction,
+  opts: DescribePortStateOptions = {},
+): PortStateView {
   const now = Date.now();
   switch (state.kind) {
     case 'queued':
@@ -87,10 +100,14 @@ export function describePortState(state: PortState, providerId: ProviderId, t: T
     case 'failed': {
       const terminal = isTerminalFailure(state.reason);
       const seconds = Math.max(0, Math.round((state.untilMs - now) / 1000));
+      // An auth rejection while the same account is online elsewhere is a
+      // location-specific refusal, not bad credentials — say so, and steer the
+      // user to another location instead of to their (working) sign-in.
+      const locationRejected = state.reason === 'auth' && opts.accountHasWorkingPeer === true;
       return {
         tone: 'bad',
-        label: t(reasonLabelKey(state.reason)),
-        guidance: t(reasonGuidanceKey(state.reason, providerId)),
+        label: t(locationRejected ? 'portState.failed.auth.labelLocation' : reasonLabelKey(state.reason)),
+        guidance: t(locationRejected ? 'portState.failed.auth.guidance.locationRejected' : reasonGuidanceKey(state.reason, providerId)),
         actionLabel:
           state.reason === 'port-in-use' ? t('portState.failed.port-in-use.action') : undefined,
         // Terminal failures don't retry, so they carry no countdown.

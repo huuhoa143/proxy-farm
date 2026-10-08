@@ -62,6 +62,10 @@ export function PortTable({
   const language = i18n.language || 'en';
   const allSelected = rows.length > 0 && rows.every((r) => selectedKeys.has(r.key));
   const someSelected = !allSelected && rows.some((r) => selectedKeys.has(r.key));
+  // Accounts with at least one online port: their credentials demonstrably work,
+  // so an auth rejection on another of their ports is location-specific (used by
+  // describePortState to show a "try another location" message, not "check login").
+  const onlineAccountIds = new Set(rows.filter((r) => r.state.kind === 'online').map((r) => r.accountId));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Spec §4.2 "live retry countdown": tick once a second, but only while at
@@ -129,7 +133,9 @@ export function PortTable({
         </thead>
         <tbody>
           {rows.map((row) => {
-            const view = describePortState(row.state, row.providerId, t);
+            const view = describePortState(row.state, row.providerId, t, {
+              accountHasWorkingPeer: onlineAccountIds.has(row.accountId),
+            });
             const state = row.state;
             const note = notes?.[row.key];
             const selected = selectedKeys.has(row.key);

@@ -44,7 +44,10 @@ describe('PortTable', () => {
       row('verifying', { kind: 'verifying', since: now }),
       row('online', { kind: 'online', since: now, exitIp: '203.0.113.5', country: 'JP', latencyMs: 40 }),
       row('retrying', { kind: 'retrying', untilMs: now + 10_000, attempt: 1, reasonKey: 'portState.failed.no-server.guidance' }),
-      row('failed-auth', { kind: 'failed', reason: 'auth', untilMs: now + 1000, attempt: 2 }, { providerId: 'hma' }),
+      // Different account from the online row so this reads as genuine bad creds
+      // (no working peer) → the generic "check your sign-in" guidance, not the
+      // location-specific one (that case is covered in portStateView.test.ts).
+      row('failed-auth', { kind: 'failed', reason: 'auth', untilMs: now + 1000, attempt: 2 }, { providerId: 'hma', accountId: 'hma-2' }),
       row('failed-port', { kind: 'failed', reason: 'port-in-use', untilMs: now + 1000, attempt: 1 }),
       row('stopped', { kind: 'stopped' }),
     ];

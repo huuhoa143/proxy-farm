@@ -245,10 +245,12 @@
     "failed": {
       "auth": {
         "label": "Sign-in rejected",
+        "labelLocation": "Location unavailable",
         "guidance": {
           "hma": "HMA rejected the device credentials — open the HMA app and check you're signed in.",
           "zoogvpn": "ZoogVPN rejected this account's password — check it in the ZoogVPN app or website.",
-          "generic": "The provider rejected these credentials — check your sign-in details."
+          "generic": "The provider rejected these credentials — check your sign-in details.",
+          "locationRejected": "Your account works at other locations, but this one refused it — try a different location."
         }
       },
       "not-in-plan": {
