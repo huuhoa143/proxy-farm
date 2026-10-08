@@ -509,6 +509,40 @@ describe('port manager', () => {
       expect(state.getState().ports[0].state).toMatchObject({ kind: 'online', exitIp: '5.5.5.5' });
     });
 
+    describe('Stop while a start is in flight', () => {
+      const ams: Target = { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] };
+
+      it('a stop during the location lookup wins: the start aborts and the row stays stopped', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>((r) => (release = r));
+        const provider = { ...fakeProvider([ams]), targets: async () => (await gate, [ams]) };
+        const { manager, state, engine } = setup({ targets: [ams], port: { state: { kind: 'queued' } }, depsOverrides: { providers: { get: () => provider } } });
+        const starting = manager.startPort('zoogvpn:nl-ams');
+        await manager.stopPort('zoogvpn:nl-ams');
+        release();
+        await starting;
+        expect(engine.started).toHaveLength(0);
+        expect(state.getState().ports[0]).toMatchObject({ enabled: false, state: { kind: 'stopped' } });
+      });
+
+      it('a stop while the claim resolves the server wins too', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>((r) => (release = r));
+        const { manager, state, engine } = setup({
+          targets: [ams],
+          port: { state: { kind: 'queued' } },
+          depsOverrides: { resolveServer: async (server) => (await gate, server) },
+        });
+        const starting = manager.startPort('zoogvpn:nl-ams');
+        await new Promise((r) => setTimeout(r, 0)); // into the claim, waiting on DNS
+        await manager.stopPort('zoogvpn:nl-ams');
+        release();
+        await starting;
+        expect(engine.started).toHaveLength(0);
+        expect(state.getState().ports[0]).toMatchObject({ enabled: false, state: { kind: 'stopped' } });
+      });
+    });
+
     it('stopPort stops the engine and marks the port disabled/stopped', async () => {
       const { manager, state, engine } = setup({ targets: [] });
       await manager.stopPort('zoogvpn:nl-ams');

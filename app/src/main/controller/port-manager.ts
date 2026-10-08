@@ -683,6 +683,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       // Removed, or renamed by a Change IP to another city, since this start was due:
       // nothing to start, and nothing to retry (a retry would only find it gone again).
       if (!port) return;
+      // The user stopped the port while this start was awaiting: it must not come back on.
+      // (Only for a start that began on an enabled row — a direct start of a stopped row
+      // is what turns it on.)
+      const stoppedMeanwhile = () => port.enabled && findPort(key)?.enabled === false;
       const account = s.accounts.find((a) => a.id === port.accountId);
       const provider = account && deps.providers.get(port.providerId);
       if (!account || !provider) {
@@ -699,6 +703,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       }
 
       const target = (await provider.targets(account)).find((t) => t.key === port.locationKey);
+      if (stoppedMeanwhile()) return;
       if (!target) {
         updatePort(key, { enabled: true });
         failWithRetry(key, { kind: 'failed', reason: 'no-server' });
@@ -710,13 +715,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       // it is usable and free, otherwise move to the best one that is.
       const selected = await withClaimLock(async () => {
         const fresh = findPort(key);
-        if (!fresh) return undefined;
+        if (!fresh || stoppedMeanwhile()) return undefined;
         const result = await selectServer({ target, accountId: fresh.accountId, portKey: key, mode: 'restart', pinned: fresh.server });
+        if (stoppedMeanwhile()) return undefined; // stopped while resolving
         // Claimed together with `enabled`, so the next selection already sees it held.
         updatePort(key, result.pick ? { enabled: true, server: result.pick.server, serverIp: result.pick.ip } : { enabled: true });
         return result;
       });
-      if (!selected) return; // removed meanwhile
+      if (!selected) return; // removed or stopped meanwhile
       if (!selected.pick) {
         failWithRetry(key, selected.dnsFailed ? { kind: 'retrying', reasonKey: 'dns-failed' } : { kind: 'failed', reason: 'no-server' });
         return;
