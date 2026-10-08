@@ -62,6 +62,7 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
   const calls: string[] = [];
   let rotateResult: RotateResult = { changed: true, from: '1.1.1.1', to: '2.2.2.2' };
   const held = (t: Target) => new Set(state.getState().ports.filter((p) => p.locationKey === t.key).map((p) => p.server));
+  let addLock: Promise<unknown> = Promise.resolve();
   const pm: PortManager & { calls: string[]; setRotate(r: RotateResult): void } = {
     calls,
     setRotate: (r) => (rotateResult = r),
@@ -81,16 +82,24 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
     setAutoRotate: async () => undefined,
     exportPorts: async () => '',
     testPort: async () => ({ ok: true, exitIp: '9.9.9.9', latencyMs: 12 }),
-    addPort: async (t, accountId) => {
-      const server = t.servers.find((sv) => !held(t).has(sv) && !(refusedFor[accountId] ?? []).includes(sv));
-      if (!server) return undefined;
-      const used = new Set(state.getState().ports.map((p) => p.proxyPort));
-      let proxyPort = 29001;
-      while (used.has(proxyPort)) proxyPort += 1;
-      const n = state.getState().ports.filter((p) => p.locationKey === t.key).length + 1;
-      const row: PortRow = { key: `${t.key}#${n}`, locationKey: t.key, server, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: true, state: { kind: 'queued' }, autoRotateMin: 0 };
-      state.setState((s) => ({ ...s, ports: [...s.ports, row] }));
-      return row;
+    // Serialized, with the limit asked under that lock, like the real one; it yields
+    // first, as the real one does while it resolves servers.
+    addPort: (t, accountId, opts) => {
+      const run = addLock.then(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+        if (opts?.atLimit?.()) return undefined;
+        const server = t.servers.find((sv) => !held(t).has(sv) && !(refusedFor[accountId] ?? []).includes(sv));
+        if (!server) return undefined;
+        const used = new Set(state.getState().ports.map((p) => p.proxyPort));
+        let proxyPort = 29001;
+        while (used.has(proxyPort)) proxyPort += 1;
+        const n = state.getState().ports.filter((p) => p.locationKey === t.key).length + 1;
+        const row: PortRow = { key: `${t.key}#${n}`, locationKey: t.key, server, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: true, state: { kind: 'queued' }, autoRotateMin: 0 };
+        state.setState((s) => ({ ...s, ports: [...s.ports, row] }));
+        return row;
+      });
+      addLock = run.then(() => undefined);
+      return run;
     },
     listServers: (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
     freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
@@ -311,6 +320,17 @@ describe('controller facade', () => {
     const r = await facade.addPorts('hma:NL-AMS', 3);
     expect(r.added).toHaveLength(2);
     expect(r.noteKey).toBe('limit-reached');
+  });
+
+  it('two concurrent addPorts with one slot left add exactly one port; the other says limit-reached', async () => {
+    const { facade, state } = setup();
+    await facade.connectHma();
+    await facade.setLimit('hma', 2);
+    await facade.addPorts('hma:NL-AMS', 1);
+    const [a, b] = await Promise.all([facade.addPorts('hma:NL-AMS', 1), facade.addPorts('hma:NL-AMS', 1)]);
+    expect(a.added.length + b.added.length).toBe(1);
+    expect([a.noteKey, b.noteKey].filter(Boolean)).toEqual(['limit-reached']);
+    expect(state.getState().ports.filter((p) => p.enabled)).toHaveLength(2);
   });
 
   it('addPorts is not capped at one port for a round-robin pool hostname; the port manager decides', async () => {

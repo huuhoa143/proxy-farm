@@ -677,6 +677,16 @@ describe('port manager', () => {
       expect([r1!.key, r2!.key].sort()).toEqual(['zoogvpn:de-ber#1', 'zoogvpn:de-ber#2']);
       rmSync(d, { recursive: true, force: true });
     });
+
+    it('asks atLimit inside the claim lock, so concurrent adds never overshoot the port limit', async () => {
+      const { manager, state } = setup({ targets: [] });
+      // One enabled port already; a limit of 2 leaves one slot for two concurrent adds.
+      const atLimit = () => state.getState().ports.filter((p) => p.enabled).length >= 2;
+      const t = ber(['1.1.1.1', '2.2.2.2', '3.3.3.3']);
+      const [r1, r2] = await Promise.all([manager.addPort(t, 'z1', { atLimit }), manager.addPort(t, 'z1', { atLimit })]);
+      expect([r1, r2].filter(Boolean)).toHaveLength(1);
+      expect(state.getState().ports).toHaveLength(2);
+    });
   });
 
   describe('reviewer findings — critical', () => {

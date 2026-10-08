@@ -185,13 +185,16 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
         noteKey = 'limit-reached';
         break;
       }
+      // The limit is checked again inside the port manager's claim lock: a concurrent
+      // addPorts may have taken the last slot since the check above.
+      const atLimit = () => deps.pool.atLimit(target.providerId);
       let row: PortRow | undefined;
       for (const account of accountsForNewPort(target.providerId, locationKey)) {
-        row = await deps.portManager.addPort(target, account.id);
+        row = await deps.portManager.addPort(target, account.id, { atLimit });
         if (row) break;
       }
       if (!row) {
-        noteKey = 'no-free-server';
+        noteKey = atLimit() ? 'limit-reached' : 'no-free-server';
         break;
       }
       added.push(row);

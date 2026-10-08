@@ -97,10 +97,12 @@ export interface PortManager {
    * Adds one port to `target` for `accountId`, pinned to the best free usable server
    * (spec §6.8), with a restart-stable proxy port and the smallest free `#n`. The row is
    * created enabled (it counts toward the provider limit at once) and `queued`; the
-   * caller starts it. `undefined` when no free usable server is left for that account.
-   * Calls are serialized, so two concurrent adds never pin the same server or port.
+   * caller starts it. `undefined` when no free usable server is left for that account,
+   * or when `opts.atLimit()` says the provider's port limit is reached.
+   * Calls are serialized, so two concurrent adds never pin the same server or port, and
+   * `atLimit` is asked inside that lock, so they never overshoot the limit either.
    */
-  addPort(target: Target, accountId: string): Promise<PortRow | undefined>;
+  addPort(target: Target, accountId: string, opts?: { atLimit?: () => boolean }): Promise<PortRow | undefined>;
   /** The location's pool with health, resolved IP (when known) and holder (spec §6.8).
    * Synchronous: uses only already-resolved IPs, never the network. */
   listServers(target: Target): ServerInfo[];
@@ -646,8 +648,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return settings.proxyUser && settings.proxyPass ? { username: settings.proxyUser, password: settings.proxyPass } : undefined;
   }
 
-  async function addPort(target: Target, accountId: string): Promise<PortRow | undefined> {
+  async function addPort(target: Target, accountId: string, opts: { atLimit?: () => boolean } = {}): Promise<PortRow | undefined> {
     return withClaimLock(async () => {
+      if (opts.atLimit?.()) return undefined;
       const { pick } = await selectServer({ target, accountId, mode: 'strict' });
       if (!pick) return undefined;
       const { settings } = deps.state.getState();
