@@ -438,6 +438,13 @@ input[type='checkbox'].switch:checked::after {
   line-height: 1.2;
   text-align: center;
 }
+/* one line per label, in every language */
+.rail-btn > span {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .rail-btn svg {
   width: 20px;
   height: 20px;

@@ -23,7 +23,7 @@
     },
     "nav": {
       "main": "Cổng",
-      "providers": "Nhà cung cấp",
+      "providers": "VPN",
       "settings": "Cài đặt"
     },
     "showPassword": "Hiện mật khẩu",
@@ -306,7 +306,7 @@
     "queued": "Đang chờ",
     "connecting": "Đang kết nối…",
     "verifying": "Đang xác minh…",
-    "online": "Đang hoạt động",
+    "online": "Đang chạy",
     "retrying": "Thử lại sau {{seconds}}s",
     "stopped": "Đã dừng",
     "failed": {
