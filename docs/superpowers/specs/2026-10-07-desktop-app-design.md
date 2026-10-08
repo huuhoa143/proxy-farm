@@ -1,6 +1,6 @@
 # Proxy Farm v2 — Desktop App (Windows + macOS, no Docker)
 
-- **Status:** approved design (rev 2, after independent review + spike 2), 2026-10-07. ⚠️ items remain open and are listed in §12.
+- **Status:** rev 3 draft, 2026-10-08, **pending owner review**. Rev 2 (2026-10-07) was approved after an independent review and spike 2. Rev 3 replaces "one port per location" with **server pools**: every provider exposes a location as a pool of servers, each server is one fixed exit IP, and a port pins one server (§6.8). Evidence: §11, 2026-10-08 rows. ⚠️ items remain open and are listed in §12.
 - **Supersedes:** the Docker-based v1 (tagged `v1-docker` before v2 work lands).
 - **Evidence:**
   - Spike 1 and spike 2, 2026-10-07, **macOS arm64 only** (§11).
@@ -14,6 +14,7 @@ Ship Proxy Farm as a desktop app that a non-technical user downloads, installs, 
 - Windows and macOS in the **same release**.
 - **No Docker, no VM, no Python, no scripts, no terminal.**
 - One VPN subscription → many local SOCKS5/HTTP proxy ports, each port an independent tunnel with its own exit IP.
+  - A location with N usable servers gives up to N ports with N different, stable exit IPs (§6.8).
 - UI in **English and Vietnamese**.
 
 Success criteria:
@@ -32,6 +33,7 @@ Success criteria:
 | **Electron (Forge + Vite), modelled on lingoreup** | Same toolchain, release pipeline and updater the team already runs. |
 | **Controller in TypeScript in Electron main** | Replaces `farm.py`/`vendors.py`. No Python runtime is shipped. |
 | **Windows HMA: privileged helper service installed at setup** | HMA's Windows credential file is admin-only and its password rotates. The app is installed per-user and the helper separately, so auto-updates need no UAC. |
+| **Location → server pool → one fixed exit IP per server; a port pins one server** (rev 3) | ✅ Measured on all three providers: the exit IP belongs to the server (HMA: = server IP, for OpenVPN, IPSec and Mimic alike; Surfshark: = server IP + 1; ZoogVPN: = server IP), reconnecting to the same server never changes it, and a location is many servers (HMA: several clusters; Surfshark: a DNS pool of 20+; ZoogVPN: numbered hosts). So "rotate" is really "change server", and pinning servers turns one location into many stable IPs. |
 | **sing-box shipped unmodified** (GPL-3, separate process) | Keeps the app MIT. Every release attaches the matching sing-box source tarball and license (GPLv3 §6). The product name must not contain "sing-box". |
 
 ## 3. Architecture
@@ -43,8 +45,9 @@ Success criteria:
 │  Main: Controller (TypeScript)                                                     │
 │   ├─ Providers      hma · zoogvpn · surfshark · file  (setup/check/targets/bind)   │
 │   ├─ Catalogs       hma (bundled + feed) · surfshark API · zoogvpn (bundled)       │
+│   ├─ ServerPools    per location: servers, health, which port holds which (§6.8)  │
 │   ├─ Accounts       multi-account pools per provider (pick / rebalance / pin)      │
-│   ├─ PortManager    start/stop/rotate/auto-rotate → render config → Supervisor     │
+│   ├─ PortManager    add/start/stop/change-server → render config → Supervisor      │
 │   ├─ Supervisor     1 sing-box child per port, config via stdin, pid registry       │
 │   ├─ Health         log events + /delay + exit-IP probe → state machine            │
 │   ├─ Backoff        30 s → 30 min + jitter, bad-IP memory, staggered starts        │
@@ -87,14 +90,27 @@ Each unit is independently testable:
    - **ZoogVPN** — email + password → "Check" (one test connection).
    - **Surfshark** — paste the WireGuard private key. An illustrated guide points to my.surfshark.com → Manual setup.
    - **File** — drag & drop `.ovpn` / `.conf`. Country is guessed from the file name and editable.
-3. **Main screen** — pick countries/cities → **Start**. Each row shows status, `127.0.0.1:port`, exit IP + country, latency, **Copy**, **Rotate IP**.
+3. **Main screen** (rev 3) — ports grouped by location:
+   ```
+   ▼ 🇯🇵 Tokyo · Surfshark     2 ports · 26 servers              [+ Add port]
+       :29001  146.70.205.100  ● Online 40 ms   [Change IP] [Stop] [Remove] [Details]
+       :29002  82.26.195.7     ● Online 52 ms   [Change IP] [Stop] [Remove] [Details]
+   ▼ 🇻🇳 Hanoi · HMA           1 port · 3 servers                [+ Add port]
+       :29003  156.59.140.19   ● Online 31 ms   …
+   ```
+   - **Add location** picker: choose a location, then **how many ports** (stepper, default 1, max = the location's free usable servers, capped by the provider's port limit). The picker shows each location's server count.
+   - **+ Add port** on a group adds one port on a free server of that location; disabled, with a tooltip, when no free server is left or the limit is reached.
+   - Each port row shows status, `127.0.0.1:port`, exit IP + country, latency, **Copy**, **Change IP**, Stop, Remove, Details.
+   - **Change IP** moves that port to another free server of the same location (§6.5). Its menu also lists the location's servers (IP, health, "in use by :2900x") so the user can pick one.
+   - A group header shows how many of its ports are online; collapsing remembers state. Bulk select and bulk actions work across groups.
 
 ### 4.2 v1 feature parity
 
 | v1 feature | v2 |
 |---|---|
 | Location picker, start/stop, multi-select + bulk actions | Keep |
-| Rotate, auto-rotate every N min (`/api/autorotate`) | Keep (rotate semantics: §6.5) |
+| Rotate, auto-rotate every N min (`/api/autorotate`) | Keep as **Change IP** = move the port to another free server of its location; auto-rotate cycles servers (§6.5) |
+| One port per location | **Changed (rev 3):** several ports per location, each pinned to a different server (§6.8) |
 | Export in 4 formats (`host:port:user:pass`, `socks5://…`, `host:port`, curl) | Keep |
 | Rotate webhook (`/api/rotate?key=`) | Keep as an **opt-in** separate listener (§6.6) |
 | Proxy username/password, auto-generated on first run | Keep (on by default, as in v1) |
@@ -122,7 +138,7 @@ Each unit is independently testable:
   - ⚠️ Windows detection (a default route via a VPN/TAP/Wintun adapter) is not verified.
 - **No telemetry** (product decision). The app contacts only:
   - VPN servers.
-  - The Surfshark server-list API.
+  - The Surfshark server-list API, and DNS lookups of Surfshark cluster hostnames (system resolver + DoH `cloudflare-dns.com`) to build their server pools (§5.3).
   - The GitHub releases and catalog feed.
   - `www.gstatic.com` (sing-box `/delay`, https only).
   - The exit-IP/geo services in §6.4.
@@ -153,25 +169,31 @@ Each unit is independently testable:
   - Bundle R46 **and**, on Windows, also accept the app's own `ca.crt.pem` (PR #2 used it), read via the Helper.
 - **Pushed by server** ✅: AES-256-GCM, `compress migrate`, `ping 10`, `ping-restart 60`.
 - **Endpoint settings**: `data_ciphers: ["AES-256-GCM"]`, `route_no_pull: true`, `explicit_exit_notify: 2`, `mtu: 1400`.
-- **Concurrency** ✅: 12 separate processes on one device, all with correct exits, stable for 17 min, one handshake each (no kicks). Default port limit: none.
-- **Auth refused**: sing-box logs `authentication failed: terminal`, then neither retries nor exits.
-  - The Supervisor kills the process.
-  - The port enters `failed(auth)` with the message "HMA rejected the device credentials — open the HMA app and check you're signed in".
-  - Retries continue on the long back-off (§6.4).
+- **Concurrency** ✅: 12 separate processes on one device, all with correct exits, stable for 17 min, one handshake each (no kicks). Default port limit: **12** (rev 3: the most verified; more is ⚠️ untested and could trip abuse detection). The user can raise it.
+- **Auth refused** — sing-box logs `authentication failed: terminal`, then neither retries nor exits; the Supervisor kills the process. Rev 3, ✅ 2026-10-08:
+  - Device credentials belong to the device, not to a server, but a location's cluster can contain servers that refuse them. The `gen-vpn.com` infrastructure is shared across Gen Digital brands, and a server serving another brand's tenant answers `AUTH_FAILED` (VN: `156.59.140.149` refuses; `156.59.140.19`, `128.1.126.101`, `128.1.126.118` accept the same device).
+  - So an HMA auth failure marks **that server** as refused for this device (§6.8, 7 days) and the port moves to the next free server of its location, shown as `retrying("server refused the device — switching")`.
+  - Only when every server of the location has refused does the port enter `failed(auth)`. If the same device is online elsewhere, the message reads "This location refused your device — try another location"; otherwise "HMA rejected the device credentials — open the HMA app and check you're signed in". Retries continue on the long back-off (§6.4).
 - **Not usable** ✅:
   - Account email/password: OpenVPN `AUTH_FAILED`, IKEv2 silent.
   - `<CC>.ult.surfeasy.mobi`: no OpenVPN.
   - IKE REDIRECT gateway IPs: no OpenVPN answer.
   - HMA discovery API: `Invalid API Key` with the in-binary key.
   - The old gluetun CA: expired 2026-09-12.
-- **Catalog**:
-  - Schema: `{key, country, city, ips: [{ip, firstSeen, lastOk}]}`. A location may have several IPs, accumulated across enumerations.
-  - Seed: PR #2's `hma-ovpn-seed.json` (115 locations, one IP each). ✅ 8/8 sampled seed IPs worked on 2026-10-07.
+- **Catalog** — the location's server pool:
+  - Schema: `{key, country, city, ips: [{ip, firstSeen, lastOk}]}`.
+  - Seed: originally PR #2's `hma-ovpn-seed.json` (115 locations, one IP each). Rev 3: the seed file may carry `ips: [...]` per location (verified servers, best first); the legacy single `ip` still loads.
+  - ✅ 2026-10-08: 74/74 seed countries reach at least one server with device credentials (VN after replacing its refusing seed IP).
+  - **A location spans several /24 clusters** ✅. VN-51-HANOI: `156.59.140.0/24` (Hanoi) and `128.1.126.0/24` (Ho Chi Minh City).
+  - **Discovery is a maintainer job, not done on users' machines** (it probes networks). `pnpm scan:hma-servers` (`app/scripts/hma-scan-servers.ts`):
+    1. Collect candidate /24s: every seed IP's /24, plus clusters found in Certificate Transparency logs. Gen Digital servers have per-server certificates named `<kind>-prod-<infra>-<cc>-<city>-<id>.gen-vpn.com` (kinds seen: `ipsec`, `mimic`, `wireguard`); OpenVPN servers share `openvpn.gen-vpn.com` but sit in the same clusters ✅ (VN). CT sources are rate-limited (certspotter: ~9 pages then HTTP 429), so harvesting is incremental and cached.
+    2. Probe each /24 with one 14-byte OpenVPN hello (`P_CONTROL_HARD_RESET_CLIENT_V2`) on udp/1194; hosts answering opcode 8 are OpenVPN servers.
+    3. Verify each with a real device-credential handshake through the app's own provider and renderer (config over stdin). Keep only servers that establish; a new server must geolocate to the location's country.
+    4. `--write` updates the seed; the result also feeds the catalog feed below.
   - Feed: a JSON file in this repo with a sha256 sidecar. The app fetches it daily and merges by `key`.
     - The catalog shows its age.
     - Stale (> 30 days): an info note only; nothing is blocked.
-    - **Who refreshes it and how is decided in the Windows track (§12).**
-  - Bad-IP failover across a location's `ips`.
+  - Server health (refused / dead / last OK) and failover across a location's servers: §6.8.
 
 ### 5.2 ZoogVPN — OpenVPN ✅
 
@@ -179,8 +201,13 @@ Each unit is independently testable:
 - Config ✅: AES-256-GCM, auth SHA256, `tls-auth` key-direction 1, `remote-cert-tls server`. UDP 1194 / TCP 443.
 - One shared CA ("Easy-RSA CA", valid to 2032) and one shared tls-auth key; both bundled and inlined.
 - Server list bundled (source: `haugene/vpn-configs-contrib`).
+- **Server pool** (rev 3): hosts are numbered per country, `<cc><n>.webunlim.com` (some `.zoogvpn.com`), one A record each, and the bundled list holds only a fraction of them.
+  - ✅ 2026-10-08, DNS: JP 2 listed vs ≥10 resolvable; DE 4 vs 9; NL 3 vs 8; SG 1 vs 5; VN 1 vs 3.
+  - ✅ Exit IP = server IP (`sg2.webunlim.com`, not in the bundled list, worked).
+  - A maintainer script (`pnpm scan:zoog-servers`) enumerates `<cc>1…<cc>N` per country until several consecutive misses and writes the bundled list. Hosts stay hostnames; the controller resolves them before bind (§6.1.4).
+  - Which servers an account may use depends on its plan: `jp4`, `vn2`, `de5` answered `AUTH_FAILED` to the test account while `sg2` worked. That is the plan-refusal case below, recorded per (account, server) in §6.8.
 - **Plan refusal vs wrong password** ⚠️. Over OpenVPN both arrive as an auth failure. v1 told them apart with IKE signals that no longer exist. Rule:
-  - Auth failure on a server while another server on the same account works → `not in plan` for that (account, server), cached for 7 days.
+  - Auth failure on a server while another server on the same account works → `not in plan` for that (account, server), cached for 7 days. The port moves to another free server, as for HMA.
   - Auth failure on ≥ 3 different servers and none working → `failed(auth)` for the account.
 
 ### 5.3 Surfshark — WireGuard ✅
@@ -188,13 +215,20 @@ Each unit is independently testable:
 - Credential: the WireGuard private key.
 - Peer settings: inner address `10.14.0.2/16`, peer = the cluster pubKey, port 51820, `mtu: 1280`, keepalive 25.
 - Generic + `static` clusters from the public API, cached 12 h.
-- **Re-resolve the host and switch the peer IP when a probe fails.** ✅ IPs went stale within minutes.
+- **Server pool** (rev 3) ✅ 2026-10-08:
+  - A cluster hostname (`jp-tok.prod.surfshark.com`) is DNS round-robin over a large pool: 20–26 distinct IPs in 16 lookups for JP/US/DE/SG; 8 for VN.
+  - The cluster's single pubKey works for **every** pool IP, so a port can pin one server: 3/3 JP and 3/3 VN pinned IPs connected.
+  - Exit IP = server IP + 1 (`193.148.16.53` → `193.148.16.54`), stable for that server.
+  - Discovery runs **in the app** (DNS only, no probing): resolve the hostname repeatedly (system resolver, plus DoH to `cloudflare-dns.com` through the host) when the location is first used and at most every 12 h, and accumulate into a persisted pool with `lastSeen`. An IP not seen for 7 days and not OK in that time is dropped.
+  - A pinned server that dies (`/delay` 504, no handshake) is marked dead for 2 h and the port moves to another free pool server (§6.8). This replaces rev 2's "re-resolve the host on probe failure" (✅ pool IPs went stale within minutes in spike 1).
+  - ⚠️ How long a pinned Surfshark server stays usable is unmeasured; the 24 h soak (§10) checks it.
 - Exit country = the geo-IP result, not the label (virtual locations).
 - A wrong key produces no log line at all. It shows up only as `/delay` 504 (§6.4).
 
 ### 5.4 Config file
 
 - `.ovpn` → openvpn-client endpoint: parse remote, proto, cipher, auth, ca, tls-auth/tls-crypt, and auth-user-pass (prompts for credentials).
+  - Rev 3: **every `remote` line** becomes a server of the file's pool (hostnames resolved before bind), so a multi-remote file can hold several ports. Today's parser keeps only the first.
 - `.conf` (WireGuard) → wireguard endpoint.
 - Unsupported directives are rejected with a clear message rather than ignored.
 - Imported files are kept in the encrypted secrets store, not as plain files.
@@ -224,7 +258,7 @@ Each unit is independently testable:
 
 - **Allocation**: test-bind the candidate port on **both** `127.0.0.1` and `0.0.0.0` before use.
   - ✅ Trap: a foreign listener on `0.0.0.0:P` lets sing-box bind `127.0.0.1:P` silently.
-- **Persistence**: each location keeps its proxy port across restarts. Auxiliary ports (clash_api) are reallocated on every start.
+- **Persistence**: each port keeps its proxy port number (and its pinned server, while that server stays usable) across restarts. Auxiliary ports (clash_api) are reallocated on every start.
 - **Bind failure** (✅ `FATAL … address already in use`, exit code 1 within ~0.1 s): pick new auxiliary ports and retry. If the proxy port itself is taken, mark the port `failed(port in use)` and offer "Move to another port".
 - **LAN sharing** — a single toggle. It is the only setting that may trigger an OS firewall prompt (Windows admin).
 
@@ -273,19 +307,20 @@ Each unit is independently testable:
 - Bad server IP remembered for 2 h; fail over to another IP of the same location.
 - Starts are queued at ≤ 3 concurrent, 2–5 s apart (also on resume and app start).
 
-### 6.5 Rotate
+### 6.5 Change IP (was "Rotate")
 
-- Choose, in order:
-  1. Another IP of the **same location**.
-  2. Otherwise another location in the **same country** (the UI says so).
+- A port's exit IP is its server's (§6.8), so changing the IP means moving the port to another server. Choose, in order:
+  1. A **free** usable server of the **same location**: not held by another port, not refused for this account, not dead; best first (most recent OK, then catalog order). Or the server the user picked from the Change-IP menu.
+  2. Otherwise another location in the **same country** (the UI says so, and the row moves to that location's group).
   3. Otherwise report "no other server available".
 - Restart only that port, then **confirm the exit IP changed** before reporting success.
-- ✅ HMA exit IP = server IP (8/8), and reconnecting to the same server always gave the same IP, so only a different server rotates.
+- Auto-rotate every N minutes applies Change IP on that schedule, cycling through the location's free servers.
+- ✅ Exit IP = server identity on every provider, and reconnecting to the same server always gives the same IP (2026-10-08: 3/3 reconnects on HMA VN and DE; HMA app toggled 5× on IPSec kept gateway and exit `128.1.126.104`).
 
 ### 6.6 Optional rotate webhook (off by default)
 
 - A separate listener on `127.0.0.1:<port>`; `0.0.0.0` only together with LAN sharing.
-- `POST /rotate/<location-key>` only.
+- `POST /rotate/<port-key>` only (rev 3: a port key is `<location-key>#<n>`). A bare `<location-key>` keeps working and means that location's first port, so existing scripts don't break.
 - Key in an `Authorization: Bearer` header, compared in constant time.
 - `Host` header must be in an allowlist (anti DNS-rebinding).
 - No CORS headers. No other endpoints.
@@ -294,6 +329,60 @@ Each unit is independently testable:
 
 - Keep-awake (`powerSaveBlocker`, prevent-app-suspension) while any port is on, if enabled.
 - `suspend` → stop all ports (exit-notify is pointless once the network is gone). `resume` → staggered restart.
+
+### 6.8 Server pools and the port model (rev 3)
+
+**Why.** On every provider a location is many servers and each server is one fixed exit IP (§2, §11). One port per location wasted that: one IP per city, and "rotate" could only jump cities. Rev 3 makes the server the unit.
+
+**Model.**
+
+- **Location** (`Target`): `{key, providerId, country, city, label, servers}`. `servers` is the location's pool of server tokens: an IP for HMA and Surfshark, a hostname for ZoogVPN and files (resolved before bind).
+- **Port**: `{key: "<location-key>#<n>", locationKey, n, accountId, proxyPort, server, enabled, state, autoRotateMin}`.
+  - `n` is the smallest free number in that location, starting at 1.
+  - `server` is the pinned server token; empty until the first start.
+- **Server health**, per (account, server):
+  - `lastOk` — last confirmed online.
+  - `refused until` — auth refused: an HMA server of another tenant, or a ZoogVPN `not in plan`. 7 days. Persisted.
+  - `dead until` — handshake timeout, `/delay` 503/504, or the host vanished from DNS. 2 h. In memory.
+
+**Pool source per provider.**
+
+| Provider | Pool | Built by | Exit IP |
+|---|---|---|---|
+| HMA | catalog `ips` of the location | maintainer scan (§5.1), shipped in the seed + feed | = server IP |
+| Surfshark | IPs behind the cluster hostname | the app, DNS sampling (§5.3) | = server IP + 1 |
+| ZoogVPN | numbered hosts of the location | maintainer enumeration (§5.2), bundled | = server IP |
+| File | the file's `remote` lines | parser (§5.4) | = server IP |
+
+**Allocation invariant.** Two enabled ports of the same provider never hold the same server, because the same server means the same exit IP. "Same" is compared on the **resolved IP**, not the token: different hostnames can point at one machine (✅ `de7.webunlim.com` and `fr4.webunlim.com` both resolve to `185.177.229.121`). The exit-IP probe is the final check: a port whose exit IP equals another port's is moved to another server.
+
+- **Add k ports** to a location: take the k best free usable servers (usable = not refused for that account, not dead; best = most recent `lastOk`, then pool order). If fewer are free, add that many and say how many were added.
+- The provider's port limit (§4.2) caps the provider's enabled ports. Defaults: HMA 12 (✅ 12 processes), Surfshark 20 (⚠️ 10 separate processes ✅, 50 endpoints in one process ✅; the 24 h soak checks 20), ZoogVPN 5 (⚠️ plan connection limit unknown), file 1 per file.
+- Ports are spread across the provider's accounts by the existing account pool. A server refused for one account may still be used by another.
+
+**Failover.** It runs on every (re)start and every due retry; the start path re-selects instead of reusing a stale choice.
+
+- Server refused → mark refused for (account, server) and move the port to the next free usable server.
+  - If none is left, the port enters `failed(auth)` or `failed(not in plan)` with the provider's message (§5.1, §5.2).
+- Server dead → mark dead for 2 h and move to the next free usable server.
+  - If none is left, `retrying` on the normal back-off; dead marks expire, so the pool recovers.
+- Change IP (§6.5) uses the same selection, excluding the current server.
+
+**IPC changes** (`contracts.ts`):
+
+- `PortRow` gains `locationKey`, `server`, `serverIp`. `key` is the port key.
+- `addPorts(locationKey, count)` → `{added: PortRow[], noteKey?}`. Replaces starting a location key.
+- `listServers(locationKey)` → `[{server, ip?, health: 'ok'|'unknown'|'refused'|'dead', lastOk?, heldBy?}]`. Feeds the Change-IP menu and the group header.
+- `rotatePort(portKey, toServer?)` takes an optional explicit server.
+- `listTargets()` reports each location's pool size and usable count.
+- `startPorts`, `stopPorts`, `removePorts`, `exportPorts`, `testPort`, `setAutoRotate` and `getLogs` keep taking port keys.
+
+**Migration** (`schemaVersion` bump):
+
+- Every existing row `K` becomes `K#1` with `locationKey = K`.
+- `portServers[K]` becomes that row's `server`.
+- Auto-rotate settings carry over.
+- The webhook keeps accepting bare location keys (§6.6).
 
 ## 7. Windows helper (HMA only) ⚠️ whole section unverified on Windows
 
@@ -373,6 +462,7 @@ proxy-farm/
   - Health state machine fed with recorded log lines and `/delay` codes (fixtures from spike 2).
   - Port allocator (wildcard-listener trap).
   - Account pools.
+  - Server pools (rev 3): allocation never gives two ports the same server; refused/dead failover and its terminal cases; Change IP selection incl. an explicit server; Surfshark DNS-pool accumulation and expiry; multi-remote `.ovpn`; the `K` → `K#1` state migration; webhook bare-key alias.
   - i18n key parity (en ⇔ vi).
 - **Integration**: real sing-box against local test servers (WireGuard userspace peer; OpenVPN test server in a dev-only container). Covers:
   - spawn via stdin;
@@ -383,7 +473,8 @@ proxy-farm/
   - bind-failure retry;
   - per-port DNS through the right tunnel;
   - an IPv6 literal does not leave via the host.
-- **Live smoke** (opt-in flag, real accounts, ≤ 1 attempt per location per 10 min): HMA ×3, ZoogVPN ×2, Surfshark ×5. Asserts the exit IP differs from the host IP and the country matches.
+- **Live smoke** (opt-in flag, real accounts, ≤ 1 attempt per location per 10 min): HMA ×3, ZoogVPN ×2, Surfshark ×5. Asserts the exit IP differs from the host IP and the country matches. Rev 3 adds: 3 ports on one Surfshark location and 2 on one HMA location, all with distinct exit IPs.
+- **Soak** (rev 3): 20 Surfshark ports pinned to pool servers + 12 HMA ports for 24 h; records how long pinned servers stay usable and how often failover moves a port.
 - **E2E**: Playwright against the packaged app (onboarding → start → copy → rotate → stop), as in lingoreup.
 - **Helper**:
   - Go unit tests for the pipe ACL and identity checks.
@@ -395,7 +486,7 @@ proxy-farm/
     - the uninstaller removes the service.
 - **Release gate**: signatures, notarization, smoke-launch, live smoke on the pinned sing-box.
 
-## 11. Spike evidence (2026-10-07, macOS arm64, no sudo, no Docker)
+## 11. Spike evidence (2026-10-07 and 2026-10-08, macOS arm64, no sudo, no Docker)
 
 | Test | Result |
 |---|---|
@@ -420,14 +511,29 @@ proxy-farm/
 | HMA session renewal keeps `udid`/`password` | ✅ |
 | sing-box runtime add/remove | ❌ none; SIGHUP rebuilds everything |
 | OpenVPN exit-notify on stop | ⚠️ no evidence it is sent |
+| **2026-10-08 (rev 3)** | |
+| HMA device creds, all 115 seed locations / 74 countries | ✅ 73/74 at first; VN refused because its seed IP was another tenant's server; 74/74 after the fix |
+| HMA VN cluster scan (`156.59.140.0/24`, one OpenVPN hello per host) | ✅ 2 OpenVPN servers answered: `.149` refuses the device, `.19` accepts it; exit = `.19` (Hanoi) |
+| HMA second VN cluster (`128.1.126.0/24`, found via the app's IPSec/Mimic gateways) | ✅ `.101` and `.118` accept the device; exits = themselves (Ho Chi Minh City) |
+| HMA reconnect to the same server ×3 (VN, DE) | ✅ same exit IP every time |
+| HMA app (IPSec), toggled 5× on VN | ✅ same gateway `128.1.126.104` and exit `128.1.126.104` each time; the morning's gateway was `156.59.140.24` |
+| HMA seed-/24 mining (first 62 locations) | ✅ 33 with 1 server, 16 with 2, 2 with 3, 11 with ≥ 4 (capped) |
+| Certificate Transparency, `*.gen-vpn.com` | ✅ per-server names `<kind>-prod-<infra>-<cc>-<city>-<id>` (ipsec, mimic, wireguard); certspotter rate-limits after ~9 pages |
+| Surfshark cluster DNS (16 lookups × 5 clusters) | ✅ 20–26 distinct IPs for JP/US/DE/SG, 8 for VN |
+| Surfshark pinned pool IPs with the cluster pubKey | ✅ 3/3 JP and 3/3 VN connected; exit = server IP + 1 |
+| ZoogVPN numbered hosts via DNS | ✅ many unlisted hosts (JP ≥ 10, DE 9, NL 8, SG 5, VN 3) |
+| ZoogVPN unlisted hosts with the test account | `sg2` ✅ exit = server IP; `jp4`, `vn2`, `de5` `AUTH_FAILED` (plan); `jp1`, `jp2` timed out |
 
 ## 12. Risks & open items
 
 | Item | Plan |
 |---|---|
 | **Windows untested** (auth format, CA, process stop, helper, detection, UAC flows) | **Windows spike before planning the Windows tasks** |
-| HMA server list: one IP per location; IPs change; no Mac-side discovery | Accumulating catalog + feed + bad-IP failover now; **find a durable server-discovery method in the Windows track** |
-| HMA rotate within a city usually impossible | Rotate falls back to another city in the same country (§6.5) |
+| HMA server discovery | Rev 3: maintainer scan (seed /24s + CT clusters + OpenVPN hello + device-cred verify) → seed + feed (§5.1). Some servers refuse the device (other tenants); refusal failover handles them (§6.8) |
+| Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
+| Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
+| ZoogVPN plan limits per server and per connection count ⚠️ | Per-(account, server) refusal memory; default limit 5 until measured |
+| HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
 | ZoogVPN plan vs password ambiguity ⚠️ | Heuristic in §5.2; refine with real data |
 | sing-box OpenVPN client is young (Aug 2026) | Pinned; live smoke gates upgrades |
 | Unsigned Windows build → SmartScreen, Defender may flag `sing-box.exe` as a hacktool | Illustrated "Run anyway" guide; submit false positives; signing hook ready |
