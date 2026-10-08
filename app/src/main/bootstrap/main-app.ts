@@ -30,6 +30,7 @@ import { setResourcesRoot } from '../resources-root';
 import { createStateStore } from '../store/state';
 import { createTray, onlineCountLabel, trayLabels, type TrayHandle } from '../tray';
 import { resolveRotateKey, startWebhook, type Webhook } from '../webhook/index';
+import { aboutPanelOptions, buildAppMenuTemplate, menuLabels } from './app-menu';
 import { openExternalIfAllowed } from './external-links';
 import { createControllerFacade } from './facade';
 import { createHmaLocalSource } from './hma-local';
@@ -342,6 +343,7 @@ export function runApp(): void {
         if (fx.language) {
           language = resolveMainLanguage(next.language, app.getLocale());
           rebuildTray();
+          rebuildMenu();
         }
         if (prev.autoCheckUpdates !== next.autoCheckUpdates) {
           if (next.autoCheckUpdates) updater.startPeriodicCheck(24);
@@ -382,6 +384,22 @@ export function runApp(): void {
     });
 
     const openExternal = (url: string) => openExternalIfAllowed(url, (u) => shell.openExternal(u), log);
+
+    // Application menu + About panel (Help links go through the same allowlist).
+    const APP_NAME = 'Proxy Farm';
+    app.setAboutPanelOptions(aboutPanelOptions(APP_NAME, app.getVersion()));
+    function rebuildMenu(): void {
+      const template = buildAppMenuTemplate({
+        platform: process.platform,
+        isDev: !app.isPackaged,
+        appName: APP_NAME,
+        labels: menuLabels(language),
+        openLink: (url) => void openExternal(url),
+        showAbout: () => app.showAboutPanel(),
+      });
+      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    }
+    rebuildMenu();
 
     function createWindow(): void {
       mainWindow = new BrowserWindow({

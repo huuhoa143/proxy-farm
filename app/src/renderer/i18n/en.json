@@ -540,5 +540,21 @@
     "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark or ZoogVPN.",
     "acknowledge": "I understand",
     "readFull": "Read the full disclaimer"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "window": "Window",
+    "help": "Help",
+    "getHelp": "Get Help",
+    "reportBug": "Report a Bug",
+    "reportSecurity": "Report a Security Issue",
+    "privacy": "Privacy Policy",
+    "disclaimer": "Disclaimer",
+    "thirdParty": "Third-Party Licenses",
+    "source": "Source Code",
+    "releaseNotes": "Release Notes",
+    "about": "About {{name}}"
   }
 }

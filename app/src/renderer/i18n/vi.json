@@ -540,5 +540,21 @@
     "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
     "acknowledge": "Tôi đã hiểu",
     "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
+  },
+  "menu": {
+    "file": "Tệp",
+    "edit": "Sửa",
+    "view": "Xem",
+    "window": "Cửa sổ",
+    "help": "Trợ giúp",
+    "getHelp": "Nhận trợ giúp",
+    "reportBug": "Báo lỗi",
+    "reportSecurity": "Báo lỗi bảo mật",
+    "privacy": "Chính sách quyền riêng tư",
+    "disclaimer": "Miễn trừ trách nhiệm",
+    "thirdParty": "Giấy phép bên thứ ba",
+    "source": "Mã nguồn",
+    "releaseNotes": "Ghi chú phát hành",
+    "about": "Giới thiệu {{name}}"
   }
 }
