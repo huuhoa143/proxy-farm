@@ -56,9 +56,12 @@ function fakeProvider(id: ProviderId, targets: (account: Account) => Target[]): 
   };
 }
 
-function fakePortManager(state: StateStore) {
+/** Pins each new port to the first server of the location no other row holds, like the
+ * real one (per account: `refusedFor` lists servers that account may not use). */
+function fakePortManager(state: StateStore, refusedFor: Record<string, string[]> = {}) {
   const calls: string[] = [];
   let rotateResult: RotateResult = { changed: true, from: '1.1.1.1', to: '2.2.2.2' };
+  const held = (t: Target) => new Set(state.getState().ports.filter((p) => p.locationKey === t.key).map((p) => p.server));
   const pm: PortManager & { calls: string[]; setRotate(r: RotateResult): void } = {
     calls,
     setRotate: (r) => (rotateResult = r),
@@ -71,18 +74,26 @@ function fakePortManager(state: StateStore) {
       calls.push(`remove:${key}`);
       state.setState((s) => ({ ...s, ports: s.ports.filter((p) => p.key !== key) }));
     },
-    rotatePort: async () => rotateResult,
+    rotatePort: async (key, toServer) => {
+      calls.push(`rotate:${key}${toServer ? `>${toServer}` : ''}`);
+      return rotateResult;
+    },
     setAutoRotate: async () => undefined,
     exportPorts: async () => '',
     testPort: async () => ({ ok: true, exitIp: '9.9.9.9', latencyMs: 12 }),
-    ensurePort: async (t, accountId) => {
+    addPort: async (t, accountId) => {
+      const server = t.servers.find((sv) => !held(t).has(sv) && !(refusedFor[accountId] ?? []).includes(sv));
+      if (!server) return undefined;
       const used = new Set(state.getState().ports.map((p) => p.proxyPort));
       let proxyPort = 29001;
       while (used.has(proxyPort)) proxyPort += 1;
-      const row: PortRow = { key: t.key, locationKey: t.key, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: false, state: { kind: 'queued' }, autoRotateMin: 0 };
+      const n = state.getState().ports.filter((p) => p.locationKey === t.key).length + 1;
+      const row: PortRow = { key: `${t.key}#${n}`, locationKey: t.key, server, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: true, state: { kind: 'queued' }, autoRotateMin: 0 };
       state.setState((s) => ({ ...s, ports: [...s.ports, row] }));
       return row;
     },
+    listServers: (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
+    freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
     syncAutoRotate: () => undefined,
     stopAutoRotate: () => undefined,
   };
@@ -111,7 +122,7 @@ describe('controller facade', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  function setup(overrides: Partial<FacadeDeps> = {}) {
+  function setup(overrides: Partial<FacadeDeps> = {}, refusedFor: Record<string, string[]> = {}) {
     const secrets = memorySecrets();
     const state = createStateStore(join(dir, 'state.json'), secrets);
     const refusals = createRefusalTracker();
@@ -124,11 +135,11 @@ describe('controller facade', () => {
       refusals,
     });
     const providers: Record<string, Provider> = {
-      hma: fakeProvider('hma', () => [target('hma:NL-AMS'), target('hma:JP-TYO', 'JP')]),
+      hma: fakeProvider('hma', () => [target('hma:NL-AMS', 'NL', ['10.0.0.1', '10.0.0.2', '10.0.0.3']), target('hma:JP-TYO', 'JP')]),
       zoogvpn: fakeProvider('zoogvpn', () => [target('zoogvpn:nl1')]),
       file: fakeProvider('file', (a) => [{ ...target(`file:${a.id}`, a.meta.country), city: a.meta.city }]),
     };
-    const portManager = fakePortManager(state);
+    const portManager = fakePortManager(state, refusedFor);
     const queue = fakeQueue();
     const allocated: number[] = [];
     const speedTest = vi.fn(async () => 42.5);
@@ -232,24 +243,91 @@ describe('controller facade', () => {
     expect(await facade.importConfigFile('x.txt', '')).toMatchObject({ ok: false, reasonKey: 'file.check.unknownExtension' });
   });
 
-  it('startPorts: a new target gets an account from the pool, a port row, and goes through the queue', async () => {
+  it('startPorts: a bare location key adds one port (account from the pool, a port row, through the queue)', async () => {
     const { facade, state, queue } = setup();
     await facade.connectHma();
     await facade.startPorts(['hma:NL-AMS', 'hma:JP-TYO', 'hma:NOPE']);
     const rows = state.getState().ports;
     expect(rows.map((r) => [r.key, r.proxyPort, r.enabled, r.state.kind])).toEqual([
-      ['hma:NL-AMS', 29001, true, 'queued'],
-      ['hma:JP-TYO', 29002, true, 'queued'],
+      ['hma:NL-AMS#1', 29001, true, 'queued'],
+      ['hma:JP-TYO#1', 29002, true, 'queued'],
     ]);
     expect(rows[0].accountId).toBe('hma-1');
-    expect(queue.enqueued).toEqual(['hma:NL-AMS', 'hma:JP-TYO']);
+    expect(queue.enqueued).toEqual(['hma:NL-AMS#1', 'hma:JP-TYO#1']);
+  });
+
+  it('startPorts: a port key starts that port; an unknown port key is ignored', async () => {
+    const { facade, state, queue } = setup();
+    await facade.connectHma();
+    await facade.addPorts('hma:NL-AMS', 1);
+    state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, enabled: false, state: { kind: 'stopped' } })) }));
+    queue.enqueued.length = 0;
+    await facade.startPorts(['hma:NL-AMS#1', 'hma:NL-AMS#7']);
+    expect(queue.enqueued).toEqual(['hma:NL-AMS#1']);
+    expect(state.getState().ports).toHaveLength(1);
+  });
+
+  it('addPorts adds k ports on different servers and starts them', async () => {
+    const { facade, state, queue } = setup();
+    await facade.connectHma();
+    const r = await facade.addPorts('hma:NL-AMS', 2);
+    expect(r.noteKey).toBeUndefined();
+    expect(r.added.map((p) => [p.key, p.server])).toEqual([
+      ['hma:NL-AMS#1', '10.0.0.1'],
+      ['hma:NL-AMS#2', '10.0.0.2'],
+    ]);
+    expect(queue.enqueued).toEqual(['hma:NL-AMS#1', 'hma:NL-AMS#2']);
+    expect(state.getState().ports.every((p) => p.enabled && p.state.kind === 'queued')).toBe(true);
+  });
+
+  it('addPorts with fewer free servers adds that many and says no-free-server', async () => {
+    const { facade } = setup();
+    await facade.connectHma();
+    const r = await facade.addPorts('hma:NL-AMS', 5);
+    expect(r.added).toHaveLength(3);
+    expect(r.noteKey).toBe('no-free-server');
+    expect(await facade.addPorts('hma:NL-AMS', 1)).toEqual({ added: [], noteKey: 'no-free-server' });
+  });
+
+  it('addPorts stops at the provider limit with limit-reached', async () => {
+    const { facade } = setup();
+    await facade.connectHma();
+    await facade.setLimit('hma', 2);
+    const r = await facade.addPorts('hma:NL-AMS', 3);
+    expect(r.added).toHaveLength(2);
+    expect(r.noteKey).toBe('limit-reached');
+  });
+
+  it('addPorts tries another account when the pooled one has no usable free server', async () => {
+    const { facade } = setup({}, { 'zoogvpn-1': ['10.0.0.1'] });
+    await facade.addAccount('zoogvpn', { username: 'a', password: 'p' });
+    await facade.addAccount('zoogvpn', { username: 'b', password: 'p' });
+    const r = await facade.addPorts('zoogvpn:nl1', 1);
+    expect(r.added.map((p) => p.accountId)).toEqual(['zoogvpn-2']);
+  });
+
+  it('listServers / listTargets come from the port manager, with freeServers filled in', async () => {
+    const { facade } = setup();
+    await facade.connectHma();
+    await facade.addPorts('hma:NL-AMS', 1);
+    expect((await facade.listServers('hma:NL-AMS')).map((s) => [s.server, s.heldBy])).toEqual([
+      ['10.0.0.1', 'x'],
+      ['10.0.0.2', undefined],
+      ['10.0.0.3', undefined],
+    ]);
+    expect(await facade.listServers('hma:NOPE')).toEqual([]);
+    const targets = await facade.listTargets('hma');
+    expect(targets.map((t) => [t.key, t.freeServers])).toEqual([
+      ['hma:NL-AMS', 2],
+      ['hma:JP-TYO', 1],
+    ]);
   });
 
   it('startPorts: a file target is bound to its own imported file, never pooled', async () => {
     const { facade, state } = setup();
     await facade.importConfigFile('a.conf', 'x', 'VN');
     const b = await facade.importConfigFile('b.conf', 'y', 'VN');
-    await facade.startPorts([`file:${b.account!.id}`]);
+    await facade.addPorts(`file:${b.account!.id}`, 1);
     expect(state.getState().ports[0].accountId).toBe(b.account!.id);
   });
 
@@ -258,8 +336,8 @@ describe('controller facade', () => {
     await facade.connectHma();
     await facade.setLimit('hma', 1);
     await facade.startPorts(['hma:NL-AMS', 'hma:JP-TYO']);
-    expect(state.getState().ports.map((r) => r.key)).toEqual(['hma:NL-AMS']);
-    expect(queue.enqueued).toEqual(['hma:NL-AMS']);
+    expect(state.getState().ports.map((r) => r.key)).toEqual(['hma:NL-AMS#1']);
+    expect(queue.enqueued).toEqual(['hma:NL-AMS#1']);
     expect((await facade.listProviders())[0].limit).toBe(1);
   });
 
@@ -268,7 +346,7 @@ describe('controller facade', () => {
     await facade.connectHma();
     await facade.startPorts(['hma:NL-AMS']);
     state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, state: { kind: 'failed', reason: 'port-in-use', untilMs: 0, attempt: 1 } })) }));
-    await facade.startPorts(['hma:NL-AMS']);
+    await facade.startPorts(['hma:NL-AMS#1']);
     expect(allocated).toEqual([29002]);
     expect(state.getState().ports[0]).toMatchObject({ proxyPort: 29002, state: { kind: 'queued' } });
   });
@@ -277,9 +355,9 @@ describe('controller facade', () => {
     const { facade, portManager, state } = setup();
     await facade.connectHma();
     await facade.startPorts(['hma:NL-AMS']);
-    await facade.stopPorts(['hma:NL-AMS']);
-    await facade.removePorts(['hma:NL-AMS']);
-    expect(portManager.calls).toEqual(['stop:hma:NL-AMS', 'remove:hma:NL-AMS']);
+    await facade.stopPorts(['hma:NL-AMS#1']);
+    await facade.removePorts(['hma:NL-AMS#1']);
+    expect(portManager.calls).toEqual(['stop:hma:NL-AMS#1', 'remove:hma:NL-AMS#1']);
     expect(state.getState().ports).toEqual([]);
   });
 
@@ -299,6 +377,9 @@ describe('controller facade', () => {
     expect((await facade.rotatePort('k')).noteKey).toBe('main.rotateResult.sameCityNote');
     portManager.setRotate({ changed: false, noteKey: 'no-server' });
     expect((await facade.rotatePort('k')).noteKey).toBe('main.rotateResult.unchangedNote');
+    portManager.setRotate({ changed: false, noteKey: 'server-unavailable' });
+    expect((await facade.rotatePort('k#1', '10.0.0.2')).noteKey).toBe('main.rotateResult.serverTaken');
+    expect(portManager.calls).toContain('rotate:k#1>10.0.0.2');
     expect(rotateNoteKey('online-timeout')).toBe('rotate.online-timeout');
     expect(rotateNoteKey(undefined)).toBeUndefined();
   });
@@ -307,9 +388,9 @@ describe('controller facade', () => {
     const { facade, speedTest, state } = setup();
     await facade.connectHma();
     await facade.startPorts(['hma:NL-AMS']);
-    expect(await facade.testPort('hma:NL-AMS', false)).toEqual({ ok: true, exitIp: '9.9.9.9', latencyMs: 12 });
+    expect(await facade.testPort('hma:NL-AMS#1', false)).toEqual({ ok: true, exitIp: '9.9.9.9', latencyMs: 12 });
     expect(speedTest).not.toHaveBeenCalled();
-    expect(await facade.testPort('hma:NL-AMS', true)).toMatchObject({ ok: true, mbps: 42.5 });
+    expect(await facade.testPort('hma:NL-AMS#1', true)).toMatchObject({ ok: true, mbps: 42.5 });
     const { proxyUser, proxyPass } = state.getState().settings;
     expect(speedTest).toHaveBeenCalledWith(29001, { username: proxyUser, password: proxyPass });
   });

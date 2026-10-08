@@ -1,15 +1,16 @@
 import path from 'node:path';
-import type {
-  Account,
-  AccountSecret,
-  AppStatus,
-  CheckResult,
-  PortRow,
-  Provider,
-  ProviderId,
-  RotateResult,
-  Settings,
-  Target,
+import {
+  splitPortKey,
+  type Account,
+  type AccountSecret,
+  type AppStatus,
+  type CheckResult,
+  type PortRow,
+  type Provider,
+  type ProviderId,
+  type RotateResult,
+  type Settings,
+  type Target,
 } from '../../shared/contracts';
 import type { AccountPool } from '../accounts/pool';
 import type { HostVpnDetector } from '../controller/host-vpn';
@@ -60,6 +61,8 @@ export function rotateNoteKey(noteKey: string | undefined): string | undefined {
   if (noteKey === undefined) return undefined;
   if (noteKey === 'rotated-to-another-city') return 'main.rotateResult.sameCityNote';
   if (noteKey === 'no-server') return 'main.rotateResult.unchangedNote';
+  // An explicit Change-IP pick that is held, unusable, not in the pool, or already current.
+  if (noteKey === 'server-unavailable' || noteKey === 'already-on-server') return 'main.rotateResult.serverTaken';
   return `rotate.${noteKey}`;
 }
 
@@ -132,36 +135,74 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     return [...seen.values()];
   }
 
-  function accountForNewPort(providerId: ProviderId, key: string): Account | undefined {
-    // A file target belongs to exactly one imported file (account) — never pool it.
-    if (providerId === 'file') {
-      if (deps.pool.atLimit('file')) return undefined;
-      return accounts().find((a) => `file:${a.id}` === key);
-    }
-    return deps.pool.pickAccount(providerId, { key });
+  function providerOf(locationKey: string): ProviderId | undefined {
+    const providerId = locationKey.split(':')[0] as ProviderId;
+    return PROVIDER_IDS.includes(providerId) ? providerId : undefined;
   }
 
-  async function startOne(key: string, targetCache: Map<ProviderId, Target[]>): Promise<void> {
-    let row = findPort(key);
-    if (!row) {
-      const providerId = key.split(':')[0] as ProviderId;
-      if (!PROVIDER_IDS.includes(providerId)) return;
-      if (!targetCache.has(providerId)) targetCache.set(providerId, await targetsFor(providerId));
-      const target = targetCache.get(providerId)!.find((t) => t.key === key);
-      if (!target) return log(`startPorts: unknown target ${key}`);
-      const account = accountForNewPort(providerId, key);
-      if (!account) return log(`startPorts: no account with room for ${key}`);
-      row = await deps.portManager.ensurePort(target, account.id);
-    } else {
-      if (!row.enabled && deps.pool.atLimit(row.providerId)) return log(`startPorts: ${row.providerId} at its port limit`);
-      if (row.state.kind === 'failed' && row.state.reason === 'port-in-use') {
-        // "Move to another port" (spec §6.2): the persisted proxy port is held by
-        // something else, so this restart allocates a fresh one.
-        const { settings, ports } = deps.state.getState();
-        const taken = new Set(ports.map((p) => p.proxyPort));
-        const proxyPort = await deps.allocator.allocate({ base: settings.basePort, taken });
-        patchPort(key, { proxyPort });
+  async function findTarget(locationKey: string): Promise<Target | undefined> {
+    const providerId = providerOf(locationKey);
+    return providerId ? (await targetsFor(providerId)).find((t) => t.key === locationKey) : undefined;
+  }
+
+  /** Accounts to try for a new port, best first: the pool's least-loaded pick, then the
+   * provider's other accounts (a server refused for one account may still be usable by
+   * another — spec §6.8). A file target belongs to exactly one imported file. */
+  function accountsForNewPort(providerId: ProviderId, locationKey: string): Account[] {
+    if (providerId === 'file') return accounts().filter((a) => `file:${a.id}` === locationKey);
+    const first = deps.pool.pickAccount(providerId);
+    const rest = accounts().filter((a) => a.providerId === providerId && a.id !== first?.id);
+    return first ? [first, ...rest] : rest;
+  }
+
+  /** spec §6.8 "Add k ports": each on a different free usable server, spread across the
+   * provider's accounts, capped by the provider's port limit. */
+  async function addPorts(locationKey: string, count: number): Promise<{ added: PortRow[]; noteKey?: string }> {
+    const target = await findTarget(locationKey);
+    if (!target) {
+      log(`addPorts: unknown location ${locationKey}`);
+      return { added: [], noteKey: 'no-free-server' };
+    }
+    const wanted = Math.min(Math.max(0, Math.floor(Number(count) || 0)), target.servers.length);
+    const added: PortRow[] = [];
+    let noteKey: string | undefined;
+    while (added.length < wanted) {
+      if (deps.pool.atLimit(target.providerId)) {
+        noteKey = 'limit-reached';
+        break;
       }
+      let row: PortRow | undefined;
+      for (const account of accountsForNewPort(target.providerId, locationKey)) {
+        row = await deps.portManager.addPort(target, account.id);
+        if (row) break;
+      }
+      if (!row) {
+        noteKey = 'no-free-server';
+        break;
+      }
+      added.push(row);
+      enqueueStart(row.key);
+    }
+    if (added.length < Math.floor(Number(count) || 0) && !noteKey) noteKey = 'no-free-server';
+    return { added: added.map((r) => findPort(r.key) ?? r), ...(noteKey ? { noteKey } : {}) };
+  }
+
+  async function startOne(key: string): Promise<void> {
+    const row = findPort(key);
+    if (!row) {
+      // A bare location key (pre-rev-3 callers) means "add one port there".
+      if (!splitPortKey(key)) await addPorts(key, 1);
+      else log(`startPorts: unknown port ${key}`);
+      return;
+    }
+    if (!row.enabled && deps.pool.atLimit(row.providerId)) return log(`startPorts: ${row.providerId} at its port limit`);
+    if (row.state.kind === 'failed' && row.state.reason === 'port-in-use') {
+      // "Move to another port" (spec §6.2): the persisted proxy port is held by
+      // something else, so this restart allocates a fresh one.
+      const { settings, ports } = deps.state.getState();
+      const taken = new Set(ports.map((p) => p.proxyPort));
+      const proxyPort = await deps.allocator.allocate({ base: settings.basePort, taken });
+      patchPort(key, { proxyPort });
     }
     enqueueStart(row.key);
   }
@@ -251,32 +292,25 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     async listTargets(providerId) {
       const ids = providerId ? [providerId] : PROVIDER_IDS;
       const out: Target[] = [];
-      for (const id of ids) out.push(...(await targetsFor(id)));
+      for (const id of ids) for (const t of await targetsFor(id)) out.push({ ...t, freeServers: deps.portManager.freeServerCount(t) });
       return out;
     },
 
-    // Interim v3 glue: one port per location until the server-pool controller lands.
     async listServers(locationKey) {
-      const providerId = locationKey.split(':')[0] as ProviderId;
-      const target = (await targetsFor(providerId)).find((t) => t.key === locationKey);
-      return (target?.servers ?? []).map((server) => ({ server, health: 'unknown' as const }));
+      const target = await findTarget(locationKey);
+      return target ? deps.portManager.listServers(target) : [];
     },
 
     async listPorts() {
       return deps.state.getState().ports;
     },
 
-    async addPorts(locationKey, count) {
-      const before = new Set(deps.state.getState().ports.map((p) => p.key));
-      if (count > 0) await startOne(locationKey, new Map());
-      return { added: deps.state.getState().ports.filter((p) => !before.has(p.key)) };
-    },
+    addPorts,
 
     async startPorts(keys) {
-      const cache = new Map<ProviderId, Target[]>();
       for (const key of keys) {
         try {
-          await startOne(key, cache);
+          await startOne(key);
         } catch (err) {
           log(`startPorts: ${key} failed`, err);
         }
@@ -297,8 +331,8 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       }
     },
 
-    async rotatePort(key): Promise<RotateResult> {
-      const result = await deps.portManager.rotatePort(key);
+    async rotatePort(key, toServer): Promise<RotateResult> {
+      const result = await deps.portManager.rotatePort(key, toServer);
       return { ...result, noteKey: rotateNoteKey(result.noteKey) };
     },
 

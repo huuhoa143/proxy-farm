@@ -1,21 +1,35 @@
 import { randomBytes } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Account, PortRow, ProviderId, Settings } from '../../shared/contracts';
+import { makePortKey, type Account, type PortRow, type ProviderId, type Settings } from '../../shared/contracts';
 import type { SecretStore } from './secrets';
 
-export const SCHEMA_VERSION = 1 as const;
+/** v2 (spec §6.8, rev 3): port keys are `<locationKey>#<n>`, each row pins its own
+ * `server`, and server health (refused / last OK) is persisted per (account, server). */
+export const SCHEMA_VERSION = 2 as const;
 
 /**
  * Refusal bookkeeping persisted alongside the rest of state (see accounts/refusals.ts
  * for the in-memory tracker this mirrors, and its `serialize`/`hydrate` helpers). Keyed
- * by accountId, then by target/server key.
+ * by accountId, then by server token (v1 keyed it by target key).
  */
 export interface RefusalsState {
-  /** accountId -> (targetKey -> epoch ms of the last auth failure, pruned at 7 days) */
+  /** accountId -> (server -> epoch ms of the last auth failure, pruned at 7 days) */
   failures: Record<string, Record<string, number>>;
-  /** accountId -> (targetKey -> epoch ms last seen online, pruned like a failure) */
+  /** accountId -> (server -> epoch ms last seen online, pruned like a failure) */
   online: Record<string, Record<string, number>>;
+}
+
+/**
+ * The persisted half of the per-(account, server) health in spec §6.8 (see
+ * controller/server-health.ts). `dead until` is deliberately not here: it is a 2 h
+ * in-memory hint.
+ */
+export interface ServerHealthState {
+  /** accountId -> (server -> epoch ms the refusal expires, 7 days after it was seen) */
+  refused: Record<string, Record<string, number>>;
+  /** accountId -> (server -> epoch ms the server was last confirmed online) */
+  lastOk: Record<string, Record<string, number>>;
 }
 
 export interface AppState {
@@ -25,12 +39,7 @@ export interface AppState {
   accounts: Account[];
   limits: Record<ProviderId, number>;
   refusals: RefusalsState;
-  /**
-   * Controller-internal bookkeeping, not part of the spec's named shape but needed to
-   * implement rotate (§6.5): the server IP currently bound to each port's key, so
-   * "another IP of the same location" can be computed. Not relied on by other modules.
-   */
-  portServers: Record<string, string>;
+  serverHealth: ServerHealthState;
 }
 
 /** Secret-store ids `settings.proxyPass` / `settings.webhook.bearer` are kept under —
@@ -70,7 +79,7 @@ export function defaultState(randomPass?: () => string): AppState {
     accounts: [],
     limits: {} as Record<ProviderId, number>,
     refusals: { failures: {}, online: {} },
-    portServers: {},
+    serverHealth: { refused: {}, lastOk: {} },
   };
 }
 
@@ -95,13 +104,58 @@ export interface CreateStateStoreOptions {
   now?: () => number;
 }
 
+/** The fields of a v1 file that v2 no longer has (spec §6.8 migration). */
+interface V1Fields {
+  portServers?: Record<string, string>;
+}
+
+type LoadedState = Partial<Omit<AppState, 'schemaVersion'>> & V1Fields & { schemaVersion?: unknown };
+
+function nestedRecord(raw: unknown): Record<string, Record<string, number>> {
+  return raw && typeof raw === 'object' ? (raw as Record<string, Record<string, number>>) : {};
+}
+
+/**
+ * v1 → v2 (spec §6.8): every row `K` becomes `K#1` with `locationKey = K`, and
+ * `portServers[K]` becomes that row's `server`. Everything else on the row (proxy port,
+ * account, auto-rotate, enabled) carries over unchanged. Refusal evidence was keyed by
+ * target key; it is re-keyed by the server that target last ran on, and dropped where
+ * that is unknown (it is only a 7-day hint).
+ */
+function migrateV1(raw: LoadedState): LoadedState {
+  const portServers = raw.portServers && typeof raw.portServers === 'object' ? raw.portServers : {};
+  const ports = Array.isArray(raw.ports)
+    ? raw.ports.map((p) => {
+        const server = portServers[p.key] ?? p.server;
+        return { ...p, key: makePortKey(p.key, 1), locationKey: p.key, ...(server ? { server } : {}) };
+      })
+    : raw.ports;
+  const rekey = (byAccount: Record<string, Record<string, number>>): Record<string, Record<string, number>> => {
+    const out: Record<string, Record<string, number>> = {};
+    for (const [accountId, byKey] of Object.entries(byAccount)) {
+      for (const [key, at] of Object.entries(byKey)) {
+        const server = portServers[key];
+        if (server) (out[accountId] ??= {})[server] = at;
+      }
+    }
+    return out;
+  };
+  const refusals =
+    raw.refusals && typeof raw.refusals === 'object'
+      ? { failures: rekey(nestedRecord(raw.refusals.failures)), online: rekey(nestedRecord(raw.refusals.online)) }
+      : raw.refusals;
+  const { portServers: _dropped, ...rest } = raw;
+  return { ...rest, ports, refusals };
+}
+
 /** Fills in any field missing from a loaded (possibly older/partial/hand-edited) file
- * with the current defaults, one level deep for `settings`/`settings.webhook`. This is
- * the one and only "migration" today (schema is still version 1); a future version
- * bump adds real field renames/moves here, keyed off the *old* `schemaVersion`. */
-function fillDefaults(raw: Partial<AppState> | undefined, randomPass?: () => string): AppState {
+ * with the current defaults, one level deep for `settings`/`settings.webhook`, after
+ * migrating a v1 (or version-less) file with `migrateV1`. */
+function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string): AppState {
   const defaults = defaultState(randomPass);
+  const raw = loaded && loaded.schemaVersion !== SCHEMA_VERSION ? migrateV1(loaded) : loaded;
   const rawSettings = (raw?.settings ?? {}) as Partial<Settings>;
+  const rawHealth = raw?.serverHealth;
   return {
     schemaVersion: SCHEMA_VERSION,
     ports: Array.isArray(raw?.ports) ? raw!.ports : defaults.ports,
@@ -111,7 +165,10 @@ function fillDefaults(raw: Partial<AppState> | undefined, randomPass?: () => str
       raw?.refusals && typeof raw.refusals === 'object'
         ? { failures: raw.refusals.failures ?? {}, online: raw.refusals.online ?? {} }
         : defaults.refusals,
-    portServers: raw?.portServers && typeof raw.portServers === 'object' ? raw.portServers : defaults.portServers,
+    serverHealth:
+      rawHealth && typeof rawHealth === 'object'
+        ? { refused: nestedRecord(rawHealth.refused), lastOk: nestedRecord(rawHealth.lastOk) }
+        : defaults.serverHealth,
     settings: {
       ...defaults.settings,
       ...rawSettings,
@@ -238,9 +295,9 @@ export function createStateStore(filePath: string, secrets: SecretStore, options
       return initializeDefaults();
     }
 
-    let parsed: Partial<AppState> | undefined;
+    let parsed: LoadedState | undefined;
     try {
-      parsed = JSON.parse(raw) as Partial<AppState>;
+      parsed = JSON.parse(raw) as LoadedState;
     } catch {
       backupCorruptFile('failed to parse as JSON');
       return initializeDefaults();
@@ -252,10 +309,10 @@ export function createStateStore(filePath: string, secrets: SecretStore, options
     }
     // A file whose `schemaVersion` is missing entirely (predates the field, or was
     // produced/hand-edited by something that forgot to set it) is NOT corrupt — treat it
-    // as the implicit v0 and migrate via `fillDefaults` below, same as any other
-    // partial/old file (reviewer item 10). Only a *present but different* version number
-    // — meaning a real, unhandled future/unknown schema — is backed up and discarded.
-    if (parsed.schemaVersion !== undefined && parsed.schemaVersion !== SCHEMA_VERSION) {
+    // as v1 and migrate via `fillDefaults` below, same as any other partial/old file
+    // (reviewer item 10). Only a version this build does not know — a real, unhandled
+    // future/unknown schema — is backed up and discarded.
+    if (parsed.schemaVersion !== undefined && parsed.schemaVersion !== 1 && parsed.schemaVersion !== SCHEMA_VERSION) {
       backupCorruptFile(`had schemaVersion ${JSON.stringify(parsed.schemaVersion)}, expected ${SCHEMA_VERSION}`);
       return initializeDefaults();
     }

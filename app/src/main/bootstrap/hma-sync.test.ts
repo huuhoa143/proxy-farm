@@ -3,13 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PortRow, PortState } from '../../shared/contracts';
-import { createAccountPool } from '../accounts/pool';
-import { createRefusalTracker } from '../accounts/refusals';
 import type { SecretStore } from '../store/secrets';
 import { createStateStore, type StateStore } from '../store/state';
 import type { HmaRead } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
-import { wireRefusals } from './refusal-wiring';
 
 function memorySecrets(): SecretStore {
   const m = new Map<string, string>();
@@ -91,56 +88,5 @@ describe('HMA credentials sync (spec §5.1 lazy apply)', () => {
     watchCb();
     await new Promise((r) => setTimeout(r, 10));
     expect(restarted).toEqual(['hma:B']);
-  });
-});
-
-describe('refusal wiring (spec §5.2 move on refusal)', () => {
-  function setup(accounts: string[]) {
-    const refusals = createRefusalTracker();
-    state.setState((s) => ({
-      ...s,
-      accounts: accounts.map((id) => ({ id, providerId: 'zoogvpn' as const, label: id, meta: {}, secretRef: id })),
-      ports: [row('zoogvpn:a', 'z1', { kind: 'online', since: 1, exitIp: '1', country: 'NL' }, 'zoogvpn'), row('zoogvpn:b', 'z1', { kind: 'connecting', since: 1 }, 'zoogvpn')],
-    }));
-    const pool = createAccountPool({
-      listAccounts: () => state.getState().accounts,
-      listPorts: () => state.getState().ports,
-      setPortAccount: (key, accountId) => state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === key ? { ...p, accountId } : p)) })),
-      getLimit: () => 0,
-      isUsable: () => true,
-      refusals,
-    });
-    const restarted: string[] = [];
-    wireRefusals({ state, refusals, pool, onPortState, restartPort: (k) => restarted.push(k) });
-    return { refusals, restarted };
-  }
-
-  const authFail: PortState = { kind: 'failed', reason: 'auth', untilMs: 5, attempt: 1 };
-
-  it('moves a not-in-plan port to another account and restarts it', () => {
-    const { refusals, restarted } = setup(['z1', 'z2']);
-    refusals.recordOnline('z1', 'zoogvpn:a');
-    refusals.recordAuthFailure('z1', 'zoogvpn:b');
-    portStateCb('zoogvpn:b', authFail);
-    expect(state.getState().ports[1].accountId).toBe('z2');
-    expect(restarted).toEqual(['zoogvpn:b']);
-  });
-
-  it('relabels it failed(not-in-plan) when no other account can take it', () => {
-    const { refusals, restarted } = setup(['z1']);
-    refusals.recordOnline('z1', 'zoogvpn:a');
-    refusals.recordAuthFailure('z1', 'zoogvpn:b');
-    state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === 'zoogvpn:b' ? { ...p, state: authFail } : p)) }));
-    portStateCb('zoogvpn:b', authFail);
-    expect(restarted).toEqual([]);
-    expect(state.getState().ports[1].state).toEqual({ ...authFail, reason: 'not-in-plan' });
-  });
-
-  it('leaves an undecided auth failure alone', () => {
-    const { refusals, restarted } = setup(['z1', 'z2']);
-    refusals.recordAuthFailure('z1', 'zoogvpn:b');
-    portStateCb('zoogvpn:b', authFail);
-    expect(restarted).toEqual([]);
-    expect(state.getState().ports[1].accountId).toBe('z1');
   });
 });

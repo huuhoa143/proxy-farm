@@ -11,12 +11,13 @@ import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import path from 'node:path';
-import type { AppStatus, PortRow, PortState, Settings } from '../../shared/contracts';
+import type { AppStatus, PortRow, PortState, ProviderId, Settings, Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
 import { createHostVpnMonitor } from '../controller/host-vpn';
 import { createPortManager } from '../controller/port-manager';
+import { reattachPorts } from '../controller/reattach';
 import type { Engine } from '../controller/ports';
 import { createRealExitIpProber, createRealPortAllocator } from '../controller/real-bindings';
 import { createStartQueue } from '../controller/start-queue';
@@ -28,13 +29,12 @@ import { getProvider, registerAllProviders } from '../providers/index';
 import { setResourcesRoot } from '../resources-root';
 import { createStateStore } from '../store/state';
 import { createTray, onlineCountLabel, trayLabels, type TrayHandle } from '../tray';
-import { startWebhook, type Webhook } from '../webhook/index';
+import { resolveRotateKey, startWebhook, type Webhook } from '../webhook/index';
 import { createControllerFacade } from './facade';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
 import { mainStrings, resolveMainLanguage, type MainLanguage } from './main-strings';
 import { observeStateStore } from './observed-state';
-import { wireRefusals } from './refusal-wiring';
 import { createSessionSecretStore } from './session-secrets';
 import { settingsEffects } from './settings-effects';
 import { measureDownloadMbps } from './speed-test';
@@ -221,15 +221,6 @@ export function runApp(): void {
     const state = observeStateStore(rawState, onPortsChanged);
 
     const allocator = createRealPortAllocator();
-    const portManager = createPortManager({
-      state,
-      secrets,
-      engine,
-      providers,
-      exitIp: createRealExitIpProber(),
-      allocator,
-      refusals,
-    });
     const pool = createAccountPool({
       listAccounts: () => state.getState().accounts,
       listPorts: () => state.getState().ports,
@@ -239,13 +230,24 @@ export function runApp(): void {
       isUsable: () => true,
       refusals,
     });
+    // Owns server-pool failover (spec §6.8), including ZoogVPN plan refusals and moving
+    // a refused port to another account of the pool.
+    const portManager = createPortManager({
+      state,
+      secrets,
+      engine,
+      providers,
+      exitIp: createRealExitIpProber(),
+      allocator,
+      refusals,
+      pool,
+    });
     const queue = createStartQueue({ onTaskError: (key, err) => log(`start ${key} failed`, err) });
     const restartPort = (key: string) => {
       state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === key ? { ...p, state: { kind: 'queued' } } : p)) }));
       queue.enqueue(key, () => portManager.startPort(key));
     };
     const onPortState = (cb: (key: string, st: PortState) => void) => engine.onStateChange(cb);
-    wireRefusals({ state, refusals, pool, onPortState, restartPort });
 
     // HMA local credentials: detection, connect, lazy apply on change (spec §5.1).
     const hma = createHmaLocalSource();
@@ -269,6 +271,7 @@ export function runApp(): void {
           bearer: s.webhook.bearer,
           hostAllowlist: ['127.0.0.1', 'localhost', ...(lanIp ? [lanIp] : [])],
           rotate: (key) => facadeRotate(key),
+          resolveKey: (key) => resolveRotateKey(key, state.getState().ports),
         });
       } catch (err) {
         log('webhook failed to start', err);
@@ -478,6 +481,16 @@ export function runApp(): void {
     hostVpn.start();
 
     await applyWebhook();
+
+    // Re-attach ports whose location a provider regrouped since the last run (spec
+    // §6.8), before anything starts under a stale key.
+    try {
+      const byProvider = new Map<ProviderId, Target[]>();
+      for (const t of await facade.listTargets()) byProvider.set(t.providerId, [...(byProvider.get(t.providerId) ?? []), t]);
+      state.setState((s) => ({ ...s, ports: reattachPorts(s.ports, byProvider) }));
+    } catch (err) {
+      log('re-attaching ports failed', err);
+    }
 
     // Restart what was on at last quit, staggered (spec §6.4 "also on app start").
     portManager.syncAutoRotate();

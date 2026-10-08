@@ -159,7 +159,7 @@ describe('state store', () => {
       const state = store.getState();
       expect(state.schemaVersion).toBe(SCHEMA_VERSION);
       // Migrated via fillDefaults, not discarded: the field that WAS present survives.
-      expect(state.ports).toEqual([{ key: 'kept' }]);
+      expect(state.ports).toEqual([{ key: 'kept#1', locationKey: 'kept' }]);
       expect(readdirSync(dir).some((f) => f.startsWith('state.json.corrupt-'))).toBe(false);
     });
   });
@@ -178,7 +178,7 @@ describe('state store', () => {
           accounts: [],
           limits: {},
           refusals: { failures: {}, online: {} },
-          portServers: {},
+          serverHealth: { refused: {}, lastOk: {} },
           settings: { ...defaultSettings(() => '<secret>'), webhook: { enabled: false, port: 0, bearer: '<secret>' } },
         }),
       );
@@ -200,7 +200,7 @@ describe('state store', () => {
           accounts: [],
           limits: {},
           refusals: { failures: {}, online: {} },
-          portServers: {},
+          serverHealth: { refused: {}, lastOk: {} },
           settings: { ...defaultSettings(() => 'pass'), webhook: { enabled: true, port: 9000, bearer: '<secret>' } },
         }),
       );
@@ -221,7 +221,7 @@ describe('state store', () => {
           accounts: [],
           limits: {},
           refusals: { failures: {}, online: {} },
-          portServers: {},
+          serverHealth: { refused: {}, lastOk: {} },
           settings: { ...defaultSettings(() => 'pass'), webhook: { enabled: false, port: 0, bearer: '<secret>' } },
         }),
       );
@@ -292,11 +292,11 @@ describe('state store', () => {
       writeFileSync(filePath, JSON.stringify({ schemaVersion: 1, ports: [{ key: 'kept' } as any] }));
       const store = createStateStore(filePath, secrets());
       const state = store.getState();
-      expect(state.ports).toEqual([{ key: 'kept' }]);
+      expect(state.ports).toEqual([{ key: 'kept#1', locationKey: 'kept' }]);
       expect(state.accounts).toEqual([]);
       expect(state.limits).toEqual({});
       expect(state.refusals).toEqual({ failures: {}, online: {} });
-      expect(state.portServers).toEqual({});
+      expect(state.serverHealth).toEqual({ refused: {}, lastOk: {} });
       expect(state.settings.basePort).toBe(29001);
     });
 
@@ -307,6 +307,72 @@ describe('state store', () => {
       expect(state.settings.basePort).toBe(40000);
       expect(state.settings.lanSharing).toBe(false);
       expect(state.settings.webhook).toEqual({ enabled: false, port: 0, bearer: '' });
+    });
+  });
+
+  describe('v1 → v2 migration (spec §6.8)', () => {
+    const v1Row = (key: string, extra: Record<string, unknown> = {}) => ({
+      key,
+      providerId: 'hma',
+      accountId: 'hma-1',
+      label: key,
+      country: 'VN',
+      city: 'Hanoi',
+      proxyPort: 29001,
+      enabled: true,
+      state: { kind: 'stopped' },
+      autoRotateMin: 0,
+      ...extra,
+    });
+
+    it('turns every row K into K#1 with locationKey K, pins portServers[K] and keeps auto-rotate', () => {
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: 1,
+          ports: [v1Row('hma:VN-51-HANOI', { autoRotateMin: 15 }), v1Row('hma:JP-40-TOKYO', { proxyPort: 29002 })],
+          portServers: { 'hma:VN-51-HANOI': '156.59.140.19' },
+        }),
+      );
+      const state = createStateStore(filePath, secrets()).getState();
+      expect(state.schemaVersion).toBe(2);
+      expect(state.ports.map((p) => [p.key, p.locationKey, p.server, p.autoRotateMin, p.proxyPort])).toEqual([
+        ['hma:VN-51-HANOI#1', 'hma:VN-51-HANOI', '156.59.140.19', 15, 29001],
+        ['hma:JP-40-TOKYO#1', 'hma:JP-40-TOKYO', undefined, 0, 29002],
+      ]);
+      expect(state).not.toHaveProperty('portServers');
+      // The migrated file is written back as v2, so the next load does not migrate twice.
+      const onDisk = JSON.parse(readFileSync(filePath, 'utf8'));
+      expect(onDisk.schemaVersion).toBe(2);
+      expect(createStateStore(filePath, secrets()).getState().ports[0].key).toBe('hma:VN-51-HANOI#1');
+    });
+
+    it('re-keys refusal evidence from target keys to the servers those targets ran on', () => {
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: 1,
+          ports: [v1Row('zoogvpn:JP-JP3')],
+          portServers: { 'zoogvpn:JP-JP3': 'jp3.webunlim.com' },
+          refusals: { failures: { z1: { 'zoogvpn:JP-JP3': 5, 'zoogvpn:unknown': 6 } }, online: {} },
+        }),
+      );
+      const state = createStateStore(filePath, secrets()).getState();
+      expect(state.refusals.failures).toEqual({ z1: { 'jp3.webunlim.com': 5 } });
+    });
+
+    it('loads a v2 file as is (no second migration)', () => {
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: 2,
+          ports: [v1Row('hma:VN#2', { locationKey: 'hma:VN' })],
+          serverHealth: { refused: { 'hma-1': { '1.2.3.4': 99 } }, lastOk: {} },
+        }),
+      );
+      const state = createStateStore(filePath, secrets()).getState();
+      expect(state.ports[0].key).toBe('hma:VN#2');
+      expect(state.serverHealth.refused).toEqual({ 'hma-1': { '1.2.3.4': 99 } });
     });
   });
 });
