@@ -6,6 +6,11 @@ import '@fontsource-variable/bricolage-grotesque';
 import '@fontsource-variable/jetbrains-mono';
 import './styles.css';
 import { App } from './App';
+import { applyInitialTheme } from './components/ThemeToggle';
+
+// Set the theme on <html> before the first render so the boot splash paints in
+// the correct theme (it renders before <ThemeToggle/> mounts).
+applyInitialTheme();
 
 const container = document.getElementById('root');
 if (container) {

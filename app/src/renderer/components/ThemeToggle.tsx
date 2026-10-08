@@ -20,6 +20,16 @@ function loadTheme(): Theme {
 }
 
 /**
+ * Apply the persisted (or system) theme to `<html data-theme>` synchronously,
+ * before React's first paint. Called from main.tsx so the boot splash — which
+ * renders before <ThemeToggle/> mounts — already shows in the right theme
+ * instead of flashing the dark default for a light-theme user.
+ */
+export function applyInitialTheme(): void {
+  if (typeof document !== 'undefined') document.documentElement.dataset.theme = loadTheme();
+}
+
+/**
  * Light/dark toggle (spec §4.2). Not part of `Settings` in contracts.ts — purely
  * a renderer-local, cosmetic preference persisted to localStorage and applied
  * via `document.documentElement.dataset.theme`.

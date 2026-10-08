@@ -533,10 +533,68 @@ input[type='checkbox'].switch:checked::after {
   min-width: 0;
 }
 .boot {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   min-height: 100vh;
   color: var(--mut);
+  background: radial-gradient(120% 90% at 50% 0%, var(--panel) 0%, var(--bg) 60%);
+}
+.boot-brand {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--acc), var(--acc-2));
+  box-shadow: 0 12px 34px -12px var(--acc-line, rgba(0, 221, 138, 0.5));
+  animation: boot-pop 0.5s var(--ease, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+.boot-brand svg {
+  width: 38px;
+  height: 38px;
+  stroke-width: 2;
+  color: #03241a;
+}
+.boot-name {
+  font-family: var(--fd);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--tx);
+}
+.boot-spinner {
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 2.5px solid var(--acc-soft, rgba(0, 221, 138, 0.2));
+  border-top-color: var(--acc);
+  animation: boot-spin 0.7s linear infinite;
+}
+.boot-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mut);
+}
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes boot-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-brand,
+  .boot-spinner {
+    animation: none;
+  }
 }
 
 /* ───────── status ───────── */

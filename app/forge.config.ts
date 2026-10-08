@@ -47,6 +47,12 @@ const SINGBOX_PLATFORM_KEYS: Record<string, string> = {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: 'Proxy Farm',
+    // App/dock/taskbar icon. electron-packager appends the per-platform
+    // extension (.icns on macOS, .ico on Windows), so the base path is given
+    // without one. Generated from icons/icon.svg (see icons/README is n/a —
+    // regenerate with the pipeline in that folder).
+    icon: path.resolve(process.cwd(), 'icons', 'icon'),
     // Go 1.26 (sing-box's toolchain) floors at macOS 12. Set explicitly so
     // the release pipeline's min-macOS check (spec §9) verifies a value this
     // config controls, rather than one Electron happened to default to.
@@ -126,6 +132,8 @@ const config: ForgeConfig = {
       config: {
         // Unsigned for now (no certificate yet); a signing hook can be added
         // to this config later without changing the maker.
+        icon: path.resolve(process.cwd(), 'icons', 'icon.ico'),
+        setupIcon: path.resolve(process.cwd(), 'icons', 'icon.ico'),
         updater: {
           url: `https://github.com/${UPDATER.owner}/${UPDATER.repo}/releases/latest/download`,
           updaterCacheDirName: UPDATER.updaterCacheDirName,

@@ -37,20 +37,47 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([api.getSettings(), api.listProviders(), api.getAppStatus()]).then(([settings, providers, appStatus]) => {
+    let settled = false;
+
+    // Safety net: if a boot IPC call hangs (never resolves nor rejects), still
+    // land on a usable screen instead of an endless loading state (which, on
+    // the dark theme, reads as a permanently black window).
+    const bootTimeout = setTimeout(() => {
+      if (cancelled || settled) return;
+      setScreen('onboarding');
+    }, 8000);
+
+    // allSettled (not all): one failing IPC call must not strand the whole app
+    // on the loading screen. Each result is applied independently; whatever
+    // resolved is used, whatever rejected falls back to a safe default.
+    void Promise.allSettled([api.getSettings(), api.listProviders(), api.getAppStatus()]).then((results) => {
       if (cancelled) return;
-      setStatus(appStatus);
-      void changeLanguage(settings.language);
-      const hasAccount = providers.some((p) => p.accounts.length > 0);
+      settled = true;
+      clearTimeout(bootTimeout);
+      const [settingsR, providersR, statusR] = results;
+      if (statusR.status === 'fulfilled') setStatus(statusR.value);
+      if (settingsR.status === 'fulfilled') void changeLanguage(settingsR.value.language);
+      const hasAccount = providersR.status === 'fulfilled' && providersR.value.some((p) => p.accounts.length > 0);
       setScreen(hasAccount ? 'main' : 'onboarding');
     });
+
     return () => {
       cancelled = true;
+      clearTimeout(bootTimeout);
     };
   }, []);
 
   if (screen === null) {
-    return <p className="boot">{t('common.loading')}</p>;
+    return (
+      <div className="boot" role="status" aria-live="polite">
+        <div className="boot-brand">
+          <Icon name="relay" />
+        </div>
+        <div className="boot-name">{t('common.appName')}</div>
+        <div className="boot-spinner" aria-hidden="true" />
+        <p className="boot-msg">{t('common.loading')}</p>
+      </div>
+    );
   }
 
   if (status.engineError) {

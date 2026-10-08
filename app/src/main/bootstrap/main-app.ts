@@ -6,7 +6,7 @@
  *   start queue → facade + IPC → window → tray/power/host-VPN/webhook → restart the
  *   ports that were on → quit handling (stop every engine and wait).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, powerMonitor, powerSaveBlocker, safeStorage, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, powerSaveBlocker, safeStorage, shell, Tray } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
@@ -336,6 +336,20 @@ export function runApp(): void {
     // IPC: only the main window's own top frame may call in (reviewer item 9).
     registerIpcHandlers(ipcMain, facade, (frame) => Boolean(mainWindow && !mainWindow.isDestroyed() && frame === mainWindow.webContents.mainFrame));
 
+    // App icon for the window / dock / taskbar. On packaged macOS the .icns in
+    // the bundle drives the dock, but in `pnpm start` (unpackaged) the dock
+    // otherwise shows the generic Electron icon — set it explicitly so the dev
+    // run also carries the real logo. Safe no-op if the png isn't found.
+    const appIcon = (() => {
+      try {
+        const img = nativeImage.createFromPath(path.join(process.cwd(), 'icons', 'icon.png'));
+        return img.isEmpty() ? null : img;
+      } catch {
+        return null;
+      }
+    })();
+    if (process.platform === 'darwin' && appIcon) app.dock?.setIcon(appIcon);
+
     function createWindow(): void {
       mainWindow = new BrowserWindow({
         width: 1280,
@@ -343,6 +357,15 @@ export function runApp(): void {
         minWidth: 900,
         minHeight: 600,
         title: 'Proxy Farm',
+        // Paint the window in the app's own base colour from the first frame,
+        // so launch never flashes an OS-default rectangle while the renderer
+        // boots. Follow the OS theme (the renderer defaults to it too, absent a
+        // stored override), so the pre-paint colour matches styles.css `--bg`.
+        backgroundColor: nativeTheme.shouldUseDarkColors ? '#080b13' : '#eef1f7',
+        // Don't show until the renderer has painted its first frame — avoids a
+        // blank window hanging on screen during Vite/React startup.
+        show: false,
+        ...(appIcon ? { icon: appIcon } : {}),
         webPreferences: {
           preload: path.join(__dirname, '../preload/index.js'),
           contextIsolation: true,
@@ -350,6 +373,14 @@ export function runApp(): void {
           sandbox: false,
         },
       });
+      mainWindow.once('ready-to-show', () => mainWindow?.show());
+      // If first paint never arrives (e.g. a renderer load failure), still
+      // surface the window after a short grace period rather than leaving the
+      // user staring at nothing — the renderer's own boot fallback then shows.
+      const revealGuard = setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+      }, 4000);
+      mainWindow.once('show', () => clearTimeout(revealGuard));
       // External links (e.g. the updater's "Open releases page" fallback) open in the
       // user's browser, never as a new in-app window.
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
