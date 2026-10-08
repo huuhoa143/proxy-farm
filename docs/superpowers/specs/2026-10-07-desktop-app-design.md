@@ -138,7 +138,7 @@ Each unit is independently testable:
   - ⚠️ Windows detection (a default route via a VPN/TAP/Wintun adapter) is not verified.
 - **No telemetry** (product decision). The app contacts only:
   - VPN servers.
-  - The Surfshark server-list API, and DNS lookups of Surfshark cluster hostnames (system resolver + DoH `cloudflare-dns.com`) to build their server pools (§5.3).
+  - The Surfshark server-list API, and DNS lookups of Surfshark cluster hostnames (system resolver + DoH `dns.google`) to build their server pools (§5.3).
   - The GitHub releases and catalog feed.
   - `www.gstatic.com` (sing-box `/delay`, https only).
   - The exit-IP/geo services in §6.4.
@@ -169,7 +169,7 @@ Each unit is independently testable:
   - Bundle R46 **and**, on Windows, also accept the app's own `ca.crt.pem` (PR #2 used it), read via the Helper.
 - **Pushed by server** ✅: AES-256-GCM, `compress migrate`, `ping 10`, `ping-restart 60`.
 - **Endpoint settings**: `data_ciphers: ["AES-256-GCM"]`, `route_no_pull: true`, `explicit_exit_notify: 2`, `mtu: 1400`.
-- **Concurrency** ✅: 12 separate processes on one device, all with correct exits, stable for 17 min, one handshake each (no kicks). Default port limit: **12** (rev 3: the most verified; more is ⚠️ untested and could trip abuse detection). The user can raise it.
+- **Concurrency** ✅: 12 separate processes on one device, all with correct exits, stable for 17 min, one handshake each (no kicks). Default port limit: **12**. ✅ 2026-10-08: 20 concurrent tunnels on one device all established, one handshake each, no auth failures or kicks over a 60 s hold; 12 stays the default for headroom against abuse detection. The user can raise it.
 - **Auth refused** — sing-box logs `authentication failed: terminal`, then neither retries nor exits; the Supervisor kills the process. Rev 3, ✅ 2026-10-08:
   - Device credentials belong to the device, not to a server, but a location's cluster can contain servers that refuse them. The `gen-vpn.com` infrastructure is shared across Gen Digital brands, and a server serving another brand's tenant answers `AUTH_FAILED` (VN: `156.59.140.149` refuses; `156.59.140.19`, `128.1.126.101`, `128.1.126.118` accept the same device).
   - So an HMA auth failure marks **that server** as refused for this device (§6.8, 7 days) and the port moves to the next free server of its location, shown as `retrying("server refused the device — switching")`.
@@ -186,7 +186,7 @@ Each unit is independently testable:
   - ✅ 2026-10-08: 74/74 seed countries reach at least one server with device credentials (VN after replacing its refusing seed IP).
   - **A location spans several /24 clusters** ✅. VN-51-HANOI: `156.59.140.0/24` (Hanoi) and `128.1.126.0/24` (Ho Chi Minh City).
   - **Discovery is a maintainer job, not done on users' machines** (it probes networks). `pnpm scan:hma-servers` (`app/scripts/hma-scan-servers.ts`):
-    1. Collect candidate /24s: every seed IP's /24, plus clusters found in Certificate Transparency logs. Gen Digital servers have per-server certificates named `<kind>-prod-<infra>-<cc>-<city>-<id>.gen-vpn.com` (kinds seen: `ipsec`, `mimic`, `wireguard`); OpenVPN servers share `openvpn.gen-vpn.com` but sit in the same clusters ✅ (VN). CT sources are rate-limited (certspotter: ~9 pages then HTTP 429), so harvesting is incremental and cached.
+    1. Collect candidate /24s: every seed IP's /24. Gen Digital servers have per-server certificates named `<kind>-prod-<infra>-<cc>-<city>-<id>.gen-vpn.com` (kinds seen: `ipsec`, `mimic`, `wireguard`); OpenVPN servers share `openvpn.gen-vpn.com` but sit in the same clusters ✅ (VN). Certificate Transparency was evaluated as a second source of /24s and **not adopted**: certspotter gives 679 names (26 countries) before HTTP 429 (10 requests / 5 min), but only 2 of 60 sampled names resolve and none fall in a seed /24 (§11).
     2. Probe each /24 with one 14-byte OpenVPN hello (`P_CONTROL_HARD_RESET_CLIENT_V2`) on udp/1194; hosts answering opcode 8 are OpenVPN servers.
     3. Verify each with a real device-credential handshake through the app's own provider and renderer (config over stdin). Keep only servers that establish; a new server must geolocate to the location's country.
     4. `--write` updates the seed; the result also feeds the catalog feed below.
@@ -219,7 +219,7 @@ Each unit is independently testable:
   - A cluster hostname (`jp-tok.prod.surfshark.com`) is DNS round-robin over a large pool: 20–26 distinct IPs in 16 lookups for JP/US/DE/SG; 8 for VN.
   - The cluster's single pubKey works for **every** pool IP, so a port can pin one server: 3/3 JP and 3/3 VN pinned IPs connected.
   - Exit IP = server IP + 1 (`193.148.16.53` → `193.148.16.54`), stable for that server.
-  - Discovery runs **in the app** (DNS only, no probing): resolve the hostname repeatedly (system resolver, plus DoH to `cloudflare-dns.com` through the host) when the location is first used and at most every 12 h, and accumulate into a persisted pool with `lastSeen`. An IP not seen for 7 days and not OK in that time is dropped.
+  - Discovery runs **in the app** (DNS only, no probing): resolve the hostname repeatedly (`dns.resolve4` against the system's DNS server, not the cached `dns.lookup`, plus DoH to `dns.google` through the host) when the location is first used and at most every 12 h, and accumulate into a persisted pool with `lastSeen`. An IP not seen for 7 days and not OK in that time is dropped.
   - A pinned server that dies (`/delay` 504, no handshake) is marked dead for 2 h and the port moves to another free pool server (§6.8). This replaces rev 2's "re-resolve the host on probe failure" (✅ pool IPs went stale within minutes in spike 1).
   - ⚠️ How long a pinned Surfshark server stays usable is unmeasured; the 24 h soak (§10) checks it.
 - Exit country = the geo-IP result, not the label (virtual locations).
@@ -357,7 +357,7 @@ Each unit is independently testable:
 **Allocation invariant.** Two enabled ports of the same provider never hold the same server, because the same server means the same exit IP. "Same" is compared on the **resolved IP**, not the token: different hostnames can point at one machine (✅ `de7.webunlim.com` and `fr4.webunlim.com` both resolve to `185.177.229.121`). The exit-IP probe is the final check: a port whose exit IP equals another port's is moved to another server.
 
 - **Add k ports** to a location: take the k best free usable servers (usable = not refused for that account, not dead; best = most recent `lastOk`, then pool order). If fewer are free, add that many and say how many were added.
-- The provider's port limit (§4.2) caps the provider's enabled ports. Defaults: HMA 12 (✅ 12 processes), Surfshark 20 (⚠️ 10 separate processes ✅, 50 endpoints in one process ✅; the 24 h soak checks 20), ZoogVPN 5 (⚠️ plan connection limit unknown), file 1 per file.
+- The provider's port limit (§4.2) caps the provider's enabled ports. Defaults: HMA 12 (✅ 20 processes verified), Surfshark 20 (⚠️ 10 separate processes ✅, 50 endpoints in one process ✅; 20 processes and the 24 h soak wait on a live test key), ZoogVPN 5 (✅ 8 concurrent tunnels on one account, no kicks; plan refusals are per server, not a connection count), file 1 per file.
 - Ports are spread across the provider's accounts by the existing account pool. A server refused for one account may still be used by another.
 
 **Failover.** It runs on every (re)start and every due retry; the start path re-selects instead of reusing a stale choice.
@@ -518,10 +518,16 @@ proxy-farm/
 | HMA reconnect to the same server ×3 (VN, DE) | ✅ same exit IP every time |
 | HMA app (IPSec), toggled 5× on VN | ✅ same gateway `128.1.126.104` and exit `128.1.126.104` each time; the morning's gateway was `156.59.140.24` |
 | HMA seed-/24 mining (first 62 locations) | ✅ 33 with 1 server, 16 with 2, 2 with 3, 11 with ≥ 4 (capped) |
-| Certificate Transparency, `*.gen-vpn.com` | ✅ per-server names `<kind>-prod-<infra>-<cc>-<city>-<id>` (ipsec, mimic, wireguard); certspotter rate-limits after ~9 pages |
-| Surfshark cluster DNS (16 lookups × 5 clusters) | ✅ 20–26 distinct IPs for JP/US/DE/SG, 8 for VN |
+| Certificate Transparency, `*.gen-vpn.com` | ✅ per-server names `<kind>-prod-<infra>-<cc>-<city>-<id>` (ipsec, mimic, wireguard); certspotter: 10 pages then HTTP 429 (`x-ratelimit-limit: 10`, `Retry-After: 286`), 679 names / 26 countries; ❌ as a server source: 2/60 names resolve, 0 in seed /24s |
+| Surfshark cluster DNS (16 lookups × 5 clusters) | ✅ 20–26 distinct IPs for JP/US/DE/SG, 8 for VN (resolvers combined) |
+| Surfshark DNS by resolver (node, 16 and 64 lookups) | ✅ `dns.resolve4` 11–14 per 16 (VN 6); at 64: us-nyc 101, jp-tok 47. `dns.lookup` ~4 (getaddrinfo cache). DoH `cloudflare-dns.com` no better than the system resolver; `dns.google` adds IPs |
+| Surfshark 20 separate processes | ⚠️ 20/20 processes started, 0/20 handshakes: the test key no longer authenticates (pubKeys match the live API; fails through another tunnel too). Rerun with a live key |
 | Surfshark pinned pool IPs with the cluster pubKey | ✅ 3/3 JP and 3/3 VN connected; exit = server IP + 1 |
 | ZoogVPN numbered hosts via DNS | ✅ many unlisted hosts (JP ≥ 10, DE 9, NL 8, SG 5, VN 3) |
+| ZoogVPN concurrent tunnels, one account, distinct servers, 12 s ramp | ✅ 8 alive together, 0 kicks; `AUTH_FAILED` on tw1, id1, uk2, se1, th1 is per server (plan) |
+| ZoogVPN DNS enumeration (`scan:zoog-servers`) | ✅ 93 → 231 hosts in 68 locations; no wildcard DNS; `de7` and `fr4` share an IP |
+| HMA concurrent tunnels, one device, ramp 12→14→16→20 | ✅ 20/20 established, one handshake each, no auth failures; sampled exits = server IP, distinct |
+| HMA full scan (`scan:hma-servers --write --max 4`) | ✅ 115/115 locations verified; 192 servers; 68 with 1, 27 with 2, 7 with 3, 13 with 4 |
 | ZoogVPN unlisted hosts with the test account | `sg2` ✅ exit = server IP; `jp4`, `vn2`, `de5` `AUTH_FAILED` (plan); `jp1`, `jp2` timed out |
 
 ## 12. Risks & open items
@@ -532,7 +538,7 @@ proxy-farm/
 | HMA server discovery | Rev 3: maintainer scan (seed /24s + CT clusters + OpenVPN hello + device-cred verify) → seed + feed (§5.1). Some servers refuse the device (other tenants); refusal failover handles them (§6.8) |
 | Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
 | Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
-| ZoogVPN plan limits per server and per connection count ⚠️ | Per-(account, server) refusal memory; default limit 5 until measured |
+| ZoogVPN plan limits per server ⚠️ | Per-(account, server) refusal memory. Connection count: ✅ ≥ 8 on one account, default 5 |
 | HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
 | ZoogVPN plan vs password ambiguity ⚠️ | Heuristic in §5.2; refine with real data |
 | sing-box OpenVPN client is young (Aug 2026) | Pinned; live smoke gates upgrades |
