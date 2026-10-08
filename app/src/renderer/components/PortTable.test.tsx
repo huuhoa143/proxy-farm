@@ -12,6 +12,7 @@ beforeAll(() => {
 function row(key: string, state: PortState, overrides: Partial<PortRow> = {}): PortRow {
   return {
     key,
+    locationKey: key,
     providerId: 'hma',
     accountId: 'hma-1',
     label: `Location ${key}`,

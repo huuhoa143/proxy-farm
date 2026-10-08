@@ -10,6 +10,7 @@ function acct(id: string, providerId: Account['providerId'] = 'zoogvpn'): Accoun
 function port(key: string, accountId: string, enabled = true, providerId: PortRow['providerId'] = 'zoogvpn'): PortRow {
   return {
     key,
+    locationKey: key,
     providerId,
     accountId,
     label: key,

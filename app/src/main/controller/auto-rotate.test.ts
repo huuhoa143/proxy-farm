@@ -5,6 +5,7 @@ import { createAutoRotateScheduler } from './auto-rotate';
 function row(key: string, autoRotateMin: number, enabled = true): PortRow {
   return {
     key,
+    locationKey: key,
     providerId: 'zoogvpn',
     accountId: 'z1',
     label: key,

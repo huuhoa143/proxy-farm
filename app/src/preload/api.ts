@@ -25,11 +25,14 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
       ipcRenderer.invoke('importConfigFile', name, content, country) as ReturnType<ProxyFarmApi['importConfigFile']>,
     listTargets: (providerId) => ipcRenderer.invoke('listTargets', providerId) as ReturnType<ProxyFarmApi['listTargets']>,
 
+    listServers: (locationKey) => ipcRenderer.invoke('listServers', locationKey) as ReturnType<ProxyFarmApi['listServers']>,
+
     listPorts: () => ipcRenderer.invoke('listPorts') as ReturnType<ProxyFarmApi['listPorts']>,
+    addPorts: (locationKey, count) => ipcRenderer.invoke('addPorts', locationKey, count) as ReturnType<ProxyFarmApi['addPorts']>,
     startPorts: (targetKeys) => ipcRenderer.invoke('startPorts', targetKeys) as ReturnType<ProxyFarmApi['startPorts']>,
     stopPorts: (targetKeys) => ipcRenderer.invoke('stopPorts', targetKeys) as ReturnType<ProxyFarmApi['stopPorts']>,
     removePorts: (targetKeys) => ipcRenderer.invoke('removePorts', targetKeys) as ReturnType<ProxyFarmApi['removePorts']>,
-    rotatePort: (targetKey) => ipcRenderer.invoke('rotatePort', targetKey) as ReturnType<ProxyFarmApi['rotatePort']>,
+    rotatePort: (portKey, toServer) => ipcRenderer.invoke('rotatePort', portKey, ...(toServer === undefined ? [] : [toServer])) as ReturnType<ProxyFarmApi['rotatePort']>,
     setAutoRotate: (targetKey, minutes) =>
       ipcRenderer.invoke('setAutoRotate', targetKey, minutes) as ReturnType<ProxyFarmApi['setAutoRotate']>,
     setLimit: (providerId, limit) => ipcRenderer.invoke('setLimit', providerId, limit) as ReturnType<ProxyFarmApi['setLimit']>,

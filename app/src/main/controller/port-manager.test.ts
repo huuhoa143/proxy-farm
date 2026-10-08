@@ -147,6 +147,7 @@ const account: Account = { id: 'z1', providerId: 'zoogvpn', label: 'z1', meta: {
 function basePort(overrides: Partial<PortRow> = {}): PortRow {
   return {
     key: 'zoogvpn:nl-ams',
+    locationKey: 'zoogvpn:nl-ams',
     providerId: 'zoogvpn',
     accountId: 'z1',
     label: 'Amsterdam',

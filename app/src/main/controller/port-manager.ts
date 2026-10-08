@@ -427,6 +427,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       const proxyPort = await deps.allocator.allocate({ preferred: settings.basePort, taken: takenProxyPorts(), base: settings.basePort });
       const row: PortRow = {
         key: target.key,
+        locationKey: target.key,
         providerId: target.providerId,
         accountId,
         label: target.label,

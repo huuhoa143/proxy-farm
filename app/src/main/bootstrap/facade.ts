@@ -255,8 +255,21 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       return out;
     },
 
+    // Interim v3 glue: one port per location until the server-pool controller lands.
+    async listServers(locationKey) {
+      const providerId = locationKey.split(':')[0] as ProviderId;
+      const target = (await targetsFor(providerId)).find((t) => t.key === locationKey);
+      return (target?.servers ?? []).map((server) => ({ server, health: 'unknown' as const }));
+    },
+
     async listPorts() {
       return deps.state.getState().ports;
+    },
+
+    async addPorts(locationKey, count) {
+      const before = new Set(deps.state.getState().ports.map((p) => p.key));
+      if (count > 0) await startOne(locationKey, new Map());
+      return { added: deps.state.getState().ports.filter((p) => !before.has(p.key)) };
     },
 
     async startPorts(keys) {

@@ -79,7 +79,7 @@ function fakePortManager(state: StateStore) {
       const used = new Set(state.getState().ports.map((p) => p.proxyPort));
       let proxyPort = 29001;
       while (used.has(proxyPort)) proxyPort += 1;
-      const row: PortRow = { key: t.key, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: false, state: { kind: 'queued' }, autoRotateMin: 0 };
+      const row: PortRow = { key: t.key, locationKey: t.key, providerId: t.providerId, accountId, label: t.label, country: t.country, city: t.city, proxyPort, enabled: false, state: { kind: 'queued' }, autoRotateMin: 0 };
       state.setState((s) => ({ ...s, ports: [...s.ports, row] }));
       return row;
     },

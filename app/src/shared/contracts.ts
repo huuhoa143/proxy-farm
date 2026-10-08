@@ -74,8 +74,47 @@ export interface Target {
   country: string; // ISO-3166 alpha-2, upper case
   city: string;
   label: string;
-  /** Candidate server IPs for this location, best first (§5.1 catalog `ips`). */
+  /**
+   * The location's server pool, best first (spec §6.8). Each entry is one server = one
+   * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname
+   * (ZoogVPN, file remotes) that the controller resolves before bind.
+   */
   servers: string[];
+  /** Filled by the controller in `listTargets`: usable servers not held by any port. */
+  freeServers?: number;
+}
+
+/** Health of one server for one account (spec §6.8). */
+export type ServerHealth = 'ok' | 'unknown' | 'refused' | 'dead';
+
+/** One server of a location's pool, as shown in the Change-IP menu (spec §4.1, §6.8). */
+export interface ServerInfo {
+  /** Pool token (IP literal or hostname). */
+  server: string;
+  /** Resolved IP, when known. */
+  ip?: string;
+  health: ServerHealth;
+  /** Epoch ms the server was last confirmed online. */
+  lastOk?: number;
+  /** Key of the port currently pinned to this server, if any. */
+  heldBy?: string;
+}
+
+/** Separator between a location key and a port number in a port key (spec §6.8). */
+export const PORT_KEY_SEPARATOR = '#';
+
+/** `<locationKey>#<n>`, n ≥ 1. */
+export function makePortKey(locationKey: string, n: number): string {
+  return `${locationKey}${PORT_KEY_SEPARATOR}${n}`;
+}
+
+/** Inverse of `makePortKey`; undefined for a bare location key (pre-rev-3 key or webhook alias). */
+export function splitPortKey(key: string): { locationKey: string; n: number } | undefined {
+  const at = key.lastIndexOf(PORT_KEY_SEPARATOR);
+  if (at <= 0) return undefined;
+  const n = Number(key.slice(at + 1));
+  if (!Number.isInteger(n) || n < 1) return undefined;
+  return { locationKey: key.slice(0, at), n };
 }
 
 export interface Account {
@@ -151,7 +190,14 @@ export interface Settings {
 }
 
 export interface PortRow {
-  key: string; // Target.key
+  /** Port key `<locationKey>#<n>` (spec §6.8). Several ports may share a location. */
+  key: string;
+  /** The location (`Target.key`) this port belongs to. */
+  locationKey: string;
+  /** Pinned server token (spec §6.8); undefined until the port's first start. */
+  server?: string;
+  /** The pinned server's resolved IP, when known. */
+  serverIp?: string;
   providerId: ProviderId;
   accountId: string;
   label: string;
@@ -223,14 +269,25 @@ export interface ProxyFarmApi {
    * says the helper is missing. Stubbed until the Windows track: returns `{ok:false, reasonKey:'hma.windowsLater'}`. */
   enableHmaSupport(): Promise<CheckResult>;
   importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
+  /** Locations with `freeServers` filled in (spec §6.8). */
   listTargets(providerId?: ProviderId): Promise<Target[]>;
 
-  // ports
+  // ports (keys are port keys `<locationKey>#<n>` unless stated otherwise)
   listPorts(): Promise<PortRow[]>;
-  startPorts(targetKeys: string[]): Promise<void>;
-  stopPorts(targetKeys: string[]): Promise<void>;
-  removePorts(targetKeys: string[]): Promise<void>;
-  rotatePort(targetKey: string): Promise<RotateResult>;
+  /** Adds up to `count` ports to a location, each on a different free usable server, and
+   * starts them. `added` may be shorter than `count`; `noteKey` then says why
+   * ('no-free-server' | 'limit-reached'). */
+  addPorts(locationKey: string, count: number): Promise<{ added: PortRow[]; noteKey?: string }>;
+  /** The location's server pool with health and which port holds each server. */
+  listServers(locationKey: string): Promise<ServerInfo[]>;
+  /** Starts existing ports. A bare location key (no `#n`) is accepted for compatibility
+   * and means "add one port to that location". */
+  startPorts(portKeys: string[]): Promise<void>;
+  stopPorts(portKeys: string[]): Promise<void>;
+  removePorts(portKeys: string[]): Promise<void>;
+  /** Change IP (spec §6.5): move the port to another free server of its location, or to
+   * `toServer` when given (must be a free usable server of the same location). */
+  rotatePort(portKey: string, toServer?: string): Promise<RotateResult>;
   setAutoRotate(targetKey: string, minutes: number): Promise<void>;
   setLimit(providerId: ProviderId, limit: number): Promise<void>;
   testPort(targetKey: string, speed: boolean): Promise<{ ok: boolean; exitIp?: string; latencyMs?: number; mbps?: number }>;
@@ -267,7 +324,7 @@ export interface ProxyFarmApi {
 export const IPC = {
   invoke: [
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
-    'listPorts', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
+    'listPorts', 'addPorts', 'listServers', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate',
   ] as const,

@@ -17,7 +17,7 @@ function memorySecrets(): SecretStore {
 }
 
 function row(key: string, accountId: string, state: PortState, providerId: PortRow['providerId'] = 'hma'): PortRow {
-  return { key, providerId, accountId, label: key, country: 'NL', city: 'c', proxyPort: 1, enabled: true, state, autoRotateMin: 0 };
+  return { key, locationKey: key, providerId, accountId, label: key, country: 'NL', city: 'c', proxyPort: 1, enabled: true, state, autoRotateMin: 0 };
 }
 
 let dir: string;

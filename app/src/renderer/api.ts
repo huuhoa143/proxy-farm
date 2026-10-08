@@ -66,6 +66,7 @@ const SAMPLE_TARGETS: Target[] = [
 function samplePortRow(target: Target, accountId: string, proxyPort: number, state: PortRow['state']): PortRow {
   return {
     key: target.key,
+    locationKey: target.key,
     providerId: target.providerId,
     accountId,
     label: target.label,
@@ -272,8 +273,25 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return providerId ? SAMPLE_TARGETS.filter((t) => t.providerId === providerId) : SAMPLE_TARGETS;
     },
 
+    async listServers(locationKey) {
+      const target = SAMPLE_TARGETS.find((t) => t.key === locationKey);
+      const held = new Map(Array.from(ports.values()).filter((p) => p.server).map((p) => [p.server!, p.key]));
+      return (target?.servers ?? []).map((server) => ({
+        server,
+        ip: server,
+        health: 'ok' as const,
+        heldBy: held.get(server),
+      }));
+    },
+
     async listPorts() {
       return Array.from(ports.values());
+    },
+
+    async addPorts(locationKey, count) {
+      const before = new Set(ports.keys());
+      for (let i = 0; i < count; i++) await api.startPorts([locationKey]);
+      return { added: Array.from(ports.values()).filter((p) => !before.has(p.key)) };
     },
 
     async startPorts(targetKeys) {
