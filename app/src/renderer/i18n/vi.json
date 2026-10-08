@@ -435,7 +435,13 @@
       "downloading": "Đang tải… {{percent}}%",
       "downloaded": "Đã tải xong bản cập nhật.",
       "restartInstall": "Khởi động lại & cài đặt",
-      "error": "Kiểm tra cập nhật thất bại.",
+      "errors": {
+        "no-releases": "Chưa có phiên bản nào được phát hành trên GitHub.",
+        "network": "Không kết nối được tới GitHub. Kiểm tra kết nối mạng rồi thử lại.",
+        "no-auto-update": "Bản này không tự cập nhật được. Hãy tải bản mới nhất thủ công.",
+        "generic": "Cập nhật thất bại. Hãy thử lại hoặc tải bản mới nhất thủ công."
+      },
+      "errorDetails": "Chi tiết: {{message}}",
       "openReleases": "Mở trang phát hành",
       "autoCheck": "Tự động kiểm tra cập nhật",
       "autoCheckNote": "Kiểm tra khi khởi động và mỗi ngày một lần. Chỉ cài đặt khi bạn chọn."

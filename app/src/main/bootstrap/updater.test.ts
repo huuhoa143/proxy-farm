@@ -1,8 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UpdateStatus } from '../../shared/contracts';
-import { createUpdaterService, isMissingAppUpdateConfig, isNoPublishedRelease, type UpdaterServiceDeps } from './updater';
+import { classifyUpdaterError, createUpdaterService, isMissingAppUpdateConfig, isNoPublishedRelease, type UpdaterServiceDeps } from './updater';
 
 // ───────────────────────── pure helpers ─────────────────────────
+
+describe('classifyUpdaterError', () => {
+  it('recognises "no published versions" by code and by message', () => {
+    expect(classifyUpdaterError(Object.assign(new Error('x'), { code: 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' }))).toBe('no-releases');
+    expect(classifyUpdaterError(new Error('No published versions on GitHub'))).toBe('no-releases');
+  });
+
+  it('recognises network failures by socket code and by Chromium net error', () => {
+    expect(classifyUpdaterError(Object.assign(new Error('getaddrinfo ENOTFOUND api.github.com'), { code: 'ENOTFOUND' }))).toBe('network');
+    expect(classifyUpdaterError(new Error('net::ERR_INTERNET_DISCONNECTED'))).toBe('network');
+    expect(classifyUpdaterError(new Error('connect ETIMEDOUT 140.82.112.6:443'))).toBe('network');
+  });
+
+  it('recognises a build that cannot auto-update', () => {
+    expect(classifyUpdaterError({ code: 'ENOENT', path: '/x/app-update.yml' })).toBe('no-auto-update');
+  });
+
+  it('falls back to generic', () => {
+    expect(classifyUpdaterError(new Error('sha512 checksum mismatch'))).toBe('generic');
+    expect(classifyUpdaterError('weird')).toBe('generic');
+    expect(classifyUpdaterError(undefined)).toBe('generic');
+  });
+});
 
 describe('isNoPublishedRelease', () => {
   it('matches the updater channel-file-not-found code', () => {
@@ -152,6 +175,12 @@ describe('UpdaterService status transitions', () => {
     au.emit('error', new Error('network down'));
     expect(svc.getStatus()).toMatchObject({ phase: 'error', message: 'network down' });
     expect(svc.getStatus().releasesUrl).toMatch(/github\.com/);
+  });
+
+  it('tags the error with its kind, keeping the raw message for details', () => {
+    const { svc, au } = setup();
+    au.emit('error', new Error('No published versions on GitHub'));
+    expect(svc.getStatus()).toMatchObject({ phase: 'error', errorKey: 'no-releases', message: 'No published versions on GitHub' });
   });
 });
 

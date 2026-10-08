@@ -435,7 +435,13 @@
       "downloading": "Downloading… {{percent}}%",
       "downloaded": "Update downloaded.",
       "restartInstall": "Restart & install",
-      "error": "Update check failed.",
+      "errors": {
+        "no-releases": "No version has been published on GitHub yet.",
+        "network": "Couldn't reach GitHub. Check your internet connection and try again.",
+        "no-auto-update": "This build can't update itself. Download the latest release manually.",
+        "generic": "The update failed. Try again, or download the latest release manually."
+      },
+      "errorDetails": "Details: {{message}}",
       "openReleases": "Open releases page",
       "autoCheck": "Check for updates automatically",
       "autoCheckNote": "Checks on start and once a day. Updates install only when you choose."

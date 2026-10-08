@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsScreen } from './SettingsScreen';
 import { createFakeProxyFarmApi } from '../api';
+import i18next from 'i18next';
 import { initI18n } from '../i18n';
 
 beforeAll(() => {
@@ -63,5 +64,33 @@ describe('SettingsScreen', () => {
 
     fireEvent.click(screen.getByLabelText('Keep this computer awake while ports are on'));
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ keepAwake: false }));
+  });
+
+  it('shows a known updater error in the UI language, with the raw message only as a details tooltip', async () => {
+    await i18next.changeLanguage('vi');
+    try {
+      const api = createFakeProxyFarmApi();
+      vi.spyOn(api, 'getUpdateStatus').mockResolvedValue({
+        phase: 'error',
+        currentVersion: '0.1.0',
+        message: 'No published versions on GitHub',
+        errorKey: 'no-releases',
+        releasesUrl: 'https://example.invalid/releases/latest',
+      });
+      render(<SettingsScreen api={api} />);
+      const note = await screen.findByTestId('update-error');
+      expect(note).toHaveTextContent('Chưa có phiên bản nào được phát hành trên GitHub.');
+      expect(note).not.toHaveTextContent('No published versions');
+      expect(note).toHaveAttribute('title', 'Chi tiết: No published versions on GitHub');
+    } finally {
+      await i18next.changeLanguage('en');
+    }
+  });
+
+  it('an unclassified updater error falls back to the generic sentence', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'getUpdateStatus').mockResolvedValue({ phase: 'error', currentVersion: '0.1.0', message: 'boom' });
+    render(<SettingsScreen api={api} />);
+    expect(await screen.findByTestId('update-error')).toHaveTextContent('The update failed.');
   });
 });

@@ -90,7 +90,7 @@ function Row({ id, label, note, children }: { id?: string; label: string; note?:
 type TranslateFn = (key: string, opts?: Record<string, unknown>) => string;
 
 /** The human-readable note under the "Check for updates" row for the current phase. */
-function updateStatusNote(update: UpdateStatus | null, t: TranslateFn): string | undefined {
+function updateStatusNote(update: UpdateStatus | null, t: TranslateFn): ReactNode {
   switch (update?.phase) {
     case 'checking':
       return t('settings.update.checking');
@@ -103,7 +103,13 @@ function updateStatusNote(update: UpdateStatus | null, t: TranslateFn): string |
     case 'downloaded':
       return t('settings.update.downloaded');
     case 'error':
-      return update.message || t('settings.update.error');
+      // A localised sentence for the known failure kinds; the updater's raw (English)
+      // message is only a details tooltip.
+      return (
+        <span data-testid="update-error" title={update.message ? t('settings.update.errorDetails', { message: update.message }) : undefined}>
+          {t(`settings.update.errors.${update.errorKey ?? 'generic'}`)}
+        </span>
+      );
     default:
       return undefined;
   }

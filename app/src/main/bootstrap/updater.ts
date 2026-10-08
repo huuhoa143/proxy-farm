@@ -20,7 +20,7 @@
  * all injected so the pure helpers and the state-transition logic are unit-testable with
  * a fake autoUpdater and no network.
  */
-import type { UpdateStatus } from '../../shared/contracts';
+import type { UpdateErrorKey, UpdateStatus } from '../../shared/contracts';
 import type { WebContentsLike } from '../ipc/index';
 
 // ───────────────────────── pure helpers (unit-tested directly) ─────────────────────────
@@ -52,6 +52,31 @@ export function isNoPublishedRelease(error: unknown): boolean {
   if (e.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND') return true;
   const msg = typeof e.message === 'string' ? e.message : '';
   return /Cannot find channel .*update info/i.test(msg);
+}
+
+/** Socket/DNS error codes and Chromium `net::ERR_*` failures that mean "couldn't reach
+ * GitHub", as opposed to the feed answering with something unusable. */
+const NETWORK_ERROR_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'ECONNABORTED', 'EPIPE']);
+
+/**
+ * Maps an updater failure to a known kind so the renderer can show it in the UI language
+ * (the raw message is English and is kept only as details). Unknown failures are
+ * `generic`.
+ */
+export function classifyUpdaterError(error: unknown): UpdateErrorKey {
+  if (isMissingAppUpdateConfig(error)) return 'no-auto-update';
+  const e = (error && typeof error === 'object' ? error : {}) as { code?: unknown; message?: unknown };
+  const code = typeof e.code === 'string' ? e.code : '';
+  const message = typeof e.message === 'string' ? e.message : typeof error === 'string' ? error : '';
+  if (code === 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' || /No published versions/i.test(message)) return 'no-releases';
+  if (NETWORK_ERROR_CODES.has(code) || /net::ERR_|\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH)\b|socket hang up|network/i.test(message)) {
+    return 'network';
+  }
+  return 'generic';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // ───────────────────────── injectable electron surface ─────────────────────────
@@ -171,16 +196,13 @@ export function createUpdaterService(deps: UpdaterServiceDeps): UpdaterService {
       setStatus({ phase: 'up-to-date' });
       return;
     }
-    const message =
-      isMissingAppUpdateConfig(error)
-        ? 'This build cannot auto-update. Please download the latest release manually.'
-        : error instanceof Error
-          ? error.message
-          : String(error);
+    const message = isMissingAppUpdateConfig(error)
+      ? 'This build cannot auto-update. Please download the latest release manually.'
+      : errorMessage(error);
     log('updater: error', error);
     // Always hand the renderer a manual-download URL so the user has an escape hatch to
     // the GitHub Releases page when auto-update fails.
-    setStatus({ phase: 'error', message, releasesUrl });
+    setStatus({ phase: 'error', message, errorKey: classifyUpdaterError(error), releasesUrl });
     // Reset the single-flight guard so the user can retry after a failure.
     installing = false;
   });
@@ -202,7 +224,7 @@ export function createUpdaterService(deps: UpdaterServiceDeps): UpdaterService {
         // catch covers a synchronous throw. Avoid clobbering an error status already set.
         if (status.phase !== 'error' && status.phase !== 'up-to-date') {
           log('updater: checkForUpdates threw', error);
-          setStatus({ phase: 'error', message: error instanceof Error ? error.message : String(error), releasesUrl });
+          setStatus({ phase: 'error', message: errorMessage(error), errorKey: classifyUpdaterError(error), releasesUrl });
         }
       }
       return status;
@@ -232,16 +254,16 @@ export function createUpdaterService(deps: UpdaterServiceDeps): UpdaterService {
             } catch (err) {
               log('updater: quitAndInstall failed', err);
               installing = false;
-              setStatus({ phase: 'error', message: err instanceof Error ? err.message : String(err), releasesUrl });
+              setStatus({ phase: 'error', message: errorMessage(err), errorKey: classifyUpdaterError(err), releasesUrl });
             }
           })();
         });
         return { success: true };
       } catch (error) {
         installing = false;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         log('updater: download failed', error);
-        setStatus({ phase: 'error', message, releasesUrl });
+        setStatus({ phase: 'error', message, errorKey: classifyUpdaterError(error), releasesUrl });
         return { success: false, error: message };
       }
     },

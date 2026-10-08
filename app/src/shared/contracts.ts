@@ -267,7 +267,7 @@ export interface AppStatus {
  *   available   — a newer version exists; `availableVersion` is set, download not started
  *   downloading — `percent` is the download progress 0..100
  *   downloaded  — fully downloaded; a restart will install `availableVersion`
- *   error       — `message` + `releasesUrl` (manual-download fallback to GitHub Releases)
+ *   error       — `errorKey` + raw `message` + `releasesUrl` (manual-download fallback to GitHub Releases)
  * `currentVersion` is always the running app's version.
  */
 export interface UpdateStatus {
@@ -276,9 +276,21 @@ export interface UpdateStatus {
   availableVersion?: string;
   notes?: string;
   percent?: number;
+  /** The raw updater error (English, for a details tooltip / bug reports). */
   message?: string;
+  /** What kind of failure `message` is, so the renderer can show a localised sentence. */
+  errorKey?: UpdateErrorKey;
   releasesUrl?: string;
 }
+
+/**
+ * Known updater failures (`settings.update.errors.<key>` in the renderer):
+ *   no-releases     — the release feed has no published version yet
+ *   network         — GitHub could not be reached (offline, DNS, timeout, TLS)
+ *   no-auto-update  — this build cannot auto-update (missing app-update.yml)
+ *   generic         — anything else
+ */
+export type UpdateErrorKey = 'no-releases' | 'network' | 'no-auto-update' | 'generic';
 
 // ───────────────────────── diagnostics (Settings → About & help) ─────────────────────────
 
