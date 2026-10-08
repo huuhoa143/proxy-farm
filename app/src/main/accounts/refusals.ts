@@ -8,8 +8,10 @@ import type { RefusalsState } from '../store/state';
  *    → 'not-in-plan' for that (account, server) pair, cached for 7 days;
  *  - auth failures on ≥ 3 distinct servers for the account, with none online
  *    → 'bad-login' for the whole account;
- *  - otherwise (not enough evidence yet) → 'undecided'. Callers keep retrying on the
- *    normal back-off until one of the two decisive verdicts is reached.
+ *  - otherwise (not enough evidence yet) → 'undecided'. Only 'bad-login' means the
+ *    credentials are wrong: on 'undecided' the caller (port-manager) moves the port to
+ *    another server, marking this one dead for a while rather than refused, so evidence
+ *    accumulates on distinct servers until one of the two decisive verdicts is reached.
  *
  * The tracker owns its own in-memory bookkeeping (failures + "seen online" markers) so
  * `classifyAuthFailure` needs only the account id. Wire it up by calling `recordOnline`

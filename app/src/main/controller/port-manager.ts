@@ -187,8 +187,12 @@ function defaultScheduleRetry(ms: number, cb: () => void): () => void {
  * (account, server) pairs.
  *   'refused'     — this server refused this account: mark it and move on.
  *   'credentials' — the account itself is rejected: stay `failed(auth)`.
+ *   'unproven'    — could be either (ZoogVPN without enough evidence yet): mark the
+ *                   server dead for the account (2 h, not the 7-day refusal) and move
+ *                   on, so failures on distinct servers accumulate until one of the
+ *                   two above can be decided.
  */
-type AuthVerdict = 'refused' | 'credentials';
+type AuthVerdict = 'refused' | 'credentials' | 'unproven';
 
 /** One server's identity for the allocation invariant (spec §6.8). Each part is compared
  * only with its own kind (a Surfshark exit IP is the server IP + 1, which may well be
@@ -489,14 +493,22 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (port.providerId === 'hma') return 'refused'; // §5.1: device creds, per-server tenant
     if (port.providerId === 'zoogvpn') {
       refusals.recordAuthFailure(port.accountId, port.server);
-      return refusals.classifyAuthFailure(port.accountId) === 'not-in-plan' ? 'refused' : 'credentials';
+      const verdict = refusals.classifyAuthFailure(port.accountId);
+      return verdict === 'not-in-plan' ? 'refused' : verdict === 'bad-login' ? 'credentials' : 'unproven';
     }
     return 'credentials';
   }
 
   /** A `failed(auth)` from the engine (spec §6.8 "server refused"). */
   function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
-    if (authVerdict(port) === 'credentials') return; // stays failed(auth), long back-off
+    const verdict = authVerdict(port);
+    if (verdict === 'credentials') return; // stays failed(auth), long back-off
+    if (verdict === 'unproven') {
+      // Stays failed(auth) only if there is nowhere else to gather evidence.
+      health.markDead(port.accountId, port.server);
+      failOver(port.key, 'server-refused');
+      return;
+    }
     health.markRefused(port.accountId, port.server);
     persistHealth();
     if (failOver(port.key, 'server-refused')) return;

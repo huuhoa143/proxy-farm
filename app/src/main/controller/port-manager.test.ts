@@ -1412,9 +1412,9 @@ describe('port manager', () => {
       await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // dead marks never strand a port
     });
 
-    it('a ZoogVPN auth failure with no other evidence is a credential problem: nothing marked, nothing moved', async () => {
+    it('a ZoogVPN auth failure with no other evidence is undecided: the server is marked dead (not refused) and the port moves on', async () => {
       const serverHealth = createServerHealth();
-      const { manager, engine } = setup({
+      const { manager, engine, state } = setup({
         targets: twoServerTargets,
         port: { enabled: false, state: { kind: 'stopped' } },
         portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
@@ -1423,9 +1423,33 @@ describe('port manager', () => {
       });
       await manager.startPort('zoogvpn:nl-ams');
       engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+      expect(serverHealth.isDead('z1', '10.0.0.1')).toBe(true);
+      expect(serverHealth.isRefused('z1', '10.0.0.1')).toBe(false);
+      expect(state.getState().serverHealth.refused.z1).toBeUndefined(); // no 7-day mark persisted
+      await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      expect(boundIp(engine.started[1].input)).toBe('10.0.0.2');
+    });
+
+    it('ZoogVPN: undecided failures on distinct servers accumulate until bad-login, which stops the walk', async () => {
+      const serverHealth = createServerHealth();
+      const servers = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+      const { manager, engine, state } = setup({
+        targets: [{ ...twoServerTargets[0], servers }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { serverHealth },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      for (let i = 1; i <= 3; i++) {
+        engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        if (i < 3) await vi.waitFor(() => expect(engine.started).toHaveLength(i + 1));
+      }
+      // The third distinct server decides it: wrong credentials, so no further move.
       await new Promise((r) => setTimeout(r, 10));
-      expect(serverHealth.isUsable('z1', '10.0.0.1')).toBe(true);
-      expect(engine.started).toHaveLength(1);
+      expect(engine.started.map((s) => boundIp(s.input))).toEqual(['10.0.0.1', '10.0.0.2', '10.0.0.3']);
+      expect(serverHealth.isUsable('z1', '10.0.0.3')).toBe(true);
+      expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'auth' });
     });
 
     describe('ZoogVPN plan refusal (spec §5.2)', () => {
