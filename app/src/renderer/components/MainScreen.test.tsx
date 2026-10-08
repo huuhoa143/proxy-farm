@@ -173,6 +173,48 @@ describe('MainScreen', () => {
     await waitFor(() => expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toHaveTextContent('203.0.113.15'));
   });
 
+  describe('free-server counts after a change', () => {
+    it('re-reads the targets once Change IP resolves, so a read taken mid-rotate does not stick', async () => {
+      const api = await renderMain();
+      const stats = screen.getByTestId('group-stats-hma:JP-TOKYO');
+      await waitFor(() => expect(stats).toHaveTextContent('6 servers · 2 free'));
+      // While the rotate is in flight the main process has not settled the pool yet.
+      let inFlight = false;
+      const listTargets = api.listTargets.bind(api);
+      vi.spyOn(api, 'listTargets').mockImplementation(async (providerId) =>
+        (await listTargets(providerId)).map((t) => (inFlight ? { ...t, freeServers: 99 } : t)),
+      );
+      const rotatePort = api.rotatePort.bind(api);
+      let finish!: () => void;
+      vi.spyOn(api, 'rotatePort').mockImplementation(async (key, toServer) => {
+        inFlight = true;
+        const result = await rotatePort(key, toServer); // pushes ports-changed with the new server
+        await new Promise<void>((resolve) => (finish = resolve));
+        inFlight = false;
+        return result;
+      });
+
+      await changeIp(TOKYO_1);
+      await waitFor(() => expect(stats).toHaveTextContent('6 servers · 99 free')); // the mid-rotate read
+      await act(async () => finish());
+      await waitFor(() => expect(stats).toHaveTextContent('6 servers · 2 free'));
+    });
+
+    it('coalesces the re-reads of a burst of changes into one', async () => {
+      const api = await renderMain();
+      await waitFor(() => expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('2 free'));
+      const spy = vi.spyOn(api, 'listTargets');
+      for (const key of [TOKYO_1, 'hma:JP-TOKYO#2']) {
+        fireEvent.click(within(screen.getByTestId(`port-row-${key}`)).getByRole('checkbox'));
+      }
+      fireEvent.click(within(screen.getByTestId('bulk-action-bar')).getByText('Change IP'));
+      await waitFor(() => expect(screen.getByTestId('bulk-rotate-summary')).toBeInTheDocument());
+      await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('shows a rotate-result note: no free server', async () => {
     await renderMain();
     await changeIp('zoogvpn:NL#1');

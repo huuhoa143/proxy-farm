@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProviderId, ProxyFarmApi, RotateResult, Target } from '../../shared/contracts';
 import { HostVpnNote } from './HostVpnNote';
@@ -21,6 +21,8 @@ export interface MainScreenProps {
 const NOTE_MS = 6000;
 const SAME_CITY_NOTE = 'main.rotateResult.sameCityNote';
 const COPIED_MS = 1500;
+/** Coalesces the target re-reads a burst of port changes triggers into one. */
+const TARGETS_REFRESH_MS = 250;
 
 function removeKey(record: Record<string, string>, key: string): Record<string, string> {
   const { [key]: _removed, ...rest } = record;
@@ -46,8 +48,20 @@ export function MainScreen({ api }: MainScreenProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const schedule = useKeyedTimeouts();
 
+  // Only the newest `listTargets` answer is applied: one read while a change is still
+  // in flight must not land after (and overwrite) the read that follows it.
+  const targetsRead = useRef(0);
+  const loadTargets = useCallback(() => {
+    const read = ++targetsRead.current;
+    void api.listTargets().then((next) => {
+      if (read === targetsRead.current) setTargets(next);
+    });
+  }, [api]);
+  /** Re-reads the locations' free-server counts once the current burst of changes settles. */
+  const refreshTargets = useCallback(() => schedule('targets', loadTargets, TARGETS_REFRESH_MS), [schedule, loadTargets]);
+
   useEffect(() => {
-    void api.listTargets().then(setTargets);
+    loadTargets();
     void api.listPorts().then((rows) => {
       setPorts(rows);
       setLoaded(true);
@@ -62,11 +76,13 @@ export function MainScreen({ api }: MainScreenProps) {
       offPorts();
       offVpn();
     };
-  }, [api]);
+  }, [api, loadTargets]);
 
   // A location's free-server count changes whenever a port takes or releases a
   // server, so re-read the targets when the set of (port, server) pairs changes
-  // — not on every state tick.
+  // — not on every state tick. The handlers below also re-read once their call
+  // resolves: a change pushed while a Change IP is still in flight may be read
+  // before the main process has settled the pool.
   const pinSignature = useMemo(
     () =>
       ports
@@ -77,8 +93,8 @@ export function MainScreen({ api }: MainScreenProps) {
   );
   useEffect(() => {
     if (!loaded) return;
-    void api.listTargets().then(setTargets);
-  }, [api, pinSignature, loaded]);
+    refreshTargets();
+  }, [refreshTargets, pinSignature, loaded]);
 
   const portCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -119,6 +135,7 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleStart(keys: string[]) {
     await api.startPorts(keys);
     setPorts(await api.listPorts());
+    refreshTargets();
   }
 
   function locationName(locationKey: string): string {
@@ -146,7 +163,7 @@ export function MainScreen({ api }: MainScreenProps) {
       );
     }
     setPorts(await api.listPorts());
-    setTargets(await api.listTargets());
+    refreshTargets();
     if (notes.length) showNotice(notes.join(' '));
   }
 
@@ -173,11 +190,13 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleStop(keys: string[]) {
     await api.stopPorts(keys);
     setPorts(await api.listPorts());
+    refreshTargets();
   }
 
   async function handleRemove(keys: string[]) {
     await api.removePorts(keys);
     setPorts(await api.listPorts());
+    refreshTargets();
     // A later port may reuse the key: it must not inherit a lasting move note.
     setRotateNotes((prev) => keys.reduce(removeKey, prev));
     setSelected((prev) => {
@@ -214,6 +233,7 @@ export function MainScreen({ api }: MainScreenProps) {
         next.delete(key);
         return next;
       });
+      refreshTargets();
     }
     const rows = await api.listPorts();
     setPorts(rows);
@@ -238,7 +258,11 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleBulkRotate(keys: string[]) {
     // One at a time: each change takes a free server, so the next one must see it taken.
     const results: RotateResult[] = [];
-    for (const key of keys) results.push(await api.rotatePort(key));
+    try {
+      for (const key of keys) results.push(await api.rotatePort(key));
+    } finally {
+      refreshTargets();
+    }
     const rows = await api.listPorts();
     setPorts(rows);
     // Ports that moved city changed key; drop the stale keys from the selection.
@@ -256,6 +280,7 @@ export function MainScreen({ api }: MainScreenProps) {
     await api.stopPorts([row.key]);
     await api.startPorts([row.key]);
     setPorts(await api.listPorts());
+    refreshTargets();
   }
 
   const closePicker = useCallback(() => setPicking(false), []);
