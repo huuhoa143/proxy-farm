@@ -460,7 +460,7 @@ describe('port manager', () => {
       serverHealth.markDead('z1', '10.0.0.4');
       const { manager } = twoPorts(['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4', 'nl5.example.net'], '10.0.0.2', { depsOverrides: { serverHealth } });
       const target = ams(['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4', 'nl5.example.net']);
-      const list = manager.listServers(target);
+      const list = await manager.listServers(target);
       expect(list).toEqual([
         { server: '10.0.0.1', ip: '10.0.0.1', health: 'ok', lastOk: serverHealth.lastOk('z1', '10.0.0.1'), heldBy: 'zoogvpn:nl-ams#1' },
         { server: '10.0.0.2', ip: '10.0.0.2', health: 'unknown', heldBy: 'zoogvpn:nl-ams#2' },
@@ -474,7 +474,7 @@ describe('port manager', () => {
     it('a stopped port keeps holding its pinned server, so it gets it back on restart', async () => {
       const { manager, state } = twoPorts(['10.0.0.1', '10.0.0.2'], '10.0.0.2');
       state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === 'zoogvpn:nl-ams#2' ? { ...p, enabled: false, state: { kind: 'stopped' } } : p)) }));
-      expect(manager.listServers(ams(['10.0.0.1', '10.0.0.2']))[1].heldBy).toBe('zoogvpn:nl-ams#2');
+      expect((await manager.listServers(ams(['10.0.0.1', '10.0.0.2'])))[1].heldBy).toBe('zoogvpn:nl-ams#2');
       expect(await manager.addPort(ams(['10.0.0.1', '10.0.0.2']), 'z1')).toBeUndefined();
     });
 
@@ -484,9 +484,9 @@ describe('port manager', () => {
       const { manager, state } = twoPorts(['10.0.0.1', '10.0.0.2', '10.0.0.3'], '10.0.0.2', { depsOverrides: { serverHealth } });
       const z2: Account = { ...account, id: 'z2', secretRef: 'z2-secret' };
       state.setState((s) => ({ ...s, accounts: [...s.accounts, z2] }));
-      expect(manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3']))[2].health).toBe('unknown'); // ports use z1
+      expect((await manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3'])))[2].health).toBe('unknown'); // ports use z1
       state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, accountId: 'z2' })) }));
-      expect(manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3']))[2].health).toBe('refused');
+      expect((await manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3'])))[2].health).toBe('refused');
     });
 
     it("with a port key, health is for that port's account only (its Change-IP menu)", async () => {
@@ -497,11 +497,11 @@ describe('port manager', () => {
       const { manager, state } = twoPorts(pool, '10.0.0.2', { depsOverrides: { serverHealth } });
       const z2: Account = { ...account, id: 'z2', secretRef: 'z2-secret' };
       state.setState((s) => ({ ...s, accounts: [...s.accounts, z2], ports: s.ports.map((p) => (p.key === 'zoogvpn:nl-ams#2' ? { ...p, accountId: 'z2' } : p)) }));
-      const health = (portKey?: string) => manager.listServers(ams(pool), portKey).slice(2).map((s) => s.health);
-      expect(health()).toEqual(['unknown', 'unknown']); // merged: usable by one of z1/z2 each
-      expect(health('zoogvpn:nl-ams#1')).toEqual(['unknown', 'dead']);
-      expect(health('zoogvpn:nl-ams#2')).toEqual(['refused', 'unknown']);
-      expect(health('zoogvpn:nl-ams#9')).toEqual(['unknown', 'unknown']); // unknown port: merged
+      const health = async (portKey?: string) => (await manager.listServers(ams(pool), portKey)).slice(2).map((s) => s.health);
+      expect(await health()).toEqual(['unknown', 'unknown']); // merged: usable by one of z1/z2 each
+      expect(await health('zoogvpn:nl-ams#1')).toEqual(['unknown', 'dead']);
+      expect(await health('zoogvpn:nl-ams#2')).toEqual(['refused', 'unknown']);
+      expect(await health('zoogvpn:nl-ams#9')).toEqual(['unknown', 'unknown']); // unknown port: merged
     });
 
     it('one round-robin hostname (a Surfshark cluster before discovery) can back two ports on different IPs', async () => {
@@ -533,7 +533,7 @@ describe('port manager', () => {
         const { manager, state } = setup({ targets: [], depsOverrides: { resolveServer: scriptedResolver(['203.0.113.1']).resolveServer } });
         state.setState((s) => ({ ...s, accounts: [surfsharkAccount], ports: [] }));
         const row = await manager.addPort(tok(), 'z1');
-        expect(manager.listServers(tok())).toEqual([{ server: HOST, ip: '203.0.113.1', health: 'unknown', heldBy: row!.key }]);
+        expect(await manager.listServers(tok())).toEqual([{ server: HOST, ip: '203.0.113.1', health: 'unknown', heldBy: row!.key }]);
         expect(manager.freeServerCount(tok())).toBe(1);
         expect(manager.freeServerCount(tok(false))).toBe(0); // a plain hostname is one server
       });
@@ -2155,7 +2155,7 @@ describe('port manager', () => {
         const { manager } = frSetup();
         const row = await manager.addPort(fr, 'z1');
         expect(row?.server).toBe('fr1.webunlim.com');
-        expect(manager.listServers(fr).find((s) => s.server === 'fr4.webunlim.com')?.health).toBe('refused');
+        expect((await manager.listServers(fr)).find((s) => s.server === 'fr4.webunlim.com')?.health).toBe('refused');
       });
 
       it('a location is "not in plan" once every server refused every account of the provider', async () => {
@@ -2172,11 +2172,71 @@ describe('port manager', () => {
         expect(manager.locationNotInPlan(fr)).toBe(true);
       });
 
-      it('listServers tags free-tier servers', () => {
+      it('listServers tags free-tier servers', async () => {
         const { manager } = frSetup();
-        const servers = manager.listServers(freeTier);
+        const servers = await manager.listServers(freeTier);
         expect(servers).toEqual([expect.objectContaining({ server: 'nl.zgfree.info', freeTier: true })]);
-        expect(manager.listServers(fr).some((s) => s.freeTier)).toBe(false);
+        expect((await manager.listServers(fr)).some((s) => s.freeTier)).toBe(false);
+      });
+
+      describe('the Change-IP menu resolves the location first (listServers)', () => {
+        function menuSetup(resolve: (s: string) => Promise<string>) {
+          const serverHealth = createServerHealth();
+          serverHealth.noteIp('de7.webunlim.com', dns['de7.webunlim.com']);
+          serverHealth.markRefused('z1', 'de7.webunlim.com');
+          const lookups: string[] = [];
+          const ctx = setup({
+            targets: [fr],
+            port: { key: 'zoogvpn:FR#1', locationKey: 'zoogvpn:FR', country: 'FR', city: 'France', server: 'fr1.webunlim.com', serverIp: dns['fr1.webunlim.com'] },
+            portServers: {},
+            engine: fakeEngine({ autoOnline: false }),
+            depsOverrides: {
+              serverHealth,
+              listResolveTimeoutMs: 50,
+              resolveServer: (s) => {
+                lookups.push(s);
+                return resolve(s);
+              },
+            },
+          });
+          return { ...ctx, lookups };
+        }
+
+        it("an unresolved twin of a refused machine is listed refused (with its IP) before anyone clicks it", async () => {
+          const { manager, engine } = menuSetup(async (s) => dns[s] ?? s);
+          const fr4 = (await manager.listServers(fr, 'zoogvpn:FR#1')).find((x) => x.server === 'fr4.webunlim.com');
+          expect(fr4).toMatchObject({ ip: '185.177.229.121', health: 'refused' });
+          expect(engine.started).toHaveLength(0); // listing never connects
+        });
+
+        it('a hostname on a machine another port holds is listed as held', async () => {
+          const { manager, state } = menuSetup(async (s) => (s === 'fr4.webunlim.com' ? '185.177.229.50' : (dns[s] ?? s)));
+          const fr4 = (await manager.listServers(fr, 'zoogvpn:FR#1')).find((x) => x.server === 'fr4.webunlim.com');
+          expect(fr4?.heldBy).toBe('zoogvpn:FR#1'); // fr4 = fr1's machine
+          expect(state.getState().ports[0].server).toBe('fr1.webunlim.com');
+        });
+
+        it('resolves each hostname once, in parallel, and never waits past its timeout', async () => {
+          let release: (ip: string) => void = () => undefined;
+          const { manager, lookups } = menuSetup((s) => (s === 'fr4.webunlim.com' ? new Promise<string>((r) => (release = r)) : Promise.resolve(dns[s] ?? s)));
+          const t0 = Date.now();
+          const [a, b] = await Promise.all([manager.listServers(fr), manager.listServers(fr)]);
+          expect(Date.now() - t0).toBeLessThan(1000);
+          expect(a.find((x) => x.server === 'fr4.webunlim.com')?.health).toBe('unknown'); // not resolved in time
+          expect(b).toEqual(a);
+          expect(lookups.filter((s) => s === 'fr4.webunlim.com')).toHaveLength(1); // shared, not doubled
+          release('185.177.229.121');
+          await vi.waitFor(async () => expect((await manager.listServers(fr)).find((x) => x.server === 'fr4.webunlim.com')?.health).toBe('refused'));
+          expect(lookups.filter((s) => s === 'fr4.webunlim.com')).toHaveLength(1); // cached once resolved
+        });
+
+        it('a lookup failure leaves the hostname unknown and marks nothing', async () => {
+          const { manager } = menuSetup(async (s) => {
+            if (s === 'fr4.webunlim.com') throw new Error('ENOTFOUND');
+            return dns[s] ?? s;
+          });
+          expect((await manager.listServers(fr, 'zoogvpn:FR#1')).find((x) => x.server === 'fr4.webunlim.com')).toEqual({ server: 'fr4.webunlim.com', health: 'unknown' });
+        });
       });
 
       it('an explicit Change IP to fr4 is refused up front', async () => {

@@ -102,6 +102,8 @@ export interface PortManagerDeps {
   onHealthChanged?: () => void;
   /** @default 100 */
   healthChangedDelayMs?: number;
+  /** How long `listServers` waits for the location's unresolved hostnames. @default 2000 */
+  listResolveTimeoutMs?: number;
   /**
    * The account pool (spec §4.2 "move a port on refusal"): when every free server of a
    * location has refused the port's account, the port may move to another account of
@@ -153,9 +155,11 @@ export interface PortManager {
   addPort(target: Target, accountId: string, opts?: { atLimit?: () => boolean }): Promise<PortRow | undefined>;
   /** The location's pool with health, resolved IP (when known) and holder (spec §6.8).
    * Health is for `portKey`'s account when that port exists (its Change-IP menu), else
-   * merged over the accounts the location's ports use. Synchronous: uses only
-   * already-resolved IPs, never the network. */
-  listServers(target: Target, portKey?: string): ServerInfo[];
+   * merged over the accounts the location's ports use. Hostnames of the location not
+   * resolved yet this session are resolved first (in parallel, each once, waiting at
+   * most `listResolveTimeoutMs`), so a hostname that is another name of a refused, dead
+   * or held machine is shown as such before anyone picks it. */
+  listServers(target: Target, portKey?: string): Promise<ServerInfo[]>;
   /** Servers of `target` that some account of its provider may use and no enabled port holds. */
   freeServerCount(target: Target): number;
   /** Every server of `target` has refused every account of its provider (spec §6.8):
@@ -1612,7 +1616,48 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     };
   }
 
-  function listServers(target: Target, portKey?: string): ServerInfo[] {
+  /** hostname -> its resolution for `listServers` in flight, shared by concurrent calls. */
+  const listResolving = new Map<string, Promise<void>>();
+
+  /** Resolves the location's hostnames not resolved yet this session, so their marks and
+   * holders are known (§6.8: a mark belongs to the machine). Never marks anything: a
+   * failure only leaves the hostname unresolved. Bounded by `listResolveTimeoutMs`; a
+   * lookup still running after that keeps going and is used next time. */
+  async function resolveForListing(target: Target): Promise<void> {
+    const pending: Array<Promise<void>> = [];
+    for (const server of target.servers) {
+      if (isIP(server) || isPoolHostname(target, server) || resolvedIp.has(server)) continue;
+      let p = listResolving.get(server);
+      if (!p) {
+        p = resolveServer(server)
+          .then(
+            (ip) => {
+              if (isIP(ip)) noteResolved(target, server, ip);
+            },
+            () => undefined,
+          )
+          .finally(() => listResolving.delete(server));
+        listResolving.set(server, p);
+      }
+      pending.push(p);
+    }
+    if (pending.length === 0) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, deps.listResolveTimeoutMs ?? 2000);
+      timer.unref?.();
+    });
+    await Promise.race([Promise.all(pending), timeout]);
+    clearTimeout(timer);
+  }
+
+  async function listServers(target: Target, portKey?: string): Promise<ServerInfo[]> {
+    await resolveForListing(target);
+    return serverInfos(target, portKey);
+  }
+
+  /** `listServers` on what is known now, without touching the network. */
+  function serverInfos(target: Target, portKey?: string): ServerInfo[] {
     const { accounts: all, ports } = deps.state.getState();
     // Health is for one port's account when asked for (a server refused for another
     // account is still a valid pick for this port), else for the accounts this
@@ -1656,7 +1701,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   function freeServerCount(target: Target): number {
     // A pool hostname held by a port still counts: its next answer may be another server.
-    return listServers(target).filter(
+    return serverInfos(target).filter(
       (s) => (!s.heldBy || isPoolHostname(target, s.server)) && (s.health === 'ok' || s.health === 'unknown'),
     ).length;
   }

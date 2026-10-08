@@ -103,7 +103,7 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
       addLock = run.then(() => undefined);
       return run;
     },
-    listServers: (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
+    listServers: async (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
     freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
     // Not in plan when every server is refused for every account (refusedFor['*']).
     locationNotInPlan: (t) => t.servers.length > 0 && t.servers.every((sv) => (refusedFor['*'] ?? []).includes(sv)),

@@ -30,6 +30,12 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The Change IP menu could list a server as free and untried when it was only another
+  hostname of a machine that had already refused the account (`fr4` next to a refused
+  `de7`), because that hostname had not been looked up yet. Opening the menu now looks
+  up the location's hostnames first (in parallel, each once, for at most 2 s), so such a
+  server shows as refused or taken before you pick it. Picking it never cost a
+  connection attempt; it only looked available until then.
 - The location picker showed a location that had just turned out not to be in the plan
   as "No free server" until the app was restarted: it re-read the locations only when a
   port changed servers. The app now tells the window whenever a server is marked
