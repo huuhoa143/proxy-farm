@@ -407,6 +407,13 @@ describe('PortTable', () => {
       expect(onAddPort).toHaveBeenCalledTimes(1);
     });
 
+    it('+ Add port says so when the location is not in the plan', () => {
+      renderGrouped({ targets: [tokyo, { ...hanoi, notInPlan: true }] });
+      const blocked = screen.getByTestId('add-port-zoogvpn:VN-HAN');
+      expect(blocked).toHaveAttribute('aria-disabled', 'true');
+      expect(blocked).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+    });
+
     it("+ Add port is disabled at the provider's port limit", () => {
       renderGrouped({ limits: { hma: 2 } });
       const blocked = screen.getByTestId('add-port-hma:JP-TOKYO');

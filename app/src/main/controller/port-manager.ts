@@ -149,6 +149,9 @@ export interface PortManager {
   listServers(target: Target, portKey?: string): ServerInfo[];
   /** Servers of `target` that some account of its provider may use and no enabled port holds. */
   freeServerCount(target: Target): number;
+  /** Every server of `target` has refused every account of its provider (spec §6.8):
+   * the location is outside the user's plan(s). False with no account to judge by. */
+  locationNotInPlan(target: Target): boolean;
   setAutoRotate(key: string, minutes: number): Promise<void>;
   exportPorts(keys: string[], format: ExportFormat): Promise<string>;
   testPort(key: string, speed: boolean): Promise<{ ok: boolean; exitIp?: string; latencyMs?: number; mbps?: number }>;
@@ -1478,8 +1481,15 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         health: status,
         ...(lastOk !== undefined ? { lastOk } : {}),
         ...(holder ? { heldBy: holder } : {}),
+        ...(target.freeTierServers?.includes(server) ? { freeTier: true } : {}),
       };
     });
+  }
+
+  function locationNotInPlan(target: Target): boolean {
+    const accounts = deps.state.getState().accounts.filter((a) => a.providerId === target.providerId);
+    if (accounts.length === 0 || target.servers.length === 0) return false;
+    return target.servers.every((server) => accounts.every((a) => health.isRefused(a.id, server)));
   }
 
   function freeServerCount(target: Target): number {
@@ -1560,6 +1570,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     addPort,
     listServers,
     freeServerCount,
+    locationNotInPlan,
     setAutoRotate,
     exportPorts,
     testPort,

@@ -95,6 +95,12 @@ export interface Target {
   freeTierServers?: string[];
   /** Filled by the controller in `listTargets`: usable servers not held by any port. */
   freeServers?: number;
+  /**
+   * Filled by the controller in `listTargets`: every server of the location has refused
+   * every account of its provider (spec §6.8, §5.2) — the location is not in the user's
+   * plan(s). Absent otherwise.
+   */
+  notInPlan?: boolean;
 }
 
 /** Health of one server for one account (spec §6.8). */
@@ -111,6 +117,8 @@ export interface ServerInfo {
   lastOk?: number;
   /** Key of the port currently pinned to this server, if any. */
   heldBy?: string;
+  /** On the provider's free tier (`Target.freeTierServers`): usable on any plan. */
+  freeTier?: boolean;
 }
 
 /** Separator between a location key and a port number in a port key (spec §6.8). */

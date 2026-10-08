@@ -18,6 +18,9 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   way (at most once per 10 minutes per account) and then either moves on as a plan
   refusal or stops with "wrong email or password". A location where every server
   refuses a working login says so: "Your ZoogVPN plan doesn't include this location".
+- The location picker marks a location whose every server refused every account of its
+  provider as "Not in your plan", with the reason as a tooltip and its quantity stepper
+  disabled; its "+ Add port" says the same. The Change IP menu tags free-tier servers.
 
 ### Fixed
 

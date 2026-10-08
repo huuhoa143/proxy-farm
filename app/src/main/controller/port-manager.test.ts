@@ -2036,6 +2036,27 @@ describe('port manager', () => {
         expect(manager.listServers(fr).find((s) => s.server === 'fr4.webunlim.com')?.health).toBe('refused');
       });
 
+      it('a location is "not in plan" once every server refused every account of the provider', async () => {
+        const { manager, serverHealth, state } = frSetup();
+        expect(manager.locationNotInPlan(fr)).toBe(false); // fr1 not refused
+        serverHealth.markRefused('z1', 'fr1.webunlim.com');
+        serverHealth.noteIp('fr4.webunlim.com', '185.177.229.121');
+        expect(manager.locationNotInPlan(fr)).toBe(true);
+        // A second account that has not been refused there may still use it.
+        state.setState((s) => ({ ...s, accounts: [...s.accounts, { ...account, id: 'z2', secretRef: 'z2' }] }));
+        expect(manager.locationNotInPlan(fr)).toBe(false);
+        serverHealth.markRefused('z2', 'fr1.webunlim.com');
+        serverHealth.markRefused('z2', 'fr4.webunlim.com');
+        expect(manager.locationNotInPlan(fr)).toBe(true);
+      });
+
+      it('listServers tags free-tier servers', () => {
+        const { manager } = frSetup();
+        const servers = manager.listServers(freeTier);
+        expect(servers).toEqual([expect.objectContaining({ server: 'nl.zgfree.info', freeTier: true })]);
+        expect(manager.listServers(fr).some((s) => s.freeTier)).toBe(false);
+      });
+
       it('an explicit Change IP to fr4 is refused up front', async () => {
         const { manager, engine, state } = frSetup();
         state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, enabled: true, server: 'fr1.webunlim.com' })) }));

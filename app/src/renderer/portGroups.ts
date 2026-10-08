@@ -78,8 +78,10 @@ export function remainingByProvider(
   return out;
 }
 
-/** How many more ports a location can take right now: free servers, capped by the provider limit. */
+/** How many more ports a location can take right now: free servers, capped by the
+ * provider limit; none for a location outside the plan. */
 export function addableCount(target: Target, remaining: Partial<Record<ProviderId, number>>): number {
+  if (target.notInPlan) return 0;
   const free = target.freeServers ?? target.servers.length;
   const cap = remaining[target.providerId];
   return cap === undefined ? free : Math.min(free, cap);
@@ -89,7 +91,8 @@ export function addableCount(target: Target, remaining: Partial<Record<ProviderI
 export function addPortBlock(
   target: Target,
   remaining: Partial<Record<ProviderId, number>>,
-): 'no-free-server' | 'limit-reached' | undefined {
+): 'not-in-plan' | 'no-free-server' | 'limit-reached' | undefined {
+  if (target.notInPlan) return 'not-in-plan';
   if (remaining[target.providerId] === 0) return 'limit-reached';
   if ((target.freeServers ?? target.servers.length) === 0) return 'no-free-server';
   return undefined;

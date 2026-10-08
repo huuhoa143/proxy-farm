@@ -105,6 +105,8 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
     },
     listServers: (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
     freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
+    // Not in plan when every server is refused for every account (refusedFor['*']).
+    locationNotInPlan: (t) => t.servers.length > 0 && t.servers.every((sv) => (refusedFor['*'] ?? []).includes(sv)),
     syncAutoRotate: () => undefined,
     stopAutoRotate: () => undefined,
     credentialsChanged: (accountId) => void calls.push(`creds:${accountId}`),
@@ -471,6 +473,17 @@ describe('controller facade', () => {
     expect(targets.map((t) => [t.key, t.freeServers])).toEqual([
       ['hma:NL-AMS', 2],
       ['hma:JP-TYO', 1],
+    ]);
+    expect(targets.some((t) => 'notInPlan' in t)).toBe(false);
+  });
+
+  it('listTargets flags a location whose every server refused every account as not in the plan', async () => {
+    const { facade } = setup({}, { '*': ['10.0.0.1'] });
+    await facade.connectHma();
+    const targets = await facade.listTargets('hma');
+    expect(targets.map((t) => [t.key, t.notInPlan])).toEqual([
+      ['hma:NL-AMS', undefined],
+      ['hma:JP-TYO', true],
     ]);
   });
 

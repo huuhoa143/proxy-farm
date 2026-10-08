@@ -89,6 +89,19 @@ describe('ChangeIpMenu', () => {
     expect(onChange).toHaveBeenCalledWith(row, undefined);
   });
 
+  it('tags a free-tier server (not to be confused with an unheld, "free" one)', async () => {
+    const { api, trigger } = await setup();
+    vi.spyOn(api, 'listServers').mockResolvedValue([
+      { server: 'nl.zgfree.info', ip: '203.0.113.15', health: 'unknown', freeTier: true },
+      { server: 'nl1.webunlim.com', ip: '203.0.113.16', health: 'unknown' },
+    ]);
+    fireEvent.click(trigger);
+    const free = await screen.findByTestId('server-nl.zgfree.info');
+    expect(free).toHaveTextContent('Free tier');
+    expect(screen.getByText('Free tier')).toHaveAttribute('title', 'A free-tier server: it works on every plan.');
+    expect(screen.getByTestId('server-nl1.webunlim.com')).not.toHaveTextContent('Free tier');
+  });
+
   it('ignores clicks on held, refused or dead servers', async () => {
     const { trigger, onChange } = await setup();
     await openMenu(trigger);

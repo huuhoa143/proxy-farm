@@ -250,7 +250,9 @@
       "addN_one": "Add {{count}} port",
       "addN_other": "Add {{count}} ports",
       "picked": "Selected locations",
-      "unpick": "Remove {{location}} from the selection"
+      "unpick": "Remove {{location}} from the selection",
+      "notInPlan": "Not in your plan",
+      "notInPlanHint": "Your {{provider}} plan doesn't include this location — every server here refused your account. Pick another location or upgrade your plan."
     },
     "group": {
       "toggle": "Show or hide the ports in {{location}}",
@@ -298,7 +300,9 @@
         "refused": "This server turned your account away, so it is skipped for 7 days.",
         "dead": "This server didn't respond, so it is skipped for 2 hours."
       },
-      "pick": "Move this port to {{server}}"
+      "pick": "Move this port to {{server}}",
+      "freeTier": "Free tier",
+      "freeTierHint": "A free-tier server: it works on every plan."
     },
     "addResult": {
       "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",

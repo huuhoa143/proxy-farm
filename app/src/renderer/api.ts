@@ -402,7 +402,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       const target = findTarget(locationKey);
       return (target?.servers ?? []).map((server) => {
         const h = health.get(server) ?? { health: 'unknown' as const };
-        return { server, ip: resolveServer(server), health: h.health, lastOk: h.lastOk, heldBy: holderOf(server) };
+        const freeTier = target?.freeTierServers?.includes(server) ? { freeTier: true } : {};
+        return { server, ip: resolveServer(server), health: h.health, lastOk: h.lastOk, heldBy: holderOf(server), ...freeTier };
       });
     },
 

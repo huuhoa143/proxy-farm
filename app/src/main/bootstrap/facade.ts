@@ -361,7 +361,12 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     async listTargets(providerId) {
       const ids = providerId ? [providerId] : PROVIDER_IDS;
       const out: Target[] = [];
-      for (const id of ids) for (const t of await targetsFor(id)) out.push({ ...t, freeServers: deps.portManager.freeServerCount(t) });
+      for (const id of ids) {
+        for (const t of await targetsFor(id)) {
+          const notInPlan = deps.portManager.locationNotInPlan(t);
+          out.push({ ...t, freeServers: deps.portManager.freeServerCount(t), ...(notInPlan ? { notInPlan } : {}) });
+        }
+      }
       return out;
     },
 

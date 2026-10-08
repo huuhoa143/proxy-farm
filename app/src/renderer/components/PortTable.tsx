@@ -169,11 +169,13 @@ export function PortTable({
     const block = target ? addPortBlock(target, remaining) : undefined;
     const provider = providerName(group.providerId, t);
     const blockReason =
-      block === 'limit-reached'
-        ? t('main.group.limitReached', { provider, limit: limits[group.providerId] })
-        : block === 'no-free-server'
-          ? t('main.group.noFreeServer', { location })
-          : undefined;
+      block === 'not-in-plan'
+        ? t('main.picker.notInPlanHint', { provider })
+        : block === 'limit-reached'
+          ? t('main.group.limitReached', { provider, limit: limits[group.providerId] })
+          : block === 'no-free-server'
+            ? t('main.group.noFreeServer', { location })
+            : undefined;
     return (
       <tr className="grp-row" data-testid={`group-${group.locationKey}`}>
         <td className="c-sel">

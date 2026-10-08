@@ -250,7 +250,9 @@
       "addN_one": "Thêm {{count}} cổng",
       "addN_other": "Thêm {{count}} cổng",
       "picked": "Vị trí đã chọn",
-      "unpick": "Bỏ chọn {{location}}"
+      "unpick": "Bỏ chọn {{location}}",
+      "notInPlan": "Không có trong gói",
+      "notInPlanHint": "Gói {{provider}} của bạn không bao gồm vị trí này — mọi máy chủ ở đây đều từ chối tài khoản của bạn. Hãy chọn vị trí khác hoặc nâng cấp gói."
     },
     "group": {
       "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",
@@ -298,7 +300,9 @@
         "refused": "Máy chủ này đã từ chối tài khoản của bạn nên tạm bỏ qua 7 ngày.",
         "dead": "Máy chủ này không phản hồi nên tạm bỏ qua 2 giờ."
       },
-      "pick": "Chuyển cổng này sang {{server}}"
+      "pick": "Chuyển cổng này sang {{server}}",
+      "freeTier": "Miễn phí",
+      "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói."
     },
     "addResult": {
       "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",

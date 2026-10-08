@@ -274,6 +274,11 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
                           <span className="mono">{ip}</span>
                           {s.ip && s.ip !== s.server && <small className="mono">{s.server}</small>}
                         </span>
+                        {s.freeTier && (
+                          <span className="pill free" title={t('main.changeIp.freeTierHint') as string}>
+                            {t('main.changeIp.freeTier')}
+                          </span>
+                        )}
                         <span className="cim-st">
                           {current && <Icon name="check" />}
                           {status}

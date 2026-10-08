@@ -257,20 +257,27 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                   const have = portCounts?.get(target.key) ?? 0;
                   const max = maxFor(target);
                   const free = target.freeServers ?? target.servers.length;
-                  const unavailable = !on && max === 0;
-                  const unavailableLabel =
-                    free === 0 ? t('main.picker.noFree') : t('main.picker.limitReached');
+                  // Every server refused every account of the provider (spec §6.8).
+                  const notInPlan = target.notInPlan === true;
+                  const unavailable = notInPlan || (!on && max === 0);
+                  const unavailableLabel = notInPlan
+                    ? t('main.picker.notInPlan')
+                    : free === 0
+                      ? t('main.picker.noFree')
+                      : t('main.picker.limitReached');
+                  const notInPlanHint = notInPlan ? (t('main.picker.notInPlanHint', { provider: providerName(target.providerId, t) }) as string) : undefined;
                   return (
                     <div
                       key={target.key}
-                      className={`opt${on ? ' on' : ''}${have ? ' run' : ''}${unavailable ? ' off' : ''}`}
+                      className={`opt${on ? ' on' : ''}${have ? ' run' : ''}${unavailable ? ' off' : ''}${notInPlan ? ' not-in-plan' : ''}`}
                       data-testid={`pick-${target.key}`}
+                      title={notInPlanHint}
                     >
                       <label className="opt-main">
                         <input
                           type="checkbox"
                           className="ck"
-                          checked={on}
+                          checked={on && !notInPlan}
                           disabled={unavailable}
                           onChange={() => toggle(target)}
                         />
@@ -290,7 +297,19 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                           </span>
                         )}
                       </label>
-                      {on && (
+                      {notInPlan && (
+                        // Shown, but nothing to step: no port can be added here.
+                        <div className="stepper is-disabled" role="group" aria-disabled="true" aria-label={notInPlanHint} title={notInPlanHint}>
+                          <button type="button" disabled aria-label={t('main.picker.fewer', { location: target.city }) as string}>
+                            −
+                          </button>
+                          <input type="number" value={0} disabled readOnly aria-label={t('main.picker.qty', { location: target.city }) as string} />
+                          <button type="button" disabled aria-label={t('main.picker.more', { location: target.city }) as string}>
+                            +
+                          </button>
+                        </div>
+                      )}
+                      {on && !notInPlan && (
                         <div
                           className="stepper"
                           role="group"
