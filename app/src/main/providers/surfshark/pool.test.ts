@@ -99,9 +99,11 @@ describe('surfshark pools: discovery', () => {
   });
 
   it('meets the first-round budget with whichever resolver answers when DoH is black-holed', async () => {
-    // Fake timers: the assertion is about which timer ends the round (the
-    // grace, not the budget), so it must not depend on how busy the host is.
-    vi.useFakeTimers();
+    // Only setTimeout/Date are faked: ensure() first reads the pool file (real
+    // I/O), so fake time is stepped while real I/O gets to finish in between.
+    // The assertion is on fake time — the round must end on the 50 ms grace,
+    // long before the 4 s budget — so host load can't change the outcome.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       const never = () => new Promise<string[]>(() => {});
       const pools = createSurfsharkPools({
@@ -113,8 +115,14 @@ describe('surfshark pools: discovery', () => {
       });
       let settled = false;
       const done = pools.ensure([HOST]).then(() => (settled = true));
-      await vi.advanceTimersByTimeAsync(50);
-      expect(settled).toBe(true); // ended by the 50 ms grace, long before the 4 s budget
+      let fakeElapsed = 0;
+      while (!settled && fakeElapsed < 4000) {
+        await new Promise((r) => setImmediate(r)); // let real I/O complete
+        await vi.advanceTimersByTimeAsync(10);
+        fakeElapsed += 10;
+      }
+      expect(settled).toBe(true);
+      expect(fakeElapsed).toBeLessThan(4000); // ended by the grace, not the budget
       await done;
       expect(pools.servers(HOST)).toEqual(['192.0.2.1', '192.0.2.2']);
     } finally {
