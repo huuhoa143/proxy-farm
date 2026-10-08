@@ -94,6 +94,21 @@ describe('describePortState', () => {
     expect(normal.guidance).toMatch(/signed in/i);
   });
 
+  it('failed(key-rejected) is action-needed with no countdown, with Surfshark-specific guidance', () => {
+    expect(isTerminalFailure('key-rejected')).toBe(true);
+    const state: PortState = { kind: 'failed', reason: 'key-rejected', untilMs: Date.now(), attempt: 3 };
+    const t = i18next.t.bind(i18next);
+    const ss = describePortState(state, 'surfshark', t);
+    expect(ss).toMatchObject({ tone: 'bad', label: 'Key not answered', terminal: true, countdownSeconds: undefined });
+    expect(ss.guidance).toMatch(/^Surfshark didn't answer this key on 3 servers\..*Manual setup → WireGuard.*suspended/);
+    expect(describePortState(state, 'file', t).guidance).toMatch(/WireGuard key/);
+  });
+
+  it('a rate-limited retry explains the wait', () => {
+    const state: PortState = { kind: 'retrying', untilMs: Date.now() + 5_000, attempt: 1, reasonKey: 'rate-limited' };
+    expect(describePortState(state, 'surfshark', i18next.t.bind(i18next)).guidance).toMatch(/too often/);
+  });
+
   it('covers failed(not-in-plan) and failed(no-server) with distinct labels', () => {
     const notInPlan = describePortState(
       { kind: 'failed', reason: 'not-in-plan', untilMs: Date.now(), attempt: 1 },

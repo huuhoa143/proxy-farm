@@ -234,6 +234,7 @@ describe('PortTable', () => {
     const rows: PortRow[] = [
       row('failed-auth', { kind: 'failed', reason: 'auth', untilMs: now + 60_000, attempt: 4 }),
       row('failed-noserver', { kind: 'failed', reason: 'no-server', untilMs: now + 60_000, attempt: 2 }),
+      row('failed-key', { kind: 'failed', reason: 'key-rejected', untilMs: now, attempt: 3 }),
     ];
     render(
       <PortTable
@@ -249,6 +250,10 @@ describe('PortTable', () => {
     const authRow = screen.getByTestId('port-row-failed-auth');
     expect(within(authRow).getByTestId('terminal-failed-auth')).toBeInTheDocument();
     expect(authRow).not.toHaveTextContent('Next try in');
+    // A WireGuard key the app stopped retrying is action-needed too.
+    const keyRow = screen.getByTestId('port-row-failed-key');
+    expect(within(keyRow).getByTestId('terminal-failed-key')).toBeInTheDocument();
+    expect(keyRow).not.toHaveTextContent('Next try in');
     // A transient failure still counts down to its next attempt.
     expect(screen.getByTestId('port-row-failed-noserver')).toHaveTextContent('Next try in');
   });

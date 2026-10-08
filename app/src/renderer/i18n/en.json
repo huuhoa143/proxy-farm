@@ -334,6 +334,13 @@
         "guidance": "Another app is already using this port.",
         "action": "Move to another port"
       },
+      "key-rejected": {
+        "label": "Key not answered",
+        "guidance": {
+          "surfshark": "Surfshark didn't answer this key on 3 servers. Check the key is listed under Manual setup → WireGuard in your Surfshark account, and that your subscription is active. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
+          "generic": "The server didn't answer this WireGuard key on 3 attempts. Check that the key and address in the file are still valid with your provider. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more."
+        }
+      },
       "no-server": {
         "label": "No server available",
         "guidance": "No working server could be reached for this location yet. It will keep retrying."
@@ -456,7 +463,8 @@
     "rotate-in-progress": "This port is already rotating.",
     "port-disabled": "Start the port before rotating it.",
     "decrypt-failed": "Your saved credentials couldn't be read.",
-    "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly."
+    "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly.",
+    "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
   },
   "hma": {
     "windowsLater": "HMA support on Windows is coming in a later version.",

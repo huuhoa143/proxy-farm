@@ -25,7 +25,7 @@ import type { StateStore } from '../store/state';
 import { exportLines, type ExportCreds } from './export-format';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator, type ProviderRegistry } from './ports';
 import { createServerHealth, type ServerHealth } from './server-health';
-import { createAttemptLimiter, type AttemptLimiter } from './provider-safety';
+import { createAttemptLimiter, createWgKeyGuard, type AttemptLimiter, type WgKeyGuard } from './provider-safety';
 
 export interface PortManagerDeps {
   state: StateStore;
@@ -94,6 +94,12 @@ export interface PortManagerDeps {
    * @default ≤ 6 per minute per account, on `now`
    */
   attemptLimiter?: AttemptLimiter;
+  /**
+   * Stops retrying a WireGuard key that has never completed a handshake once it fails
+   * several attempts in a row (spec §6.4 "Provider safety"). @default a fresh guard
+   * seeded from `AppState.wgLockouts`; its locks are written back there.
+   */
+  wgKeyGuard?: WgKeyGuard;
 }
 
 /** Who asked for a start/Change IP. A user action resets the port's back-off; an
@@ -170,6 +176,17 @@ function firstLanIPv4(): string {
  * port-manager's own pre-engine reasons (`secret-unavailable`, `start-error`, …).
  * Whether one actually condemns the server is `onConnectivityFailure`'s call. */
 const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 'verify-failed']);
+
+/** The `retrying` reasonKeys that mean "no handshake": the tunnel never answered. A
+ * crash (`exited`) says nothing about the key, and `verify-failed` comes after a 200. */
+const NO_HANDSHAKE_REASONS = new Set(['timeout', 'unreachable']);
+
+/** A WireGuard account: Surfshark, or an imported WireGuard `.conf`. Every port of such
+ * an account sends WireGuard handshakes, which fail silently (spec §5.3). */
+function isWireguardAccount(account: Account, secret: AccountSecret | null): boolean {
+  if (account.providerId === 'surfshark') return true;
+  return account.providerId === 'file' && secret?.kind === 'file' && /^\s*\[Interface\]/im.test(secret.content);
+}
 
 /** Connectivity failures of two different ports this close together are one incident
  * on the host or the provider's side, not two dead servers (spec §6.4). */
@@ -282,6 +299,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
   const health = deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth });
   const limiter = deps.attemptLimiter ?? createAttemptLimiter({ now });
+  const wgGuard = deps.wgKeyGuard ?? createWgKeyGuard({ now, initial: deps.state.getState().wgLockouts });
+  /** accountId -> whether it is a WireGuard account (needs its secret; cached). */
+  const wgAccounts = new Map<string, boolean>();
   /** server token -> last resolved IPv4, for the invariant check and `listServers`. */
   const resolvedIp = new Map<string, string>();
   /** server IP -> exit IP observed through it; exit IP = server identity (§6.5). */
@@ -303,6 +323,20 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   function persistHealth(): void {
     deps.state.setState((st) => ({ ...st, serverHealth: health.serialize() }));
+  }
+
+  function persistLockouts(): void {
+    deps.state.setState((st) => ({ ...st, wgLockouts: wgGuard.serialize() }));
+  }
+
+  function isWireguard(accountId: string): boolean {
+    const cached = wgAccounts.get(accountId);
+    if (cached !== undefined) return cached;
+    const account = deps.state.getState().accounts.find((a) => a.id === accountId);
+    if (!account) return false;
+    const wg = isWireguardAccount(account, loadAccountSecret(deps.secrets, account.secretRef));
+    wgAccounts.set(accountId, wg);
+    return wg;
   }
 
   function findPort(key: string): PortRow | undefined {
@@ -610,7 +644,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    *    `STICKY_RECONNECT_FAILURES` failed reconnects in a row; a server the port never
    *    got online on (a new pin, a failover target) is condemned at once.
    */
-  function onConnectivityFailure(port: PortRow & { server: string }): void {
+  function onConnectivityFailure(port: PortRow & { server: string }): ProviderId | '*' | undefined {
     const at = now();
     const wasOnline = onlineSinceStart.delete(port.key);
     recentFailures = recentFailures.filter((f) => at - f.at < CORRELATED_DROP_WINDOW_MS && f.key !== port.key);
@@ -621,17 +655,72 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     const scope = (incidentUntil.get('*') ?? 0) > at ? '*' : (incidentUntil.get(port.providerId) ?? 0) > at ? port.providerId : undefined;
     if (scope !== undefined) {
       incidentUntil.set(scope, at + INCIDENT_HOLD_MS);
-      return;
+      return scope;
     }
-    if (wasOnline) return;
+    if (wasOnline) return undefined;
     if (lastOnlineServer.get(port.key) === port.server) {
       const failures = (stickyFailures.get(port.key) ?? 0) + 1;
       stickyFailures.set(port.key, failures);
-      if (failures < STICKY_RECONNECT_FAILURES) return;
+      if (failures < STICKY_RECONNECT_FAILURES) return undefined;
     }
     stickyFailures.delete(port.key);
     health.markDead(port.accountId, port.server);
-    failOver(port.key, 'server-dead');
+    // A WireGuard port does not jump to the next server at once: that would be another
+    // silent handshake seconds after the last one. Its back-off retry re-selects, and the
+    // dead mark moves it then (spec §6.4 "Provider safety").
+    if (!isWireguard(port.accountId)) failOver(port.key, 'server-dead');
+    return undefined;
+  }
+
+  /** Ports that completed a handshake (`verifying` or `online`) since their last start. */
+  const handshookSinceStart = new Set<string>();
+
+  /** Shows `failed(key-rejected)`: no timer, nothing retries until the user acts. */
+  function markKeyRejected(key: string): void {
+    cancelLocalRetry(key);
+    const attempt = Math.max(1, backoffAttempts.get(key) ?? 0);
+    updatePort(key, { state: { kind: 'failed', reason: 'key-rejected', untilMs: Date.now(), attempt } });
+  }
+
+  /** The account's key got no handshake on too many attempts: stop every one of its
+   * ports (their engines too, so nothing keeps knocking) and leave them failed.
+   * Deferred: runs from inside the engine's state-change callback. */
+  function lockAccount(accountId: string): void {
+    setTimeout(() => {
+      for (const p of deps.state.getState().ports) {
+        if (p.accountId !== accountId || !p.enabled || rotatingKeys.has(p.key)) continue;
+        cancelLocalRetry(p.key);
+        void deps.engine
+          .stop(p.key)
+          .catch(() => undefined)
+          .then(() => {
+            // Still locked, still this account's, and not stopped by the user meanwhile.
+            const row = findPort(p.key);
+            if (row?.enabled && row.accountId === accountId && wgGuard.isLocked(accountId)) markKeyRejected(p.key);
+          });
+      }
+    }, 0);
+  }
+
+  /** WireGuard bookkeeping for one engine state change (spec §6.4 "Provider safety"). */
+  function trackHandshakes(port: PortRow, state: PortState, incident: ProviderId | '*' | undefined): void {
+    if (!isWireguard(port.accountId)) return;
+    if (state.kind === 'verifying' || state.kind === 'online') {
+      // WireGuard reaches `verifying` on its first /delay 200: the handshake completed.
+      handshookSinceStart.add(port.key);
+      const wasLocked = wgGuard.isLocked(port.accountId);
+      wgGuard.recordHandshake(port.accountId);
+      if (wasLocked) persistLockouts();
+      return;
+    }
+    if (state.kind !== 'retrying' || !NO_HANDSHAKE_REASONS.has(state.reasonKey)) return;
+    // A drop after a handshake, or the whole host losing its network, says nothing about the key.
+    if (handshookSinceStart.has(port.key) || incident === '*') return;
+    const proven = health.workedRecently(port.accountId, Number.POSITIVE_INFINITY);
+    if (wgGuard.recordNoHandshake(port.accountId, proven)) {
+      persistLockouts();
+      lockAccount(port.accountId);
+    }
   }
 
   /** The exit-IP probe is the invariant's final check (spec §6.8): a port whose exit IP
@@ -681,16 +770,18 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       else refusals.clearOnline(port.accountId, port.server);
     }
 
+    let incident: ProviderId | '*' | undefined;
     if (state.kind === 'online') {
       onlineSinceStart.add(key);
       lastOnlineServer.set(key, port.server);
       stickyFailures.delete(key);
       onOnline(pinned, state.exitIp);
     } else if (state.kind === 'retrying' && CONNECTIVITY_RETRY_REASONS.has(state.reasonKey)) {
-      onConnectivityFailure(pinned);
+      incident = onConnectivityFailure(pinned);
     } else if (state.kind === 'failed' && state.reason === 'auth') {
       onAuthFailure(pinned, state);
     }
+    trackHandshakes(port, state, incident);
     if (port.providerId === 'zoogvpn') persistRefusals();
   });
 
@@ -811,6 +902,20 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         return;
       }
 
+      // A WireGuard key the app stopped retrying (spec §6.4 "Provider safety"): only a
+      // user Start tries again, and only once.
+      if (isWireguardAccount(account, secret)) {
+        if (opts.user && wgGuard.isLocked(account.id)) {
+          wgGuard.rearm(account.id);
+          persistLockouts();
+        }
+        if (wgGuard.isLocked(account.id)) {
+          updatePort(key, { enabled: true });
+          markKeyRejected(key);
+          return;
+        }
+      }
+
       const target = (await provider.targets(account)).find((t) => t.key === port.locationKey);
       if (stoppedMeanwhile()) return;
       if (!target) {
@@ -852,6 +957,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       }
       const renderInput = buildRenderInput(findPort(key) ?? port, endpoint);
       onlineSinceStart.delete(key); // a fresh (re)connect from here on
+      handshookSinceStart.delete(key);
       try {
         await deps.engine.start(key, renderInput, { attempt: backoffAttempts.get(key) ?? 0 });
       } catch (err) {
@@ -899,7 +1005,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     // any throw after that must be attributed to the new key (reviewer round 3, item 2).
     const effectiveKey = { current: key };
     try {
-      return await doRotate(key, toServer, effectiveKey);
+      return await doRotate(key, toServer, effectiveKey, opts);
     } catch (err) {
       failWithRetry(effectiveKey.current, { kind: 'retrying', reasonKey: 'rotate-error' });
       throw err;
@@ -918,7 +1024,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     fellBackToAnotherCity: boolean;
   }
 
-  async function doRotate(key: string, toServer: string | undefined, effectiveKey: { current: string }): Promise<RotateResult> {
+  async function doRotate(key: string, toServer: string | undefined, effectiveKey: { current: string }, opts: StartOptions): Promise<RotateResult> {
     const s = deps.state.getState();
     const port = s.ports.find((p) => p.key === key);
     if (!port) return { changed: false, noteKey: 'no-server' };
@@ -928,7 +1034,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (!account || !provider) return { changed: false, noteKey: 'no-server' };
     // Distinct from "no-server" (reviewer item 10): it's the stored credential that
     // couldn't be read back.
-    if (!loadAccountSecret(deps.secrets, account.secretRef)) return { changed: false, noteKey: 'decrypt-failed' };
+    const secret = loadAccountSecret(deps.secrets, account.secretRef);
+    if (!secret) return { changed: false, noteKey: 'decrypt-failed' };
+    if (isWireguardAccount(account, secret) && wgGuard.isLocked(account.id)) {
+      // The Change-IP button re-arms a stopped key for one attempt; automation never does.
+      if (!opts.user) return { changed: false, noteKey: 'key-rejected' };
+      wgGuard.rearm(account.id);
+      persistLockouts();
+    }
     // A Change IP is a handshake attempt like any other (spec §6.4 "Provider safety").
     if (limiter.take(account.id) > 0) return { changed: false, noteKey: 'rate-limited' };
 
@@ -1053,6 +1166,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     await deps.engine.stop(key);
     onlineSinceStart.delete(key);
     onlineSinceStart.delete(finalKey);
+    handshookSinceStart.delete(key);
+    handshookSinceStart.delete(finalKey);
     const attempt = backoffAttempts.get(key) ?? 0;
     backoffAttempts.delete(key);
     if (attempt > 0) backoffAttempts.set(finalKey, attempt);
@@ -1161,8 +1276,11 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   function credentialsChanged(accountId: string): void {
     health.forgetMarks(accountId);
     refusals.forgetFailures(accountId);
+    wgGuard.forget(accountId);
+    wgAccounts.delete(accountId);
     persistHealth();
     persistRefusals();
+    persistLockouts();
   }
 
   return {

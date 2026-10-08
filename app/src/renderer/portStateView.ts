@@ -23,7 +23,7 @@ export interface PortStateView {
  * are NOT terminal and still show a countdown.
  */
 export function isTerminalFailure(reason: FailReason): boolean {
-  return reason === 'auth' || reason === 'not-in-plan';
+  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
 }
 
 function authGuidanceKey(providerId: ProviderId): string {
@@ -42,6 +42,8 @@ function reasonLabelKey(reason: FailReason): string {
       return 'portState.failed.port-in-use.label';
     case 'no-server':
       return 'portState.failed.no-server.label';
+    case 'key-rejected':
+      return 'portState.failed.key-rejected.label';
     default:
       return 'portState.failed.no-server.label';
   }
@@ -57,6 +59,8 @@ function reasonGuidanceKey(reason: FailReason, providerId: ProviderId): string {
       return 'portState.failed.port-in-use.guidance';
     case 'no-server':
       return 'portState.failed.no-server.guidance';
+    case 'key-rejected':
+      return providerId === 'surfshark' ? 'portState.failed.key-rejected.guidance.surfshark' : 'portState.failed.key-rejected.guidance.generic';
     default:
       return 'portState.failed.no-server.guidance';
   }

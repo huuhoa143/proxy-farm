@@ -161,7 +161,13 @@ export type LogSignal = 'established' | 'auth-terminal';
 
 export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 504 } | { code: 'error'; message: string };
 
-export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server';
+/**
+ * `key-rejected`: a WireGuard key that has never completed a handshake got no answer on
+ * several attempts in a row, so the app stopped trying (spec §6.4 "Provider safety").
+ * Unlike every other reason it is not retried automatically at all: only a user Start or
+ * Change IP tries again.
+ */
+export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server' | 'key-rejected';
 
 export type PortState =
   | { kind: 'queued' }

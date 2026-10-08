@@ -10,6 +10,9 @@
 /** Handshake attempts one account may start per minute, across all of its ports. */
 export const ATTEMPTS_PER_MINUTE = 6;
 
+/** Attempts with no handshake in a row before a never-proven WireGuard key is stopped. */
+export const WG_UNPROVEN_FAILURE_LIMIT = 3;
+
 export interface AttemptLimiter {
   /**
    * Takes one attempt from `accountId`'s budget. Returns 0 when the attempt may start
@@ -41,5 +44,61 @@ export function createAttemptLimiter(opts: { now?: () => number; perMinute?: num
       buckets.set(accountId, { tokens, at: t });
       return Math.ceil((1 - tokens) * refillMs);
     },
+  };
+}
+
+export interface WgKeyGuard {
+  /** The account's key completed a handshake: it is proven, and its count resets. */
+  recordHandshake(accountId: string): void;
+  /**
+   * One attempt ended without a handshake. `proven` = the account has handshaken
+   * before (persisted `lastOk`), in which case only the normal back-off applies.
+   * Returns true when this failure locks the account.
+   */
+  recordNoHandshake(accountId: string, proven: boolean): boolean;
+  isLocked(accountId: string): boolean;
+  /** A user action (Start, Change IP) lifts the lock for ONE more attempt: if that one
+   * fails without a handshake too, the account is locked again at once. */
+  rearm(accountId: string): void;
+  /** New credentials: drop the lock and the count. */
+  forget(accountId: string): void;
+  /** accountId -> epoch ms it was locked, for `AppState.wgLockouts`. */
+  serialize(): Record<string, number>;
+}
+
+/**
+ * Stops a WireGuard key that has never been seen to work from being retried forever.
+ * Counts attempts with no handshake per account; after `limit` in a row the account is
+ * locked: no automatic attempt at all until the user acts. The lock is persisted, so an
+ * app restart does not start the count over.
+ */
+export function createWgKeyGuard(opts: { now?: () => number; initial?: Record<string, number>; limit?: number } = {}): WgKeyGuard {
+  const now = opts.now ?? Date.now;
+  const limit = opts.limit ?? WG_UNPROVEN_FAILURE_LIMIT;
+  const lockedAt = new Map(Object.entries(opts.initial ?? {}));
+  const failures = new Map<string, number>();
+  return {
+    recordHandshake(accountId) {
+      failures.delete(accountId);
+      lockedAt.delete(accountId);
+    },
+    recordNoHandshake(accountId, proven) {
+      if (proven || lockedAt.has(accountId)) return false;
+      const n = (failures.get(accountId) ?? 0) + 1;
+      failures.set(accountId, n);
+      if (n < limit) return false;
+      lockedAt.set(accountId, now());
+      return true;
+    },
+    isLocked: (accountId) => lockedAt.has(accountId),
+    rearm(accountId) {
+      if (!lockedAt.delete(accountId)) return;
+      failures.set(accountId, limit - 1);
+    },
+    forget(accountId) {
+      lockedAt.delete(accountId);
+      failures.delete(accountId);
+    },
+    serialize: () => Object.fromEntries(lockedAt),
   };
 }

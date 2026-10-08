@@ -8,7 +8,7 @@ import { createStateStore, type StateStore } from '../store/state';
 import { createPortManager, type PortManagerDeps } from './port-manager';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator } from './ports';
 import { createServerHealth } from './server-health';
-import { createAttemptLimiter } from './provider-safety';
+import { createAttemptLimiter, createWgKeyGuard } from './provider-safety';
 
 function fakeSecretStore(): SecretStore {
   const map = new Map<string, string>();
@@ -2004,6 +2004,121 @@ describe('port manager', () => {
       // The one hostname was resolved again, yielding a different IP (the real §5.3 fix).
       expect(resolved).toEqual(['jp-tok.prod.surfshark.com', 'jp-tok.prod.surfshark.com']);
       expect(boundIp(engine.started[1].input)).toBe('203.0.113.2');
+    });
+  });
+  describe('WireGuard provider safety (spec §6.4)', () => {
+    const KEY = 'surfshark:jp-tok#1';
+    const ssTargets: Target[] = [
+      { key: 'surfshark:jp-tok', providerId: 'surfshark', country: 'JP', city: 'Tokyo', label: 'Tokyo', servers: ['10.1.0.1', '10.1.0.2', '10.1.0.3', '10.1.0.4'] },
+    ];
+    const ssAccount: Account = { id: 's1', providerId: 'surfshark', label: 'key …abc', meta: {}, secretRef: 's1-secret' };
+    const timeout: PortState = { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' };
+
+    function ssSetup(depsOverrides: Partial<PortManagerDeps> = {}) {
+      const ctx = setup({
+        targets: ssTargets,
+        port: { key: KEY, locationKey: 'surfshark:jp-tok', providerId: 'surfshark', accountId: 's1', country: 'JP', city: 'Tokyo', label: 'Tokyo', enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { attemptLimiter: { take: () => 0 }, ...depsOverrides },
+      });
+      ctx.secrets.saveSecret('s1-secret', JSON.stringify({ kind: 'wgkey', privateKey: 'k' }));
+      ctx.state.setState((st) => ({ ...st, accounts: [account, ssAccount] }));
+      return ctx;
+    }
+
+    /** One automatic attempt: the due retry restarts the port, which then times out. */
+    async function failAgain(ctx: ReturnType<typeof ssSetup>, startedBefore: number): Promise<void> {
+      ctx.engine.fireRetryDue(KEY);
+      await vi.waitFor(() => expect(ctx.engine.started).toHaveLength(startedBefore + 1));
+      ctx.engine.fireState(KEY, timeout);
+    }
+
+    const stateOf = (ctx: ReturnType<typeof ssSetup>) => ctx.state.getState().ports.find((p) => p.key === KEY)!.state;
+
+    it('a never-proven key that gets no handshake 3 times in a row is stopped: failed(key-rejected), no retry, lock persisted', async () => {
+      const ctx = ssSetup();
+      await ctx.manager.startPort(KEY);
+      ctx.engine.fireState(KEY, timeout);
+      // No immediate hop to the next server: that would be another handshake seconds later.
+      await new Promise((r) => setTimeout(r, 10));
+      expect(ctx.engine.started).toHaveLength(1);
+      await failAgain(ctx, 1);
+      await failAgain(ctx, 2);
+      await vi.waitFor(() => expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' }));
+      expect(ctx.engine.stopped).toContain(KEY);
+      expect(Object.keys(ctx.state.getState().wgLockouts)).toEqual(['s1']);
+      // The three attempts went to three different servers (each marked dead in turn).
+      expect(new Set(ctx.engine.started.map((s) => (s.input.endpoint as { peers: Array<{ address: string }> }).peers[0].address)).size).toBe(3);
+
+      // Automatic starts (a stale due retry, app start) do not touch the provider again.
+      ctx.engine.fireRetryDue(KEY);
+      await new Promise((r) => setTimeout(r, 10));
+      await ctx.manager.startPort(KEY);
+      expect(ctx.engine.started).toHaveLength(3);
+      expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' });
+      expect(await ctx.manager.rotatePort(KEY)).toEqual({ changed: false, noteKey: 'key-rejected' });
+    });
+
+    it('a user Start re-arms the key for exactly one attempt', async () => {
+      const ctx = ssSetup({ wgKeyGuard: createWgKeyGuard({ initial: { s1: 1 } }) });
+      await ctx.manager.startPort(KEY);
+      expect(ctx.engine.started).toHaveLength(0);
+      expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' });
+
+      await ctx.manager.startPort(KEY, { user: true });
+      expect(ctx.engine.started).toHaveLength(1);
+      ctx.engine.fireState(KEY, timeout);
+      await vi.waitFor(() => expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' }));
+    });
+
+    it('a handshake clears the lock and the count', async () => {
+      const ctx = ssSetup();
+      await ctx.manager.startPort(KEY);
+      ctx.engine.fireState(KEY, timeout);
+      await failAgain(ctx, 1);
+      ctx.engine.fireRetryDue(KEY);
+      await vi.waitFor(() => expect(ctx.engine.started).toHaveLength(3));
+      ctx.engine.fireState(KEY, { kind: 'verifying', since: 1 }); // first /delay 200
+      ctx.engine.fireState(KEY, timeout); // a later drop: says nothing about the key
+      await failAgain(ctx, 3);
+      await failAgain(ctx, 4);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(stateOf(ctx)).toMatchObject({ kind: 'retrying' });
+    });
+
+    it('an account that has worked before is never locked; it just backs off', async () => {
+      const serverHealth = createServerHealth();
+      serverHealth.markOk('s1', '10.1.0.9');
+      const ctx = ssSetup({ serverHealth });
+      await ctx.manager.startPort(KEY);
+      ctx.engine.fireState(KEY, timeout);
+      for (let n = 1; n < 5; n++) await failAgain(ctx, n);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(stateOf(ctx)).toMatchObject({ kind: 'retrying', reasonKey: 'timeout' });
+      expect(ctx.state.getState().wgLockouts).toEqual({});
+    });
+
+    it('new credentials drop the lock', async () => {
+      const ctx = ssSetup({ wgKeyGuard: createWgKeyGuard({ initial: { s1: 1 } }) });
+      ctx.manager.credentialsChanged('s1');
+      expect(ctx.state.getState().wgLockouts).toEqual({});
+      await ctx.manager.startPort(KEY);
+      expect(ctx.engine.started).toHaveLength(1);
+    });
+
+    it('OpenVPN accounts are unaffected: no lock however often a server times out', async () => {
+      const { manager, engine, state } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { attemptLimiter: { take: () => 0 } },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      engine.fireState('zoogvpn:nl-ams', timeout);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(state.getState().wgLockouts).toEqual({});
+      expect(engine.started).toHaveLength(2); // the immediate failover still happens for OpenVPN
     });
   });
 });

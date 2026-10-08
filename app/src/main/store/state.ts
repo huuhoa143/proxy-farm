@@ -43,6 +43,10 @@ export interface AppState {
   /** Old location key → the location its ports were re-attached to at boot (spec §6.8),
    * so the webhook still resolves a retired bare location key (spec §6.6). */
   locationAliases: Record<string, string>;
+  /** WireGuard accounts the app stopped retrying (spec §6.4 "Provider safety"):
+   * accountId -> epoch ms of the lock. Persisted so an app restart does not start the
+   * failed-handshake count over against the provider. */
+  wgLockouts: Record<string, number>;
 }
 
 /** Secret-store ids `settings.proxyPass` / `settings.webhook.bearer` are kept under —
@@ -86,6 +90,7 @@ export function defaultState(randomPass?: () => string): AppState {
     refusals: { failures: {}, online: {} },
     serverHealth: { refused: {}, lastOk: {} },
     locationAliases: {},
+    wgLockouts: {},
   };
 }
 
@@ -189,6 +194,8 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
       raw?.locationAliases && typeof raw.locationAliases === 'object' && !Array.isArray(raw.locationAliases)
         ? raw.locationAliases
         : defaults.locationAliases,
+    wgLockouts:
+      raw?.wgLockouts && typeof raw.wgLockouts === 'object' && !Array.isArray(raw.wgLockouts) ? raw.wgLockouts : defaults.wgLockouts,
     settings: {
       ...defaults.settings,
       ...rawSettings,

@@ -424,6 +424,13 @@ describe('state store', () => {
       expect(createStateStore(filePath, secrets()).getState().locationAliases).toEqual({ 'zoogvpn:JP-JP3': 'zoogvpn:JP' });
     });
 
+    it('persists WireGuard lockouts, defaulting to empty (a file from before them loads fine)', () => {
+      const store = createStateStore(filePath, secrets());
+      expect(store.getState().wgLockouts).toEqual({});
+      store.setState((s) => ({ ...s, wgLockouts: { 'surfshark-1': 123 } }));
+      expect(createStateStore(filePath, secrets()).getState().wgLockouts).toEqual({ 'surfshark-1': 123 });
+    });
+
     it('loads a v2 file as is (no second migration)', () => {
       writeFileSync(
         filePath,
