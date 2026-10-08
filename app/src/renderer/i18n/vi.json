@@ -241,7 +241,9 @@
       "more": "Thêm một cổng ở {{location}}",
       "maxHint": "Tối đa {{max}} — mỗi máy chủ trống một cổng",
       "addN_one": "Thêm {{count}} cổng",
-      "addN_other": "Thêm {{count}} cổng"
+      "addN_other": "Thêm {{count}} cổng",
+      "picked": "Vị trí đã chọn",
+      "unpick": "Bỏ chọn {{location}}"
     },
     "group": {
       "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",

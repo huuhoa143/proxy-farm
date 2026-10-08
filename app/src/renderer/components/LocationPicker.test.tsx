@@ -110,4 +110,29 @@ describe('LocationPicker', () => {
     const picked = onSubmit.mock.calls[0][0].map((r: { locationKey: string }) => r.locationKey).sort();
     expect(picked).toEqual(['hma:JP-NGO', 'hma:JP-TOKYO', 'surfshark:JP-KYO']);
   });
+
+  it('keeps picks visible as removable chips while a search hides their rows', () => {
+    const { onSubmit, row } = renderPicker();
+    expect(screen.queryByTestId('picked-chips')).toBeNull();
+    fireEvent.click(within(row('hma:JP-TOKYO')).getByRole('checkbox'));
+    fireEvent.click(within(row('hma:JP-TOKYO')).getByRole('button', { name: 'One more port in Tokyo' }));
+    fireEvent.click(within(row('surfshark:JP-KYO')).getByRole('checkbox'));
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Nagoya' } });
+    // Both picked rows are filtered out, but the chips still show them with their counts.
+    expect(screen.queryByTestId('pick-hma:JP-TOKYO')).toBeNull();
+    expect(screen.queryByTestId('pick-surfshark:JP-KYO')).toBeNull();
+    const chips = screen.getByRole('list', { name: 'Selected locations' });
+    expect(within(chips).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByTestId('picked-hma:JP-TOKYO')).toHaveTextContent('Tokyo×2');
+    expect(screen.getByTestId('picked-surfshark:JP-KYO')).toHaveTextContent('Kyoto');
+    expect(screen.getByTestId('picker-submit')).toHaveTextContent('Add 3 ports');
+
+    // Removing a chip unpicks it, and the footer follows.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Tokyo from the selection' }));
+    expect(screen.queryByTestId('picked-hma:JP-TOKYO')).toBeNull();
+    expect(screen.getByTestId('picker-submit')).toHaveTextContent('Add 1 port');
+    fireEvent.click(screen.getByTestId('picker-submit'));
+    expect(onSubmit).toHaveBeenCalledWith([{ locationKey: 'surfshark:JP-KYO', count: 1 }]);
+  });
 });

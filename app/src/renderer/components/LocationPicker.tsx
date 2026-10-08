@@ -124,6 +124,15 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
     });
   }
 
+  function unpick(key: string) {
+    setPicked((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+
   function toggleGroup(group: CountryGroup) {
     setPicked((prev) => {
       const next = new Map(prev);
@@ -189,6 +198,33 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                 </button>
               ))}
             </div>
+          )}
+          {picked.size > 0 && (
+            // Every pick stays visible (and removable) here, even when a search
+            // or provider filter hides its row — the footer counts them all.
+            <ul className="pick-chips" aria-label={t('main.picker.picked') as string} data-testid="picked-chips">
+              {Array.from(picked, ([key, count]) => {
+                const target = targetByKey.get(key);
+                if (!target) return null;
+                return (
+                  <li key={key} className="pick-chip" data-testid={`picked-${key}`}>
+                    <Flag country={target.country} size="sm" />
+                    <span className="pick-chip-t" title={`${target.city} · ${countryName(target.country, language)}`}>
+                      {target.city}
+                    </span>
+                    {count > 1 && <b>×{count}</b>}
+                    <button
+                      type="button"
+                      aria-label={t('main.picker.unpick', { location: target.city }) as string}
+                      title={t('main.picker.unpick', { location: target.city }) as string}
+                      onClick={() => unpick(key)}
+                    >
+                      <Icon name="x" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
         <div className="picklist">

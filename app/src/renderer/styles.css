@@ -1491,6 +1491,62 @@ table.port-table {
   outline: 2px solid var(--acc);
   outline-offset: 2px;
 }
+/* picked locations, kept visible while a search/filter hides their rows */
+.pick-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 72px;
+  overflow-y: auto;
+}
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 4px 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--acc-line);
+  background: var(--acc-soft);
+  color: var(--tx);
+  font-size: 12px;
+  font-weight: 600;
+  animation: fade 0.15s ease-out both;
+}
+.pick-chip-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick-chip b {
+  color: var(--acc);
+  font-variant-numeric: tabular-nums;
+}
+.pick-chip button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.pick-chip button:hover {
+  background: var(--panel-2);
+  color: var(--tx);
+}
+.pick-chip button svg {
+  width: 12px;
+  height: 12px;
+}
 .picklist {
   flex: 1;
   overflow: auto;
