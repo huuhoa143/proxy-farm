@@ -7,6 +7,8 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-10-09
+
 ### Changed
 
 - ZoogVPN: a refused sign-in is now told apart from a server outside your plan by a
@@ -53,7 +55,7 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   other servers of the location were free. The refused server is still remembered, but
   the port now goes back to the server it was on before, or, if that one is no longer
   usable, to the next free usable server of the location. The row says which server
-  refused and where the port went. It fails for good only when no usable server is
+  refused and where the port went, and keeps saying it until the next Change IP on it. It fails for good only when no usable server is
   left. Any other refusal of a port that was online follows the same rule, during a
   Change IP too, and a login that a server accepted moments ago is no longer re-checked
   with an extra connection.
@@ -124,5 +126,6 @@ The Docker-based edition is archived at the
 [`v1-docker`](https://github.com/huuhoa143/proxy-farm/tree/v1-docker) tag and is no
 longer developed.
 
-[Unreleased]: https://github.com/huuhoa143/proxy-farm/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/huuhoa143/proxy-farm/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/huuhoa143/proxy-farm/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/huuhoa143/proxy-farm/releases/tag/v0.1.0
