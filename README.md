@@ -10,7 +10,7 @@ Proxy Farm is a desktop app that turns your own VPN subscription into many local
 SOCKS5/HTTP proxy ports. Each port is an independent tunnel pinned to one VPN server,
 so each port has its own stable exit IP.
 
-![Proxy Farm main screen](docs/screenshots/v2/main-light-en.png)
+![Proxy Farm main screen](docs/screenshots/v2/main-server-pools-en.png)
 
 - **Runs on your computer.** No Docker, no VM, no admin rights, no terminal. Proxies
   listen on `127.0.0.1` by default.

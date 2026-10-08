@@ -10,7 +10,7 @@ Proxy Farm là ứng dụng desktop biến gói VPN của chính bạn thành nh
 SOCKS5/HTTP chạy ngay trên máy. Mỗi cổng là một tunnel độc lập, ghim vào một máy chủ VPN,
 nên mỗi cổng có một IP lối ra riêng và ổn định.
 
-![Màn hình chính của Proxy Farm](docs/screenshots/v2/main-light-vi.png)
+![Màn hình chính của Proxy Farm](docs/screenshots/v2/main-server-pools-vi.png)
 
 - **Chạy trên máy bạn.** Không Docker, không máy ảo, không cần quyền admin, không cần
   terminal. Proxy mặc định chỉ nghe trên `127.0.0.1`.
