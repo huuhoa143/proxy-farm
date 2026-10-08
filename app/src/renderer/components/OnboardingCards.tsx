@@ -16,6 +16,13 @@ function resultMessage(t: ReturnType<typeof useTranslation>['t'], result: CheckR
   return { ok: false, text: t(key, { defaultValue: key, label: result.label ?? '' }) as string };
 }
 
+/** Turn a rejected IPC call into a user-facing message (main throws an i18n key). */
+function errorMessage(t: ReturnType<typeof useTranslation>['t'], err: unknown): Message {
+  const raw = err instanceof Error ? err.message : String(err);
+  const key = raw.split(': ').pop() || raw || 'checkResult.reason.invalid-format';
+  return { ok: false, text: t(key, { defaultValue: key }) as string };
+}
+
 function ResultLine({ message, testId }: { message: Message | null; testId: string }) {
   if (!message) return null;
   return (
@@ -89,6 +96,8 @@ export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) 
       const result = await api.connectHma();
       setMessage(resultMessage(t, result));
       if (result.ok) onAdded();
+    } catch (err) {
+      setMessage(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
@@ -100,6 +109,8 @@ export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) 
     try {
       const result = await api.enableHmaSupport();
       setMessage(resultMessage(t, result));
+    } catch (err) {
+      setMessage(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
@@ -190,6 +201,8 @@ export function ZoogVpnCard({ api, onAdded, accountCount }: ZoogVpnCardProps) {
       const result = await api.addAccount('zoogvpn', { email, password });
       setMessage(resultMessage(t, result));
       if (result.ok) onAdded();
+    } catch (err) {
+      setMessage(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
@@ -257,6 +270,8 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
       const result = await api.addAccount('surfshark', { privateKey: key });
       setMessage(resultMessage(t, result));
       if (result.ok) onAdded();
+    } catch (err) {
+      setMessage(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
@@ -318,6 +333,7 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
   const [message, setMessage] = useState<Message | null>(null);
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [country, setCountry] = useState('');
+  const [busy, setBusy] = useState(false);
 
   async function stageFile(file: File) {
     const content = await file.text();
@@ -326,18 +342,32 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
     setMessage(null);
   }
 
+  const validCountry = /^[A-Z]{2}$/.test(country);
+
   async function confirmImport() {
     if (!pending) return;
-    const result = await api.importConfigFile(pending.name, pending.content, country || undefined);
-    setMessage(resultMessage(t, result));
-    if (result.ok) {
-      setPending(null);
-      setCountry('');
-      onAdded();
+    // Validate the country in the UI before the IPC call: a blank or 1-letter
+    // code would otherwise reach the backend (or import an un-flagged location).
+    if (!validCountry) {
+      setMessage({ ok: false, text: t('onboarding.providers.file.countryInvalid') as string });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.importConfigFile(pending.name, pending.content, country);
+      setMessage(resultMessage(t, result));
+      if (result.ok) {
+        setPending(null);
+        setCountry('');
+        onAdded();
+      }
+    } catch (err) {
+      setMessage(errorMessage(t, err));
+    } finally {
+      setBusy(false);
     }
   }
-
-  const validCountry = /^[A-Z]{2}$/.test(country);
 
   return (
     <CardShell providerId="file" accountCount={accountCount}>
@@ -406,9 +436,18 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
               )}
             </div>
             <p className="hint">{t('onboarding.providers.file.countryGuessedNote')}</p>
+            {country !== '' && !validCountry && (
+              <p className="hint bad" data-testid="file-country-invalid">
+                {t('onboarding.providers.file.countryInvalid')}
+              </p>
+            )}
           </div>
           <div className="pc-actions">
-            <button className="btn primary" onClick={() => void confirmImport()}>
+            <button
+              className="btn primary"
+              disabled={busy || !validCountry}
+              onClick={() => void confirmImport()}
+            >
               <Icon name="check" />
               {t('onboarding.providers.file.import')}
             </button>

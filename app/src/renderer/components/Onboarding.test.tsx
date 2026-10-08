@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { Onboarding } from './Onboarding';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
-import type { ProxyFarmApi } from '../../shared/contracts';
+import type { ProviderId, ProxyFarmApi } from '../../shared/contracts';
 
 beforeAll(() => {
   initI18n('en');
@@ -58,5 +58,25 @@ describe('Onboarding', () => {
   it('enables Continue only after an account exists', async () => {
     render(<Onboarding api={createFakeProxyFarmApi()} onDone={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('onboarding-continue')).toBeEnabled());
+  });
+
+  it('hides the port-limit panel until at least one provider is connected', async () => {
+    const api = createFakeProxyFarmApi();
+    api.listProviders = async () =>
+      (['hma', 'zoogvpn', 'surfshark', 'file'] as ProviderId[]).map((id) => ({
+        id,
+        accounts: [],
+        detected: id === 'hma' ? { found: false } : undefined,
+        limit: 0,
+      }));
+    render(<Onboarding api={api} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('onboarding')).toBeInTheDocument());
+    expect(screen.getByTestId('onboarding-continue')).toBeDisabled();
+    expect(screen.queryByTestId('provider-limits')).toBeNull();
+  });
+
+  it('shows the port-limit panel once an account exists', async () => {
+    render(<Onboarding api={createFakeProxyFarmApi()} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('provider-limits')).toBeInTheDocument());
   });
 });

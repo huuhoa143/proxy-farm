@@ -70,20 +70,25 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
         <SurfsharkCard api={api} onAdded={markAdded} accountCount={counts.surfshark} />
         <FileCard api={api} onAdded={markAdded} accountCount={counts.file} />
       </div>
-      <section className="panel" data-testid="provider-limits" aria-labelledby="limits-title">
-        <div className="panel-h">
-          <h2 id="limits-title">
-            <Icon name="network" />
-            {t('onboarding.portLimit.title')}
-          </h2>
-          <p>{t('onboarding.portLimit.note')}</p>
-        </div>
-        <div className="limit-list">
-          {PROVIDER_IDS.map((id) => (
-            <ProviderLimitField key={id} api={api} providerId={id} initialLimit={limits[id]} />
-          ))}
-        </div>
-      </section>
+      {/* Port limits only make sense once at least one provider is connected —
+          keep them out of the first-run "add a provider" step (they stay
+          reachable here afterwards and from the Providers screen). */}
+      {hasAnyAccount && (
+        <section className="panel" data-testid="provider-limits" aria-labelledby="limits-title">
+          <div className="panel-h">
+            <h2 id="limits-title">
+              <Icon name="network" />
+              {t('onboarding.portLimit.title')}
+            </h2>
+            <p>{t('onboarding.portLimit.note')}</p>
+          </div>
+          <div className="limit-list">
+            {PROVIDER_IDS.map((id) => (
+              <ProviderLimitField key={id} api={api} providerId={id} initialLimit={limits[id]} />
+            ))}
+          </div>
+        </section>
+      )}
       <div className={`onb-footer${hasAnyAccount ? ' ready' : ''}`}>
         <span className="sum">
           {hasAnyAccount ? t('onboarding.status.total', { count: total }) : t('onboarding.continueHint')}
