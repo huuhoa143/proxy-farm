@@ -1,24 +1,42 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadSeed, mergeCatalog } from './catalog';
 
+async function seedFile(locations: unknown[]): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'pf-seed-'));
+  const file = path.join(dir, 'seed.json');
+  await writeFile(file, JSON.stringify({ fetched: 1700000000, locations }));
+  return file;
+}
+
 describe('loadSeed', () => {
-  it('reads the bundled hma-ovpn-seed.json and converts it to the catalog schema', async () => {
+  it('reads the bundled hma-ovpn-seed.json: every location has at least one unique IP, none confirmed yet', async () => {
     const catalog = await loadSeed();
     expect(catalog.locations.length).toBe(115);
     const abuDhabi = catalog.locations.find((l) => l.key === 'AE-1-ABU-DHABI');
-    expect(abuDhabi).toBeDefined();
-    expect(abuDhabi!.country).toBe('AE');
-    expect(abuDhabi!.city).toBe('Abu Dhabi');
-    expect(abuDhabi!.ips).toEqual([{ ip: '5.62.19.134', firstSeen: catalog.fetched, lastOk: null }]);
+    expect(abuDhabi).toMatchObject({ country: 'AE', city: 'Abu Dhabi' });
+    for (const loc of catalog.locations) {
+      expect(loc.ips.length).toBeGreaterThan(0);
+      expect(new Set(loc.ips.map((i) => i.ip)).size).toBe(loc.ips.length);
+      for (const ip of loc.ips) {
+        expect(ip.lastOk).toBeNull();
+        expect(ip.firstSeen).toBe(catalog.fetched);
+      }
+    }
   });
 
-  it('every location has exactly one seed IP with lastOk null', async () => {
-    const catalog = await loadSeed();
-    for (const loc of catalog.locations) {
-      expect(loc.ips).toHaveLength(1);
-      expect(loc.ips[0].lastOk).toBeNull();
-      expect(loc.ips[0].firstSeen).toBe(catalog.fetched);
-    }
+  it('a legacy single-ip entry becomes a one-IP location', async () => {
+    const catalog = await loadSeed(await seedFile([{ key: 'X-1', country: 'XX', city: 'X', ip: '10.0.0.1' }]));
+    expect(catalog.locations[0].ips).toEqual([{ ip: '10.0.0.1', firstSeen: 1700000000, lastOk: null }]);
+  });
+
+  it('an `ips` list supersedes `ip`, keeps its order, and drops duplicates', async () => {
+    const catalog = await loadSeed(
+      await seedFile([{ key: 'X-1', country: 'XX', city: 'X', ip: '10.0.0.9', ips: ['10.0.0.2', '10.0.0.3', '10.0.0.2'] }]),
+    );
+    expect(catalog.locations[0].ips.map((i) => i.ip)).toEqual(['10.0.0.2', '10.0.0.3']);
   });
 });
 

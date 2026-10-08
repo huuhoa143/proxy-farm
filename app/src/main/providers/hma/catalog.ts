@@ -19,7 +19,11 @@ interface SeedLocation {
   country: string;
   countryName?: string;
   city: string;
+  /** Primary server (the original PR #2 seed shape). */
   ip: string;
+  /** Every server of the location verified to accept HMA device credentials, best
+   * first. Optional; when present it supersedes `ip` (scripts/hma-scan-servers.ts). */
+  ips?: string[];
   port?: number;
   proto?: string;
 }
@@ -38,7 +42,7 @@ export async function loadSeed(seedPath: string = resourcePath('catalogs', 'hma-
       key: loc.key,
       country: loc.country,
       city: loc.city,
-      ips: [{ ip: loc.ip, firstSeen: seed.fetched, lastOk: null }],
+      ips: [...new Set(loc.ips?.length ? loc.ips : [loc.ip])].map((ip) => ({ ip, firstSeen: seed.fetched, lastOk: null })),
     })),
   };
 }

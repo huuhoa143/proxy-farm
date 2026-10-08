@@ -38,7 +38,7 @@ importers:
         version: 7.0.2(dmg-builder@24.13.3)(electron-builder-squirrel-windows@24.13.3)
       '@electron-forge/cli':
         specifier: ^7.11.1
-        version: 7.11.2(encoding@0.1.13)
+        version: 7.11.2(encoding@0.1.13)(esbuild@0.21.5)
       '@electron-forge/maker-zip':
         specifier: ^7.11.1
         version: 7.11.2
@@ -84,6 +84,9 @@ importers:
       electron-updater:
         specifier: ^6.8.3
         version: 6.8.9
+      esbuild:
+        specifier: 0.21.5
+        version: 0.21.5
       extract-zip:
         specifier: ^2.0.1
         version: 2.0.1
@@ -3493,9 +3496,9 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  '@electron-forge/cli@7.11.2(encoding@0.1.13)':
+  '@electron-forge/cli@7.11.2(encoding@0.1.13)(esbuild@0.21.5)':
     dependencies:
-      '@electron-forge/core': 7.11.2(encoding@0.1.13)
+      '@electron-forge/core': 7.11.2(encoding@0.1.13)(esbuild@0.21.5)
       '@electron-forge/core-utils': 7.11.2
       '@electron-forge/shared-types': 7.11.2
       '@electron/get': 3.1.0
@@ -3546,7 +3549,7 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/core@7.11.2(encoding@0.1.13)':
+  '@electron-forge/core@7.11.2(encoding@0.1.13)(esbuild@0.21.5)':
     dependencies:
       '@electron-forge/core-utils': 7.11.2
       '@electron-forge/maker-base': 7.11.2
@@ -3557,7 +3560,7 @@ snapshots:
       '@electron-forge/template-vite': 7.11.2
       '@electron-forge/template-vite-typescript': 7.11.2
       '@electron-forge/template-webpack': 7.11.2
-      '@electron-forge/template-webpack-typescript': 7.11.2
+      '@electron-forge/template-webpack-typescript': 7.11.2(esbuild@0.21.5)
       '@electron-forge/tracer': 7.11.2
       '@electron/get': 3.1.0
       '@electron/packager': 18.4.4
@@ -3718,13 +3721,13 @@ snapshots:
       - bluebird
       - supports-color
 
-  '@electron-forge/template-webpack-typescript@7.11.2':
+  '@electron-forge/template-webpack-typescript@7.11.2(esbuild@0.21.5)':
     dependencies:
       '@electron-forge/shared-types': 7.11.2
       '@electron-forge/template-base': 7.11.2
       fs-extra: 10.1.0
       typescript: 5.4.5
-      webpack: 5.111.1
+      webpack: 5.111.1(esbuild@0.21.5)
     transitivePeerDependencies:
       - '@minify-html/node'
       - '@napi-rs/image'
@@ -5971,13 +5974,15 @@ snapshots:
 
   minimist@1.2.8: {}
 
-  minimizer-webpack-plugin@5.13.0(webpack@5.111.1):
+  minimizer-webpack-plugin@5.13.0(esbuild@0.21.5)(webpack@5.111.1(esbuild@0.21.5)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.5.0
       terser: 5.51.2
-      webpack: 5.111.1
+      webpack: 5.111.1(esbuild@0.21.5)
+    optionalDependencies:
+      esbuild: 0.21.5
 
   minipass-collect@1.0.2:
     dependencies:
@@ -6800,7 +6805,7 @@ snapshots:
 
   webpack-sources@3.6.0: {}
 
-  webpack@5.111.1:
+  webpack@5.111.1(esbuild@0.21.5):
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -6814,7 +6819,7 @@ snapshots:
       events: 3.3.0
       graceful-fs: 4.2.11
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.13.0(webpack@5.111.1)
+      minimizer-webpack-plugin: 5.13.0(esbuild@0.21.5)(webpack@5.111.1(esbuild@0.21.5))
       schema-utils: 4.5.0
       tapable: 2.3.3
       watchpack: 2.5.2
