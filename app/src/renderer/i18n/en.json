@@ -278,7 +278,8 @@
       "secret-unavailable": "Your saved credentials couldn't be read.",
       "start-error": "Starting the port failed.",
       "rotate-error": "Rotating failed.",
-      "dns-failed": "The server's address couldn't be looked up."
+      "dns-failed": "The server's address couldn't be looked up.",
+      "server-rejected": "This server refused the device — switching to another server in the same location."
     }
   },
   "settings": {

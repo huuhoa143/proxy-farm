@@ -278,7 +278,8 @@
       "secret-unavailable": "Không đọc được thông tin đăng nhập đã lưu.",
       "start-error": "Khởi động cổng thất bại.",
       "rotate-error": "Đổi IP thất bại.",
-      "dns-failed": "Không tra được địa chỉ máy chủ."
+      "dns-failed": "Không tra được địa chỉ máy chủ.",
+      "server-rejected": "Máy chủ này từ chối thiết bị — đang chuyển sang máy chủ khác cùng vị trí."
     }
   },
   "settings": {

@@ -1088,6 +1088,63 @@ describe('port manager', () => {
       expect(serverMemory.isBad('10.0.0.1')).toBe(false);
     });
 
+    describe('HMA per-server auth failover', () => {
+      const hmaTarget = (servers: string[]): Target => ({
+        key: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', servers,
+      });
+      const hmaSetup = (servers: string[], serverMemory = createServerMemory()) => {
+        const targets = [hmaTarget(servers)];
+        const ctx = setup({
+          targets,
+          port: { key: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverMemory, providers: { get: () => fakeProvider(targets) } },
+        });
+        return { ...ctx, serverMemory };
+      };
+
+      it('a server that refuses the device is marked bad and the port moves to the next server', async () => {
+        const { manager, engine, state, serverMemory } = hmaSetup(['10.9.0.1', '10.9.0.2']);
+        await manager.startPort('hma:VN-51-HANOI');
+        expect(serverOf(engine.started[0].input)).toBe('10.9.0.1');
+
+        engine.fireState('hma:VN-51-HANOI', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+
+        expect(serverMemory.isBad('10.9.0.1')).toBe(true);
+        // Shown as a transient switch, not as "sign-in rejected".
+        const row = state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI')!;
+        expect(row.state).toMatchObject({ kind: 'retrying', reasonKey: 'server-rejected' });
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        expect(serverOf(engine.started[1].input)).toBe('10.9.0.2');
+        expect(state.getState().portServers['hma:VN-51-HANOI']).toBe('10.9.0.2');
+      });
+
+      it('with no other server left, the auth failure stays terminal and nothing restarts', async () => {
+        const { manager, engine, state } = hmaSetup(['10.9.0.1']);
+        await manager.startPort('hma:VN-51-HANOI');
+        engine.fireState('hma:VN-51-HANOI', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+
+        await new Promise((r) => setTimeout(r, 20));
+        expect(engine.started).toHaveLength(1);
+        const row = state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI')!;
+        expect(row.state).toMatchObject({ kind: 'failed', reason: 'auth' });
+      });
+
+      it('stops failing over once every server of the location has refused', async () => {
+        const serverMemory = createServerMemory();
+        serverMemory.markBad('10.9.0.2'); // already refused earlier
+        const { manager, engine, state } = hmaSetup(['10.9.0.1', '10.9.0.2'], serverMemory);
+        await manager.startPort('hma:VN-51-HANOI');
+        expect(serverOf(engine.started[0].input)).toBe('10.9.0.1');
+        engine.fireState('hma:VN-51-HANOI', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+
+        await new Promise((r) => setTimeout(r, 20));
+        expect(engine.started).toHaveLength(1);
+        expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI')!.state).toMatchObject({ kind: 'failed', reason: 'auth' });
+      });
+    });
+
     it('a single-host target re-resolves its one server on retry (§5.3 Surfshark), re-deriving the IP', async () => {
       const resolved: string[] = [];
       let nth = 0;

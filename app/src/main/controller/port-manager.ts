@@ -183,6 +183,28 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const backoffRng = deps.backoffRng ?? Math.random;
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
   const serverMemory = deps.serverMemory ?? createServerMemory();
+  /** Candidate servers of each port's target, as of its last `startPort` (best first). */
+  const candidateServers = new Map<string, string[]>();
+
+  /**
+   * HMA per-server auth failover. HMA device credentials belong to the device, not to a
+   * server, yet a location's cluster can contain servers that refuse them (shared Gen
+   * Digital infrastructure: a server serving another brand's tenant answers AUTH_FAILED).
+   * So an HMA `failed(auth)` says "this server", not "your credentials": remember the
+   * server as bad and move straight on to the location's next candidate. Only when every
+   * candidate has refused does the port stay `failed(auth)`. Other providers keep auth
+   * as a credential problem (ZoogVPN's plan-refusal tracker relies on that).
+   */
+  function failOverRejectedServer(key: string, server: string): void {
+    const port = findPort(key);
+    if (!port || port.providerId !== 'hma' || !port.enabled || rotatingKeys.has(key)) return;
+    serverMemory.markBad(server);
+    const alternatives = (candidateServers.get(key) ?? []).filter((s) => s !== server && !serverMemory.isBad(s));
+    if (alternatives.length === 0) return;
+    updatePort(key, { state: { kind: 'retrying', untilMs: Date.now(), attempt: 1, reasonKey: 'server-rejected' } });
+    // Defer: we are inside the engine's state-change callback.
+    setTimeout(() => void startPort(key).catch(() => undefined), 0);
+  }
   // §4.2/§6.5 auto-rotate timers (reviewer item 8): this module owns syncing them —
   // callers (IPC layer, webhook, the real engine via `rotatePort`) never have to
   // remember to do it themselves.
@@ -216,6 +238,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         serverMemory.markOk(server);
       } else if (state.kind === 'retrying' && CONNECTIVITY_RETRY_REASONS.has(state.reasonKey)) {
         serverMemory.markBad(server);
+      } else if (state.kind === 'failed' && state.reason === 'auth') {
+        failOverRejectedServer(key, server);
       }
     }
 
@@ -446,6 +470,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       // advances past a dead IP instead of re-selecting the one just stored under
       // `portServers[key]` (reviewer I-1 / §6.4 bad-IP failover).
       const serverIp = target && pickServer(target.servers, s.portServers[key], serverMemory);
+      if (target) candidateServers.set(key, target.servers);
       if (!target || !serverIp) {
         updatePort(key, { enabled: true });
         failWithRetry(key, { kind: 'failed', reason: 'no-server' });
@@ -502,6 +527,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function removePort(key: string): Promise<void> {
     cancelLocalRetry(key);
+    candidateServers.delete(key);
     await deps.engine.stop(key).catch(() => undefined);
     deps.state.setState((s) => {
       const { [key]: _removed, ...portServers } = s.portServers;
