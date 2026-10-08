@@ -60,6 +60,32 @@ describe('server health (spec §6.8, per account and server)', () => {
     expect(restored.lastOk('b', 'O')).toBe(c.now());
   });
 
+  it('workedRecently: a recent lastOk on another server, within the window', () => {
+    const c = clock();
+    const h = createServerHealth({ now: c.now });
+    expect(h.workedRecently('a', 1000)).toBe(false);
+    h.markOk('a', 'S1');
+    expect(h.workedRecently('a', 1000)).toBe(true);
+    expect(h.workedRecently('a', 1000, 'S1')).toBe(false); // only that very server
+    expect(h.workedRecently('b', 1000)).toBe(false); // per account
+    c.advance(1000);
+    expect(h.workedRecently('a', 1000)).toBe(false);
+  });
+
+  it('forgetMarks drops the account\'s refused and dead marks, keeps lastOk and other accounts', () => {
+    const h = createServerHealth();
+    h.markOk('a', 'O');
+    h.markRefused('a', 'R');
+    h.markDead('a', 'D');
+    h.markRefused('b', 'R');
+    h.forgetMarks('a');
+    expect(h.isUsable('a', 'R')).toBe(true);
+    expect(h.isUsable('a', 'D')).toBe(true);
+    expect(h.lastOk('a', 'O')).toBeTypeOf('number');
+    expect(h.isRefused('b', 'R')).toBe(true);
+    expect(h.serialize().refused).toEqual({ b: { R: expect.any(Number) } });
+  });
+
   it('serialize prunes expired refusals', () => {
     const c = clock();
     const h = createServerHealth({ now: c.now });

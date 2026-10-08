@@ -1516,7 +1516,9 @@ describe('port manager', () => {
       const hmaTarget = (servers: string[]): Target => ({
         key: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', servers,
       });
-      const hmaSetup = (servers: string[], serverHealth = createServerHealth()) => {
+      /** `proven`: the account was confirmed online on another server recently. */
+      const hmaSetup = (servers: string[], serverHealth = createServerHealth(), proven = true) => {
+        if (proven) serverHealth.markOk('z1', '10.9.9.9');
         const targets = [hmaTarget(servers)];
         const ctx = setup({
           targets,
@@ -1568,6 +1570,51 @@ describe('port manager', () => {
         expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI#1')!.state).toMatchObject({ kind: 'failed', reason: 'auth' });
         engine.fireRetryDue('hma:VN-51-HANOI#1');
         await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      });
+
+      it('with no proof the device creds work anywhere, an auth failure is a credential problem: nothing marked, no pool walk', async () => {
+        const { manager, engine, state, serverHealth } = hmaSetup(['10.9.0.1', '10.9.0.2'], createServerHealth(), false);
+        await manager.startPort('hma:VN-51-HANOI#1');
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        await new Promise((r) => setTimeout(r, 20));
+        expect(serverHealth.isUsable('z1', '10.9.0.1')).toBe(true);
+        expect(engine.started).toHaveLength(1);
+        expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'auth' });
+      });
+
+      it('a recent lastOk only on the failing server itself is no proof either', async () => {
+        const serverHealth = createServerHealth();
+        serverHealth.markOk('z1', '10.9.0.1');
+        const { manager, engine } = hmaSetup(['10.9.0.1', '10.9.0.2'], serverHealth, false);
+        await manager.startPort('hma:VN-51-HANOI#1');
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(false);
+      });
+
+      it('another port of the account being online is proof: the server is refused and the port moves', async () => {
+        const { manager, engine, state, serverHealth } = hmaSetup(['10.9.0.1', '10.9.0.2', '10.9.0.3'], createServerHealth(), false);
+        state.setState((s) => ({
+          ...s,
+          ports: [
+            ...s.ports,
+            basePort({ key: 'hma:JP-1#1', locationKey: 'hma:JP-1', providerId: 'hma', proxyPort: 29009, server: '10.8.0.1', state: { kind: 'online', since: 1, exitIp: '10.8.0.1', country: 'JP' } }),
+          ],
+        }));
+        await manager.startPort('hma:VN-51-HANOI#1');
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(true);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      });
+
+      it('credentialsChanged forgets refused/dead marks earned under the old creds, persisted', async () => {
+        const serverHealth = createServerHealth();
+        serverHealth.markRefused('z1', '10.9.0.1');
+        serverHealth.markDead('z1', '10.9.0.2');
+        const { manager, state } = hmaSetup(['10.9.0.1', '10.9.0.2'], serverHealth);
+        manager.credentialsChanged('z1');
+        expect(serverHealth.isUsable('z1', '10.9.0.1')).toBe(true);
+        expect(serverHealth.isUsable('z1', '10.9.0.2')).toBe(true);
+        expect(state.getState().serverHealth.refused.z1).toBeUndefined();
       });
     });
 

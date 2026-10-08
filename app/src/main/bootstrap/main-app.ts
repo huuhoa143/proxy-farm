@@ -251,7 +251,14 @@ export function runApp(): void {
 
     // HMA local credentials: detection, connect, lazy apply on change (spec §5.1).
     const hma = createHmaLocalSource();
-    const hmaSync = createHmaCredsSync({ source: hma, state, secrets, onPortState, restartPort });
+    const hmaSync = createHmaCredsSync({
+      source: hma,
+      state,
+      secrets,
+      onPortState,
+      restartPort,
+      onCredentialsChanged: (accountId) => portManager.credentialsChanged(accountId),
+    });
     void hmaSync.check().catch((err) => log('hma credential check failed', err));
 
     // Webhook (spec §6.6): only while enabled; rebuilt on LAN/webhook changes.

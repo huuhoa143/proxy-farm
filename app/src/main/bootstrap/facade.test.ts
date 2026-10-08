@@ -96,6 +96,7 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
     freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
     syncAutoRotate: () => undefined,
     stopAutoRotate: () => undefined,
+    credentialsChanged: (accountId) => void calls.push(`creds:${accountId}`),
   };
   return pm;
 }
@@ -214,6 +215,20 @@ describe('controller facade', () => {
     expect(second.account?.id).toBe(first.account?.id);
     expect(state.getState().accounts).toHaveLength(1);
     expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!).password).toBe('b'.repeat(64));
+  });
+
+  it('a re-import with a changed secret drops server marks earned under the old one; an unchanged one does not', async () => {
+    const { facade, portManager } = setup();
+    await facade.connectHma();
+    await facade.connectHma(); // same creds
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual([]);
+    hmaRead = { status: 'found', creds: { udid: HMA_UDID, password: 'b'.repeat(64) } };
+    await facade.connectHma();
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:hma-1']);
+
+    await facade.addAccount('zoogvpn', { username: 'me', password: 'old' });
+    await facade.addAccount('zoogvpn', { username: 'me', password: 'new' }); // the duplicate-account path
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:hma-1', 'creds:zoogvpn-1']);
   });
 
   it('connectHma: not installed → hma.notFound; not macOS → hma.windowsLater', async () => {

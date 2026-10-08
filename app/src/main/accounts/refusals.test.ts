@@ -12,6 +12,17 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     expect(t.isRefused('z1', 'zoogvpn:nl')).toBe(false);
   });
 
+  it('forgetFailures drops the auth-failure evidence of one account (new credentials)', () => {
+    const t = createRefusalTracker();
+    for (const s of ['a', 'b', 'c']) t.recordAuthFailure('z1', s);
+    t.recordAuthFailure('z2', 'a');
+    expect(t.classifyAuthFailure('z1')).toBe('bad-login');
+    t.forgetFailures('z1');
+    expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    expect(t.isRefused('z1', 'a')).toBe(false);
+    expect(t.isRefused('z2', 'a')).toBe(true);
+  });
+
   it('bad-login: failures on >= 3 distinct servers and none online', () => {
     const t = createRefusalTracker();
     t.recordAuthFailure('z1', 'a');

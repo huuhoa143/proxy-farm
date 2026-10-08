@@ -106,6 +106,15 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     deps.secrets.saveSecret(secretRef, JSON.stringify(secret));
   }
 
+  /** Overwrites an existing account's secret; if it really changed, server marks earned
+   * under the old credentials are dropped (a 7-day refusal must not outlive them). */
+  function replaceAccountSecret(account: Account, secret: AccountSecret): void {
+    const next = JSON.stringify(secret);
+    if (deps.secrets.loadSecret(account.secretRef) === next) return;
+    deps.secrets.saveSecret(account.secretRef, next);
+    deps.portManager.credentialsChanged(account.id);
+  }
+
   function createAccount(providerId: ProviderId, label: string, secret: AccountSecret, meta: Record<string, string>): Account {
     const id = nextAccountId(providerId);
     const account: Account = { id, providerId, label, meta, secretRef: `account:${id}` };
@@ -224,7 +233,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     const meta = { ...(check.meta ?? {}), source: 'local' };
     const existing = accounts().find((a) => a.providerId === 'hma' && a.meta.source === 'local');
     if (existing) {
-      saveAccountSecret(existing.secretRef, check.secret);
+      replaceAccountSecret(existing, check.secret);
       const updated: Account = { ...existing, label: check.label ?? existing.label, meta };
       deps.state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === existing.id ? updated : a)) }));
       return { ok: true, label: updated.label, account: updated };
@@ -267,7 +276,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
       const duplicate = accounts().find((a) => a.providerId === providerId && a.label === (check.label ?? ''));
       if (duplicate) {
-        saveAccountSecret(duplicate.secretRef, check.secret);
+        replaceAccountSecret(duplicate, check.secret);
         return { ok: true, label: duplicate.label, account: duplicate };
       }
       const account = createAccount(providerId, check.label ?? providerId, check.secret, check.meta ?? {});

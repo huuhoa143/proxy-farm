@@ -116,6 +116,10 @@ export interface PortManager {
   /** Cancels every auto-rotate timer. Call once on app shutdown so no rotate tick
    * fires (or keeps the event loop alive) while engines are being torn down. */
   stopAutoRotate(): void;
+  /** The account's secret changed (HMA re-import, a re-entered password): forget the
+   * refused/dead marks and auth-failure evidence gathered under the old credentials, so
+   * no server stays shunned for days because of them. */
+  credentialsChanged(accountId: string): void;
 }
 
 /**
@@ -146,6 +150,10 @@ function firstLanIPv4(): string {
  * reasons. Deliberately NOT auth (that is a refusal, handled separately) nor
  * port-manager's own pre-engine reasons (`secret-unavailable`, `start-error`, …). */
 const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 'verify-failed']);
+
+/** How recent a confirmed-online on another server must be for an HMA auth failure to
+ * count as that server refusing the device rather than the device creds being bad. */
+const HMA_PROVEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** How long `rotatePort` waits for the restarted port to reach `online` before giving
  * up on confirming the new exit IP (reviewer item 1). */
@@ -489,8 +497,20 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return true;
   }
 
+  /** The port's account demonstrably works: another of its ports is online, or it was
+   * confirmed online on another server recently. */
+  function accountWorksElsewhere(port: PortRow & { server: string }): boolean {
+    const otherOnline = deps.state
+      .getState()
+      .ports.some((p) => p.key !== port.key && p.accountId === port.accountId && p.state.kind === 'online');
+    return otherOnline || health.workedRecently(port.accountId, HMA_PROVEN_WINDOW_MS, port.server);
+  }
+
   function authVerdict(port: PortRow & { server: string }): AuthVerdict {
-    if (port.providerId === 'hma') return 'refused'; // §5.1: device creds, per-server tenant
+    // §5.1: device creds, per-server tenant — but a refusal only once the creds are known
+    // to work somewhere; otherwise (stale or revoked device creds) walking the pool would
+    // just mark every server refused for a week.
+    if (port.providerId === 'hma') return accountWorksElsewhere(port) ? 'refused' : 'credentials';
     if (port.providerId === 'zoogvpn') {
       refusals.recordAuthFailure(port.accountId, port.server);
       const verdict = refusals.classifyAuthFailure(port.accountId);
@@ -993,6 +1013,13 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }
   }
 
+  function credentialsChanged(accountId: string): void {
+    health.forgetMarks(accountId);
+    refusals.forgetFailures(accountId);
+    persistHealth();
+    persistRefusals();
+  }
+
   return {
     startPort,
     stopPort,
@@ -1006,5 +1033,6 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     testPort,
     syncAutoRotate,
     stopAutoRotate: () => autoRotate.stopAll(),
+    credentialsChanged,
   };
 }

@@ -11,6 +11,9 @@ export interface HmaCredsSyncDeps {
   onPortState(cb: (key: string, state: PortState) => void): () => void;
   /** Re-render and restart one port with its account's CURRENT secret (via the queue). */
   restartPort(key: string): void;
+  /** An account's credentials were just replaced (port-manager's `credentialsChanged`:
+   * drop server marks earned under the old ones). */
+  onCredentialsChanged?(accountId: string): void;
 }
 
 export interface HmaCredsSync {
@@ -47,6 +50,7 @@ export function createHmaCredsSync(deps: HmaCredsSyncDeps): HmaCredsSync {
         ...s,
         accounts: s.accounts.map((a) => (a.id === account.id ? { ...a, meta: { ...a.meta, udid: r.creds.udid } } : a)),
       }));
+      deps.onCredentialsChanged?.(account.id);
       changed.push(account.id);
     }
     for (const port of deps.state.getState().ports) {

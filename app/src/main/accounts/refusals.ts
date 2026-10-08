@@ -40,6 +40,9 @@ export interface RefusalTracker {
   classifyAuthFailure(accountId: string): RefusalVerdict;
   /** Is this specific (account, server) pair currently remembered as refused? */
   isRefused(accountId: string, serverKey: string): boolean;
+  /** The account's credentials changed: auth failures seen under the old ones are no
+   * evidence any more. "Seen online" markers are kept. */
+  forgetFailures(accountId: string): void;
   /** A snapshot suitable for `AppState.refusals` (store/state.ts). */
   serialize(): RefusalsState;
 }
@@ -117,6 +120,10 @@ export function createRefusalTracker(options: CreateRefusalTrackerOptions = {}):
 
     isRefused(accountId, serverKey) {
       return liveEntries(failures, accountId, REFUSAL_TTL_MS).has(serverKey);
+    },
+
+    forgetFailures(accountId) {
+      failures.delete(accountId);
     },
 
     serialize() {

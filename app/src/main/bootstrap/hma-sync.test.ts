@@ -37,9 +37,11 @@ describe('HMA credentials sync (spec §5.1 lazy apply)', () => {
   let read: HmaRead;
   let watchCb: () => void;
   const restarted: string[] = [];
+  const credentialsChanged: string[] = [];
 
   function setup() {
     restarted.length = 0;
+    credentialsChanged.length = 0;
     secrets.saveSecret('account:hma-1', JSON.stringify({ kind: 'userpass', username: 'U1.old', password: 'p1' }));
     state.setState((s) => ({
       ...s,
@@ -56,6 +58,7 @@ describe('HMA credentials sync (spec §5.1 lazy apply)', () => {
       secrets,
       onPortState,
       restartPort: (k) => restarted.push(k),
+      onCredentialsChanged: (id) => credentialsChanged.push(id),
     });
   }
 
@@ -64,6 +67,14 @@ describe('HMA credentials sync (spec §5.1 lazy apply)', () => {
     read = { status: 'found', creds: { udid: 'U1.old', password: 'p1' } };
     expect(await sync.check()).toEqual([]);
     expect(restarted).toEqual([]);
+    expect(credentialsChanged).toEqual([]);
+  });
+
+  it('reports changed creds so server marks earned under the old ones are dropped', async () => {
+    const sync = setup();
+    read = { status: 'found', creds: { udid: 'U1.new', password: 'p2' } };
+    await sync.check();
+    expect(credentialsChanged).toEqual(['hma-1']);
   });
 
   it('saves changed creds; restarts a down port now, a working one only once it drops; never a disabled one', async () => {

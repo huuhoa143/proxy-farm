@@ -28,6 +28,12 @@ export interface ServerHealth {
   /** Neither refused nor dead for this account. */
   isUsable(accountId: string, server: string): boolean;
   lastOk(accountId: string, server: string): number | undefined;
+  /** The account was confirmed online on some server other than `exceptServer` within
+   * the last `withinMs` — evidence that its credentials work. */
+  workedRecently(accountId: string, withinMs: number, exceptServer?: string): boolean;
+  /** Drops every refused/dead mark of the account (its credentials changed, so marks
+   * earned under the old ones prove nothing). `lastOk` is kept. */
+  forgetMarks(accountId: string): void;
   /** The persisted half (refused + lastOk), for `AppState.serverHealth`. */
   serialize(): ServerHealthState;
 }
@@ -103,6 +109,15 @@ export function createServerHealth(opts: ServerHealthOptions = {}): ServerHealth
     isDead: (accountId, server) => active(deadUntil, accountId, server),
     isUsable: (accountId, server) => !active(refusedUntil, accountId, server) && !active(deadUntil, accountId, server),
     lastOk: (accountId, server) => okAt.get(accountId)?.get(server),
+    workedRecently(accountId, withinMs, exceptServer) {
+      const since = now() - withinMs;
+      for (const [server, at] of okAt.get(accountId) ?? []) if (server !== exceptServer && at > since) return true;
+      return false;
+    },
+    forgetMarks(accountId) {
+      refusedUntil.delete(accountId);
+      deadUntil.delete(accountId);
+    },
     serialize,
   };
 }
