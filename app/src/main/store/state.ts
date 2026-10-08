@@ -30,6 +30,9 @@ export interface ServerHealthState {
   refused: Record<string, Record<string, number>>;
   /** accountId -> (server -> epoch ms the server was last confirmed online) */
   lastOk: Record<string, Record<string, number>>;
+  /** hostname -> the IP it last resolved to. Marks of a server whose IP is known are
+   * keyed by that IP, shared by every hostname on it. Absent in older files. */
+  ips?: Record<string, string>;
 }
 
 export interface AppState {
@@ -188,7 +191,11 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
         : defaults.refusals,
     serverHealth:
       rawHealth && typeof rawHealth === 'object'
-        ? { refused: nestedRecord(rawHealth.refused), lastOk: nestedRecord(rawHealth.lastOk) }
+        ? {
+            refused: nestedRecord(rawHealth.refused),
+            lastOk: nestedRecord(rawHealth.lastOk),
+            ...(rawHealth.ips && typeof rawHealth.ips === 'object' && !Array.isArray(rawHealth.ips) ? { ips: rawHealth.ips } : {}),
+          }
         : defaults.serverHealth,
     locationAliases:
       raw?.locationAliases && typeof raw.locationAliases === 'object' && !Array.isArray(raw.locationAliases)

@@ -386,8 +386,17 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return n;
   }
 
+  /** The server's IP: resolved this session, else the last one remembered by `health`. */
   function knownIp(server: string): string | undefined {
-    return isIP(server) ? server : resolvedIp.get(server);
+    return isIP(server) ? server : (resolvedIp.get(server) ?? health.ipOf(server));
+  }
+
+  /** Records what `server` resolved to. Its health marks follow the machine (§6.8): a
+   * server refused under another name is refused under this one too. Not for a
+   * round-robin pool hostname, which names many machines. */
+  function noteResolved(target: Target, server: string, ip: string): void {
+    resolvedIp.set(server, ip);
+    if (!isPoolHostname(target, server) && health.noteIp(server, ip)) persistHealth();
   }
 
   function identityOf(server: string, ip?: string): Identity {
@@ -421,7 +430,13 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return health.isDead(accountId, server) ? 1 : 0;
   }
 
-  function orderCandidates(opts: SelectOptions): string[] {
+  /** Highest tier a selection may use: strict = usable only; restart = dead too, and
+   * refused only when allowed. */
+  function maxTierOf(opts: SelectOptions): number {
+    return opts.mode === 'strict' ? 0 : opts.allowRefused ? 2 : 1;
+  }
+
+  function orderCandidates(opts: SelectOptions): Array<{ s: string; t: number }> {
     const pool = opts.target.servers;
     const index = new Map(pool.map((s, i) => [s, i]));
     let order: string[];
@@ -438,11 +453,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (opts.pinned !== undefined && order.includes(opts.pinned)) order = [opts.pinned, ...order.filter((s) => s !== opts.pinned)];
     // Stable sort: usable first, keeping the order above within each tier.
     const ranked = order.map((s) => ({ s, t: tier(opts.accountId, s) }));
-    const maxTier = opts.mode === 'strict' ? 0 : opts.allowRefused ? 2 : 1;
-    return ranked
-      .filter((r) => r.t <= maxTier)
-      .sort((a, b) => a.t - b.t)
-      .map((r) => r.s);
+    const maxTier = maxTierOf(opts);
+    return ranked.filter((r) => r.t <= maxTier).sort((a, b) => a.t - b.t);
   }
 
   /** Some server of the location that no other port holds is refused for the account:
@@ -459,7 +471,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    */
   async function selectServer(opts: SelectOptions): Promise<{ pick?: ServerPick; dnsFailed: boolean; onlyRefused?: boolean }> {
     let dnsFailed = false;
-    for (const server of orderCandidates(opts)) {
+    /** Candidates that turned out, once resolved, to be a machine already marked under
+     * another name: tried only after every candidate of their old tier. */
+    const demoted: Array<{ server: string; ip: string; t: number }> = [];
+    const free = (server: string, ip: string): boolean => {
+      const id = identityOf(server, ip);
+      return !(opts.exclude && sameMachine(opts.exclude, id)) && !heldBy(opts.target.providerId, id, opts.portKey);
+    };
+    for (const { s: server, t: assumed } of orderCandidates(opts)) {
       // An IP literal is its own identity; a hostname is judged on what it resolves to now.
       if (opts.exclude && isIP(server) && opts.exclude.token === server) continue;
       // A round-robin pool hostname is asked again while its answer is held by another
@@ -474,13 +493,17 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           health.markDead(opts.accountId, server); // the host vanished from DNS
           break;
         }
-        resolvedIp.set(server, ip);
-        const id = identityOf(server, ip);
-        if (opts.exclude && sameMachine(opts.exclude, id)) continue;
-        if (heldBy(opts.target.providerId, id, opts.portKey)) continue;
+        noteResolved(opts.target, server, ip);
+        const t = tier(opts.accountId, server);
+        if (t > assumed) {
+          if (t <= maxTierOf(opts)) demoted.push({ server, ip, t });
+          break;
+        }
+        if (!free(server, ip)) continue;
         return { pick: { server, ip }, dnsFailed };
       }
     }
+    for (const { server, ip } of demoted.sort((a, b) => a.t - b.t)) if (free(server, ip)) return { pick: { server, ip }, dnsFailed };
     return { dnsFailed, onlyRefused: !dnsFailed && freeRefusedExists(opts) };
   }
 
@@ -1133,7 +1156,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
           health.markDead(fresh.accountId, toServer);
           return { noteKey: 'server-unavailable' };
         }
-        resolvedIp.set(toServer, ip);
+        noteResolved(currentTarget, toServer, ip);
+        if (!health.isUsable(fresh.accountId, toServer)) return { noteKey: 'server-unavailable' }; // another name of a marked machine
         if (heldBy(fresh.providerId, identityOf(toServer, ip), key)) return { noteKey: 'server-unavailable' };
         updatePort(key, onNewServer(toServer, ip));
         return { target: currentTarget, pick: { server: toServer, ip }, account, finalKey: key, fellBackToAnotherCity: false };

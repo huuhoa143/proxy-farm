@@ -1852,6 +1852,52 @@ describe('port manager', () => {
       });
     });
 
+    describe('a mark follows the machine behind every hostname (spec §6.8)', () => {
+      // ✅ 2026-10-08: de7.webunlim.com and fr4.webunlim.com both resolve to 185.177.229.121.
+      const dns: Record<string, string> = {
+        'de7.webunlim.com': '185.177.229.121',
+        'fr4.webunlim.com': '185.177.229.121',
+        'fr1.webunlim.com': '185.177.229.50',
+      };
+      const fr: Target = { key: 'zoogvpn:FR', providerId: 'zoogvpn', country: 'FR', city: 'France', label: 'France', servers: ['fr4.webunlim.com', 'fr1.webunlim.com'] };
+
+      function frSetup(serverHealth = createServerHealth()) {
+        serverHealth.noteIp('de7.webunlim.com', dns['de7.webunlim.com']);
+        serverHealth.markRefused('z1', 'de7.webunlim.com'); // de7 refused the account
+        const ctx = setup({
+          targets: [fr],
+          port: { key: 'zoogvpn:FR#1', locationKey: 'zoogvpn:FR', country: 'FR', city: 'France', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, resolveServer: async (s) => dns[s] ?? s },
+        });
+        return { ...ctx, serverHealth };
+      }
+
+      it('fr4 is skipped without a handshake once de7 (the same IP) refused the account', async () => {
+        const { manager, engine, state } = frSetup();
+        await manager.startPort('zoogvpn:FR#1');
+        expect(engine.started.map((s) => boundIp(s.input))).toEqual(['185.177.229.50']);
+        expect(serverOf(state, 'zoogvpn:FR#1')).toBe('fr1.webunlim.com');
+        // The learned hostname → IP is persisted, so the next run knows it before DNS.
+        expect(state.getState().serverHealth.ips?.['fr4.webunlim.com']).toBe('185.177.229.121');
+      });
+
+      it('adding a port never pins fr4 either, and the Change-IP list shows it refused', async () => {
+        const { manager } = frSetup();
+        const row = await manager.addPort(fr, 'z1');
+        expect(row?.server).toBe('fr1.webunlim.com');
+        expect(manager.listServers(fr).find((s) => s.server === 'fr4.webunlim.com')?.health).toBe('refused');
+      });
+
+      it('an explicit Change IP to fr4 is refused up front', async () => {
+        const { manager, engine, state } = frSetup();
+        state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, enabled: true, server: 'fr1.webunlim.com' })) }));
+        expect(await manager.rotatePort('zoogvpn:FR#1', 'fr4.webunlim.com', { user: true })).toEqual({ changed: false, noteKey: 'server-unavailable' });
+        expect(engine.started).toHaveLength(0);
+      });
+    });
+
     describe('HMA per-server auth failover', () => {
       const hmaTarget = (servers: string[]): Target => ({
         key: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', servers,

@@ -15,6 +15,11 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   engine and stays failed until you start it, change its IP or enter new credentials;
   app start, wake from sleep, auto-rotate and the webhook leave it alone.
 - The retry back-off restarted at 30 s on every attempt instead of growing to 30 min.
+- Server marks (refused, dead, last OK) now belong to the machine, keyed by its resolved
+  IP, so they apply to every hostname that points at it: after `de7.webunlim.com` refused
+  an account, `fr4.webunlim.com` (the same server) is skipped without another handshake.
+  Marks saved by 0.1.0 under hostnames move onto the IP the first time each host
+  resolves, and the hostname-to-IP map is saved with them.
 
 ## [0.1.0] — 2026-10-08
 
