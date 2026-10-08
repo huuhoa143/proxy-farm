@@ -1,6 +1,9 @@
 /**
  * ZoogVPN provider — OpenVPN with account username/password (spec §5.2).
  *
+ * A target is a location (country, city) whose servers are its numbered
+ * hosts (spec §6.8); before rev 3 every host was its own target.
+ *
  * Note (known gap, see report): the bundled server list carries both a UDP
  * 1194 and a TCP 443 variant per server (`ZoogServer.protos`), matching the
  * spec's "UDP 1194 (and allow TCP 443 variant)". `Provider.bind()` has no
@@ -18,6 +21,50 @@ import { loadCaLines, loadTlsAuthLines } from './ca';
 import { loadServers, type ZoogServer } from './servers';
 
 const SERVER_PORT = 1194;
+
+/**
+ * Location key (spec §6.8): `zoogvpn:<CC>` for a country-wide location (the
+ * city is the country name, i.e. ZoogVPN names no city), otherwise
+ * `zoogvpn:<CC>-<CITY>` with the city upper-cased and non-alphanumerics
+ * turned into `-` (`zoogvpn:US-EAST`), in the style of HMA's
+ * `hma:JP-40-TOKYO-ULT`. Derived from data only, so it is stable across
+ * server-list updates.
+ */
+export function zoogLocationKey(country: string, city: string, countryName: string): string {
+  if (city === countryName || city === '') return `zoogvpn:${country}`;
+  const slug = city
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `zoogvpn:${country}-${slug}`;
+}
+
+/**
+ * One target per (country, city); its servers are the hostnames of that
+ * location in list order (by host number; host-scan.ts `sortServers`).
+ * Hosts sharing an IP across locations are left to the controller, which
+ * compares resolved IPs (§6.8).
+ */
+export function groupLocations(servers: ZoogServer[]): Target[] {
+  const byKey = new Map<string, Target>();
+  for (const s of servers) {
+    const key = zoogLocationKey(s.country, s.city, s.countryName);
+    const existing = byKey.get(key);
+    if (existing) {
+      if (!existing.servers.includes(s.host)) existing.servers.push(s.host);
+      continue;
+    }
+    byKey.set(key, {
+      key,
+      providerId: 'zoogvpn',
+      country: s.country,
+      city: s.city,
+      label: s.city === s.countryName || s.city === '' ? s.countryName : `${s.countryName} — ${s.city}`,
+      servers: [s.host],
+    });
+  }
+  return [...byKey.values()];
+}
 
 export interface ZoogvpnProviderDeps {
   loadServers?: () => ZoogServer[];
@@ -53,15 +100,7 @@ export function createZoogvpnProvider(deps: ZoogvpnProviderDeps = {}): Provider 
     },
 
     async targets(_account: Account): Promise<Target[]> {
-      const servers = getServers();
-      return servers.map((s) => ({
-        key: `zoogvpn:${s.key}`,
-        providerId: 'zoogvpn',
-        country: s.country,
-        city: s.city,
-        label: `${s.countryName} (${s.host})`,
-        servers: [s.host],
-      }));
+      return groupLocations(getServers());
     },
 
     bind(_target: Target, serverIp: string, _account: Account, secret: AccountSecret) {

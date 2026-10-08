@@ -17,7 +17,8 @@
     "publish": "electron-forge publish",
     "test": "vitest run",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
-    "scan:hma-servers": "node scripts/run-ts.mjs scripts/hma-scan-servers.ts"
+    "scan:hma-servers": "node scripts/run-ts.mjs scripts/hma-scan-servers.ts",
+    "scan:zoog-servers": "node scripts/run-ts.mjs scripts/zoog-scan-servers.ts"
   },
   "keywords": [],
   "author": {

@@ -1,21 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { createZoogvpnProvider } from './index';
+import { createZoogvpnProvider, zoogLocationKey } from './index';
 import type { Account, AccountSecret } from '../types';
 import type { ZoogServer } from './servers';
 
 const FAKE_CA_LINES = ['-----BEGIN CERTIFICATE-----', 'ZmFrZS1jZXJ0', '-----END CERTIFICATE-----'];
 const FAKE_TA_LINES = ['-----BEGIN OpenVPN Static key V1-----', 'ZmFrZS1rZXk=', '-----END OpenVPN Static key V1-----'];
 
+const zs = (host: string, country: string, countryName: string, city = countryName): ZoogServer => ({
+  host,
+  country,
+  countryName,
+  city,
+  protos: { udp: 1194 },
+});
+
 function fakeServers(): ZoogServer[] {
   return [
-    {
-      key: 'JP-JP1',
-      host: 'jp1.webunlim.com',
-      country: 'JP',
-      countryName: 'Japan',
-      city: 'Japan',
-      protos: { udp: 1194, tcp: 443 },
-    },
+    zs('jp1.webunlim.com', 'JP', 'Japan'),
+    zs('jp2.webunlim.com', 'JP', 'Japan'),
+    zs('jp4.zoogvpn.com', 'JP', 'Japan'),
+    zs('us4.east.zoogvpn.com', 'US', 'United States', 'East'),
+    zs('us.zgfree.info', 'US', 'United States'),
+    zs('us5.east.zoogvpn.com', 'US', 'United States', 'East'),
   ];
 }
 
@@ -43,17 +49,56 @@ describe('zoogvpn provider: check', () => {
 });
 
 describe('zoogvpn provider: targets', () => {
-  it('reads the bundled server list into Target[] with zoogvpn:-prefixed keys', async () => {
+  it('groups hosts into one target per (country, city), servers = exact hostnames in list order', async () => {
     const provider = makeProvider();
     const account: Account = { id: 'zoog-1', providerId: 'zoogvpn', label: 'Zoog', meta: {}, secretRef: 'zoog-1' };
     const targets = await provider.targets(account);
-    expect(targets).toHaveLength(1);
-    expect(targets[0]).toMatchObject({
-      key: 'zoogvpn:JP-JP1',
-      providerId: 'zoogvpn',
-      country: 'JP',
-      servers: ['jp1.webunlim.com'],
+    expect(targets).toEqual([
+      {
+        key: 'zoogvpn:JP',
+        providerId: 'zoogvpn',
+        country: 'JP',
+        city: 'Japan',
+        label: 'Japan',
+        servers: ['jp1.webunlim.com', 'jp2.webunlim.com', 'jp4.zoogvpn.com'],
+      },
+      {
+        key: 'zoogvpn:US-EAST',
+        providerId: 'zoogvpn',
+        country: 'US',
+        city: 'East',
+        label: 'United States — East',
+        servers: ['us4.east.zoogvpn.com', 'us5.east.zoogvpn.com'],
+      },
+      {
+        key: 'zoogvpn:US',
+        providerId: 'zoogvpn',
+        country: 'US',
+        city: 'United States',
+        label: 'United States',
+        servers: ['us.zgfree.info'],
+      },
+    ]);
+  });
+
+  it('a host listed twice appears once', async () => {
+    const provider = createZoogvpnProvider({
+      loadServers: () => [zs('sg1.webunlim.com', 'SG', 'Singapore'), zs('sg1.webunlim.com', 'SG', 'Singapore')],
+      caLines: FAKE_CA_LINES,
+      tlsAuthLines: FAKE_TA_LINES,
     });
+    const account: Account = { id: 'zoog-1', providerId: 'zoogvpn', label: 'Zoog', meta: {}, secretRef: 'zoog-1' };
+    const [target] = await provider.targets(account);
+    expect(target.servers).toEqual(['sg1.webunlim.com']);
+  });
+});
+
+describe('zoogLocationKey', () => {
+  it('is zoogvpn:<CC> for a country-wide location and zoogvpn:<CC>-<CITY> otherwise', () => {
+    expect(zoogLocationKey('JP', 'Japan', 'Japan')).toBe('zoogvpn:JP');
+    expect(zoogLocationKey('US', 'East', 'United States')).toBe('zoogvpn:US-EAST');
+    expect(zoogLocationKey('US', 'Los Angeles', 'United States')).toBe('zoogvpn:US-LOS-ANGELES');
+    expect(zoogLocationKey('GB', '', 'United Kingdom')).toBe('zoogvpn:GB');
   });
 });
 
@@ -62,7 +107,7 @@ describe('zoogvpn provider: bind', () => {
     const provider = makeProvider();
     const account: Account = { id: 'zoog-1', providerId: 'zoogvpn', label: 'Zoog', meta: {}, secretRef: 'zoog-1' };
     const secret: AccountSecret = { kind: 'userpass', username: 'user@example.com', password: 'hunter2' };
-    const target = { key: 'zoogvpn:JP-JP1', providerId: 'zoogvpn' as const, country: 'JP', city: 'Japan', label: 'Japan', servers: ['jp1.webunlim.com'] };
+    const target = { key: 'zoogvpn:JP', providerId: 'zoogvpn' as const, country: 'JP', city: 'Japan', label: 'Japan', servers: ['jp1.webunlim.com'] };
 
     const endpoint = provider.bind(target, '198.51.100.5', account, secret);
 
@@ -91,5 +136,17 @@ describe('zoogvpn provider: real bundled CA + tls-auth + servers', () => {
     expect(loadTlsAuthLines()[0]).toBe('-----BEGIN OpenVPN Static key V1-----');
     const servers = loadServers();
     expect(servers.length).toBeGreaterThan(50);
+  });
+
+  it('the bundled list groups into multi-server locations with no host in two locations', async () => {
+    const provider = createZoogvpnProvider({ caLines: FAKE_CA_LINES, tlsAuthLines: FAKE_TA_LINES });
+    const account: Account = { id: 'zoog-1', providerId: 'zoogvpn', label: 'Zoog', meta: {}, secretRef: 'zoog-1' };
+    const targets = await provider.targets(account);
+    const keys = targets.map((t) => t.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    const hosts = targets.flatMap((t) => t.servers);
+    expect(new Set(hosts).size).toBe(hosts.length);
+    expect(targets.find((t) => t.key === 'zoogvpn:JP')!.servers.length).toBeGreaterThan(1);
+    for (const t of targets) expect(t.key).toMatch(/^zoogvpn:[A-Z]{2}(-[A-Z0-9-]+)?$/);
   });
 });
