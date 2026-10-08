@@ -207,6 +207,9 @@ export function runApp(): void {
       binPath: binPath || 'sing-box',
       createPortHealth: (o) => new PortHealth({ ...o, giveUpAfter: () => settingsNow().giveUpAfter }),
     });
+    /** Every key with an engine started and not stopped: ports, and credential probes
+     * (spec §5.2), which have no port row for the shutdown to find them by. */
+    const liveEngineKeys = new Set<string>();
     const engine: Engine = {
       ...realEngine,
       // `opts` carries the port's back-off attempt count: dropping it restarted every
@@ -214,7 +217,12 @@ export function runApp(): void {
       start: (key, input, opts) => {
         if (shuttingDown) return Promise.reject(new Error('shutting down'));
         if (engineError) return Promise.reject(new Error(engineError));
+        liveEngineKeys.add(key);
         return realEngine.start(key, input, opts);
+      },
+      stop: (key) => {
+        liveEngineKeys.delete(key);
+        return realEngine.stop(key);
       },
     };
 
@@ -488,7 +496,8 @@ export function runApp(): void {
 
     async function stopAllEngines(): Promise<void> {
       queue.clear();
-      await Promise.all(state.getState().ports.map((p) => engine.stop(p.key).catch(() => undefined)));
+      const keys = new Set([...state.getState().ports.map((p) => p.key), ...liveEngineKeys]);
+      await Promise.all([...keys].map((key) => engine.stop(key).catch(() => undefined)));
     }
 
     // Tray (spec §4.3).
