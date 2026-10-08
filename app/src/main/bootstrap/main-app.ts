@@ -50,6 +50,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const DEFAULT_WEBHOOK_PORT = 29000;
+const QUIT_ARG = '--quit';
 
 function log(msg: string, err?: unknown): void {
   try {
@@ -100,15 +101,26 @@ export function runApp(): void {
   const userDataOverride = process.env.PROXYFARM_USER_DATA_DIR;
   if (userDataOverride) app.setPath('userData', userDataOverride);
 
+  // `Proxy Farm --quit` asks a running instance to stop its engines and exit: Windows
+  // has no SIGTERM for GUI apps, so scripts and the e2e suite quit it this way.
+  const quitRequested = process.argv.includes(QUIT_ARG);
+
   // 1. single instance — a second launch focuses the existing window (spec §4.3, §6.3).
-  if (!app.requestSingleInstanceLock()) {
+  if (!app.requestSingleInstanceLock() || quitRequested) {
     app.quit();
     return;
   }
 
   let mainWindow: BrowserWindow | null = null;
   let showWindow: () => void = () => undefined;
-  app.on('second-instance', () => showWindow());
+  app.on('second-instance', (_event, argv) => {
+    if (argv.includes(QUIT_ARG)) {
+      log(`${QUIT_ARG}: quitting`);
+      app.quit();
+      return;
+    }
+    showWindow();
+  });
 
   // Stop every engine and wait before the process exits (spec §6.3) — also the hook a
   // future electron-updater `quitAndInstall` must await first.
