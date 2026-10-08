@@ -8,11 +8,13 @@ import { sampleWireguardEndpoint } from '../engine/__fixtures__/endpoints';
 import type { PidEntry } from '../engine/pid-registry';
 import type { ExitInfo } from '../engine/supervisor';
 import { createRealEngine, reapOrphanedEngines, type EngineProcessLike, type PortHealthLike } from './engine-adapter';
+import { PortHealth } from '../health/state-machine';
 import { PortInUseError } from './ports';
 
 function fakeEngineProcess(pid: number | undefined = 111): EngineProcessLike & {
   startedConfigs: string[];
   stop: ReturnType<typeof vi.fn>;
+  kill: ReturnType<typeof vi.fn>;
   emitLog: (line: string) => void;
   emitExit: (info: ExitInfo) => void;
 } {
@@ -28,6 +30,7 @@ function fakeEngineProcess(pid: number | undefined = 111): EngineProcessLike & {
       startedConfigs.push(config);
     },
     stop: stopFn,
+    kill: vi.fn(async () => undefined),
     onLog(cb: (line: string) => void) {
       logCbs.add(cb);
       return () => logCbs.delete(cb);
@@ -141,7 +144,18 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     removedPids.length = 0;
   });
 
-  function setup(opts: { exitIpResult?: ExitIpResult | Error; delayResult?: DelayResult; isPortFree?: (port: number) => Promise<boolean> } = {}) {
+  function setup(
+    opts: {
+      exitIpResult?: ExitIpResult | Error;
+      delayResult?: DelayResult;
+      /** Overrides `delayResult`: called for every /delay request. */
+      delayFn?: () => Promise<DelayResult>;
+      isPortFree?: (port: number) => Promise<boolean>;
+      /** Use the real PortHealth instead of the recording fake. */
+      realHealth?: boolean;
+      engineOpts?: Partial<Parameters<typeof createRealEngine>[0]>;
+    } = {},
+  ) {
     const processes: ReturnType<typeof fakeEngineProcess>[] = [];
     const healths: ReturnType<typeof fakePortHealth>[] = [];
     const healthOpts: Array<{ initialAttempt?: number } | undefined> = [];
@@ -159,6 +173,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       },
       createPortHealth: (o) => {
         healthOpts.push(o);
+        if (opts.realHealth) return new PortHealth(o);
         const h = fakePortHealth();
         healths.push(h);
         return h;
@@ -172,6 +187,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       },
       delayProbeFn: async (clashPort, secret, tag) => {
         delayCalls.push({ clashPort, secret, tag });
+        if (opts.delayFn) return opts.delayFn();
         return opts.delayResult ?? { code: 200, ms: 5 };
       },
       exitIpProbeFn: async (proxyPort, probeOpts) => {
@@ -186,6 +202,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       removePidFn: async (registryPath, key) => {
         removedPids.push({ registryPath, key });
       },
+      ...opts.engineOpts,
     });
 
     return { engine, processes, healths, healthOpts, delayCalls, exitIpCalls, fireDelayTick: () => scheduledCb?.() };
@@ -474,6 +491,94 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     fireDelayTick();
     await vi.waitFor(() => expect(healths[0].fedDelayMs).toEqual([37]));
     expect(healths[0].fedDelay).toEqual([200]);
+  });
+
+  describe('hung engine: the controller API stops answering', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const never = () => new Promise<DelayResult>(() => undefined);
+
+    it('a poll that never settles is fed as a failed probe once the hard deadline passes', async () => {
+      vi.useFakeTimers();
+      const { engine, healths, fireDelayTick } = setup({ delayFn: never });
+      await engine.start('k1', sampleInput(45261));
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(healths[0].fedDelay).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(healths[0].fedDelay).toEqual(['error']);
+    });
+
+    it('skips a tick while the previous poll is still pending, instead of stacking requests', async () => {
+      vi.useFakeTimers();
+      const { engine, delayCalls, fireDelayTick } = setup({ delayFn: never });
+      await engine.start('k1', sampleInput(45262));
+      fireDelayTick();
+      fireDelayTick();
+      expect(delayCalls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(10_000);
+      fireDelayTick();
+      expect(delayCalls).toHaveLength(2);
+    });
+
+    it('kills the engine after `unresponsiveKillAfter` unanswered polls in a row, and feeds that exit as a crash', async () => {
+      vi.useFakeTimers();
+      const { engine, processes, healths, fireDelayTick } = setup({ delayFn: never, engineOpts: { unresponsiveKillAfter: 3, killGraceMs: 1234 } });
+      await engine.start('k1', sampleInput(45263));
+      for (let i = 0; i < 2; i += 1) {
+        fireDelayTick();
+        await vi.advanceTimersByTimeAsync(10_000);
+      }
+      expect(processes[0].kill).not.toHaveBeenCalled();
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(processes[0].kill).toHaveBeenCalledTimes(1);
+      expect(processes[0].kill).toHaveBeenCalledWith(1234);
+      processes[0].emitExit({ code: null, signal: 'SIGKILL' });
+      expect(healths[0].fedExit).toEqual([null]);
+    });
+
+    it('any answer, even an error one, resets the unanswered count', async () => {
+      vi.useFakeTimers();
+      let hang = true;
+      const { engine, processes, fireDelayTick } = setup({
+        delayFn: () => (hang ? never() : Promise.resolve({ code: 'error', message: 'ECONNREFUSED' } as DelayResult)),
+        engineOpts: { unresponsiveKillAfter: 2 },
+      });
+      await engine.start('k1', sampleInput(45264));
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+      hang = false;
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(0);
+      hang = true;
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(processes[0].kill).not.toHaveBeenCalled();
+    });
+
+    it('with the real PortHealth, an online port whose controller hangs drops to retrying(unresponsive) and its engine is stopped', async () => {
+      vi.useFakeTimers();
+      let hang = false;
+      const states: PortState[] = [];
+      const { engine, processes, fireDelayTick } = setup({
+        realHealth: true,
+        delayFn: () => (hang ? never() : Promise.resolve({ code: 200, ms: 42 } as DelayResult)),
+      });
+      engine.onStateChange((_k, s) => states.push(s));
+      await engine.start('k1', sampleInput(45265));
+      fireDelayTick(); // first 200 -> verifying -> exit-IP probe -> online
+      await vi.advanceTimersByTimeAsync(0);
+      expect(states.at(-1)).toMatchObject({ kind: 'online', latencyMs: 42 });
+
+      hang = true; // e.g. `kill -STOP <sing-box pid>`
+      fireDelayTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(states.at(-1)).toMatchObject({ kind: 'retrying', reasonKey: 'unresponsive' });
+      // Quiesced for the back-off: stop() escalates to SIGKILL for a frozen process.
+      expect(processes[0].stop).toHaveBeenCalled();
+    });
   });
 
   it('probe(key) hits clash_api with the same stored clash port/secret as the delay poll', async () => {

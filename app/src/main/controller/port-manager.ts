@@ -175,7 +175,7 @@ function firstLanIPv4(): string {
  * reasons. Deliberately NOT auth (that is a refusal, handled separately) nor
  * port-manager's own pre-engine reasons (`secret-unavailable`, `start-error`, …).
  * Whether one actually condemns the server is `onConnectivityFailure`'s call. */
-const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 'verify-failed']);
+const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'unresponsive', 'exited', 'verify-failed']);
 
 /** The `retrying` reasonKeys that mean "no handshake": the tunnel never answered. A
  * crash (`exited`) says nothing about the key, and `verify-failed` comes after a 200. */

@@ -357,6 +357,7 @@
     "reason": {
       "timeout": "The connection didn't come up in time.",
       "unreachable": "The server isn't answering.",
+      "unresponsive": "The connection stopped responding — restarting it.",
       "verify-failed": "Connected, but the exit IP couldn't be checked.",
       "exited": "The engine stopped unexpectedly.",
       "secret-unavailable": "Your saved credentials couldn't be read.",

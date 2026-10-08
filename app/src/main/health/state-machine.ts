@@ -154,8 +154,14 @@ export class PortHealth {
       }
       return;
     }
-    // code === 'error' (clash_api itself unreachable, e.g. process not up yet or just crashed):
-    // intentionally a no-op here — process-exit handling is feedExit's job, not this probe's.
+    // code === 'error': clash_api timed out, refused the connection or answered garbage.
+    // Before `online` that is expected (the process may not be listening yet) and the
+    // connecting deadline / exit-IP verification cover a dead start. Once online it is a
+    // failed probe like any other: a wedged engine (e.g. SIGSTOPped) never exits, so
+    // waiting for feedExit would leave the port showing online with a stale latency forever.
+    if (this._state.kind === 'online') {
+      this.scheduleRetry({ kind: 'retrying', reasonKey: 'unresponsive' });
+    }
   }
 
   /**

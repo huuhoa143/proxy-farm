@@ -297,4 +297,35 @@ describe('EngineProcess', () => {
     await engine.stop();
     expect(isAlive(pid)).toBe(false);
   }, 10000);
+
+  it('kill() SIGKILLs a frozen (SIGSTOPped) child after the grace and reports the exit via onExit', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
+    const logged: string[] = [];
+    const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
+    engine.onLog((l) => logged.push(l));
+    engine.onExit((info) => exits.push(info));
+
+    engine.start(JSON.stringify({}));
+    await waitFor(() => logged.length >= 1);
+    const pid = engine.pid!;
+    process.kill(pid, 'SIGSTOP'); // a stopped process leaves SIGTERM pending: only SIGKILL ends it
+
+    await engine.kill(150);
+    expect(isAlive(pid)).toBe(false);
+    expect(exits).toEqual([{ code: null, signal: 'SIGKILL' }]);
+    expect(engine.pid).toBeUndefined();
+  }, 10000);
+
+  it('kill() ends a responsive child with SIGTERM, without waiting out the grace', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
+    const logged: string[] = [];
+    engine.onLog((l) => logged.push(l));
+    engine.start(JSON.stringify({}));
+    await waitFor(() => logged.length >= 1);
+
+    const startedAt = Date.now();
+    await engine.kill(5000);
+    expect(Date.now() - startedAt).toBeLessThan(4000);
+    expect(engine.pid).toBeUndefined();
+  }, 10000);
 });

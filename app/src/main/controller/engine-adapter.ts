@@ -6,7 +6,7 @@ import { reapOrphans, recordPid, removePid, type PidEntry, type ReapOrphansOptio
 import { renderConfig } from '../engine/render-config';
 import { EngineProcess, type EngineProcessOptions, type ExitInfo } from '../engine/supervisor';
 import { singboxPath } from '../engine/singbox-path';
-import { delayProbe } from '../health/delay';
+import { delayProbe, FETCH_TIMEOUT_MS } from '../health/delay';
 import { probeExitIp } from '../health/exit-ip';
 import { classifyLog } from '../health/signals';
 import { PortHealth, type PortHealthOptions } from '../health/state-machine';
@@ -53,6 +53,15 @@ const MAX_CLASH_BIND_RETRIES = 5;
  * is actually dead fails these AND the `/delay` check, so it still drops to a retry. */
 const MAX_EXIT_IP_ATTEMPTS = 3;
 
+/** Adapter-side backstop on every clash_api health request, a little above the probe's
+ * own client timeout, so even a probe implementation that never settles cannot stall
+ * the poll (an unanswered poll is a failed probe, never an endless await). */
+const DEFAULT_PROBE_DEADLINE_MS = FETCH_TIMEOUT_MS + 2000;
+
+/** Polls in a row the controller API has not answered at all before the engine is
+ * considered hung and force-killed (see `unresponsiveKillAfter`). */
+const DEFAULT_UNRESPONSIVE_KILL_AFTER = 3;
+
 /** The slice of `EngineProcess`'s public API this adapter needs — a structural
  * interface (not the class itself) so tests can inject a plain-object fake; a class
  * with private fields can't otherwise satisfy a class-typed parameter. */
@@ -61,6 +70,9 @@ export interface EngineProcessLike {
   readonly logs: string[];
   start(configJson: string): void;
   stop(): Promise<void>;
+  /** Force-terminates a hung process (SIGTERM, SIGKILL after `graceMs`); the exit is
+   * reported through `onExit` like a crash. */
+  kill(graceMs?: number): Promise<void>;
   onLog(cb: (line: string) => void): () => void;
   onExit(cb: (info: ExitInfo) => void): () => void;
 }
@@ -96,6 +108,15 @@ export interface CreateRealEngineOptions {
    * @default [1500, 4000, 8000, 15000]
    */
   initialProbeDelaysMs?: number[];
+  /** Hard cap on every clash_api health request made here; past it the request counts
+   * as unanswered. @default 10_000 (the probe's own 8 s client timeout + 2 s) */
+  probeDeadlineMs?: number;
+  /** Consecutive polls the controller API leaves unanswered before the engine is treated
+   * as hung and killed (SIGTERM, then SIGKILL after `killGraceMs`); its exit then goes
+   * through the normal crash → back-off → restart path. @default 3 */
+  unresponsiveKillAfter?: number;
+  /** SIGTERM → SIGKILL grace when killing a hung engine. @default the supervisor's (3 s) */
+  killGraceMs?: number;
   /** Injectable for tests. */
   createEngineProcess?: (opts?: EngineProcessOptions) => EngineProcessLike;
   createPortHealth?: (opts?: PortHealthOptions) => PortHealthLike;
@@ -169,6 +190,11 @@ interface PortEntry {
   /** True while the child is being stopped because the port entered a back-off: that
    * exit is ours too. */
   quiescing?: boolean;
+  /** A `/delay` poll is outstanding: the next tick is skipped rather than stacked. */
+  probeInFlight?: boolean;
+  /** Polls in a row that clash_api left unanswered (hard timeout), for the hung-engine
+   * watchdog. Reset by any answer, even an error one. */
+  unansweredPolls: number;
 }
 
 /**
@@ -191,6 +217,24 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   const doRecordPid = options.recordPidFn ?? recordPid;
   const doRemovePid = options.removePidFn ?? removePid;
   const now = options.now ?? Date.now;
+  const probeDeadlineMs = options.probeDeadlineMs ?? DEFAULT_PROBE_DEADLINE_MS;
+  const unresponsiveKillAfter = Math.max(1, options.unresponsiveKillAfter ?? DEFAULT_UNRESPONSIVE_KILL_AFTER);
+
+  /** Every clash_api health request goes through here: it never rejects and never waits
+   * longer than `probeDeadlineMs`, whatever the underlying probe does. */
+  function delayWithDeadline(entry: PortEntry): Promise<DelayResult> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<DelayResult>((resolve) => {
+      timer = setTimeout(
+        () => resolve({ code: 'error', timedOut: true, message: `clash_api did not answer within ${probeDeadlineMs} ms` }),
+        probeDeadlineMs,
+      );
+    });
+    const request = doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG).catch(
+      (err: unknown): DelayResult => ({ code: 'error', message: `delay probe failed: ${err instanceof Error ? err.message : String(err)}` }),
+    );
+    return Promise.race([request, deadline]).finally(() => clearTimeout(timer));
+  }
 
   const entries = new Map<string, PortEntry>();
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
@@ -318,9 +362,9 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     }
     // Every exit-IP probe failed. Is the tunnel itself up? If `/delay` is 200 the port is
     // usable despite unverifiable geo (reviewer I-2) — go online with unknown IP/country.
-    const delay = await doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG).catch(() => undefined);
+    const delay = await delayWithDeadline(entry);
     if (!stillVerifying()) return;
-    if (delay?.code === 200) {
+    if (delay.code === 200) {
       health.feedEstablishedThenVerify(true, { exitIp: 'unknown', country: 'unknown', latencyMs: delay.ms });
     } else {
       health.feedEstablishedThenVerify(false);
@@ -361,6 +405,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       callerInput: input,
       lastConfig: config,
       bindErrorRetries: 0,
+      unansweredPolls: 0,
       cancelDelayPoll: () => undefined,
       unsubscribe: [],
       stopping: false,
@@ -465,10 +510,38 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     );
 
     const probeOnce = () => {
-      void doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG)
-        // The round trip of a 200 is the port's latency (spec §4.2 Latency column).
-        .then((result: DelayResult) => health.feedDelay(result.code, result.code === 200 ? result.ms : undefined))
-        .catch(() => undefined);
+      // Bounded by `delayWithDeadline`, so this guard can only skip a tick, never wedge the poll.
+      if (entry.probeInFlight) return;
+      entry.probeInFlight = true;
+      void delayWithDeadline(entry)
+        .then((result: DelayResult) => {
+          if (entry.stopping || entries.get(key) !== entry) return;
+          // The round trip of a 200 is the port's latency (spec §4.2 Latency column). A
+          // timed-out or errored poll is a failed probe; PortHealth decides what it means.
+          health.feedDelay(result.code, result.code === 200 ? result.ms : undefined);
+          watchHung(result);
+        })
+        .finally(() => {
+          entry.probeInFlight = false;
+        });
+    };
+
+    // Hung-engine watchdog: a process that is alive but frozen (deadlocked, SIGSTOPped)
+    // never exits, so neither onExit nor a clean stop() would ever fire for it. Once the
+    // controller API has ignored `unresponsiveKillAfter` polls in a row, kill it; its exit
+    // is not flagged as ours, so it is fed to PortHealth as a crash and the normal
+    // back-off/retry path restarts the engine.
+    const watchHung = (result: DelayResult) => {
+      if (!(result.code === 'error' && result.timedOut)) {
+        entry.unansweredPolls = 0;
+        return;
+      }
+      entry.unansweredPolls += 1;
+      if (entry.unansweredPolls < unresponsiveKillAfter) return;
+      entry.unansweredPolls = 0;
+      // A stop already in progress escalates to SIGKILL on its own.
+      if (engineProcess.pid === undefined || entry.quiescing || entry.respawning) return;
+      void engineProcess.kill(options.killGraceMs).catch(() => undefined);
     };
     const cancelPoll = schedule(delayPollMs, probeOnce);
     const earlyTimers = initialProbeDelaysMs.map((ms) => {
@@ -502,7 +575,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   async function probe(key: string): Promise<DelayResult> {
     const entry = entries.get(key);
     if (!entry) return { code: 'error', message: `probe: no running engine for "${key}"` };
-    return doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG);
+    return delayWithDeadline(entry);
   }
 
   function getLogs(key: string): string[] {

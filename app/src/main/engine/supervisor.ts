@@ -9,6 +9,8 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_RING_CAPACITY = 2000;
 const DEFAULT_HARD_KILL_TIMEOUT_MS = 6000;
+/** SIGTERM → SIGKILL grace for `kill()` (a hung engine): short, it is already unresponsive. */
+const DEFAULT_KILL_GRACE_MS = 3000;
 
 /**
  * `error` is set when the process never (successfully) ran at all — e.g. a
@@ -168,6 +170,42 @@ export class EngineProcess {
       } else {
         try {
           child.kill('SIGINT');
+        } catch {
+          // already gone
+        }
+      }
+    });
+  }
+
+  /**
+   * Force-terminates a hung engine: SIGTERM (taskkill /f on win32), then SIGKILL if it
+   * hasn't exited after `graceMs`. Unlike `stop()` this is not a polite shutdown request —
+   * it is for a process that stopped answering — and its exit is reported through
+   * `onExit` like any other. Resolves once the child has exited.
+   */
+  async kill(graceMs = DEFAULT_KILL_GRACE_MS): Promise<void> {
+    const child = this.child;
+    if (!child) return;
+
+    await new Promise<void>((resolve) => {
+      const unsubscribe = this.onExit(() => {
+        clearTimeout(hardKillTimer);
+        unsubscribe();
+        resolve();
+      });
+      const hardKillTimer = setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // already gone
+        }
+      }, graceMs);
+
+      if (this.platform === 'win32') {
+        if (child.pid) this.taskkillFn(child.pid).catch(() => undefined);
+      } else {
+        try {
+          child.kill('SIGTERM');
         } catch {
           // already gone
         }

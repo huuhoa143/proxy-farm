@@ -357,6 +357,7 @@
     "reason": {
       "timeout": "Kết nối không lên kịp.",
       "unreachable": "Máy chủ không phản hồi.",
+      "unresponsive": "Kết nối ngừng phản hồi — đang khởi động lại.",
       "verify-failed": "Đã kết nối nhưng không kiểm tra được IP ra.",
       "exited": "Bộ máy dừng bất ngờ.",
       "secret-unavailable": "Không đọc được thông tin đăng nhập đã lưu.",

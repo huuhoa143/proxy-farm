@@ -159,7 +159,9 @@ export interface Provider {
 
 export type LogSignal = 'established' | 'auth-terminal';
 
-export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 504 } | { code: 'error'; message: string };
+/** `timedOut` on an error: clash_api did not answer at all within the client's hard timeout
+ * (a wedged or frozen engine), as opposed to answering with an error or refusing the connection. */
+export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 504 } | { code: 'error'; message: string; timedOut?: boolean };
 
 /**
  * `key-rejected`: a WireGuard key that has never completed a handshake got no answer on

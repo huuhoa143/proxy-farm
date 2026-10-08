@@ -144,6 +144,27 @@ describe('PortHealth', () => {
     expect(health.state.kind).toBe('retrying');
   });
 
+  it('a failed probe (error / no answer) on an online port drops it to retrying(unresponsive) — a wedged engine never exits', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '1.2.3.4', country: 'US', latencyMs: 80 });
+
+    health.feedDelay('error');
+    expect(health.state).toMatchObject({ kind: 'retrying', reasonKey: 'unresponsive' });
+  });
+
+  it('an error probe while connecting/verifying is still a no-op (clash_api may not be listening yet)', () => {
+    const health = new PortHealth();
+    health.start();
+    health.feedDelay('error');
+    expect(health.state.kind).toBe('connecting');
+    health.feedLog('established');
+    health.feedDelay('error');
+    expect(health.state.kind).toBe('verifying');
+  });
+
   it('503 while still connecting is a transient no-op (sing-box keeps retrying internally)', () => {
     const health = new PortHealth();
     health.start();
