@@ -63,6 +63,8 @@ export class PortHealth {
 
   private _state: PortState = { kind: 'queued' };
   private attempt = 0;
+  /** The latest `/delay` round trip since the last start, carried into `online`. */
+  private lastLatencyMs: number | undefined;
   private cancelPendingRetry: (() => void) | null = null;
   private cancelConnectingDeadline: (() => void) | null = null;
   private readonly stateChangeCbs = new Set<(state: PortState) => void>();
@@ -87,6 +89,7 @@ export class PortHealth {
   start(): void {
     this.clearPendingRetry();
     this.giveUpReason = undefined;
+    this.lastLatencyMs = undefined;
     this.enterConnecting();
   }
 
@@ -111,14 +114,21 @@ export class PortHealth {
     this.scheduleRetry({ kind: 'failed', reason: 'auth' });
   }
 
-  /** Feeds a `/delay` probe result's HTTP-status code (spec §6.4). Ignored unless currently active (see class docs). */
-  feedDelay(code: DelayResult['code']): void {
+  /**
+   * Feeds a `/delay` probe result (spec §6.4): its HTTP-status code and, for a 200, the
+   * round trip in ms, which becomes the port's `latencyMs` (kept fresh while online by
+   * the periodic poll). Ignored unless currently active (see class docs).
+   */
+  feedDelay(code: DelayResult['code'], ms?: number): void {
     if (!this.isActive()) return;
     if (code === 200) {
+      if (ms !== undefined) this.lastLatencyMs = ms;
       // WireGuard never logs "established" — the first successful delay probe is its readiness signal.
       if (this._state.kind === 'connecting') {
         this.clearConnectingDeadline();
         this.setState({ kind: 'verifying', since: this.now() });
+      } else if (this._state.kind === 'online' && ms !== undefined && ms !== this._state.latencyMs) {
+        this.setState({ ...this._state, latencyMs: ms });
       }
       return;
     }
@@ -152,7 +162,8 @@ export class PortHealth {
       }
       this.attempt = 0;
       this.clearPendingRetry();
-      this.setState({ kind: 'online', since: this.now(), exitIp: info.exitIp, country: info.country, latencyMs: info.latencyMs });
+      const latencyMs = info.latencyMs ?? this.lastLatencyMs;
+      this.setState({ kind: 'online', since: this.now(), exitIp: info.exitIp, country: info.country, ...(latencyMs !== undefined ? { latencyMs } : {}) });
       return;
     }
     this.scheduleRetry({ kind: 'retrying', reasonKey: 'verify-failed' });

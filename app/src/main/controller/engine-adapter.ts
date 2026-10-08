@@ -71,7 +71,7 @@ export interface PortHealthLike {
   start(): void;
   stop(): void;
   feedLog(sig: LogSignal): void;
-  feedDelay(code: DelayResult['code']): void;
+  feedDelay(code: DelayResult['code'], ms?: number): void;
   feedEstablishedThenVerify(exitOk: boolean, info?: { exitIp: string; country: string; latencyMs?: number }): void;
   feedExit(code: number | null): void;
   onStateChange(cb: (state: PortState) => void): () => void;
@@ -318,7 +318,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     const delay = await doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG).catch(() => undefined);
     if (!stillVerifying()) return;
     if (delay?.code === 200) {
-      health.feedEstablishedThenVerify(true, { exitIp: 'unknown', country: 'unknown' });
+      health.feedEstablishedThenVerify(true, { exitIp: 'unknown', country: 'unknown', latencyMs: delay.ms });
     } else {
       health.feedEstablishedThenVerify(false);
     }
@@ -440,7 +440,8 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     const probeOnce = () => {
       void doDelayProbe(entry.clashPort, entry.clashSecret, ENDPOINT_TAG)
-        .then((result: DelayResult) => health.feedDelay(result.code))
+        // The round trip of a 200 is the port's latency (spec §4.2 Latency column).
+        .then((result: DelayResult) => health.feedDelay(result.code, result.code === 200 ? result.ms : undefined))
         .catch(() => undefined);
     };
     const cancelPoll = schedule(delayPollMs, probeOnce);

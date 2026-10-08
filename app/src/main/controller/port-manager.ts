@@ -562,8 +562,16 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // port-manager persists its transitions (reviewer item 6), and the one place server
   // health is learned: `online` = OK (and the exit-IP invariant check), a connectivity
   // `retrying` = dead (2 h), a `failed(auth)` = possibly refused (see `authVerdict`).
+  /** port key -> `since` of the online state last handled, to tell a latency refresh of
+   * the same online stretch from a new transition. */
+  const handledOnline = new Map<string, number>();
+
   deps.engine.onStateChange((key, state) => {
     updatePort(key, { state });
+    // An online port's periodic latency refresh is not a transition: nothing to learn.
+    if (state.kind === 'online' && handledOnline.get(key) === state.since) return;
+    if (state.kind === 'online') handledOnline.set(key, state.since);
+    else handledOnline.delete(key);
     const port = findPort(key);
     if (!port?.server) return;
     const pinned = port as PortRow & { server: string };

@@ -61,6 +61,32 @@ describe('PortHealth', () => {
     expect(health.state).toEqual({ kind: 'online', since: clock.now(), exitIp: '5.62.19.134', country: 'NL', latencyMs: 42 });
   });
 
+  it('latency: a /delay 200 before online is carried into online, and the poll keeps it fresh', () => {
+    const clock = fakeClock();
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule });
+    const seen: Array<number | undefined> = [];
+    health.onStateChange((s) => s.kind === 'online' && seen.push(s.latencyMs));
+    health.start();
+    health.feedDelay(200, 87); // WireGuard readiness probe
+    health.feedEstablishedThenVerify(true, { exitIp: '5.62.19.134', country: 'NL' });
+    expect(health.state).toMatchObject({ kind: 'online', latencyMs: 87 });
+    const since = (health.state as { since: number }).since;
+    health.feedDelay(200, 64);
+    expect(health.state).toEqual({ kind: 'online', since, exitIp: '5.62.19.134', country: 'NL', latencyMs: 64 });
+    health.feedDelay(200, 64); // unchanged: no new state event
+    expect(seen).toEqual([87, 64]);
+  });
+
+  it('latency from a previous run is not carried across a restart', () => {
+    const health = new PortHealth();
+    health.start();
+    health.feedDelay(200, 87);
+    health.start();
+    health.feedLog('established');
+    health.feedEstablishedThenVerify(true, { exitIp: '5.62.19.134', country: 'NL' });
+    expect((health.state as { latencyMs?: number }).latencyMs).toBeUndefined();
+  });
+
   it('moves verifying -> retrying with a scheduled back-off when exitOk is false', () => {
     const clock = fakeClock();
     const health = new PortHealth({ now: clock.now, schedule: clock.schedule });

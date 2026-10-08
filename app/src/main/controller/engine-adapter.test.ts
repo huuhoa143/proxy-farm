@@ -50,6 +50,7 @@ function fakePortHealth(): PortHealthLike & {
   stopped: number;
   fedLog: LogSignal[];
   fedDelay: DelayResult['code'][];
+  fedDelayMs: Array<number | undefined>;
   fedExit: Array<number | null>;
   fedVerify: Array<{ ok: boolean; info?: { exitIp: string; country: string } }>;
   setState: (s: PortState) => void;
@@ -66,6 +67,7 @@ function fakePortHealth(): PortHealthLike & {
     stopped: 0,
     fedLog: [] as LogSignal[],
     fedDelay: [] as DelayResult['code'][],
+    fedDelayMs: [] as Array<number | undefined>,
     fedExit: [] as Array<number | null>,
     fedVerify: [] as Array<{ ok: boolean; info?: { exitIp: string; country: string } }>,
     start() {
@@ -79,8 +81,9 @@ function fakePortHealth(): PortHealthLike & {
     feedLog(sig: LogSignal) {
       self.fedLog.push(sig);
     },
-    feedDelay(code: DelayResult['code']) {
+    feedDelay(code: DelayResult['code'], ms?: number) {
       self.fedDelay.push(code);
+      self.fedDelayMs.push(ms);
     },
     feedEstablishedThenVerify(ok: boolean, info?: { exitIp: string; country: string }) {
       self.fedVerify.push({ ok, info });
@@ -235,7 +238,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     await engine.start('k1', sampleInput(45206));
     healths[0].setState({ kind: 'verifying', since: 2 });
     await vi.waitFor(() => expect(healths[0].fedVerify).toHaveLength(1));
-    expect(healths[0].fedVerify[0]).toEqual({ ok: true, info: { exitIp: 'unknown', country: 'unknown' } });
+    expect(healths[0].fedVerify[0]).toEqual({ ok: true, info: { exitIp: 'unknown', country: 'unknown', latencyMs: 5 } }); // the /delay round trip
     expect(exitIpCalls.length).toBe(3); // bounded by MAX_EXIT_IP_ATTEMPTS, not infinite
   });
 
@@ -434,6 +437,14 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     fireDelayTick();
     await vi.waitFor(() => expect(healths[0].fedDelay).toEqual([504]));
     expect(delayCalls[0].tag).toBe('ep');
+  });
+
+  it('the /delay poll hands a 200\'s round trip to PortHealth as the latency', async () => {
+    const { engine, healths, fireDelayTick } = setup({ delayResult: { code: 200, ms: 37 } });
+    await engine.start('k1', sampleInput(45213));
+    fireDelayTick();
+    await vi.waitFor(() => expect(healths[0].fedDelayMs).toEqual([37]));
+    expect(healths[0].fedDelay).toEqual([200]);
   });
 
   it('probe(key) hits clash_api with the same stored clash port/secret as the delay poll', async () => {

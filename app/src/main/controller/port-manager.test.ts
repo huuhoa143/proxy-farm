@@ -512,6 +512,22 @@ describe('port manager', () => {
       expect(state.getState().ports[0].state).toMatchObject({ kind: 'retrying', reasonKey: 'dns-failed' });
     });
 
+    it('an online latency refresh updates the row but is not treated as a new online transition', async () => {
+      const serverHealth = createServerHealth();
+      const { manager, state, engine } = setup({
+        targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }],
+        port: { enabled: false, state: { kind: 'stopped' } },
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { serverHealth },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 5, exitIp: '10.0.0.1', country: 'NL', latencyMs: 80 });
+      const markOk = vi.spyOn(serverHealth, 'markOk');
+      engine.fireState('zoogvpn:nl-ams', { kind: 'online', since: 5, exitIp: '10.0.0.1', country: 'NL', latencyMs: 64 });
+      expect(state.getState().ports[0].state).toMatchObject({ kind: 'online', latencyMs: 64 });
+      expect(markOk).not.toHaveBeenCalled();
+    });
+
     it("startPort persists whatever PortHealth reports via the engine's onStateChange (reviewer item 6)", async () => {
       const { manager, state, engine } = setup({
         targets: [{ key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] }],
