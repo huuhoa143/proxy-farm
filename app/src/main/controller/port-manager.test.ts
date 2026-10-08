@@ -7,6 +7,7 @@ import type { SecretStore } from '../store/secrets';
 import { createStateStore } from '../store/state';
 import { createPortManager, type PortManagerDeps } from './port-manager';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator } from './ports';
+import { createServerMemory } from './server-memory';
 
 function fakeSecretStore(): SecretStore {
   const map = new Map<string, string>();
@@ -40,18 +41,24 @@ function fakeEngine(opts: { autoOnline?: boolean } = {}): Engine & {
   started: Array<{ key: string; input: RenderInput }>;
   stopped: string[];
   fireState: (key: string, state: PortState) => void;
+  fireRetryDue: (key: string) => void;
 } {
   const autoOnline = opts.autoOnline ?? true;
   const started: Array<{ key: string; input: RenderInput }> = [];
   const stopped: string[] = [];
   const stateChangeCbs = new Set<(key: string, state: PortState) => void>();
+  const retryDueCbs = new Set<(key: string) => void>();
   function fireState(key: string, state: PortState): void {
     for (const cb of stateChangeCbs) cb(key, state);
+  }
+  function fireRetryDue(key: string): void {
+    for (const cb of retryDueCbs) cb(key);
   }
   return {
     started,
     stopped,
     fireState,
+    fireRetryDue,
     start: async (key, input) => {
       started.push({ key, input });
       if (autoOnline) {
@@ -67,6 +74,10 @@ function fakeEngine(opts: { autoOnline?: boolean } = {}): Engine & {
     onStateChange: (cb) => {
       stateChangeCbs.add(cb);
       return () => stateChangeCbs.delete(cb);
+    },
+    onRetryDue: (cb) => {
+      retryDueCbs.add(cb);
+      return () => retryDueCbs.delete(cb);
     },
   };
 }
@@ -1020,6 +1031,89 @@ describe('port manager', () => {
       // `state` (here: 'online') forever, with no retry timer ever scheduled.
       expect(rows[0].state.kind).toBe('retrying');
       expect((rows[0].state as { reasonKey: string }).reasonKey).toBe('rotate-error');
+    });
+  });
+
+  describe('reviewer I-1 / spec §6.4: bad-IP failover on retry', () => {
+    const twoServerTargets: Target[] = [
+      { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] },
+    ];
+    const serverOf = (input: RenderInput) => (input.endpoint as { peers: Array<{ address: string }> }).peers[0].address;
+
+    it('startPort skips a server already marked bad and selects the next candidate', async () => {
+      const serverMemory = createServerMemory();
+      serverMemory.markBad('10.0.0.1');
+      const { manager, state, engine } = setup({
+        targets: twoServerTargets,
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' }, // last-used server, now bad
+        depsOverrides: { serverMemory },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(serverOf(engine.started[0].input)).toBe('10.0.0.2');
+      expect(state.getState().portServers['zoogvpn:nl-ams']).toBe('10.0.0.2');
+    });
+
+    it('a connectivity retry marks the current IP bad; the due retry then fails over to the other IP', async () => {
+      const { manager, state, engine } = setup({
+        targets: twoServerTargets,
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
+        engine: fakeEngine({ autoOnline: false }),
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(serverOf(engine.started[0].input)).toBe('10.0.0.1'); // sticky to last-good first
+
+      // 504 black hole -> PortHealth drops to retrying('timeout'): marks 10.0.0.1 bad.
+      engine.fireState('zoogvpn:nl-ams', { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' });
+      // Back-off elapses: the engine asks the controller to retry -> re-resolve + re-select.
+      engine.fireRetryDue('zoogvpn:nl-ams');
+
+      await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      expect(serverOf(engine.started[1].input)).toBe('10.0.0.2'); // failed over past the bad IP
+      expect(state.getState().portServers['zoogvpn:nl-ams']).toBe('10.0.0.2');
+    });
+
+    it('an auth failure does NOT mark the server bad (credential problem, not the IP)', async () => {
+      const serverMemory = createServerMemory();
+      const { manager, engine } = setup({
+        targets: twoServerTargets,
+        port: { enabled: false, state: { kind: 'stopped' } },
+        portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { serverMemory },
+      });
+      await manager.startPort('zoogvpn:nl-ams');
+      engine.fireState('zoogvpn:nl-ams', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+      expect(serverMemory.isBad('10.0.0.1')).toBe(false);
+    });
+
+    it('a single-host target re-resolves its one server on retry (§5.3 Surfshark), re-deriving the IP', async () => {
+      const resolved: string[] = [];
+      let nth = 0;
+      const { manager, engine } = setup({
+        targets: [{ key: 'surfshark:jp-tok', providerId: 'surfshark', country: 'JP', city: 'Tokyo', label: 'Tokyo', servers: ['jp-tok.prod.surfshark.com'] }],
+        port: { key: 'surfshark:jp-tok', providerId: 'surfshark', country: 'JP', city: 'Tokyo', label: 'Tokyo', enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: {
+          providers: { get: () => fakeProvider([{ key: 'surfshark:jp-tok', providerId: 'surfshark', country: 'JP', city: 'Tokyo', label: 'Tokyo', servers: ['jp-tok.prod.surfshark.com'] }]) },
+          resolveServer: async (server) => {
+            resolved.push(server);
+            nth += 1;
+            return `203.0.113.${nth}`; // a fresh IP each resolve
+          },
+        },
+      });
+      await manager.startPort('surfshark:jp-tok');
+      expect(serverOf(engine.started[0].input)).toBe('203.0.113.1');
+
+      engine.fireState('surfshark:jp-tok', { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' });
+      engine.fireRetryDue('surfshark:jp-tok');
+      await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+      // The one hostname was resolved again, yielding a different IP (the real §5.3 fix).
+      expect(resolved).toEqual(['jp-tok.prod.surfshark.com', 'jp-tok.prod.surfshark.com']);
+      expect(serverOf(engine.started[1].input)).toBe('203.0.113.2');
     });
   });
 });

@@ -9,6 +9,7 @@ import type { SecretStore } from '../store/secrets';
 import type { StateStore } from '../store/state';
 import { exportLines, type ExportCreds } from './export-format';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator, type ProviderRegistry } from './ports';
+import { createServerMemory, type ServerMemory } from './server-memory';
 
 export interface PortManagerDeps {
   state: StateStore;
@@ -54,6 +55,16 @@ export interface PortManagerDeps {
    * through, hostnames go through the OS resolver (IPv4 only).
    */
   resolveServer?: (server: string) => Promise<string>;
+  /**
+   * Per-server-IP health memory behind §6.4's bad-IP failover: a server that fails with a
+   * connectivity (not auth) reason is remembered as bad for 2 h, so the next (re)start of
+   * that port skips it and advances to the next candidate in `Target.servers` instead of
+   * re-selecting the same dead IP. `lastOk` recency also orders failover candidates
+   * (§5.1's "best first by lastOk"). @default a fresh in-memory instance. Injectable so a
+   * test can drive it with a fake clock, or the bootstrap layer can supply one that also
+   * persists HMA catalog `lastOk` across restarts.
+   */
+  serverMemory?: ServerMemory;
 }
 
 export interface PortManager {
@@ -112,6 +123,39 @@ function nextServerRoundRobin(servers: string[], current: string | undefined): s
   return next === current ? undefined : next;
 }
 
+/** The `retrying` reasonKeys that mean "this server IP is bad" (auth-independent
+ * connectivity failure), so the current server is remembered as bad and failover picks
+ * another (spec §6.4). `PortHealth`'s own 504/503/connect-deadline/process-exit/
+ * verify-failure reasons; deliberately NOT `auth` (a credential problem, not the IP) nor
+ * port-manager's own pre-engine reasons (`dns-failed`, `secret-unavailable`,
+ * `start-error`, `rotate-error` — none are evidence the server IP itself is dead). */
+const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 'verify-failed']);
+
+/**
+ * Picks the server to (re)start a port on from its location's candidates (spec §6.4
+ * bad-IP failover + §5.1 "best first by lastOk"):
+ * - Candidates recently marked bad are skipped; if that leaves none, the full list is
+ *   used anyway (better to retry the least-bad option than to strand the port — the bad
+ *   window is only 2 h).
+ * - `preferred` (the server the port last ran on) is kept if it is still eligible, so a
+ *   healthy port reconnecting doesn't needlessly churn servers.
+ * - Otherwise the most-recently-confirmed-ok candidate wins, tie-broken by the catalog's
+ *   own best-first order.
+ * Returns `undefined` only when there are no candidates at all.
+ */
+function pickServer(servers: string[], preferred: string | undefined, mem: ServerMemory): string | undefined {
+  if (servers.length === 0) return undefined;
+  const good = servers.filter((s) => !mem.isBad(s));
+  const pool = good.length > 0 ? good : servers;
+  if (preferred && pool.includes(preferred)) return preferred;
+  return [...pool].sort((a, b) => {
+    const okA = mem.lastOk(a) ?? 0;
+    const okB = mem.lastOk(b) ?? 0;
+    if (okA !== okB) return okB - okA;
+    return pool.indexOf(a) - pool.indexOf(b);
+  })[0];
+}
+
 /** How long `rotatePort` waits for the restarted port to reach `online` before giving
  * up on confirming the new exit IP (reviewer item 1). */
 const DEFAULT_ROTATE_ONLINE_TIMEOUT_MS = 45_000;
@@ -135,6 +179,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const scheduleRetryFn = deps.scheduleRetry ?? defaultScheduleRetry;
   const backoffRng = deps.backoffRng ?? Math.random;
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
+  const serverMemory = deps.serverMemory ?? createServerMemory();
   // §4.2/§6.5 auto-rotate timers (reviewer item 8): this module owns syncing them —
   // callers (IPC layer, webhook, the real engine via `rotatePort`) never have to
   // remember to do it themselves.
@@ -158,6 +203,19 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // `AppState.refusals` on every change so it survives a restart.
   deps.engine.onStateChange((key, state) => {
     updatePort(key, { state });
+
+    // §6.4 bad-IP failover memory: the server this port is bound to is confirmed good on
+    // `online`, or remembered bad on a connectivity `retrying` (not auth). The next
+    // (re)start then skips a bad IP and advances to the next candidate (see `pickServer`).
+    const server = deps.state.getState().portServers[key];
+    if (server) {
+      if (state.kind === 'online') {
+        serverMemory.markOk(server);
+      } else if (state.kind === 'retrying' && CONNECTIVITY_RETRY_REASONS.has(state.reasonKey)) {
+        serverMemory.markBad(server);
+      }
+    }
+
     const port = findPort(key);
     if (!port || port.providerId !== 'zoogvpn') return;
     if (state.kind === 'online') {
@@ -169,6 +227,16 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       }
     }
     persistRefusals();
+  });
+
+  // §6.4 health-driven retry: when a port's back-off elapses, re-run `startPort` rather
+  // than letting the engine respawn its stale config in place (reviewer I-1). `startPort`
+  // re-resolves the host and re-selects a server via `pickServer`, so a dead/stale IP
+  // fails over to the next candidate (and a single-host Surfshark target re-derives its
+  // one IP). A rotate in flight already does its own stop+start, so skip the retry then.
+  deps.engine.onRetryDue?.((key) => {
+    if (rotatingKeys.has(key)) return;
+    void startPort(key).catch(() => undefined);
   });
 
   // Serializes port-allocating operations so two concurrent calls never read the same
@@ -371,7 +439,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
       const targets = await provider.targets(account);
       const target = targets.find((t) => t.key === port.key);
-      const serverIp = s.portServers[key] ?? target?.servers[0];
+      // Pick the best eligible candidate, skipping IPs recently marked bad so a retry
+      // advances past a dead IP instead of re-selecting the one just stored under
+      // `portServers[key]` (reviewer I-1 / §6.4 bad-IP failover).
+      const serverIp = target && pickServer(target.servers, s.portServers[key], serverMemory);
       if (!target || !serverIp) {
         updatePort(key, { enabled: true });
         failWithRetry(key, { kind: 'failed', reason: 'no-server' });

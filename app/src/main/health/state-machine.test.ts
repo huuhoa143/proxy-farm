@@ -369,4 +369,28 @@ describe('PortHealth', () => {
     expect(health.giveUpReason).toBe('auth');
     expect(clock.hasPending).toBe(false); // no retry timer scheduled — truly stopped
   });
+
+  it('reviewer M-5: giveUpAfter as a getter is read live on each tick, not captured at construction', () => {
+    const clock = fakeClock();
+    let giveUpAfter = 0; // live Settings value; starts at "never"
+    const health = new PortHealth({ now: clock.now, schedule: clock.schedule, giveUpAfter: () => giveUpAfter });
+    health.start();
+
+    // With 0 it keeps retrying however many times.
+    for (let i = 0; i < 3; i += 1) {
+      health.feedLog('auth-terminal');
+      expect(health.state.kind).toBe('failed');
+      clock.advance(clock.pendingDelayMs!);
+      clock.fire();
+      expect(health.state.kind).toBe('connecting');
+    }
+
+    // The user lowers it in Settings; the very next failure (attempt 4 >= 2) gives up,
+    // which a value captured at construction (0) never would.
+    giveUpAfter = 2;
+    health.feedLog('auth-terminal');
+    expect(health.state).toEqual({ kind: 'stopped' });
+    expect(health.giveUpReason).toBe('auth');
+    expect(clock.hasPending).toBe(false);
+  });
 });
