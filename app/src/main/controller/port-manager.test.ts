@@ -1262,6 +1262,99 @@ describe('port manager', () => {
     });
   });
 
+  describe('Change IP vs a pending local retry', () => {
+    /** Captures `scheduleRetry` callbacks; cancelling removes one. */
+    function retryRecorder() {
+      const pending: Array<() => void> = [];
+      const scheduleRetry = (_ms: number, cb: () => void): (() => void) => {
+        pending.push(cb);
+        return () => {
+          const i = pending.indexOf(cb);
+          if (i !== -1) pending.splice(i, 1);
+        };
+      };
+      return { pending, scheduleRetry };
+    }
+
+    it('a failed(no-server) port moved to another city by Change IP: the old retry is cancelled and a stale one stays quiet', async () => {
+      const targets: Target[] = [
+        { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1'] },
+        { key: 'zoogvpn:nl-rot', providerId: 'zoogvpn', country: 'NL', city: 'Rotterdam', label: 'Rotterdam', servers: ['10.0.0.9'] },
+      ];
+      const retries = retryRecorder();
+      const { manager, state, engine } = setup({
+        targets,
+        port: { key: 'zoogvpn:nl-ams#1', enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        exitIpResults: [{ ip: '5.5.5.5', country: 'NL' }, { ip: '6.6.6.6', country: 'NL' }],
+        depsOverrides: { scheduleRetry: retries.scheduleRetry },
+      });
+      // Another port holds Amsterdam's only server, so #1 fails with no-server and waits.
+      state.setState((s) => ({
+        ...s,
+        ports: [...s.ports, basePort({ key: 'zoogvpn:nl-ams#2', proxyPort: 29002, server: '10.0.0.1', enabled: false, state: { kind: 'stopped' } })],
+      }));
+      await manager.startPort('zoogvpn:nl-ams#1');
+      expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'no-server' });
+      expect(retries.pending).toHaveLength(1);
+      const stale = retries.pending[0];
+
+      const result = await manager.rotatePort('zoogvpn:nl-ams#1');
+      expect(result.noteKey).toBe('rotated-to-another-city');
+      expect(state.getState().ports[0].key).toBe('zoogvpn:nl-rot#1');
+      expect(retries.pending).toHaveLength(0); // cancelled by the rotate
+
+      // Even a timer that already fired finds no row under the old key: no throw, no new
+      // retry scheduled for a ghost key, nothing restarted.
+      const startedBefore = engine.started.length;
+      stale();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(retries.pending).toHaveLength(0);
+      expect(engine.started).toHaveLength(startedBefore);
+      expect(state.getState().ports.map((p) => p.key)).toEqual(['zoogvpn:nl-rot#1', 'zoogvpn:nl-ams#2']);
+    });
+
+    it('startPort on a key with no row returns quietly (no throw, no retry)', async () => {
+      const retries = retryRecorder();
+      const { manager } = setup({ targets: [], depsOverrides: { scheduleRetry: retries.scheduleRetry } });
+      await expect(manager.startPort('zoogvpn:gone#1')).resolves.toBeUndefined();
+      expect(retries.pending).toHaveLength(0);
+    });
+
+    it('a same-location Change IP is not torn down by the old retry firing mid-rotate', async () => {
+      const servers = ['10.0.0.1', '10.0.0.2'];
+      const ams: Target = { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers };
+      let gate: Promise<void> | undefined;
+      const provider = { ...fakeProvider([ams]), targets: async () => (await gate, [ams]) };
+      const retries = retryRecorder();
+      const { manager, state, engine, secrets } = setup({
+        targets: [ams],
+        exitIpResults: [{ ip: '1.1.1.1', country: 'NL' }, { ip: '2.2.2.2', country: 'NL' }],
+        depsOverrides: { scheduleRetry: retries.scheduleRetry, providers: { get: () => provider } },
+      });
+      // An unreadable secret leaves the port retrying on a local timer.
+      secrets.deleteSecret('z1-secret');
+      await manager.startPort('zoogvpn:nl-ams');
+      expect(retries.pending).toHaveLength(1);
+      secrets.saveSecret('z1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
+
+      let release!: () => void;
+      gate = new Promise((r) => (release = r));
+      const rotating = manager.rotatePort('zoogvpn:nl-ams');
+      // The timer fires while the rotate is still looking up the location.
+      retries.pending.shift()!();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(engine.started).toHaveLength(0); // no competing start
+      expect(retries.pending).toHaveLength(1); // still owed, should the rotate not move the port
+      release();
+      const result = await rotating;
+      expect(result.changed).toBe(true);
+      expect(retries.pending).toHaveLength(0); // the rotate restarted the port: nothing owed
+      expect(engine.started.map((s) => s.key)).toEqual(['zoogvpn:nl-ams']);
+      expect(state.getState().ports[0].server).toBe('10.0.0.2');
+    });
+  });
+
   describe('server-pool failover (spec §6.8)', () => {
     const twoServerTargets: Target[] = [
       { key: 'zoogvpn:nl-ams', providerId: 'zoogvpn', country: 'NL', city: 'Amsterdam', label: 'Amsterdam', servers: ['10.0.0.1', '10.0.0.2'] },

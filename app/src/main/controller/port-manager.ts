@@ -438,9 +438,16 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         ? { kind: 'retrying', untilMs, attempt, reasonKey: outcome.reasonKey }
         : { kind: 'failed', reason: outcome.reason, untilMs, attempt };
     updatePort(key, { state });
+    armLocalRetry(key, delayMs);
+  }
+
+  function armLocalRetry(key: string, delayMs: number): void {
     cancelLocalRetry(key);
     const cancel = scheduleRetryFn(delayMs, () => {
       localRetryCancel.delete(key);
+      // A Change IP in flight owns the port's restart; if it ends without moving the
+      // port, this retry is still owed, so it waits another round instead of racing it.
+      if (rotatingKeys.has(key)) return armLocalRetry(key, delayMs);
       void startPort(key).catch(() => undefined);
     });
     localRetryCancel.set(key, cancel);
@@ -638,7 +645,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     try {
       const s = deps.state.getState();
       const port = s.ports.find((p) => p.key === key);
-      if (!port) throw new Error(`startPort: unknown port ${key}`);
+      // Removed, or renamed by a Change IP to another city, since this start was due:
+      // nothing to start, and nothing to retry (a retry would only find it gone again).
+      if (!port) return;
       const account = s.accounts.find((a) => a.id === port.accountId);
       const provider = account && deps.providers.get(port.providerId);
       if (!account || !provider) {
@@ -846,6 +855,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     });
 
     if ('noteKey' in claim) return { changed: false, noteKey: claim.noteKey };
+    // The rotate restarts the port itself: a local retry still pending from an earlier
+    // failure must not fire into it (or, after a move, at a key that no longer exists).
+    clearLocalRetryAttempts(key);
     const { target, pick, finalKey, fellBackToAnotherCity } = claim;
     effectiveKey.current = finalKey;
     rotatingKeys.add(finalKey);
