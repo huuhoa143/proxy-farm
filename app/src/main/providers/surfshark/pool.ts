@@ -7,8 +7,13 @@
  * The cluster's single WireGuard pubKey works for every pool IP, so pinning
  * one gives a port a fixed exit (server IP + 1). Discovery therefore samples
  * the hostname several times, a few seconds apart, through the system
- * resolver and DoH (`cloudflare-dns.com`, a different view of the rotation),
- * and accumulates every A record seen with `firstSeen` / `lastSeen`.
+ * resolver and DoH (`dns.google`, a different view of the rotation), and
+ * accumulates every A record seen with `firstSeen` / `lastSeen`.
+ *
+ * Measured 2026-10-08 (16 lookups per cluster): `dns.resolve4` sees 11–14
+ * distinct IPs, while `dns.lookup` sees ~4 because getaddrinfo caches the
+ * answer, so the system side must query the resolver, not the OS cache.
+ * cloudflare-dns.com added nothing over the system resolver; dns.google did.
  *
  * Schedule:
  * - A cluster is sampled when it has never been sampled, and again at most
@@ -39,13 +44,13 @@ import path from 'node:path';
 export const POOL_REFRESH_MS = 12 * 60 * 60 * 1000;
 export const POOL_FORGET_MS = 7 * 24 * 60 * 60 * 1000;
 export const POOL_RETRY_MS = 15 * 60 * 1000;
-export const DOH_URL = 'https://cloudflare-dns.com/dns-query';
+export const DOH_URL = 'https://dns.google/resolve';
 
 const IPV4_RE = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 const LOOKUP_TIMEOUT_MS = 5000;
 
 export interface PoolNet {
-  /** A records via the OS resolver. */
+  /** A records straight from the configured DNS server (no OS cache). */
   resolveSystem(host: string): Promise<string[]>;
   /** A records via DNS-over-HTTPS. */
   resolveDoh(host: string): Promise<string[]>;
@@ -81,8 +86,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
 
 export const defaultPoolNet: PoolNet = {
   async resolveSystem(host) {
-    const addrs = await withTimeout(dns.lookup(host, { all: true, family: 4 }), LOOKUP_TIMEOUT_MS, host);
-    return addrs.map((a) => a.address);
+    return withTimeout(dns.resolve4(host), LOOKUP_TIMEOUT_MS, host);
   },
   async resolveDoh(host) {
     const url = `${DOH_URL}?name=${encodeURIComponent(host)}&type=A`;
