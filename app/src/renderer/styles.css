@@ -944,8 +944,7 @@ table.port-table {
 .st .lbl.neutral {
   color: var(--dim);
 }
-.st-sub,
-.st-note {
+.st-sub {
   max-width: 300px;
 }
 .st-sub {
@@ -969,20 +968,47 @@ table.port-table {
 .st-sub .btn {
   margin-top: 6px;
 }
+/* Change IP result: one compact line under its row, spanning the columns */
+.port-table tr.note-row > td {
+  padding-top: 0;
+  padding-bottom: 10px;
+}
+.port-table tr.note-row.is-selected {
+  background: var(--acc-soft);
+}
+.port-table tr.note-row.is-selected > td.c-sel {
+  background: linear-gradient(var(--acc-soft), var(--acc-soft)), var(--panel);
+}
+.port-table tr.note-row.is-failed {
+  background: var(--bad-row);
+}
+.port-table tr.note-row.is-failed > td.c-sel {
+  background: linear-gradient(var(--bad-row), var(--bad-row)), var(--panel);
+}
+.port-table tbody tr.row:has(+ tr.note-row) > td {
+  padding-bottom: 6px;
+}
 .st-note {
-  margin: 5px 0 0 23px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
+  /* fill the cell without adding to the table's min-content width */
+  width: 0;
+  min-width: 100%;
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--dim);
-  white-space: normal;
+  white-space: nowrap;
+  animation: fade 0.2s ease-out both;
+}
+.st-note span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .st-note svg {
   width: 13px;
   height: 13px;
-  margin-top: 2px;
   color: var(--acc);
 }
 .loc {
@@ -2162,8 +2188,7 @@ table.port-table {
   .rowact .btn {
     padding: 5px 8px;
   }
-  .st-sub,
-  .st-note {
+  .st-sub {
     max-width: 230px;
   }
   .port-table td,

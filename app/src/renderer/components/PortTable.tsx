@@ -331,12 +331,6 @@ export function PortTable({
                     )}
                   </>
                 )}
-                {note && (
-                  <div className="st-note" data-testid={`rotate-note-${row.key}`} role="status">
-                    <Icon name="rotate" />
-                    <span>{note}</span>
-                  </div>
-                )}
               </td>
               <td className="c-srv">
                 <div className="srv">
@@ -429,6 +423,19 @@ export function PortTable({
                 </div>
               </td>
             </tr>
+            {note && (
+              // Its own full-width line under the row, so a long "a → b" never
+              // wraps inside (and widens) the Status column.
+              <tr className={`note-row${selected ? ' is-selected' : ''}${state.kind === 'failed' ? ' is-failed' : ''}`} data-testid={`rotate-note-row-${row.key}`}>
+                <td className="c-sel" />
+                <td colSpan={COLUMNS - 1}>
+                  <div className="st-note" data-testid={`rotate-note-${row.key}`} role="status" title={note}>
+                    <Icon name="rotate" />
+                    <span>{note}</span>
+                  </div>
+                </td>
+              </tr>
+            )}
             {isOpen && <PortDetailsDrawer row={row} api={api} colSpan={COLUMNS} />}
           </Fragment>
         );

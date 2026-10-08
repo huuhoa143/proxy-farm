@@ -147,7 +147,33 @@ describe('PortTable', () => {
         notes={{ online: 'Exit IP changed: 1.2.3.4 → 5.6.7.8' }}
       />,
     );
-    expect(screen.getByTestId('rotate-note-online')).toHaveTextContent('Exit IP changed: 1.2.3.4 → 5.6.7.8');
+    const note = screen.getByTestId('rotate-note-online');
+    expect(note).toHaveTextContent('Exit IP changed: 1.2.3.4 → 5.6.7.8');
+    expect(note).toHaveAttribute('title', 'Exit IP changed: 1.2.3.4 → 5.6.7.8');
+    // Its own full-width row right under the port's row — not inside the Status cell,
+    // where a long "a → b" wrapped and widened the column.
+    const portRow = screen.getByTestId('port-row-online');
+    expect(portRow).not.toContainElement(note);
+    const noteRow = screen.getByTestId('rotate-note-row-online');
+    expect(portRow.nextElementSibling).toBe(noteRow);
+    const cell = note.closest('td');
+    expect(cell?.colSpan).toBe(portRow.querySelectorAll(':scope > td').length - 1);
+  });
+
+  it('renders no note row when there is no rotate-result note', () => {
+    const online = row('online', { kind: 'online', since: Date.now(), exitIp: '1.2.3.4', country: 'JP' });
+    render(
+      <PortTable
+        rows={[online]}
+        selectedKeys={new Set()}
+        onToggleSelect={noop}
+        onToggleSelectAll={noop}
+        onCopy={noop}
+        onRotate={noop}
+        api={defaultApi()}
+      />,
+    );
+    expect(screen.queryByTestId('rotate-note-row-online')).toBeNull();
   });
 
   it('Details drawer fetches logs and Refresh re-fetches them', async () => {
