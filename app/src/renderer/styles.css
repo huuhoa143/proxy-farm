@@ -1551,6 +1551,8 @@ table.port-table {
   flex: 1;
   overflow: auto;
   padding: 2px 12px 14px;
+  /* keyboard focus scrolls a row clear of the sticky country header */
+  scroll-padding-top: 48px;
 }
 .grp + .grp {
   margin-top: 4px;
@@ -1560,10 +1562,17 @@ table.port-table {
   align-items: center;
   gap: 10px;
   padding: 12px 10px 6px;
+  /* Pull the opaque header over the list's 12px side gutter too, and draw a
+     rule under it, so a city row scrolling beneath reads as tucked under a
+     clean edge instead of being half-covered. */
+  margin: 0 -12px;
+  padding-left: 22px;
+  padding-right: 22px;
   position: sticky;
   top: 0;
   background: var(--panel);
-  z-index: 1;
+  box-shadow: 0 1px 0 var(--line);
+  z-index: 2;
 }
 .grp-h .nm {
   font-size: 12px;
