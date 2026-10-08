@@ -25,6 +25,10 @@ export interface AutoRotateScheduler {
 
 function defaultSchedule(ms: number, cb: () => void): () => void {
   const timer = setInterval(cb, ms);
+  // Don't let a rotate timer keep the process alive during shutdown (the
+  // scheduler is also stopped explicitly via stopAll, but unref is the belt to
+  // that braces so a tick can never outlive the app it serves).
+  timer.unref?.();
   return () => clearInterval(timer);
 }
 

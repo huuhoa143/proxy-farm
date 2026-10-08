@@ -163,6 +163,26 @@ describe('reapOrphans', () => {
     expect(raw).toEqual({});
   });
 
+  it('kills when `ps` truncated the exe path (prefix of the recorded full path)', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'pf-pidreg-'));
+    const registryPath = path.join(dir, 'pids.json');
+    const child = spawnSleeper();
+    await new Promise((r) => child.once('spawn', r));
+
+    const full = '/Applications/Proxy Farm.app/Contents/Resources/sing-box/darwin-arm64/sing-box';
+    await recordPid(registryPath, 'k1', { pid: child.pid!, exe: full, startedAt: 1700000000000 });
+
+    const exited = waitExit(child);
+    const killed = await reapOrphans(registryPath, {
+      // comm= truncated the long path to a leading slice — still our process.
+      readProcess: async (pid) => (pid === child.pid ? { exe: full.slice(0, 40), startedAt: 1700000000000 } : null),
+    });
+
+    expect(killed).toBe(1);
+    await exited;
+    expect(isAlive(child.pid!)).toBe(false);
+  });
+
   it('does NOT kill when the exe path does not match (pid reused by another process)', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'pf-pidreg-'));
     const registryPath = path.join(dir, 'pids.json');

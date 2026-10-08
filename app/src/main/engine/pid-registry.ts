@@ -151,6 +151,24 @@ async function defaultReadProcess(pid: number): Promise<ProcessSnapshot | null> 
   }
 }
 
+/**
+ * Whether an observed process path matches the one recorded at spawn. Exact
+ * match is the common case, but macOS `ps -o comm=` truncates long paths (a
+ * packaged `/Applications/Proxy Farm.app/Contents/Resources/.../sing-box` can
+ * exceed the column width), so also accept a prefix match (observed is a leading
+ * slice of the recorded full path, or vice-versa) or an equal basename. This
+ * only ever loosens the exe check — reaping still also requires the pid to be
+ * one we recorded, currently alive, AND started within the start-time tolerance,
+ * which is what actually prevents touching an unrelated process on a reused pid.
+ */
+function exePathsMatch(observed: string, recorded: string): boolean {
+  if (observed === recorded) return true;
+  if (observed.length > 0 && (recorded.startsWith(observed) || observed.startsWith(recorded))) return true;
+  const base = (p: string): string => p.split(/[/\\]/).pop() ?? p;
+  const ob = base(observed);
+  return ob.length > 0 && ob === base(recorded);
+}
+
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -199,7 +217,7 @@ export async function reapOrphans(registryPath: string, opts: ReapOrphansOptions
       // eslint-disable-next-line no-await-in-loop
       const snapshot = await readProcess(entry.pid);
       if (!snapshot) continue;
-      const exeMatches = snapshot.exe === entry.exe;
+      const exeMatches = exePathsMatch(snapshot.exe, entry.exe);
       const timeMatches = Math.abs(snapshot.startedAt - entry.startedAt) <= tolerance;
       if (exeMatches && timeMatches) {
         kill(entry.pid);

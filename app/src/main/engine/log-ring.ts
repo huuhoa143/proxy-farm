@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]/g;
 
-const SENSITIVE_KEYS = ['username', 'password', 'private_key', 'pre_shared_key', 'secret'];
+const SENSITIVE_KEYS = ['username', 'password', 'private_key', 'pre_shared_key', 'secret', 'udid'];
 const KEY_GROUP = SENSITIVE_KEYS.join('|');
 
 /**
@@ -28,6 +28,15 @@ const MIXED_INBOUND_USER_RE = /(inbound\/mixed\[[^\]]*\]:\s*)\[[^\]]*\]/g;
 const HEX_RUN_RE = /(?<![0-9a-f])[0-9a-f]{64,}(?![0-9a-f])/gi;
 
 /**
+ * The HMA device id (udid) used as the OpenVPN username (spec §5.1), shaped
+ * `U1.<uuid>.hmaNNN`. It is in the threat model but isn't a 64-hex run and may
+ * appear bare in a sing-box line with no `username=` key, so match the shape
+ * directly. (The matching `username=`/`username:` and the 64-hex password are
+ * already covered above.)
+ */
+const UDID_RE = /\bU\d+\.[0-9a-f-]{16,}\.hma\d+\b/gi;
+
+/**
  * Redacts a log line before it is ever buffered (spec §6.1.7): strips ANSI
  * escapes first (so the patterns below see plain text), then the bracketed
  * proxy username in `inbound/mixed[tag]: [user] ...` connection logs, then
@@ -42,6 +51,7 @@ export function redactLine(line: string): string {
   out = out.replace(SENSITIVE_FIELD_RE, (_match, prefix: string, value: string) =>
     value.startsWith('"') ? `${prefix}"[redacted]"` : `${prefix}[redacted]`,
   );
+  out = out.replace(UDID_RE, '[redacted]');
   out = out.replace(HEX_RUN_RE, '[redacted]');
   return out;
 }

@@ -88,6 +88,9 @@ export interface PortManager {
    * the integrator can call it once at app startup with the rows loaded from disk
    * (nothing in this module runs until something calls a method on it). */
   syncAutoRotate(): void;
+  /** Cancels every auto-rotate timer. Call once on app shutdown so no rotate tick
+   * fires (or keeps the event loop alive) while engines are being torn down. */
+  stopAutoRotate(): void;
 }
 
 /**
@@ -729,5 +732,5 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }
   }
 
-  return { startPort, stopPort, removePort, rotatePort, setAutoRotate, exportPorts, testPort, ensurePort, syncAutoRotate };
+  return { startPort, stopPort, removePort, rotatePort, setAutoRotate, exportPorts, testPort, ensurePort, syncAutoRotate, stopAutoRotate: () => autoRotate.stopAll() };
 }

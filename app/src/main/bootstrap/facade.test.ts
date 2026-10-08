@@ -84,6 +84,7 @@ function fakePortManager(state: StateStore) {
       return row;
     },
     syncAutoRotate: () => undefined,
+    stopAutoRotate: () => undefined,
   };
   return pm;
 }

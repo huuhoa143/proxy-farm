@@ -134,6 +134,15 @@ function assertInbound(cfg: Record<string, unknown>): void {
     if (!Array.isArray(users) || users.length === 0) {
       throw new Error('assertConfigInvariants: inbound.users must be non-empty when listen is "0.0.0.0" (LAN sharing requires proxy auth)');
     }
+    // Backstop must guard the property it protects: an empty/absent username or
+    // password would expose the LAN inbound as an open proxy just as a missing
+    // users array would. Unreachable via render-config today, but this is the
+    // last line of defence, so assert the credentials are actually present.
+    for (const u of users as Array<Record<string, unknown>>) {
+      if (typeof u?.username !== 'string' || u.username.length === 0 || typeof u?.password !== 'string' || u.password.length === 0) {
+        throw new Error('assertConfigInvariants: every inbound user must have a non-empty username and password when listen is "0.0.0.0"');
+      }
+    }
   }
 }
 

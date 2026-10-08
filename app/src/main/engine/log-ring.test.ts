@@ -83,6 +83,19 @@ describe('redactLine', () => {
     const line = 'password_hash_old=deadbeef';
     expect(redactLine(line)).toBe(line);
   });
+
+  it('redacts a bare HMA udid token (U<n>.<uuid>.hmaN) even with no key name', () => {
+    const udid = 'U1.550e8400-e29b-41d4-a716-446655440000.hma123';
+    const line = `INFO openvpn: connecting as ${udid} to server`;
+    const out = redactLine(line);
+    expect(out).not.toContain(udid);
+    expect(out).toBe('INFO openvpn: connecting as [redacted] to server');
+  });
+
+  it('redacts a udid given as a value of a udid key', () => {
+    const line = 'udid=U1.550e8400-e29b-41d4-a716-446655440000.hma7';
+    expect(redactLine(line)).toBe('udid=[redacted]');
+  });
 });
 
 describe('LogRing', () => {

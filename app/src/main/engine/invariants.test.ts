@@ -30,6 +30,20 @@ describe('assertConfigInvariants', () => {
     expect(() => assertConfigInvariants(cfg)).not.toThrow();
   });
 
+  it('throws when a 0.0.0.0 inbound user is missing a password (would be an open LAN proxy)', () => {
+    const cfg = baseConfig();
+    (cfg.inbounds as Array<Record<string, unknown>>)[0].listen = '0.0.0.0';
+    (cfg.inbounds as Array<Record<string, unknown>>)[0].users = [{ username: 'u' }];
+    expect(() => assertConfigInvariants(cfg)).toThrow(/non-empty username and password/);
+  });
+
+  it('throws when a 0.0.0.0 inbound user has an empty username', () => {
+    const cfg = baseConfig();
+    (cfg.inbounds as Array<Record<string, unknown>>)[0].listen = '0.0.0.0';
+    (cfg.inbounds as Array<Record<string, unknown>>)[0].users = [{ username: '', password: 'p' }];
+    expect(() => assertConfigInvariants(cfg)).toThrow(/non-empty username and password/);
+  });
+
   it('throws on non-object input', () => {
     expect(() => assertConfigInvariants(null)).toThrow();
     expect(() => assertConfigInvariants('nope')).toThrow();

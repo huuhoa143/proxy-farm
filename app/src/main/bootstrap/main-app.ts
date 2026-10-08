@@ -6,7 +6,7 @@
  *   start queue → facade + IPC → window → tray/power/host-VPN/webhook → restart the
  *   ports that were on → quit handling (stop every engine and wait).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, powerSaveBlocker, safeStorage, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, powerSaveBlocker, safeStorage, session, shell, Tray } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
@@ -199,7 +199,7 @@ export function runApp(): void {
     const realEngine = createRealEngine({
       registryPath,
       binPath: binPath || 'sing-box',
-      createPortHealth: (o) => new PortHealth({ ...o, giveUpAfter: settingsNow().giveUpAfter }),
+      createPortHealth: (o) => new PortHealth({ ...o, giveUpAfter: () => settingsNow().giveUpAfter }),
     });
     const engine: Engine = {
       ...realEngine,
@@ -350,6 +350,19 @@ export function runApp(): void {
     })();
     if (process.platform === 'darwin' && appIcon) app.dock?.setIcon(appIcon);
 
+    // Content-Security-Policy (defense-in-depth for a credential-handling app).
+    // sandbox:false + the preload bridge means any remote page that ever loaded
+    // in this window would inherit the full IPC surface, so lock down what can
+    // load/execute. Production is strict (scripts from the bundle only); dev is
+    // loosened just enough for Vite's HMR (inline/eval + the ws dev channel).
+    const isDevServer = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    const csp = isDevServer
+      ? "default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*; img-src 'self' data:; font-src 'self' data:"
+      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
+    session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
+      cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } });
+    });
+
     function createWindow(): void {
       mainWindow = new BrowserWindow({
         width: 1280,
@@ -386,6 +399,15 @@ export function runApp(): void {
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         if (/^https?:\/\//.test(url)) void shell.openExternal(url);
         return { action: 'deny' };
+      });
+      // Never let the main frame navigate away from the app's own origin — a
+      // remote page here would keep this frame's identity and thus the full IPC
+      // surface (see CSP note above). External http(s) links open in the browser.
+      mainWindow.webContents.on('will-navigate', (event, url) => {
+        const allowed = MAIN_WINDOW_VITE_DEV_SERVER_URL ? url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL) : url.startsWith('file://');
+        if (allowed) return;
+        event.preventDefault();
+        if (/^https?:\/\//.test(url)) void shell.openExternal(url);
       });
       if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
         void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -467,6 +489,7 @@ export function runApp(): void {
     shutdown = async () => {
       shuttingDown = true;
       updater.stopPeriodicCheck();
+      portManager.stopAutoRotate();
       hmaSync.dispose();
       hostVpn.stop();
       power?.dispose();
