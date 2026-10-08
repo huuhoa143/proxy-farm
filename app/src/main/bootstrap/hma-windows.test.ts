@@ -6,6 +6,7 @@ import {
   createHmaWindowsSupport,
   hmaAuthPath,
   hmaMirrorPath,
+  isLocalPath,
   MAX_COMMAND_LINE,
   parseWhoamiSid,
   psQuote,
@@ -40,14 +41,35 @@ describe('HMA support on Windows (spec §7)', () => {
     expect(script).toContain("$app = 'C:\\Users\\O''Brien\\Proxy Farm.exe'");
   });
 
-  it('the setup embeds the task script, grants the user read + run only, and hands the script to Administrators', () => {
+  it('accepts only a local fixed-drive app path', () => {
+    expect(isLocalPath('C:\\Users\\me\\AppData\\Local\\Programs\\proxy-farm\\Proxy Farm.exe')).toBe(true);
+    expect(isLocalPath('\\\\server\\share\\Proxy Farm.exe')).toBe(false);
+    expect(isLocalPath('\\\\?\\C:\\x.exe')).toBe(false);
+    expect(isLocalPath('relative\\x.exe')).toBe(false);
+    expect(() => buildSyncScript('\\\\evil\\share\\x.exe')).toThrow(/local path/);
+  });
+
+  it('the sync script verifies HMA\'s folders are trusted before copying, and refuses a non-local app path', () => {
+    const sync = buildSyncScript('C:\\pf.exe');
+    expect(sync).toContain('function Test-Trusted');
+    // TrustedInstaller, SYSTEM and Administrators are the only accepted owners.
+    expect(sync).toContain('S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464');
+    expect(sync).toContain('ReparsePoint');
+    expect(sync).toContain('$app.StartsWith($env:SystemDrive');
+  });
+
+  it('the setup embeds the sync script in the task action, grants the user read + run only, and never writes a script file', () => {
     const setup = buildSetupScript({ userSid: SID, appExe: 'C:\\pf.exe' });
-    const embedded = setup.match(/\$syncB64 = '([^']+)'/)?.[1] ?? '';
-    expect(Buffer.from(embedded, 'base64').toString('utf8')).toBe(buildSyncScript('C:\\pf.exe'));
+    const encoded = setup.match(/-EncodedCommand ([A-Za-z0-9+/=]+)'/)?.[1] ?? '';
+    expect(Buffer.from(encoded, 'base64').toString('utf16le')).toBe(buildSyncScript('C:\\pf.exe'));
     expect(setup).toContain(`$sid = '${SID}'`);
     expect(setup).toContain("'ReadAndExecute'");
     expect(setup).toContain('(A;;GRGX;;;$_)');
-    expect(setup).toMatch(/\$scriptAcl\.SetOwner\(\[Security\.Principal\.SecurityIdentifier\]'S-1-5-32-544'\)/);
+    // No script file on disk any more.
+    expect(setup).not.toContain('hma-sync.ps1');
+    // Every created folder ends up an Administrators-owned real directory or the setup throws.
+    expect(setup).toContain('not owned by Administrators');
+    expect(setup).toContain('is a reparse point');
   });
 
   it('the elevation command carries the setup intact and fits the Windows command line', () => {
@@ -95,6 +117,13 @@ describe('HMA support on Windows (spec §7)', () => {
       const hma = createHmaWindowsSupport({ runFile: async (file) => (calls.push(file), { code: 1, stdout: '' }) });
       expect(await hma.enable()).toEqual({ ok: false, reason: 'failed' });
       expect(calls).toHaveLength(1);
+    });
+
+    it('refuses a non-local app path without running anything', async () => {
+      const calls: string[] = [];
+      const hma = createHmaWindowsSupport({ appExe: '\\\\srv\\share\\Proxy Farm.exe', runFile: async (f) => (calls.push(f), { code: 0, stdout: '' }) });
+      expect(await hma.enable()).toEqual({ ok: false, reason: 'failed' });
+      expect(calls).toHaveLength(0);
     });
   });
 

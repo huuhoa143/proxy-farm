@@ -54,12 +54,24 @@ export function psQuote(value: string): string {
   return `'${value.replace(/['‘’‚‛]/g, (q) => q + q)}'`;
 }
 
+/** A local fixed-drive path (`C:\...`); never a UNC path or a drive-relative one. SYSTEM
+ * must not probe a path a standard user could point at a network location. */
+export function isLocalPath(p: string): boolean {
+  return /^[A-Za-z]:\\(?!\\)/.test(p);
+}
+
 /**
- * The script the task runs as SYSTEM. Copies HMA's `auth` only when it changed (so the
- * app's file watcher sees real changes only), via a temp file and a rename so a reader
- * never sees half a file, and removes the copy when HMA has none (signed out).
+ * The script the task runs as SYSTEM. It is embedded in the task action itself
+ * (`-EncodedCommand`), never written to a file a user could later tamper with. Before
+ * reading HMA's credentials it checks that every folder from `Privax` down to the `auth`
+ * file is owned by SYSTEM, Administrators or TrustedInstaller and is not a reparse point,
+ * so a standard user — who may create folders under `%ProgramData%` — cannot make the task
+ * copy some other SYSTEM-readable file into the user-readable copy or follow a link out.
+ * It copies only when the file changed (via a temp file + rename), removes the copy when
+ * HMA has none (signed out), and removes itself and the copy when Proxy Farm is gone.
  */
 export function buildSyncScript(appExe: string): string {
+  if (!isLocalPath(appExe)) throw new Error(`hma-windows: appExe must be a local path: ${appExe}`);
   return `# Proxy Farm - HMA support. Installed by Proxy Farm; runs as SYSTEM.
 # Keeps a copy of HMA VPN's device credentials that Proxy Farm can read.
 $ErrorActionPreference = 'Stop'
@@ -67,17 +79,31 @@ $ProgressPreference = 'SilentlyContinue'
 $root = Join-Path $env:ProgramData 'ProxyFarm'
 $dir = Join-Path $root 'hma'
 $dst = Join-Path $dir 'auth'
-$src = Join-Path $env:ProgramData 'Privax\\HMA VPN\\HmaProVpn\\auth'
+$hmaDir = Join-Path $env:ProgramData 'Privax\\HMA VPN\\HmaProVpn'
+$src = Join-Path $hmaDir 'auth'
 $app = ${psQuote(appExe)}
-if (-not (Test-Path -LiteralPath $app -PathType Leaf)) {
-  # Proxy Farm was uninstalled: remove this task and the copy.
+# TrustedInstaller, SYSTEM and Administrators are the only owners a system path may have.
+$trusted = @('S-1-5-18', 'S-1-5-32-544', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+function Test-Trusted([string]$p) {
+  $it = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+  if (-not $it) { return $false }
+  if (($it.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
+  return $trusted -contains (Get-Acl -LiteralPath $p).GetOwner([Security.Principal.SecurityIdentifier]).Value
+}
+if (-not $app.StartsWith($env:SystemDrive, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $app -PathType Leaf)) {
+  # Proxy Farm was uninstalled (or the recorded path is not local): remove the copy and self.
   Unregister-ScheduledTask -TaskPath ${psQuote(HMA_TASK_FOLDER)} -TaskName ${psQuote(HMA_TASK_NAME)} -Confirm:$false -ErrorAction SilentlyContinue
   try { $svc = New-Object -ComObject 'Schedule.Service'; $svc.Connect(); $svc.GetFolder('\\').DeleteFolder(${psQuote(HMA_TASK_FOLDER.replace(/\\/g, ''))}, 0) } catch { }
   cmd.exe /d /c rd /s /q "$root" | Out-Null
   exit 0
 }
 if (-not (Test-Path -LiteralPath $dir -PathType Container)) { exit 0 }
-if (Test-Path -LiteralPath $src -PathType Leaf) {
+# The HMA chain must be trusted at every level, or we leave the copy as it was / remove it.
+$ok = $true
+foreach ($p in @((Join-Path $env:ProgramData 'Privax'), (Join-Path $env:ProgramData 'Privax\\HMA VPN'), $hmaDir)) {
+  if (-not (Test-Trusted $p)) { $ok = $false; break }
+}
+if ($ok -and (Test-Path -LiteralPath $src -PathType Leaf) -and (Test-Trusted $src)) {
   $bytes = [IO.File]::ReadAllBytes($src)
   if ((Test-Path -LiteralPath $dst -PathType Leaf) -and
       ([Convert]::ToBase64String([IO.File]::ReadAllBytes($dst)) -eq [Convert]::ToBase64String($bytes))) { exit 0 }
@@ -85,22 +111,31 @@ if (Test-Path -LiteralPath $src -PathType Leaf) {
   [IO.File]::WriteAllBytes($tmp, $bytes)
   Move-Item -LiteralPath $tmp -Destination $dst -Force
 } elseif (Test-Path -LiteralPath $dst) {
+  # Signed out, or HMA's folder is not trustworthy: do not keep a stale copy around.
   Remove-Item -LiteralPath $dst -Force
 }
 `;
 }
 
+/** PowerShell's `-EncodedCommand`: base64 of UTF-16LE. */
+export function encodePowerShell(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64');
+}
+
 /**
  * The elevated setup (run once, after the UAC prompt). It (re)creates
- * `%ProgramData%\ProxyFarm` with an Administrators-owned, protected ACL (a folder that
- * existed with any other owner is deleted first, since anyone may create folders in
- * ProgramData), writes the sync script there, and registers the task with a security
- * descriptor that lets the enabling user start it. Users who enabled it before keep
- * their access. Exits 0 once the copy exists, 2 when HMA has no credentials yet.
+ * `%ProgramData%\ProxyFarm` and `…\hma`, each owned by Administrators with a protected ACL
+ * that only grants the enabling user read (any pre-existing folder with a foreign owner, or
+ * a reparse point, is deleted first — anyone may create folders under `%ProgramData%`), and
+ * registers the task with the sync script embedded in its action and a security descriptor
+ * that lets the enabling user start it. Users who enabled it before keep their access.
+ * The script is never written to disk, so there is no script file for a user to tamper with.
+ * Exits 0 once the copy exists, 2 when HMA has no credentials yet.
  */
 export function buildSetupScript(opts: { userSid: string; appExe: string }): string {
   if (!SID_RE.test(opts.userSid)) throw new Error(`hma-windows: not a SID: ${opts.userSid}`);
-  const sync = buildSyncScript(opts.appExe);
+  const syncEncoded = encodePowerShell(buildSyncScript(opts.appExe));
+  const powershell = `$env:SystemRoot + '\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'`;
   return `$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $sid = ${psQuote(opts.userSid)}
@@ -110,59 +145,51 @@ $trusted = @('S-1-5-18', 'S-1-5-32-544')
 $users = New-Object System.Collections.Generic.List[string]
 $users.Add($sid)
 
-function Get-TrustedDir([string]$path) {
+function Remove-IfUntrusted([string]$path) {
+  # Returns $true if, afterwards, $path does NOT exist (so the caller creates it fresh).
   $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-  if (-not $item) { return $null }
+  if (-not $item) { return $true }
   $isLink = ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
   $owner = if ($item.PSIsContainer -and -not $isLink) { (Get-Acl -LiteralPath $path).GetOwner([Security.Principal.SecurityIdentifier]).Value } else { '' }
-  if ($trusted -contains $owner) { return $item }
-  # Not ours: remove it without following links (rd never traverses junctions).
+  if ($trusted -contains $owner) { return $false }
+  # Not ours (or a link): remove without following links (rd never traverses junctions).
   if ($item.PSIsContainer) { cmd.exe /d /c rd /s /q "$path" | Out-Null } else { Remove-Item -LiteralPath $path -Force }
   if (Test-Path -LiteralPath $path) { throw "cannot replace $path" }
-  return $null
+  return $true
 }
 
-function Set-DirAcl([string]$path, [bool]$userInherits) {
+function New-TrustedDir([string]$path, [bool]$userInherits) {
+  # New-Item throws if the path was recreated between the check and here, closing the race.
+  if (Remove-IfUntrusted $path) { New-Item -ItemType Directory -Path $path -ErrorAction Stop | Out-Null }
   $acl = New-Object System.Security.AccessControl.DirectorySecurity
   $acl.SetOwner([Security.Principal.SecurityIdentifier]'S-1-5-32-544')
   $acl.SetAccessRuleProtection($true, $false)
   $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
-  $none = [Security.AccessControl.InheritanceFlags]::None
   foreach ($s in $trusted) {
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule([Security.Principal.SecurityIdentifier]$s, 'FullControl', $inherit, 'None', 'Allow')))
   }
-  $flags = if ($userInherits) { $inherit } else { $none }
+  $flags = if ($userInherits) { $inherit } else { [Security.AccessControl.InheritanceFlags]::None }
   foreach ($u in $users) {
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule([Security.Principal.SecurityIdentifier]$u, 'ReadAndExecute', $flags, 'None', 'Allow')))
   }
   Set-Acl -LiteralPath $path -AclObject $acl
+  # The final state must be an Administrators-owned real directory, or we refuse.
+  $final = Get-Item -LiteralPath $path -Force
+  if (($final.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "$path is a reparse point" }
+  if ((Get-Acl -LiteralPath $path).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544') { throw "$path not owned by Administrators" }
 }
 
-$rootItem = Get-TrustedDir $root
-if ($rootItem) {
-  $dirItem = Get-TrustedDir $dir
-  if ($dirItem) {
-    # Keep the users who enabled HMA support before.
-    foreach ($rule in (Get-Acl -LiteralPath $dir).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier])) {
-      $v = $rule.IdentityReference.Value
-      if ($rule.AccessControlType -eq 'Allow' -and $trusted -notcontains $v -and -not $users.Contains($v)) { $users.Add($v) }
-    }
+# Keep the users who enabled HMA support before, if the existing hma folder is trusted.
+$existing = Get-Item -LiteralPath $dir -Force -ErrorAction SilentlyContinue
+if ($existing -and -not (($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) -and
+    ($trusted -contains (Get-Acl -LiteralPath $dir).GetOwner([Security.Principal.SecurityIdentifier]).Value)) {
+  foreach ($rule in (Get-Acl -LiteralPath $dir).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier])) {
+    $v = $rule.IdentityReference.Value
+    if ($rule.AccessControlType -eq 'Allow' -and $trusted -notcontains $v -and -not $users.Contains($v)) { $users.Add($v) }
   }
 }
-if (-not (Test-Path -LiteralPath $root)) { New-Item -ItemType Directory -Path $root | Out-Null }
-Set-DirAcl $root $false
-if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-Set-DirAcl $dir $true
-
-$script = Join-Path $root 'hma-sync.ps1'
-if (Test-Path -LiteralPath $script) { Remove-Item -LiteralPath $script -Force }
-$syncB64 = ${psQuote(Buffer.from(sync, 'utf8').toString('base64'))}
-[IO.File]::WriteAllText($script, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($syncB64)), (New-Object Text.UTF8Encoding($true)))
-# A file's owner may always rewrite its ACL, and a new file can be owned by the elevated
-# user rather than Administrators: a script SYSTEM runs must not belong to the user.
-$scriptAcl = Get-Acl -LiteralPath $script
-$scriptAcl.SetOwner([Security.Principal.SecurityIdentifier]'S-1-5-32-544')
-Set-Acl -LiteralPath $script -AclObject $scriptAcl
+New-TrustedDir $root $false
+New-TrustedDir $dir $true
 
 $svc = New-Object -ComObject 'Schedule.Service'
 $svc.Connect()
@@ -183,9 +210,10 @@ $boot = $def.Triggers.Create(8)
 $every = $def.Triggers.Create(1)
 $every.StartBoundary = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss')
 $every.Repetition.Interval = 'PT5M'
+# The sync script is embedded in the action (-EncodedCommand), not a file on disk.
 $action = $def.Actions.Create(0)
-$action.Path = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'
-$action.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $script + '"'
+$action.Path = ${powershell}
+$action.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand ${syncEncoded}'
 $sddl = 'D:P(A;;FA;;;SY)(A;;FA;;;BA)' + (($users | ForEach-Object { "(A;;GRGX;;;$_)" }) -join '')
 $task = $folder.RegisterTaskDefinition(${psQuote(HMA_TASK_NAME)}, $def, 6, 'SYSTEM', $null, 5, $sddl)
 $null = $task.Run($null)
@@ -259,6 +287,9 @@ export function createHmaWindowsSupport(opts: HmaWindowsSupportOptions = {}): Hm
 
   return {
     async enable() {
+      // The task probes this path as SYSTEM; a non-local path (e.g. UNC) is refused so it
+      // can never make SYSTEM authenticate to a remote host.
+      if (!isLocalPath(appExe)) return { ok: false, reason: 'failed' };
       const who = await runFile(system32('whoami.exe'), ['/user', '/fo', 'csv', '/nh']);
       const userSid = parseWhoamiSid(who.stdout);
       if (!userSid) return { ok: false, reason: 'failed' };
