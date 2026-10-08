@@ -30,6 +30,7 @@ import { setResourcesRoot } from '../resources-root';
 import { createStateStore } from '../store/state';
 import { createTray, onlineCountLabel, trayLabels, type TrayHandle } from '../tray';
 import { resolveRotateKey, startWebhook, type Webhook } from '../webhook/index';
+import { openExternalIfAllowed } from './external-links';
 import { createControllerFacade } from './facade';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
@@ -373,6 +374,8 @@ export function runApp(): void {
       cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } });
     });
 
+    const openExternal = (url: string) => openExternalIfAllowed(url, (u) => shell.openExternal(u), log);
+
     function createWindow(): void {
       mainWindow = new BrowserWindow({
         width: 1280,
@@ -404,20 +407,21 @@ export function runApp(): void {
         if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
       }, 4000);
       mainWindow.once('show', () => clearTimeout(revealGuard));
-      // External links (e.g. the updater's "Open releases page" fallback) open in the
-      // user's browser, never as a new in-app window.
+      // External links (About & help, the updater's "Open releases page" fallback) open
+      // in the user's browser, never as a new in-app window — and only when they point
+      // at this project's GitHub pages (isAllowedExternalUrl); anything else is dropped.
       mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+        openExternal(url);
         return { action: 'deny' };
       });
       // Never let the main frame navigate away from the app's own origin — a
       // remote page here would keep this frame's identity and thus the full IPC
-      // surface (see CSP note above). External http(s) links open in the browser.
+      // surface (see CSP note above). Allowlisted external links open in the browser.
       mainWindow.webContents.on('will-navigate', (event, url) => {
         const allowed = MAIN_WINDOW_VITE_DEV_SERVER_URL ? url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL) : url.startsWith('file://');
         if (allowed) return;
         event.preventDefault();
-        if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+        openExternal(url);
       });
       if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
         void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
