@@ -103,6 +103,9 @@ export interface CreateRealEngineOptions {
   delayProbeFn?: typeof delayProbe;
   exitIpProbeFn?: typeof probeExitIp;
   classifyLogFn?: typeof classifyLog;
+  /** Injectable proxy-port availability check. @default the real `isPortFree` (binds the
+   * port to test it). Tests inject a fake so they never depend on a real free port. */
+  isPortFreeFn?: typeof isPortFree;
   recordPidFn?: typeof recordPid;
   removePidFn?: typeof removePid;
   /** Injectable clock, used only for the pid registry's `startedAt`. */
@@ -181,6 +184,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   const doDelayProbe = options.delayProbeFn ?? delayProbe;
   const doExitIpProbe = options.exitIpProbeFn ?? probeExitIp;
   const doClassifyLog = options.classifyLogFn ?? classifyLog;
+  const doIsPortFree = options.isPortFreeFn ?? isPortFree;
   const doRecordPid = options.recordPidFn ?? recordPid;
   const doRemovePid = options.removePidFn ?? removePid;
   const now = options.now ?? Date.now;
@@ -328,7 +332,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     // substitute (spec §6.2: `failed('port-in-use')`, "Move to another port"). Auxiliary
     // (clash) ports, by contrast, just get a different candidate via `allocatePort`'s own
     // scan — that retry is already built into `allocatePort` below.
-    if (!(await isPortFree(input.listen.port))) {
+    if (!(await doIsPortFree(input.listen.port))) {
       throw new PortInUseError(input.listen.port);
     }
 

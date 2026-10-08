@@ -138,7 +138,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     removedPids.length = 0;
   });
 
-  function setup(opts: { exitIpResult?: ExitIpResult | Error; delayResult?: DelayResult } = {}) {
+  function setup(opts: { exitIpResult?: ExitIpResult | Error; delayResult?: DelayResult; isPortFree?: (port: number) => Promise<boolean> } = {}) {
     const processes: ReturnType<typeof fakeEngineProcess>[] = [];
     const healths: ReturnType<typeof fakePortHealth>[] = [];
     const delayCalls: Array<{ clashPort: number; secret: string; tag: string }> = [];
@@ -174,6 +174,7 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
         if (opts.exitIpResult instanceof Error) throw opts.exitIpResult;
         return opts.exitIpResult ?? { ip: '9.9.9.9', country: 'NL' };
       },
+      isPortFreeFn: opts.isPortFree,
       recordPidFn: async (registryPath, key, entry) => {
         recordedPids.push({ registryPath, key, entry });
       },
@@ -371,7 +372,10 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
 
     describe('reviewer round 3, item 1: the bind-error regex must not grab a timestamp', () => {
       it('a real timestamped PROXY-port bind-failure line -> terminal failed(port-in-use)', async () => {
-        const { engine, processes } = setup();
+        // Fake the pre-spawn port check (true) so `start` proceeds to the spawn; the
+        // bind failure under test arrives as a sing-box LOG line, not the pre-check.
+        // Keeps the test hermetic — it no longer binds the real default port 29001.
+        const { engine, processes } = setup({ isPortFree: async () => true });
         const seen: Array<{ key: string; state: PortState }> = [];
         engine.onStateChange((key, state) => seen.push({ key, state }));
         await engine.start('k1', sampleInput(29001));
