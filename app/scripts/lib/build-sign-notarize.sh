@@ -37,6 +37,7 @@ smoke_launch_app() {
 
   local STARTUP_TIMEOUT="${PF_SMOKE_STARTUP_TIMEOUT:-15}"
   local STABLE_SECONDS="${PF_SMOKE_STABLE_SECONDS:-5}"
+  local RENDERER_TIMEOUT="${PF_SMOKE_RENDERER_TIMEOUT:-30}"
 
   local PLIST="$APP/Contents/Info.plist"
   local BUNDLE_ID EXE_NAME EXE_PATH
@@ -99,10 +100,16 @@ smoke_launch_app() {
     fi
   done
 
-  local RENDERER_PID
-  RENDERER_PID="$(pgrep -f "${EXE_NAME} Helper.*--type=renderer" 2>/dev/null | head -1 || true)"
+  # The first launch of a freshly stapled app is slow (Gatekeeper assesses it),
+  # so poll for the renderer instead of checking once.
+  local RENDERER_PID="" renderer_deadline=$((SECONDS + RENDERER_TIMEOUT))
+  while (( SECONDS < renderer_deadline )); do
+    RENDERER_PID="$(pgrep -f "${EXE_NAME} Helper.*--type=renderer" 2>/dev/null | head -1 || true)"
+    [[ -n "$RENDERER_PID" ]] && break
+    sleep 1
+  done
   if [[ -z "$RENDERER_PID" ]]; then
-    red "smoke: Renderer Helper never spawned (or already exited) — UI would be a white screen"
+    red "smoke: Renderer Helper never spawned within ${RENDERER_TIMEOUT}s — UI would be a white screen"
     return 1
   fi
   sleep "$STABLE_SECONDS"
@@ -282,8 +289,15 @@ build_sign_notarize_dist() {
   bold "verify-min-macos ($ARCH)"
   verify_min_macos "$BSN_APP" || return 1
 
-  bold "verify-singbox-bundled ($ARCH)"
-  verify_singbox_bundled "$BSN_APP" "$ARCH" || return 1
+  # Signing rewrites the binary (codesign embeds its signature), so the pinned
+  # sha256 only holds before the sign step; on --resume after it, codesign's
+  # own verification (and notarization) already vouches for the binary.
+  if ! state_is_done "sign${SUFFIX}"; then
+    bold "verify-singbox-bundled ($ARCH)"
+    verify_singbox_bundled "$BSN_APP" "$ARCH" || return 1
+  else
+    green "verify-singbox-bundled ($ARCH) — skipped (already signed)"
+  fi
 
   if (( DRY_RUN == 1 )); then
     warn "[dry-run] stopping before codesign/notarize/dist for $ARCH (needs Apple identity + gh credentials)"
