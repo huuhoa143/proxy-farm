@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -99,27 +99,48 @@ describe('surfshark pools: discovery', () => {
   });
 
   it('meets the first-round budget with whichever resolver answers when DoH is black-holed', async () => {
-    const never = () => new Promise<string[]>(() => {});
-    const pools = createSurfsharkPools({
-      poolPath,
-      net: { resolveSystem: async () => ['192.0.2.1', '192.0.2.2'], resolveDoh: never, sleep: () => new Promise(() => {}) },
-      now,
-      answerGraceMs: 50,
-      firstRoundBudgetMs: 4000,
-    });
-    const started = Date.now();
-    await pools.ensure([HOST]);
-    expect(Date.now() - started).toBeLessThan(1000); // the grace, not the budget or DoH's own timeout
-    expect(pools.servers(HOST)).toEqual(['192.0.2.1', '192.0.2.2']);
+    // Fake timers: the assertion is about which timer ends the round (the
+    // grace, not the budget), so it must not depend on how busy the host is.
+    vi.useFakeTimers();
+    try {
+      const never = () => new Promise<string[]>(() => {});
+      const pools = createSurfsharkPools({
+        poolPath,
+        net: { resolveSystem: async () => ['192.0.2.1', '192.0.2.2'], resolveDoh: never, sleep: () => new Promise(() => {}) },
+        now,
+        answerGraceMs: 50,
+        firstRoundBudgetMs: 4000,
+      });
+      let settled = false;
+      const done = pools.ensure([HOST]).then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(50);
+      expect(settled).toBe(true); // ended by the 50 ms grace, long before the 4 s budget
+      await done;
+      expect(pools.servers(HOST)).toEqual(['192.0.2.1', '192.0.2.2']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets the slower resolver contribute when it answers within the grace', async () => {
-    const later = (ips: string[], ms: number) => () => new Promise<string[]>((r) => setTimeout(() => r(ips), ms));
+    // DoH answers strictly after the system resolver (chained, no timers), and
+    // the grace and budget are far longer than the test, so the outcome
+    // depends only on ordering, never on host load.
+    let systemAnswered!: () => void;
+    const systemDone = new Promise<void>((r) => (systemAnswered = r));
     const pools = createSurfsharkPools({
       poolPath,
-      net: { resolveSystem: later(['192.0.2.1'], 1), resolveDoh: later(['198.51.100.1'], 30), sleep: () => new Promise(() => {}) },
+      net: {
+        resolveSystem: async () => {
+          systemAnswered();
+          return ['192.0.2.1'];
+        },
+        resolveDoh: () => systemDone.then(() => ['198.51.100.1']),
+        sleep: () => new Promise(() => {}),
+      },
       now,
-      answerGraceMs: 2000,
+      answerGraceMs: 60_000,
+      firstRoundBudgetMs: 60_000,
     });
     await pools.ensure([HOST]);
     expect(new Set(pools.servers(HOST))).toEqual(new Set(['192.0.2.1', '198.51.100.1']));
