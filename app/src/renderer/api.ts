@@ -119,6 +119,8 @@ function samplePortRow(
 export interface FakeProxyFarmApi extends ProxyFarmApi {
   /** Test/dev-only hook: flip the simulated "another VPN is active" signal. */
   __setHostVpnActive(active: boolean): void;
+  /** Test hook: push `onTargetsChanged` as main does when server health changes. */
+  __emitTargetsChanged(): void;
 }
 
 export function createFakeProxyFarmApi(): FakeProxyFarmApi {
@@ -207,6 +209,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
   const portsListeners = new Set<Listener<PortRow[]>>();
   const hostVpnListeners = new Set<Listener<boolean>>();
   const updateStatusListeners = new Set<Listener<UpdateStatus>>();
+  const targetsListeners = new Set<() => void>();
   const appVersion = typeof __PROXYFARM_APP_VERSION__ !== 'undefined' ? __PROXYFARM_APP_VERSION__ : 'dev';
   let updateStatus: UpdateStatus = { phase: 'idle', currentVersion: appVersion };
 
@@ -402,7 +405,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       const target = findTarget(locationKey);
       return (target?.servers ?? []).map((server) => {
         const h = health.get(server) ?? { health: 'unknown' as const };
-        return { server, ip: resolveServer(server), health: h.health, lastOk: h.lastOk, heldBy: holderOf(server) };
+        const freeTier = target?.freeTierServers?.includes(server) ? { freeTier: true } : {};
+        return { server, ip: resolveServer(server), health: h.health, lastOk: h.lastOk, heldBy: holderOf(server), ...freeTier };
       });
     },
 
@@ -640,6 +644,15 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
     onUpdateStatus(cb) {
       updateStatusListeners.add(cb);
       return () => updateStatusListeners.delete(cb);
+    },
+
+    onTargetsChanged(cb) {
+      targetsListeners.add(cb);
+      return () => targetsListeners.delete(cb);
+    },
+
+    __emitTargetsChanged() {
+      for (const listener of targetsListeners) listener();
     },
 
     __setHostVpnActive(active) {

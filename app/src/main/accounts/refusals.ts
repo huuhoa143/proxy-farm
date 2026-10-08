@@ -1,27 +1,21 @@
 import type { RefusalsState } from '../store/state';
 
 /**
- * ZoogVPN plan-refusal vs wrong-password heuristic (spec §5.2; mirrors v1 farm.py
- * `refused_by` / `note_refusal`). Over OpenVPN both arrive as a plain auth failure, so:
+ * Auth-failure evidence per (account, server), for the ONE case the live credential
+ * check cannot decide (spec §5.2).
  *
- *  - an auth failure on one server while another server on the same account is online
- *    → 'not-in-plan' for that (account, server) pair, cached for 7 days;
- *  - auth failures on ≥ 3 distinct servers for the account, with none online
- *    → 'bad-login' for the whole account;
- *  - otherwise (not enough evidence yet) → 'undecided'. Only 'bad-login' means the
- *    credentials are wrong: on 'undecided' the caller (port-manager) moves the port to
- *    another server, marking this one dead for a while rather than refused, so evidence
- *    accumulates on distinct servers until one of the two decisive verdicts is reached.
+ * Over OpenVPN a ZoogVPN wrong password and a server outside the plan both arrive as
+ * `AUTH_FAILED`. 0.1.0 guessed from counts ("3 distinct servers refused, none online →
+ * bad login"), which told a fresh account on a restrictive plan that its password was
+ * wrong. The controller now asks a free-tier server instead (controller/credential-probe.ts),
+ * which answers deterministically. This tracker is only the last resort for when every
+ * free-tier server is unreachable: `suspectsBadLogin` then stops the pool walk, and the
+ * port says the login could NOT be verified — never that the password is wrong.
  *
- * The tracker owns its own in-memory bookkeeping (failures + "seen online" markers) so
- * `classifyAuthFailure` needs only the account id. Wire it up by calling `recordOnline`
- * whenever a port for this account reaches `online`, `clearOnline` whenever it stops or
- * fails, and `recordAuthFailure` whenever a port fails with `reason: 'auth'`. Call
- * `serialize()` after every mutation and persist the result into `AppState.refusals` (and
- * pass it back in as `initial` next time) so the memory survives an app restart.
+ * Wire-up: `recordAuthFailure` on a port's auth failure, `recordOnline` when a port of
+ * the account reaches `online`, `clearOnline` when it stops or fails. Persist
+ * `serialize()` into `AppState.refusals` and pass it back as `initial`.
  */
-
-export type RefusalVerdict = 'not-in-plan' | 'bad-login' | 'undecided';
 
 export const REFUSAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** An "online" marker older than this no longer counts as live evidence — it is cleared
@@ -37,7 +31,9 @@ export interface RefusalTracker {
   /** The port for this (account, server) stopped or failed: it is no longer evidence
    * that the account works, so stop counting it as "online". */
   clearOnline(accountId: string, serverKey: string): void;
-  classifyAuthFailure(accountId: string): RefusalVerdict;
+  /** Last resort only (see the module docs): refused on ≥ 3 distinct servers with none
+   * online. Means "the login could not be verified", not "the password is wrong". */
+  suspectsBadLogin(accountId: string): boolean;
   /** Is this specific (account, server) pair currently remembered as refused? */
   isRefused(accountId: string, serverKey: string): boolean;
   /** The account's credentials changed: auth failures seen under the old ones are no
@@ -111,11 +107,9 @@ export function createRefusalTracker(options: CreateRefusalTrackerOptions = {}):
       online.get(accountId)?.delete(serverKey);
     },
 
-    classifyAuthFailure(accountId) {
-      const hasOnline = liveEntries(online, accountId, ONLINE_TTL_MS).size > 0;
-      if (hasOnline) return 'not-in-plan';
-      if (liveEntries(failures, accountId, REFUSAL_TTL_MS).size >= AUTH_SERVER_THRESHOLD) return 'bad-login';
-      return 'undecided';
+    suspectsBadLogin(accountId) {
+      if (liveEntries(online, accountId, ONLINE_TTL_MS).size > 0) return false;
+      return liveEntries(failures, accountId, REFUSAL_TTL_MS).size >= AUTH_SERVER_THRESHOLD;
     },
 
     isRefused(accountId, serverKey) {

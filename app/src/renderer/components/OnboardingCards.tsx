@@ -12,7 +12,11 @@ interface Message {
 }
 
 function resultMessage(t: ReturnType<typeof useTranslation>['t'], result: CheckResult): Message {
-  if (result.ok) return { ok: true, text: result.label ? accountLabel(t, result.label) : (t('checkResult.ok') as string) };
+  if (result.ok) {
+    const text = result.label ? accountLabel(t, result.label) : (t('checkResult.ok') as string);
+    // Accepted with a caveat (e.g. the login could not be checked live just now).
+    return { ok: true, text: result.noteKey ? `${text} — ${t(result.noteKey, { defaultValue: result.noteKey })}` : text };
+  }
   const key = result.reasonKey ?? 'checkResult.reason.invalid-format';
   return { ok: false, text: t(key, { defaultValue: key, label: result.label ?? '' }) as string };
 }

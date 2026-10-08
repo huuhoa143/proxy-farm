@@ -250,7 +250,9 @@
       "addN_one": "Add {{count}} port",
       "addN_other": "Add {{count}} ports",
       "picked": "Selected locations",
-      "unpick": "Remove {{location}} from the selection"
+      "unpick": "Remove {{location}} from the selection",
+      "notInPlan": "Not in your plan",
+      "notInPlanHint": "Your {{provider}} plan doesn't include this location — every server here refused your account. Pick another location or upgrade your plan."
     },
     "group": {
       "toggle": "Show or hide the ports in {{location}}",
@@ -298,7 +300,10 @@
         "refused": "This server turned your account away, so it is skipped for 7 days.",
         "dead": "This server didn't respond, so it is skipped for 2 hours."
       },
-      "pick": "Move this port to {{server}}"
+      "pick": "Move this port to {{server}}",
+      "freeTier": "Free tier",
+      "freeTierHint": "A free-tier server: it works on every plan.",
+      "noneFreeNoAltHint": "None free here, and no other location in this country — the port keeps its server"
     },
     "addResult": {
       "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",
@@ -349,6 +354,20 @@
       "no-server": {
         "label": "No server available",
         "guidance": "No working server could be reached for this location yet. It will keep retrying."
+      },
+      "detail": {
+        "wrong-credentials": {
+          "label": "Wrong email or password",
+          "guidance": "{{provider}} refused this email and password, on a free server too, so it's not your plan. Re-enter them on the {{provider}} card and press Check, then start the port."
+        },
+        "unverified-login": {
+          "label": "Sign-in couldn't be verified",
+          "guidance": "Several {{provider}} servers refused the sign-in, and the free servers that tell a wrong password from your plan couldn't be reached. Check your email and password on the {{provider}} card, or start the port to try again."
+        },
+        "location-not-in-plan": {
+          "label": "Not in your plan",
+          "guidance": "Your {{provider}} plan doesn't include this location — pick another location or upgrade your plan."
+        }
       }
     },
     "attempt": "attempt {{n}}",
@@ -368,7 +387,10 @@
       "server-refused": "This server refused the sign-in — moving to another server in the same location.",
       "server-dead": "This server stopped answering — moving to another server in the same location.",
       "duplicate-exit": "Another port already exits through this IP — moving to a different server.",
-      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often."
+      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often.",
+      "server-not-in-plan": "Your {{provider}} plan doesn't include this server — moving to another one.",
+      "checking-sign-in": "The server refused the sign-in — checking your email and password on a {{provider}} free server…",
+      "credentials-changed": "Your sign-in details just changed — connecting again."
     }
   },
   "settings": {
@@ -468,6 +490,9 @@
     "secretsUnavailable": "This computer's secure storage isn't available, so your passwords and keys are kept in memory only. You'll need to add them again after you quit."
   },
   "rotate": {
+    "server-refused": "{{server}} isn't in your plan, and no other server here is free and usable — the port can't connect.",
+    "server-refused-returned": "{{server}} isn't in your plan — the port went back to {{to}}.",
+    "server-refused-moved": "{{server}} isn't in your plan — the port moved to {{to}} instead.",
     "not-verified": "Rotated, but the old exit IP was unknown, so the change couldn't be confirmed.",
     "online-timeout": "The new server didn't come online in time.",
     "probe-failed": "Rotated, but the new exit IP couldn't be checked.",
@@ -476,6 +501,7 @@
     "port-disabled": "Start the port before rotating it.",
     "decrypt-failed": "Your saved credentials couldn't be read.",
     "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly.",
+    "needs-attention": "This port needs your attention first — start it again to retry.",
     "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
   },
   "hma": {
@@ -491,7 +517,9 @@
   "zoogvpn": {
     "check": {
       "missingUsername": "Enter your ZoogVPN email.",
-      "missingPassword": "Enter your ZoogVPN password."
+      "missingPassword": "Enter your ZoogVPN password.",
+      "wrongCredentials": "ZoogVPN says this email or password is wrong. Check them and try again.",
+      "unverified": "Added, but the sign-in couldn't be checked right now: ZoogVPN's free servers didn't answer. Proxy Farm checks it again when a port connects."
     }
   },
   "surfshark": {

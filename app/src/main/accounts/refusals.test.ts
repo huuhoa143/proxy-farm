@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createRefusalTracker, ONLINE_TTL_MS, REFUSAL_TTL_MS } from './refusals';
 
-describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
-  it('not-in-plan: auth failure on one server while another on the account is online', () => {
+describe('refusal tracker (§5.2 last resort when no free-tier server can be reached)', () => {
+  it('an auth failure while another server of the account is online is no suspicion; the pair is remembered', () => {
     const t = createRefusalTracker();
     t.recordOnline('z1', 'zoogvpn:nl');
     t.recordAuthFailure('z1', 'zoogvpn:us');
-    expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
     expect(t.isRefused('z1', 'zoogvpn:us')).toBe(true);
     // the online server itself is not refused
     expect(t.isRefused('z1', 'zoogvpn:nl')).toBe(false);
@@ -16,20 +16,20 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     const t = createRefusalTracker();
     for (const s of ['a', 'b', 'c']) t.recordAuthFailure('z1', s);
     t.recordAuthFailure('z2', 'a');
-    expect(t.classifyAuthFailure('z1')).toBe('bad-login');
+    expect(t.suspectsBadLogin('z1')).toBe(true);
     t.forgetFailures('z1');
-    expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
     expect(t.isRefused('z1', 'a')).toBe(false);
     expect(t.isRefused('z2', 'a')).toBe(true);
   });
 
-  it('bad-login: failures on >= 3 distinct servers and none online', () => {
+  it('suspects the login after failures on >= 3 distinct servers with none online', () => {
     const t = createRefusalTracker();
     t.recordAuthFailure('z1', 'a');
     t.recordAuthFailure('z1', 'b');
-    expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
     t.recordAuthFailure('z1', 'c');
-    expect(t.classifyAuthFailure('z1')).toBe('bad-login');
+    expect(t.suspectsBadLogin('z1')).toBe(true);
   });
 
   it('a repeated failure on the same server does not by itself reach the 3-server threshold', () => {
@@ -37,17 +37,17 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     t.recordAuthFailure('z1', 'a');
     t.recordAuthFailure('z1', 'a');
     t.recordAuthFailure('z1', 'a');
-    expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
   });
 
-  it('a success on one server resets the bad-login verdict for the account', () => {
+  it('a success on one server lifts the suspicion for the account', () => {
     const t = createRefusalTracker();
     t.recordAuthFailure('z1', 'a');
     t.recordAuthFailure('z1', 'b');
     t.recordAuthFailure('z1', 'c');
-    expect(t.classifyAuthFailure('z1')).toBe('bad-login');
+    expect(t.suspectsBadLogin('z1')).toBe(true);
     t.recordOnline('z1', 'd');
-    expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
   });
 
   it('expires a refusal after 7 days using the injected clock', () => {
@@ -61,7 +61,7 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     expect(t.isRefused('z1', 'zoogvpn:us')).toBe(false);
   });
 
-  it('expired failures do not count toward the 3-server bad-login threshold', () => {
+  it('expired failures do not count toward the 3-server threshold', () => {
     let now = 0;
     const t = createRefusalTracker({ clock: () => now });
     t.recordAuthFailure('z1', 'a');
@@ -69,7 +69,7 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     now += REFUSAL_TTL_MS + 1;
     t.recordAuthFailure('z1', 'c');
     // a and b have expired; only c is a live failure
-    expect(t.classifyAuthFailure('z1')).toBe('undecided');
+    expect(t.suspectsBadLogin('z1')).toBe(false);
   });
 
   it('accounts are tracked independently', () => {
@@ -77,29 +77,29 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
     t.recordAuthFailure('z1', 'a');
     t.recordAuthFailure('z1', 'b');
     t.recordAuthFailure('z1', 'c');
-    expect(t.classifyAuthFailure('z1')).toBe('bad-login');
-    expect(t.classifyAuthFailure('z2')).toBe('undecided');
+    expect(t.suspectsBadLogin('z1')).toBe(true);
+    expect(t.suspectsBadLogin('z2')).toBe(false);
     expect(t.isRefused('z2', 'a')).toBe(false);
   });
 
   describe('clearOnline (reviewer item 9: a stopped/failed port is no longer evidence)', () => {
-    it('clearing the only online marker drops back out of not-in-plan', () => {
+    it('clearing the only online marker makes the evidence count again', () => {
       const t = createRefusalTracker();
       t.recordOnline('z1', 'nl');
-      t.recordAuthFailure('z1', 'us');
-      expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+      for (const s of ['us', 'jp', 'de']) t.recordAuthFailure('z1', s);
+      expect(t.suspectsBadLogin('z1')).toBe(false);
       t.clearOnline('z1', 'nl');
-      expect(t.classifyAuthFailure('z1')).toBe('undecided');
+      expect(t.suspectsBadLogin('z1')).toBe(true);
     });
 
     it('an online marker expires on its own after ONLINE_TTL_MS even without an explicit clear', () => {
       let now = 0;
       const t = createRefusalTracker({ clock: () => now });
       t.recordOnline('z1', 'nl');
-      t.recordAuthFailure('z1', 'us');
-      expect(t.classifyAuthFailure('z1')).toBe('not-in-plan');
+      for (const s of ['us', 'jp', 'de']) t.recordAuthFailure('z1', s);
+      expect(t.suspectsBadLogin('z1')).toBe(false);
       now += ONLINE_TTL_MS + 1;
-      expect(t.classifyAuthFailure('z1')).toBe('undecided');
+      expect(t.suspectsBadLogin('z1')).toBe(true);
     });
   });
 
@@ -119,7 +119,7 @@ describe('refusal tracker (§5.2 ZoogVPN plan vs login heuristic)', () => {
       const snapshot = first.serialize();
 
       const second = createRefusalTracker({ initial: snapshot, clock: () => 1000 });
-      expect(second.classifyAuthFailure('z1')).toBe('bad-login');
+      expect(second.suspectsBadLogin('z1')).toBe(true);
       expect(second.isRefused('z1', 'a')).toBe(true);
     });
 

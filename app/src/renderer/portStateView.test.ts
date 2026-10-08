@@ -122,4 +122,51 @@ describe('describePortState', () => {
     );
     expect(notInPlan.label).not.toBe(noServer.label);
   });
+
+  describe('what the login check found (spec §5.2)', () => {
+    const t = () => i18next.t.bind(i18next);
+    const failed = (reason: 'auth' | 'not-in-plan', detail?: 'wrong-credentials' | 'unverified-login' | 'location-not-in-plan'): PortState => ({
+      kind: 'failed',
+      reason,
+      untilMs: Date.now(),
+      attempt: 1,
+      ...(detail ? { detail } : {}),
+    });
+
+    it('wrong-credentials says the email or password is wrong, and that it is not the plan', () => {
+      const view = describePortState(failed('auth', 'wrong-credentials'), 'zoogvpn', t());
+      expect(view.label).toBe('Wrong email or password');
+      expect(view.guidance).toContain('ZoogVPN refused this email and password, on a free server too');
+      expect(view.terminal).toBe(true);
+      // Another port of the account online does not turn it into a "location" message.
+      expect(describePortState(failed('auth', 'wrong-credentials'), 'zoogvpn', t(), { accountHasWorkingPeer: true }).label).toBe('Wrong email or password');
+    });
+
+    it('unverified-login never claims the password is wrong', () => {
+      const view = describePortState(failed('auth', 'unverified-login'), 'zoogvpn', t());
+      expect(view.label).toBe("Sign-in couldn't be verified");
+      expect(view.guidance).not.toMatch(/is wrong/);
+    });
+
+    it('a whole location outside the plan: pick another location or upgrade (en + vi)', () => {
+      const view = describePortState(failed('not-in-plan', 'location-not-in-plan'), 'zoogvpn', t());
+      expect(view.label).toBe('Not in your plan');
+      expect(view.guidance).toBe("Your ZoogVPN plan doesn't include this location — pick another location or upgrade your plan.");
+      void i18next.changeLanguage('vi');
+      try {
+        expect(describePortState(failed('not-in-plan', 'location-not-in-plan'), 'zoogvpn', t()).guidance).toBe(
+          'Gói ZoogVPN của bạn không bao gồm vị trí này — chọn vị trí khác hoặc nâng cấp gói.',
+        );
+      } finally {
+        void i18next.changeLanguage('en');
+      }
+    });
+
+    it('a plan refusal of one server, and the live check in progress, name the provider', () => {
+      const moving: PortState = { kind: 'retrying', untilMs: Date.now() + 1000, attempt: 1, reasonKey: 'server-not-in-plan' };
+      expect(describePortState(moving, 'zoogvpn', t()).guidance).toBe("Your ZoogVPN plan doesn't include this server — moving to another one.");
+      const checking: PortState = { kind: 'retrying', untilMs: Date.now() + 1000, attempt: 1, reasonKey: 'checking-sign-in' };
+      expect(describePortState(checking, 'zoogvpn', t()).guidance).toContain('on a ZoogVPN free server');
+    });
+  });
 });

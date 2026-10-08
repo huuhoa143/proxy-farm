@@ -62,6 +62,11 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
       ipcRenderer.on(IPC.events.hostVpnChanged, listener);
       return () => ipcRenderer.removeListener(IPC.events.hostVpnChanged, listener);
     },
+    onTargetsChanged: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on(IPC.events.targetsChanged, listener);
+      return () => ipcRenderer.removeListener(IPC.events.targetsChanged, listener);
+    },
     onUpdateStatus: (cb) => {
       const listener = (_event: unknown, status: unknown) => cb(status as Parameters<typeof cb>[0]);
       ipcRenderer.on(IPC.events.updateStatus, listener);

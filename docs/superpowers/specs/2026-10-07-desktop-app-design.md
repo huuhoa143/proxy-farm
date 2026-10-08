@@ -87,7 +87,7 @@ Each unit is independently testable:
      - Found → "✅ HMA found — Connect".
      - Not found / no credentials → steps: "Install HMA, sign in, connect once, then come back". The app watches for the file and continues by itself.
      - Windows without the helper → "Enable HMA support" button. This runs the elevated helper installer: one UAC.
-   - **ZoogVPN** — email + password → "Check" (one test connection).
+   - **ZoogVPN** — email + password → "Check" (one test connection to a free-tier host, §5.2).
    - **Surfshark** — paste the WireGuard private key. An illustrated guide points to my.surfshark.com → Manual setup.
    - **File** — drag & drop `.ovpn` / `.conf`. Country is guessed from the file name and editable.
 3. **Main screen** (rev 3) — ports grouped by location:
@@ -206,9 +206,12 @@ Each unit is independently testable:
   - ✅ Exit IP = server IP (`sg2.webunlim.com`, not in the bundled list, worked).
   - A maintainer script (`pnpm scan:zoog-servers`) enumerates `<cc>1…<cc>N` per country until several consecutive misses and writes the bundled list. Hosts stay hostnames; the controller resolves them before bind (§6.1.4).
   - Which servers an account may use depends on its plan: `jp4`, `vn2`, `de5` answered `AUTH_FAILED` to the test account while `sg2` worked. That is the plan-refusal case below, recorded per (account, server) in §6.8.
-- **Plan refusal vs wrong password** ⚠️. Over OpenVPN both arrive as an auth failure. v1 told them apart with IKE signals that no longer exist. Rule:
-  - Auth failure on a server while another server on the same account works → `not in plan` for that (account, server), cached for 7 days. The port moves to another free server, as for HMA.
-  - Auth failure on ≥ 3 different servers and none working → `failed(auth)` for the account.
+- **Plan refusal vs wrong password** ✅ 2026-10-09. Over OpenVPN both arrive as the same `AUTH_FAILED`; v1 told them apart with IKE signals that no longer exist, and 0.1.0 guessed from counts ("refused on ≥ 3 servers, none working → bad login"), which told a fresh account on a restrictive plan that its password was wrong. The free-tier hosts settle it instead:
+  - Evidence (live, one account, 2026-10-09): the free hosts `nl.zgfree.info`, `uk.zgfree.info`, `us.zgfree.info` (in the bundled list) take any valid login whatever the plan. With the real credentials `nl.zgfree.info` connected (exit 185.107.80.250); with a wrong password it failed auth. On that account's plan jp1–jp10, tw1–tw3, de1, de2, de7 and fr4 refused while nl1, nl2, nl3.zoogvpn.com, nl4, de3 and fr1 worked. So a free-host handshake is a deterministic credential check, and a refusal elsewhere by a working login is the plan.
+  - **Credential probe** (`controller/credential-probe.ts`): one short tunnel to a free host, through the same engine and `bind` as a port (config on stdin, nothing on disk, loopback only, under a key no port can have), waiting at most 40 s for "established" or an auth failure, then stopped. The nearest free host first (judged from the system time zone), the next one on a network error, at most 2 hosts. Every handshake takes from the account's attempt budget (§6.4).
+  - **Adding an account, or new credentials ("Check")**: one probe before anything is stored. Established → stored, credentials *verified* (timestamp persisted). Auth failure → not stored: "wrong email or password". Network error or timeout → stored, *unverified*, with a note.
+  - **A port's `AUTH_FAILED`**: credentials *verified* (or another port of the account online) → a plan refusal: the server is marked refused for 7 days (per machine, §6.8) and the port fails over; with nothing left, `failed(not in plan)`, and when every server of the location refused it, "Your ZoogVPN plan doesn't include this location — pick another location or upgrade your plan." *Unverified* → the probe runs first (at most once per 10 min per account; the port waits with its engine stopped): auth failure → `failed(auth)` "wrong email or password" for every port of the account that is not up, and the refusals marked since the login was last verified are dropped (they rested on a false assumption); established → as verified. A port going online also marks the credentials verified. A verified login whose location runs out with nothing of the account online is probed again (throttled), in case the password changed since.
+  - **Last resort** only when no free host can be reached: the refusing server is marked dead (2 h, not refused) and the port moves on; after refusals on 3 distinct servers with none working, the port stops with "sign-in couldn't be verified" — never "wrong password".
 
 ### 5.3 Surfshark — WireGuard ✅
 
@@ -552,7 +555,7 @@ proxy-farm/
 | Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
 | ZoogVPN plan limits per server ⚠️ | Per-(account, server) refusal memory. Connection count: ✅ ≥ 8 on one account, default 5 |
 | HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
-| ZoogVPN plan vs password ambiguity ⚠️ | Heuristic in §5.2; refine with real data |
+| ZoogVPN plan vs password ambiguity ✅ | Free-host credential probe (§5.2), 2026-10-09; the count heuristic is only a labelled last resort |
 | sing-box OpenVPN client is young (Aug 2026) | Pinned; live smoke gates upgrades |
 | Unsigned Windows build → SmartScreen, Defender may flag `sing-box.exe` as a hacktool | Illustrated "Run anyway" guide; submit false positives; signing hook ready |
 | RAM at high port counts (~15–20 MB/port) | Acceptable for 5–20 ports; sharded mode later |

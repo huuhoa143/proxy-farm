@@ -27,7 +27,7 @@ export interface WebContentsLike {
 /** Every invokable method, with the push-only event methods removed: those are not
  * `ipcMain.handle` calls, they are broadcast via `broadcastPortsChanged` /
  * `broadcastHostVpnChanged` / `broadcastUpdateStatus` instead (see below). */
-export type ControllerFacade = Omit<ProxyFarmApi, 'onPortsChanged' | 'onHostVpnChanged' | 'onUpdateStatus'>;
+export type ControllerFacade = Omit<ProxyFarmApi, 'onPortsChanged' | 'onHostVpnChanged' | 'onTargetsChanged' | 'onUpdateStatus'>;
 
 /**
  * Registers one `ipcMain.handle` per name in `IPC.invoke`, each forwarding to the
@@ -71,6 +71,11 @@ export function broadcastPortsChanged(windows: Iterable<WebContentsLike>, rows: 
 /** Push a host-VPN-detector transition to every open window (spec §4.3). */
 export function broadcastHostVpnChanged(windows: Iterable<WebContentsLike>, active: boolean): void {
   for (const w of windows) w.send(IPC.events.hostVpnChanged, active);
+}
+
+/** Tell every open window that server health changed, so it re-reads `listTargets`. */
+export function broadcastTargetsChanged(windows: Iterable<WebContentsLike>): void {
+  for (const w of windows) w.send(IPC.events.targetsChanged);
 }
 
 /** Push an auto-update status to every open window (spec §9). Called by the

@@ -74,6 +74,9 @@ export interface Target {
   country: string; // ISO-3166 alpha-2, upper case
   city: string;
   label: string;
+  /** The location covers the whole country: `city` is only the country's name, in the
+   * provider's language (ZoogVPN "Germany"). The UI shows the localised country name. */
+  countryWide?: boolean;
   /**
    * The location's server pool, best first (spec §6.8). Each entry is one server = one
    * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname
@@ -87,8 +90,20 @@ export interface Target {
    * absent means every token is one server.
    */
   poolHostnames?: boolean;
+  /**
+   * Servers of `servers` on the provider's free tier: any valid login may use them,
+   * whatever its plan, so a handshake there checks the credentials alone (spec §5.2,
+   * ZoogVPN `*.zgfree.info`). Optional; absent means none.
+   */
+  freeTierServers?: string[];
   /** Filled by the controller in `listTargets`: usable servers not held by any port. */
   freeServers?: number;
+  /**
+   * Filled by the controller in `listTargets`: every server of the location has refused
+   * every account of its provider (spec §6.8, §5.2) — the location is not in the user's
+   * plan(s). Absent otherwise.
+   */
+  notInPlan?: boolean;
 }
 
 /** Health of one server for one account (spec §6.8). */
@@ -105,6 +120,8 @@ export interface ServerInfo {
   lastOk?: number;
   /** Key of the port currently pinned to this server, if any. */
   heldBy?: string;
+  /** On the provider's free tier (`Target.freeTierServers`): usable on any plan. */
+  freeTier?: boolean;
 }
 
 /** Separator between a location key and a port number in a port key (spec §6.8). */
@@ -143,6 +160,9 @@ export interface CheckResult {
   ok: boolean;
   reasonKey?: string; // i18n key
   label?: string; // human label for the account, e.g. 'key …AbC='
+  /** i18n key of a caveat on an accepted result, e.g. the login could not be checked
+   * live right now ('zoogvpn.check.unverified'). */
+  noteKey?: string;
 }
 
 export interface Provider {
@@ -171,13 +191,39 @@ export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 50
  */
 export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server' | 'key-rejected';
 
+/**
+ * What the app found out about a failure, beyond its reason (spec §5.2):
+ *   wrong-credentials    — `auth`: a free-tier server refused the login too, so the
+ *                          email/password are wrong (not the plan).
+ *   unverified-login     — `auth`: several servers refused the login and no free-tier
+ *                          server could be reached to tell a wrong password from the plan.
+ *   location-not-in-plan — `not-in-plan`: every server of the location refused an
+ *                          account whose login works.
+ */
+export type FailDetail = 'wrong-credentials' | 'unverified-login' | 'location-not-in-plan';
+
+/**
+ * Failures retrying cannot fix: the provider refused the login, the plan does not
+ * include the location's servers, or a WireGuard key got no answer. Nothing restarts
+ * such a port automatically (no timer, no engine) until the user acts: Start, Change
+ * IP, or new credentials. `port-in-use` and `no-server` are transient and keep retrying.
+ */
+export function isTerminalFailure(reason: FailReason): boolean {
+  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
+}
+
+/** True for a `failed` state that is terminal (see `isTerminalFailure`). */
+export function isTerminalState(state: PortState): boolean {
+  return state.kind === 'failed' && isTerminalFailure(state.reason);
+}
+
 export type PortState =
   | { kind: 'queued' }
   | { kind: 'connecting'; since: number }
   | { kind: 'verifying'; since: number }
   | { kind: 'online'; since: number; exitIp: string; country: string; latencyMs?: number }
   | { kind: 'retrying'; untilMs: number; attempt: number; reasonKey: string }
-  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number }
+  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number; detail?: FailDetail }
   | { kind: 'stopped' };
 
 export interface ExitIpResult {
@@ -244,6 +290,12 @@ export interface RotateResult {
    * (§6.5 step 2): that location's city. Reported even when `changed` is false (the new
    * exit IP could not be confirmed), so the move is never silent. */
   movedTo?: string;
+  /** Set when the server Change IP moved the port to refused its account (not in the
+   * plan, another tenant's server): that server. The port does not stay on it. */
+  refusedServer?: string;
+  /** With `refusedServer`: the server the port went to instead, once it was online
+   * again (the one it was on before when still usable). Absent when it found none. */
+  landedOn?: string;
 }
 
 export interface AppStatus {
@@ -385,6 +437,10 @@ export interface ProxyFarmApi {
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
   onHostVpnChanged(cb: (active: boolean) => void): () => void;
+  /** A server health mark changed (refused, dead, confirmed online, or a hostname
+   * resolved onto a marked machine): the locations' `freeServers`/`notInPlan` from
+   * `listTargets` may be out of date. Carries nothing; re-read what you show. */
+  onTargetsChanged(cb: () => void): () => void;
   onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
 }
 
@@ -396,7 +452,12 @@ export const IPC = {
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',
   ] as const,
-  events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
+  events: {
+    portsChanged: 'pf:portsChanged',
+    hostVpnChanged: 'pf:hostVpnChanged',
+    targetsChanged: 'pf:targetsChanged',
+    updateStatus: 'pf:updateStatus',
+  } as const,
 } as const;
 
 declare global {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { PortTable } from './PortTable';
 import { createFakeProxyFarmApi } from '../api';
-import { initI18n } from '../i18n';
+import { changeLanguage, initI18n } from '../i18n';
 import type { PortRow, PortState, ProxyFarmApi, Target } from '../../shared/contracts';
 
 beforeAll(() => {
@@ -405,6 +405,57 @@ describe('PortTable', () => {
       expect(blocked).toHaveAttribute('title', 'Every server in Hanoi is already in use or unavailable.');
       fireEvent.click(blocked);
       expect(onAddPort).toHaveBeenCalledTimes(1);
+    });
+
+    it('a country-wide location is headed by the localised country, once ("Đức", not "Germany Đức")', async () => {
+      const germany: Target = { ...hanoi, key: 'zoogvpn:DE', country: 'DE', city: 'Germany', label: 'Germany', countryWide: true, servers: ['de3.webunlim.com'] };
+      const de = row('zoogvpn:DE#1', { kind: 'online', since: Date.now(), exitIp: '185.1.1.1', country: 'DE' }, {
+        locationKey: 'zoogvpn:DE', providerId: 'zoogvpn', country: 'DE', city: 'Germany', server: 'de3.webunlim.com', serverIp: '185.1.1.1', proxyPort: 29009,
+      });
+      await act(() => changeLanguage('vi'));
+      try {
+        renderGrouped({ rows: [de], targets: [germany] });
+        const header = screen.getByTestId('group-zoogvpn:DE');
+        expect(header).toHaveTextContent('Đức');
+        expect(header).not.toHaveTextContent('Germany');
+        expect(header.textContent!.match(/Đức/g)).toHaveLength(1);
+        expect(within(screen.getByTestId('port-row-zoogvpn:DE#1')).getAllByRole('checkbox')[0]).toHaveAccessibleName('Đức · cổng #1');
+        fireEvent.click(screen.getByTestId('change-ip-zoogvpn:DE#1'));
+        expect(await screen.findByText('Máy chủ ở Đức')).toBeInTheDocument();
+      } finally {
+        await act(() => changeLanguage('en'));
+      }
+    });
+
+    it("the Change IP menu learns whether the port's provider has another location in its country", async () => {
+      const api = createFakeProxyFarmApi();
+      const spy = vi.spyOn(api, 'listServers').mockResolvedValue([{ server: '10.0.0.1', health: 'ok', heldBy: 'hma:JP-TOKYO#2' }]);
+      const osaka: Target = { ...tokyo, key: 'hma:JP-OSAKA', city: 'Osaka' };
+      const surfsharkOsaka: Target = { ...osaka, key: 'surfshark:JP-OSA', providerId: 'surfshark' };
+      const { unmount } = renderGrouped({ api, targets: [tokyo, hanoi, surfsharkOsaka] }); // another provider's city does not count
+      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
+      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('no other location in this country');
+      unmount();
+      renderGrouped({ api, targets: [tokyo, hanoi, osaka] });
+      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
+      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('tries another city in the same country');
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('+ Add port says so when the location is not in the plan', () => {
+      renderGrouped({ targets: [tokyo, { ...hanoi, notInPlan: true }] });
+      const blocked = screen.getByTestId('add-port-zoogvpn:VN-HAN');
+      expect(blocked).toHaveAttribute('aria-disabled', 'true');
+      expect(blocked).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+    });
+
+    it('the group header says "Not in your plan" instead of a free-server count', () => {
+      renderGrouped({ targets: [tokyo, { ...hanoi, freeServers: 0, notInPlan: true }] });
+      const stats = screen.getByTestId('group-stats-zoogvpn:VN-HAN');
+      expect(stats).toHaveTextContent('Not in your plan');
+      expect(stats).not.toHaveTextContent('free');
+      expect(screen.getByTestId('not-in-plan-zoogvpn:VN-HAN')).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+      expect(screen.queryByTestId('not-in-plan-hma:JP-TOKYO')).toBeNull();
     });
 
     it("+ Add port is disabled at the provider's port limit", () => {

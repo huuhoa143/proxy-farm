@@ -1299,6 +1299,14 @@ table.port-table {
   background: var(--acc-soft);
   border-color: transparent;
 }
+.pill.free {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: transparent;
+}
 
 /* empty state */
 .empty {
@@ -2862,6 +2870,18 @@ svg.i.spin {
   opacity: 0.45;
   cursor: default;
   background: transparent;
+}
+/* A location outside the plan: the stepper is there, but greyed out. */
+.stepper.is-disabled {
+  border-color: var(--line);
+  animation: none;
+  cursor: not-allowed;
+}
+.stepper.is-disabled input {
+  color: var(--mut);
+}
+.opt.not-in-plan .city .pool {
+  color: var(--bad);
 }
 .stepper input {
   width: 36px;

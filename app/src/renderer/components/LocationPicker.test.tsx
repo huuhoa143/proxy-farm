@@ -54,6 +54,23 @@ describe('LocationPicker', () => {
     expect(within(row('hma:JP-OSAKA')).getByRole('checkbox')).toBeDisabled();
   });
 
+  it('a location outside the plan says so: not pickable, a disabled stepper, the reason as a tooltip', () => {
+    const notInPlan: Target = { ...target('zoogvpn:JP', 'Japan', 10, 0, 'zoogvpn'), notInPlan: true };
+    const { row, onSubmit } = renderPicker({ targets: [TOKYO, notInPlan] });
+    const r = row('zoogvpn:JP');
+    expect(r).toHaveTextContent('Not in your plan');
+    expect(r).not.toHaveTextContent('No free server');
+    expect(r).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+    expect(within(r).getByRole('checkbox')).toBeDisabled();
+    const stepper = within(r).getByRole('group');
+    expect(stepper).toHaveAttribute('aria-disabled', 'true');
+    for (const b of within(stepper).getAllByRole('button')) expect(b).toBeDisabled();
+    expect(within(stepper).getByRole('spinbutton')).toBeDisabled();
+    fireEvent.click(within(r).getByRole('checkbox'));
+    expect(screen.getByTestId('picker-submit')).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('a picked location gets a stepper: default 1, max = free servers', () => {
     const { row } = renderPicker();
     fireEvent.click(within(row('hma:JP-TOKYO')).getByRole('checkbox'));
@@ -144,6 +161,27 @@ describe('LocationPicker', () => {
       const headers = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
       // CLDR's Vietnamese keeps "Italy"; the header says Ý, and sorts as Ý.
       expect(headers).toEqual(['Áo', 'Đức', 'Nhật Bản', 'Ý']);
+    } finally {
+      await act(() => changeLanguage('en'));
+    }
+  });
+
+  it('a country-wide location (ZoogVPN "Germany") is named after the country in the UI language, picked chip too', async () => {
+    const wide = (key: string, country: string, city: string): Target => ({ ...target(key, city, 2, 2, 'zoogvpn'), country, countryWide: true });
+    const germany = wide('zoogvpn:DE', 'DE', 'Germany');
+    const usEast: Target = { ...target('zoogvpn:US-EAST', 'East', 2, 2, 'zoogvpn'), country: 'US' };
+    const us = wide('zoogvpn:US', 'US', 'United States');
+    await act(() => changeLanguage('vi'));
+    try {
+      const { row } = renderPicker({ targets: [germany, usEast, us] });
+      expect(row('zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(row('zoogvpn:DE')).not.toHaveTextContent('Germany');
+      expect(row('zoogvpn:US-EAST')).toHaveTextContent('East');
+      expect(row('zoogvpn:US')).toHaveTextContent('Hoa Kỳ');
+      expect(row('zoogvpn:US')).not.toHaveTextContent('United States');
+      fireEvent.click(within(row('zoogvpn:DE')).getByRole('checkbox'));
+      expect(screen.getByTestId('picked-zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(within(row('zoogvpn:DE')).getByRole('group')).toHaveAccessibleName('Số cổng ở Đức');
     } finally {
       await act(() => changeLanguage('en'));
     }

@@ -21,7 +21,7 @@ function fakeIpcRenderer(): IpcRendererLike & { listeners: Map<string, Set<(...a
 describe('preload API surface (spec §3)', () => {
   it('exposes exactly the IPC.invoke methods plus the two event subscriptions — no more, no less', () => {
     const api = createProxyFarmApi(fakeIpcRenderer());
-    const expected = new Set([...IPC.invoke, 'onPortsChanged', 'onHostVpnChanged', 'onUpdateStatus']);
+    const expected = new Set([...IPC.invoke, 'onPortsChanged', 'onHostVpnChanged', 'onTargetsChanged', 'onUpdateStatus']);
     expect(new Set(Object.keys(api))).toEqual(expected);
   });
 
@@ -82,5 +82,16 @@ describe('preload API surface (spec §3)', () => {
     expect(cb).toHaveBeenCalledWith(true);
     unsubscribe();
     expect(ipc.listeners.get(IPC.events.hostVpnChanged)?.size).toBe(0);
+  });
+
+  it('onTargetsChanged subscribes on the targets-changed channel', () => {
+    const ipc = fakeIpcRenderer();
+    const api = createProxyFarmApi(ipc);
+    const cb = vi.fn();
+    const unsubscribe = api.onTargetsChanged(cb);
+    for (const listener of ipc.listeners.get(IPC.events.targetsChanged) ?? []) listener({});
+    expect(cb).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    expect(ipc.listeners.get(IPC.events.targetsChanged)?.size).toBe(0);
   });
 });

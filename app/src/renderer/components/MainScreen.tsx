@@ -12,6 +12,7 @@ import { CredentialsChip } from './CredentialsChip';
 import { Icon } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 import { providerName } from '../ui/providerName';
+import { locationName as nameOf } from '../ui/locationName';
 import { remainingByProvider } from '../portGroups';
 
 export interface MainScreenProps {
@@ -30,7 +31,8 @@ function removeKey(record: Record<string, string>, key: string): Record<string, 
 }
 
 export function MainScreen({ api }: MainScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language || 'en';
   const [targets, setTargets] = useState<Target[]>([]);
   const [ports, setPorts] = useState<PortRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -77,6 +79,10 @@ export function MainScreen({ api }: MainScreenProps) {
       offVpn();
     };
   }, [api, loadTargets]);
+
+  // Server health changed in main (a server refused, died or came back): free counts
+  // and "not in your plan" may have changed with no port taking or releasing a server.
+  useEffect(() => api.onTargetsChanged(refreshTargets), [api, refreshTargets]);
 
   // A location's free-server count changes whenever a port takes or releases a
   // server, so re-read the targets when the set of (port, server) pairs changes
@@ -139,7 +145,13 @@ export function MainScreen({ api }: MainScreenProps) {
   }
 
   function locationName(locationKey: string): string {
-    return targets.find((t) => t.key === locationKey)?.city ?? locationKey;
+    const target = targets.find((t) => t.key === locationKey);
+    return target ? nameOf(target, language) : locationKey;
+  }
+
+  /** How the UI names a port's location (the localised country for a country-wide one). */
+  function rowLocation(row: PortRow): string {
+    return nameOf({ ...row, countryWide: targets.find((t) => t.key === row.locationKey)?.countryWide }, language);
   }
 
   /** Add ports per location (spec §6.8); say so when fewer than asked could be added. */
@@ -210,6 +222,10 @@ export function MainScreen({ api }: MainScreenProps) {
     // A move to another city is always said, whether or not the new IP was confirmed.
     if (result.movedTo) return t('main.rotateResult.movedToCityNote', { city: result.movedTo });
     if (result.noteKey === SAME_CITY_NOTE) return t(SAME_CITY_NOTE);
+    // The picked server refused the account: say so, and where the port is now.
+    if (result.refusedServer && result.noteKey) {
+      return t(result.noteKey, { server: result.refusedServer, to: result.landedOn, defaultValue: result.noteKey });
+    }
     if (result.changed) {
       return t('main.rotateResult.changedNote', { from: result.from, to: result.to });
     }
@@ -222,7 +238,7 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleRotate(row: PortRow, toServer?: string) {
     // Captured up front: a port moved to another city comes back under a new key.
     const key = row.key;
-    const fromCity = row.city;
+    const fromCity = rowLocation(row);
     setRotating((prev) => new Set(prev).add(key));
     let result: RotateResult;
     try {
@@ -246,13 +262,19 @@ export function MainScreen({ api }: MainScreenProps) {
       showNotice(note);
       const moved = rows.find((r) => r.proxyPort === row.proxyPort);
       if (moved) {
-        const movedNote = t('main.rotateResult.movedFromToNote', { from: fromCity, to: result.movedTo ?? moved.city });
+        const movedNote = t('main.rotateResult.movedFromToNote', { from: fromCity, to: rowLocation(moved) });
         setRotateNotes((prev) => ({ ...removeKey(prev, key), [moved.key]: movedNote }));
       }
       return;
     }
     setRotateNotes((prev) => ({ ...prev, [key]: note }));
-    schedule(`rotate:${key}`, () => setRotateNotes((prev) => removeKey(prev, key)), NOTE_MS);
+    // A refused pick is worth keeping, like a city move: the user asked for that
+    // server and should still see why the port is elsewhere after a glance away.
+    // Routine "IP changed a → b" notes fade.
+    // (Re-scheduling the key with a no-op drops any fade still pending from an
+    // earlier Change IP on this row.)
+    if (result.refusedServer) schedule(`rotate:${key}`, () => {}, 0);
+    else schedule(`rotate:${key}`, () => setRotateNotes((prev) => removeKey(prev, key)), NOTE_MS);
   }
 
   async function handleBulkRotate(keys: string[]) {

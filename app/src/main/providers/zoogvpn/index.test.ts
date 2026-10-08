@@ -60,6 +60,7 @@ describe('zoogvpn provider: targets', () => {
         country: 'JP',
         city: 'Japan',
         label: 'Japan',
+        countryWide: true,
         servers: ['jp1.webunlim.com', 'jp2.webunlim.com', 'jp4.zoogvpn.com'],
       },
       {
@@ -76,7 +77,9 @@ describe('zoogvpn provider: targets', () => {
         country: 'US',
         city: 'United States',
         label: 'United States',
+        countryWide: true,
         servers: ['us.zgfree.info'],
+        freeTierServers: ['us.zgfree.info'],
       },
     ]);
   });

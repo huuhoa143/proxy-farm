@@ -41,17 +41,21 @@ function defaultSchedule(ms: number, cb: () => void): () => void {
   return () => clearTimeout(timer);
 }
 
-type RetryKind = { kind: 'failed'; reason: 'auth' } | { kind: 'retrying'; reasonKey: string };
-
 /**
  * Drives one port's health state machine (spec §6.4):
- * `queued → connecting → verifying → online`, with `auth-terminal` dropping
- * to `failed(auth)` and a 504 (or losing an online connection, or an
- * unexpected process exit) dropping to `retrying` — both on the back-off
- * schedule, and both still auto-retrying since `giveUpAfter` defaults to
- * never ("failed is not given up"). Once `giveUpAfter` is reached the port
- * moves to a terminal `stopped` (see `giveUpReason`) and no further retry is
- * scheduled.
+ * `queued → connecting → verifying → online`, with a 504 (or losing an online
+ * connection, or an unexpected process exit) dropping to `retrying` on the
+ * back-off schedule, auto-retrying since `giveUpAfter` defaults to never. Once
+ * `giveUpAfter` is reached the port moves to a terminal `stopped` (see
+ * `giveUpReason`) and no further retry is scheduled.
+ *
+ * `auth-terminal` drops to `failed(auth)` with NO retry timer: the provider
+ * refused the login, and knocking again on the same server cannot change that.
+ * What the refusal means (wrong credentials, or a server outside the plan) is
+ * the controller's call (port-manager); it moves the port to another server
+ * itself or leaves it failed until the user acts. A timer here used to restart
+ * such a port every ~30 s forever, each time against a server that had just
+ * refused it.
  *
  * Signals (`feedLog`/`feedDelay`/`feedExit`) are only ever acted on while the
  * port is `connecting`, `verifying`, or `online` — a stray/late signal while
@@ -119,8 +123,11 @@ export class PortHealth {
       }
       return;
     }
-    // 'auth-terminal': credentials rejected, terminal for this process — still retried later (not given up).
-    this.scheduleRetry({ kind: 'failed', reason: 'auth' });
+    // 'auth-terminal': the login was refused. Terminal: no timer (see the class docs).
+    this.clearConnectingDeadline();
+    this.clearPendingRetry();
+    this.attempt += 1;
+    this.setState({ kind: 'failed', reason: 'auth', untilMs: this.now(), attempt: this.attempt });
   }
 
   /**
@@ -143,14 +150,14 @@ export class PortHealth {
     }
     if (code === 504) {
       // Silent black hole (wrong key / unreachable server): always drops to a scheduled retry.
-      this.scheduleRetry({ kind: 'retrying', reasonKey: 'timeout' });
+      this.scheduleRetry({ reasonKey: 'timeout' });
       return;
     }
     if (code === 503) {
       // "Endpoint dead or not ready": only actionable once we'd already called it online — during
       // connecting/verifying sing-box keeps retrying internally, so this is a transient no-op.
       if (this._state.kind === 'online') {
-        this.scheduleRetry({ kind: 'retrying', reasonKey: 'unreachable' });
+        this.scheduleRetry({ reasonKey: 'unreachable' });
       }
       return;
     }
@@ -160,7 +167,7 @@ export class PortHealth {
     // failed probe like any other: a wedged engine (e.g. SIGSTOPped) never exits, so
     // waiting for feedExit would leave the port showing online with a stale latency forever.
     if (this._state.kind === 'online') {
-      this.scheduleRetry({ kind: 'retrying', reasonKey: 'unresponsive' });
+      this.scheduleRetry({ reasonKey: 'unresponsive' });
     }
   }
 
@@ -181,7 +188,7 @@ export class PortHealth {
       this.setState({ kind: 'online', since: this.now(), exitIp: info.exitIp, country: info.country, ...(latencyMs !== undefined ? { latencyMs } : {}) });
       return;
     }
-    this.scheduleRetry({ kind: 'retrying', reasonKey: 'verify-failed' });
+    this.scheduleRetry({ reasonKey: 'verify-failed' });
   }
 
   /**
@@ -192,7 +199,7 @@ export class PortHealth {
    */
   feedExit(_code: number | null): void {
     if (!this.isActive()) return;
-    this.scheduleRetry({ kind: 'retrying', reasonKey: 'exited' });
+    this.scheduleRetry({ reasonKey: 'exited' });
   }
 
   /** Subscribes to every state transition. Returns an unsubscribe function. */
@@ -238,12 +245,12 @@ export class PortHealth {
     this.cancelConnectingDeadline = this.schedule(this.connectingDeadlineMs, () => {
       this.cancelConnectingDeadline = null;
       if (this._state.kind === 'connecting') {
-        this.scheduleRetry({ kind: 'retrying', reasonKey: 'unreachable' });
+        this.scheduleRetry({ reasonKey: 'unreachable' });
       }
     });
   }
 
-  private scheduleRetry(partial: RetryKind): void {
+  private scheduleRetry(partial: { reasonKey: string }): void {
     this.clearConnectingDeadline();
     this.clearPendingRetry();
     const delayMs = nextBackoffMs(this.attempt);
@@ -252,21 +259,18 @@ export class PortHealth {
 
     const giveUpAfter = this.getGiveUpAfter();
     if (giveUpAfter > 0 && this.attempt >= giveUpAfter) {
-      this.giveUpReason = partial.kind === 'failed' ? partial.reason : partial.reasonKey;
+      this.giveUpReason = partial.reasonKey;
       this.setState({ kind: 'stopped' });
       return; // truly given up — no timer, no further auto-retry
     }
 
-    if (partial.kind === 'failed') {
-      this.setState({ kind: 'failed', reason: partial.reason, untilMs, attempt: this.attempt });
-    } else {
-      this.setState({ kind: 'retrying', untilMs, attempt: this.attempt, reasonKey: partial.reasonKey });
-    }
-
+    // Armed BEFORE the state is announced: a listener that reacts to `retrying` by
+    // stopping the port (`stop()`) must be able to cancel this timer.
     this.cancelPendingRetry = this.schedule(delayMs, () => {
       this.cancelPendingRetry = null;
       this.enterConnecting();
       for (const cb of this.retryDueCbs) cb();
     });
+    this.setState({ kind: 'retrying', untilMs, attempt: this.attempt, reasonKey: partial.reasonKey });
   }
 }
