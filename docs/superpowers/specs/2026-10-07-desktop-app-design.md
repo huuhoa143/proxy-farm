@@ -304,7 +304,9 @@ Each unit is independently testable:
   - Cache geo per IP.
 
 **Back-off**: 30 s, 1, 2, 4 … capped at 30 min, plus random jitter.
-- Bad server IP remembered for 2 h; fail over to another IP of the same location.
+- A port's exit IP is sticky: a drop of an online port retries the **same** server on the back-off and marks nothing.
+- A server is judged dead (remembered for 2 h, fail over to another server of the same location) only when it fails a **fresh reconnect**: at once for a server the port never got online on, after 2 failed reconnects in a row for the server it was online on.
+- Correlated drops are not dead servers: when another port of the same provider failed within the last 15 s, that provider has an incident; when ports of two providers did, the host has one. During an incident (2 min, extended by every further failure) nothing is marked and no port moves; every port retries its own server. (2026-10-08: every few minutes all HMA tunnels stalled together for 30–60 s while direct traffic was fine.)
 - Starts are queued at ≤ 3 concurrent, 2–5 s apart (also on resume and app start).
 
 ### 6.5 Change IP (was "Rotate")
@@ -343,7 +345,7 @@ Each unit is independently testable:
 - **Server health**, per (account, server):
   - `lastOk` — last confirmed online.
   - `refused until` — auth refused: an HMA server of another tenant, or a ZoogVPN `not in plan`. 7 days. Persisted.
-  - `dead until` — handshake timeout, `/delay` 503/504, or the host vanished from DNS. 2 h. In memory.
+  - `dead until` — a fresh reconnect failed (handshake timeout, `/delay` 503/504; see §6.4 for when a drop counts), or the host vanished from DNS. 2 h. In memory.
 
 **Pool source per provider.**
 
@@ -364,7 +366,7 @@ Each unit is independently testable:
 
 - Server refused → mark refused for (account, server) and move the port to the next free usable server.
   - If none is left, the port enters `failed(auth)` or `failed(not in plan)` with the provider's message (§5.1, §5.2).
-- Server dead → mark dead for 2 h and move to the next free usable server.
+- Server dead (by the §6.4 rule: a failed fresh reconnect, never a drop of an online port or a correlated drop) → mark dead for 2 h and move to the next free usable server.
   - If none is left, `retrying` on the normal back-off; dead marks expire, so the pool recovers.
 - Change IP (§6.5) uses the same selection, excluding the current server.
 

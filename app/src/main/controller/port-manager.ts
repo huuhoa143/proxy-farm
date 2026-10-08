@@ -62,6 +62,8 @@ export interface PortManagerDeps {
   scheduleRetry?: (ms: number, cb: () => void) => () => void;
   /** Injectable for deterministic backoff-jitter tests. @default `Math.random`. */
   backoffRng?: () => number;
+  /** Clock for the correlated-drop window (see `onConnectivityFailure`). @default Date.now */
+  now?: () => number;
   /**
    * Turns a server token into an IPv4 literal before `provider.bind` (spec §6.1.4:
    * "server hostnames are resolved by the controller beforehand, so configs contain IPs
@@ -149,11 +151,22 @@ function firstLanIPv4(): string {
   return '127.0.0.1';
 }
 
-/** The `retrying` reasonKeys that mean "this server is dead" (spec §6.8: handshake
+/** The `retrying` reasonKeys that may mean "this server is dead" (spec §6.8: handshake
  * timeout, `/delay` 503/504): `PortHealth`'s own timeout/unreachable/exited/verify
  * reasons. Deliberately NOT auth (that is a refusal, handled separately) nor
- * port-manager's own pre-engine reasons (`secret-unavailable`, `start-error`, …). */
+ * port-manager's own pre-engine reasons (`secret-unavailable`, `start-error`, …).
+ * Whether one actually condemns the server is `onConnectivityFailure`'s call. */
 const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'exited', 'verify-failed']);
+
+/** Connectivity failures of two different ports this close together are one incident
+ * on the host or the provider's side, not two dead servers (spec §6.4). */
+const CORRELATED_DROP_WINDOW_MS = 15_000;
+/** How long an incident keeps every server of its scope unjudged; each further failure
+ * inside it extends it. */
+const INCIDENT_HOLD_MS = 2 * 60_000;
+/** Failed fresh reconnects in a row before a server a port was online on is given up
+ * (its exit IP is the port's identity, so it is not dropped on one bad minute). */
+const STICKY_RECONNECT_FAILURES = 2;
 
 /** How recent a confirmed-online on another server must be for an HMA auth failure to
  * count as that server refusing the device rather than the device creds being bad. */
@@ -252,6 +265,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   const rotateOnlineTimeoutMs = deps.rotateOnlineTimeoutMs ?? DEFAULT_ROTATE_ONLINE_TIMEOUT_MS;
   const scheduleRetryFn = deps.scheduleRetry ?? defaultScheduleRetry;
   const backoffRng = deps.backoffRng ?? Math.random;
+  const now = deps.now ?? Date.now;
   const resolveServer = deps.resolveServer ?? defaultResolveServer;
   const health = deps.serverHealth ?? createServerHealth({ initial: deps.state.getState().serverHealth });
   /** server token -> last resolved IPv4, for the invariant check and `listServers`. */
@@ -541,6 +555,58 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     if (port.providerId === 'zoogvpn') updatePort(port.key, { state: { ...state, reason: 'not-in-plan' } });
   }
 
+  // Bookkeeping for `onConnectivityFailure` (spec §6.4 "a port's exit IP is sticky").
+  /** Ports that have reached `online` since their last (re)start. */
+  const onlineSinceStart = new Set<string>();
+  /** port key -> the server it was last online on. */
+  const lastOnlineServer = new Map<string, string>();
+  /** port key -> failed fresh reconnects in a row to its `lastOnlineServer`. */
+  const stickyFailures = new Map<string, number>();
+  /** Connectivity failures within the last `CORRELATED_DROP_WINDOW_MS`. */
+  let recentFailures: Array<{ key: string; providerId: ProviderId; at: number }> = [];
+  /** Provider (or '*' for the whole host) -> epoch ms its incident holds until. */
+  const incidentUntil = new Map<ProviderId | '*', number>();
+
+  /**
+   * A connectivity failure (`retrying` timeout/unreachable/exited/verify-failed) of a
+   * pinned port (spec §6.4, §6.8). The rule, in order:
+   *
+   * 1. Correlated: if another port of the same provider failed within the last 15 s,
+   *    that provider has an incident; if ports of two providers did, the host has one
+   *    (its network or uplink dropped). During an incident (2 min, extended by every
+   *    further failure) nothing is marked and no port moves: `PortHealth`'s back-off
+   *    retries each port on its SAME server.
+   * 2. A drop of a port that had reached `online` since its last start marks nothing
+   *    either: the retry reconnects to the same server, keeping the exit IP.
+   * 3. Only a failed fresh reconnect condemns a server: it is marked dead (2 h) and the
+   *    port fails over. For the server the port was last online on, that takes
+   *    `STICKY_RECONNECT_FAILURES` failed reconnects in a row; a server the port never
+   *    got online on (a new pin, a failover target) is condemned at once.
+   */
+  function onConnectivityFailure(port: PortRow & { server: string }): void {
+    const at = now();
+    const wasOnline = onlineSinceStart.delete(port.key);
+    recentFailures = recentFailures.filter((f) => at - f.at < CORRELATED_DROP_WINDOW_MS && f.key !== port.key);
+    const others = recentFailures;
+    recentFailures = [...others, { key: port.key, providerId: port.providerId, at }];
+    if (others.some((f) => f.providerId === port.providerId)) incidentUntil.set(port.providerId, at + INCIDENT_HOLD_MS);
+    if (others.some((f) => f.providerId !== port.providerId)) incidentUntil.set('*', at + INCIDENT_HOLD_MS);
+    const scope = (incidentUntil.get('*') ?? 0) > at ? '*' : (incidentUntil.get(port.providerId) ?? 0) > at ? port.providerId : undefined;
+    if (scope !== undefined) {
+      incidentUntil.set(scope, at + INCIDENT_HOLD_MS);
+      return;
+    }
+    if (wasOnline) return;
+    if (lastOnlineServer.get(port.key) === port.server) {
+      const failures = (stickyFailures.get(port.key) ?? 0) + 1;
+      stickyFailures.set(port.key, failures);
+      if (failures < STICKY_RECONNECT_FAILURES) return;
+    }
+    stickyFailures.delete(port.key);
+    health.markDead(port.accountId, port.server);
+    failOver(port.key, 'server-dead');
+  }
+
   /** The exit-IP probe is the invariant's final check (spec §6.8): a port whose exit IP
    * equals another enabled port's of the same provider moves to another server. */
   function onOnline(port: PortRow & { server: string }, exitIp: string): void {
@@ -561,7 +627,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // `PortHealth` (inside the real `Engine`) OWNS `PortRow.state` — this is the one place
   // port-manager persists its transitions (reviewer item 6), and the one place server
   // health is learned: `online` = OK (and the exit-IP invariant check), a connectivity
-  // `retrying` = dead (2 h), a `failed(auth)` = possibly refused (see `authVerdict`).
+  // `retrying` = possibly dead (see `onConnectivityFailure`), a `failed(auth)` = possibly
+  // refused (see `authVerdict`).
   /** port key -> `since` of the online state last handled, to tell a latency refresh of
    * the same online stretch from a new transition. */
   const handledOnline = new Map<string, number>();
@@ -586,10 +653,12 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     }
 
     if (state.kind === 'online') {
+      onlineSinceStart.add(key);
+      lastOnlineServer.set(key, port.server);
+      stickyFailures.delete(key);
       onOnline(pinned, state.exitIp);
     } else if (state.kind === 'retrying' && CONNECTIVITY_RETRY_REASONS.has(state.reasonKey)) {
-      health.markDead(port.accountId, port.server);
-      failOver(key, 'server-dead');
+      onConnectivityFailure(pinned);
     } else if (state.kind === 'failed' && state.reason === 'auth') {
       onAuthFailure(pinned, state);
     }
@@ -740,6 +809,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
       const endpoint = provider.bind(target, selected.pick.ip, account, secret);
       const renderInput = buildRenderInput(findPort(key) ?? port, endpoint);
+      onlineSinceStart.delete(key); // a fresh (re)connect from here on
       try {
         await deps.engine.start(key, renderInput);
       } catch (err) {
@@ -934,6 +1004,8 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     const renderInput = buildRenderInput(port, endpoint);
 
     await deps.engine.stop(key);
+    onlineSinceStart.delete(key);
+    onlineSinceStart.delete(finalKey);
     await deps.engine.start(finalKey, renderInput);
 
     // Wait for `PortHealth` to confirm the tunnel before probing (reviewer item 1).

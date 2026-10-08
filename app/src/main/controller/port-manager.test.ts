@@ -1472,6 +1472,117 @@ describe('port manager', () => {
       expect(serverOf(state, 'zoogvpn:nl-ams')).toBe('10.0.0.2');
     });
 
+    describe('sticky exit IP: drops vs dead servers (spec §6.4)', () => {
+      const pool = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+      const drop = { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' } as const;
+      const online = (ip: string) => ({ kind: 'online', since: Math.random(), exitIp: ip, country: 'NL' }) as const;
+
+      /** #1 on 10.0.0.1 and #2 on 10.0.0.2, both started and online; a settable clock. */
+      async function twoOnline() {
+        const serverHealth = createServerHealth();
+        const clock = { t: 1_000_000 };
+        const ctx = setup({
+          targets: [{ ...twoServerTargets[0], servers: pool }],
+          port: { key: 'zoogvpn:nl-ams#1', enabled: false, state: { kind: 'stopped' } },
+          portServers: { 'zoogvpn:nl-ams': '10.0.0.1' },
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, now: () => clock.t },
+        });
+        ctx.state.setState((s) => ({
+          ...s,
+          ports: [...s.ports, basePort({ key: 'zoogvpn:nl-ams#2', proxyPort: 29002, server: '10.0.0.2', enabled: false, state: { kind: 'stopped' } })],
+        }));
+        await ctx.manager.startPort('zoogvpn:nl-ams#1');
+        await ctx.manager.startPort('zoogvpn:nl-ams#2');
+        ctx.engine.fireState('zoogvpn:nl-ams#1', online('10.0.0.1'));
+        ctx.engine.fireState('zoogvpn:nl-ams#2', online('10.0.0.2'));
+        ctx.engine.started.length = 0;
+        /** The back-off elapses: the port restarts (a fresh reconnect); returns the IP it bound. */
+        const retry = async (key: string) => {
+          const n = ctx.engine.started.length;
+          ctx.engine.fireRetryDue(key);
+          await vi.waitFor(() => expect(ctx.engine.started).toHaveLength(n + 1));
+          return boundIp(ctx.engine.started[n].input);
+        };
+        return { ...ctx, serverHealth, clock, retry };
+      }
+
+      it('a lone drop of an online port marks nothing and reconnects to the same server', async () => {
+        const { engine, serverHealth, retry } = await twoOnline();
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        await new Promise((r) => setTimeout(r, 10));
+        expect(engine.started).toHaveLength(0); // no move
+        expect(serverHealth.isUsable('z1', '10.0.0.1')).toBe(true);
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+      });
+
+      it('the server a port was online on is given up only after failed fresh reconnects in a row', async () => {
+        const { engine, serverHealth, retry, clock, state } = await twoOnline();
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        clock.t += 60_000;
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+        engine.fireState('zoogvpn:nl-ams#1', drop); // first failed reconnect: still sticky
+        expect(serverHealth.isUsable('z1', '10.0.0.1')).toBe(true);
+        clock.t += 60_000;
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+        engine.fireState('zoogvpn:nl-ams#1', drop); // second: the server is dead
+        expect(serverHealth.isDead('z1', '10.0.0.1')).toBe(true);
+        await vi.waitFor(() => expect(serverOf(state, 'zoogvpn:nl-ams#1')).toBe('10.0.0.3'));
+      });
+
+      it('a server the port never got online on is still condemned on its first failure', async () => {
+        const { engine, serverHealth, state, retry } = await twoOnline();
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        serverHealth.markDead('z1', '10.0.0.1'); // say it went away for good
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.3'); // a new pin
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        expect(serverHealth.isDead('z1', '10.0.0.3')).toBe(true);
+        await vi.waitFor(() => expect(serverOf(state, 'zoogvpn:nl-ams#1')).toBe('10.0.0.4'));
+      });
+
+      it('ports of one provider failing together are an incident: nothing is marked, nothing moves, until it is over', async () => {
+        const { engine, serverHealth, retry, clock, state } = await twoOnline();
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        clock.t += 3_000;
+        engine.fireState('zoogvpn:nl-ams#2', drop);
+        // Both reconnect to their own servers and keep failing while the incident lasts.
+        for (let round = 0; round < 3; round++) {
+          clock.t += 40_000;
+          expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+          engine.fireState('zoogvpn:nl-ams#1', drop);
+          clock.t += 2_000;
+          expect(await retry('zoogvpn:nl-ams#2')).toBe('10.0.0.2');
+          engine.fireState('zoogvpn:nl-ams#2', drop);
+        }
+        expect(pool.every((s) => serverHealth.isUsable('z1', s))).toBe(true);
+        expect([serverOf(state, 'zoogvpn:nl-ams#1'), serverOf(state, 'zoogvpn:nl-ams#2')]).toEqual(['10.0.0.1', '10.0.0.2']);
+
+        // Long after it, a lone server that still fails its reconnects is judged normally.
+        clock.t += 10 * 60_000;
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        clock.t += 60_000;
+        expect(await retry('zoogvpn:nl-ams#1')).toBe('10.0.0.1');
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        expect(serverHealth.isDead('z1', '10.0.0.1')).toBe(true);
+      });
+
+      it('ports of two providers failing together are a host-wide incident', async () => {
+        const { engine, serverHealth, state, clock } = await twoOnline();
+        // An HMA port whose server never got online (alone, that failure would condemn it).
+        state.setState((s) => ({
+          ...s,
+          accounts: [...s.accounts, { ...account, id: 'h1', providerId: 'hma' }],
+          ports: [...s.ports, basePort({ key: 'hma:VN#1', locationKey: 'hma:VN', providerId: 'hma', accountId: 'h1', proxyPort: 29003, server: '10.9.0.1', state: { kind: 'connecting', since: 1 } })],
+        }));
+        engine.fireState('zoogvpn:nl-ams#1', drop);
+        clock.t += 5_000;
+        engine.fireState('hma:VN#1', drop);
+        expect(serverHealth.isUsable('h1', '10.9.0.1')).toBe(true);
+        expect(serverHealth.isUsable('z1', '10.0.0.1')).toBe(true);
+      });
+    });
+
     it('with every server dead the port stays retrying on the normal back-off; the due retry still tries', async () => {
       const { manager, state, engine } = setup({
         targets: [{ ...twoServerTargets[0], servers: ['10.0.0.1'] }],
