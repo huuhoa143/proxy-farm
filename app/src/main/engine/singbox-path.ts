@@ -90,10 +90,14 @@ const REQUIRED_TAGS = ['with_gvisor', 'with_wireguard', 'with_openvpn'] as const
  * Runs `<bin> version` and throws unless the output reports the pinned
  * version with all required build tags (spec §2).
  */
-export async function assertSingboxVersion(binPath: string = singboxPath()): Promise<void> {
+export async function assertSingboxVersion(
+  binPath: string = singboxPath(),
+  /** Runs `<bin> version` and returns its stdout. Overridable for tests. */
+  runVersion: (binPath: string) => Promise<string> = async (bin) => (await execFileAsync(bin, ['version'])).stdout,
+): Promise<void> {
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync(binPath, ['version']));
+    stdout = await runVersion(binPath);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`assertSingboxVersion: failed to run "${binPath} version": ${message}`);
