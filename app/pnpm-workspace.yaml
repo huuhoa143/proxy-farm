@@ -1,0 +1,12 @@
+# pnpm 10+ reads its settings here (pnpm 11 ignores them in .npmrc).
+# electron-forge needs a flat node_modules to package the app.
+nodeLinker: hoisted
+
+# Dependencies whose install scripts must run: electron downloads its binary,
+# esbuild installs its native binary.
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+allowBuilds:
+  electron: true
+  esbuild: true
