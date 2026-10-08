@@ -473,6 +473,7 @@
     "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
   },
   "hma": {
+    "deviceLabel": "Device …{{suffix}}",
     "windowsLater": "HMA support on Windows is coming in a later version.",
     "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
     "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
@@ -488,6 +489,7 @@
     }
   },
   "surfshark": {
+    "keyLabel": "Key …{{suffix}}",
     "check": {
       "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
       "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",

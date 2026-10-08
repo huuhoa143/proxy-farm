@@ -473,6 +473,7 @@
     "key-rejected": "Proxy Farm đã ngừng thử lại khóa WireGuard này vì không nhận được phản hồi. Hãy bật cổng trong ứng dụng để thử thêm một lần."
   },
   "hma": {
+    "deviceLabel": "Thiết bị …{{suffix}}",
     "windowsLater": "Hỗ trợ HMA trên Windows sẽ có ở phiên bản sau.",
     "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
     "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
@@ -488,6 +489,7 @@
     }
   },
   "surfshark": {
+    "keyLabel": "Khoá …{{suffix}}",
     "check": {
       "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
       "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
