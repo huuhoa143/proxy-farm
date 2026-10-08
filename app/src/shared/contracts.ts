@@ -74,6 +74,9 @@ export interface Target {
   country: string; // ISO-3166 alpha-2, upper case
   city: string;
   label: string;
+  /** The location covers the whole country: `city` is only the country's name, in the
+   * provider's language (ZoogVPN "Germany"). The UI shows the localised country name. */
+  countryWide?: boolean;
   /**
    * The location's server pool, best first (spec §6.8). Each entry is one server = one
    * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname

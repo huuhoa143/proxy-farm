@@ -165,4 +165,25 @@ describe('LocationPicker', () => {
       await act(() => changeLanguage('en'));
     }
   });
+
+  it('a country-wide location (ZoogVPN "Germany") is named after the country in the UI language, picked chip too', async () => {
+    const wide = (key: string, country: string, city: string): Target => ({ ...target(key, city, 2, 2, 'zoogvpn'), country, countryWide: true });
+    const germany = wide('zoogvpn:DE', 'DE', 'Germany');
+    const usEast: Target = { ...target('zoogvpn:US-EAST', 'East', 2, 2, 'zoogvpn'), country: 'US' };
+    const us = wide('zoogvpn:US', 'US', 'United States');
+    await act(() => changeLanguage('vi'));
+    try {
+      const { row } = renderPicker({ targets: [germany, usEast, us] });
+      expect(row('zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(row('zoogvpn:DE')).not.toHaveTextContent('Germany');
+      expect(row('zoogvpn:US-EAST')).toHaveTextContent('East');
+      expect(row('zoogvpn:US')).toHaveTextContent('Hoa Kỳ');
+      expect(row('zoogvpn:US')).not.toHaveTextContent('United States');
+      fireEvent.click(within(row('zoogvpn:DE')).getByRole('checkbox'));
+      expect(screen.getByTestId('picked-zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(within(row('zoogvpn:DE')).getByRole('group')).toHaveAccessibleName('Số cổng ở Đức');
+    } finally {
+      await act(() => changeLanguage('en'));
+    }
+  });
 });

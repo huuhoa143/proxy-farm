@@ -12,6 +12,7 @@ import { CredentialsChip } from './CredentialsChip';
 import { Icon } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 import { providerName } from '../ui/providerName';
+import { locationName as nameOf } from '../ui/locationName';
 import { remainingByProvider } from '../portGroups';
 
 export interface MainScreenProps {
@@ -30,7 +31,8 @@ function removeKey(record: Record<string, string>, key: string): Record<string, 
 }
 
 export function MainScreen({ api }: MainScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language || 'en';
   const [targets, setTargets] = useState<Target[]>([]);
   const [ports, setPorts] = useState<PortRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -139,7 +141,13 @@ export function MainScreen({ api }: MainScreenProps) {
   }
 
   function locationName(locationKey: string): string {
-    return targets.find((t) => t.key === locationKey)?.city ?? locationKey;
+    const target = targets.find((t) => t.key === locationKey);
+    return target ? nameOf(target, language) : locationKey;
+  }
+
+  /** How the UI names a port's location (the localised country for a country-wide one). */
+  function rowLocation(row: PortRow): string {
+    return nameOf({ ...row, countryWide: targets.find((t) => t.key === row.locationKey)?.countryWide }, language);
   }
 
   /** Add ports per location (spec §6.8); say so when fewer than asked could be added. */
@@ -222,7 +230,7 @@ export function MainScreen({ api }: MainScreenProps) {
   async function handleRotate(row: PortRow, toServer?: string) {
     // Captured up front: a port moved to another city comes back under a new key.
     const key = row.key;
-    const fromCity = row.city;
+    const fromCity = rowLocation(row);
     setRotating((prev) => new Set(prev).add(key));
     let result: RotateResult;
     try {
@@ -246,7 +254,7 @@ export function MainScreen({ api }: MainScreenProps) {
       showNotice(note);
       const moved = rows.find((r) => r.proxyPort === row.proxyPort);
       if (moved) {
-        const movedNote = t('main.rotateResult.movedFromToNote', { from: fromCity, to: result.movedTo ?? moved.city });
+        const movedNote = t('main.rotateResult.movedFromToNote', { from: fromCity, to: rowLocation(moved) });
         setRotateNotes((prev) => ({ ...removeKey(prev, key), [moved.key]: movedNote }));
       }
       return;

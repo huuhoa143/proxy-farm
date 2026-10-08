@@ -4,6 +4,7 @@ import type { ProviderId, Target } from '../../shared/contracts';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
+import { isCountryWide, locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 import { useModalFocusTrap } from '../ui/useModalFocusTrap';
 import { addableCount } from '../portGroups';
@@ -86,7 +87,7 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
     }
     const list = Array.from(byCountry.values());
     list.sort((a, b) => a.name.localeCompare(b.name, language));
-    for (const group of list) group.targets.sort((a, b) => a.city.localeCompare(b.city, language));
+    for (const group of list) group.targets.sort((a, b) => locationName(a, language).localeCompare(locationName(b, language), language));
     return list;
   }, [targets, provider, query, language]);
 
@@ -209,14 +210,17 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                 return (
                   <li key={key} className="pick-chip" data-testid={`picked-${key}`}>
                     <Flag country={target.country} size="sm" />
-                    <span className="pick-chip-t" title={`${target.city} · ${countryName(target.country, language)}`}>
-                      {target.city}
+                    <span
+                      className="pick-chip-t"
+                      title={isCountryWide(target, language) ? locationName(target, language) : `${target.city} · ${countryName(target.country, language)}`}
+                    >
+                      {locationName(target, language)}
                     </span>
                     {count > 1 && <b>×{count}</b>}
                     <button
                       type="button"
-                      aria-label={t('main.picker.unpick', { location: target.city }) as string}
-                      title={t('main.picker.unpick', { location: target.city }) as string}
+                      aria-label={t('main.picker.unpick', { location: locationName(target, language) }) as string}
+                      title={t('main.picker.unpick', { location: locationName(target, language) }) as string}
                       onClick={() => unpick(key)}
                     >
                       <Icon name="x" />
@@ -266,6 +270,8 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                       ? t('main.picker.noFree')
                       : t('main.picker.limitReached');
                   const notInPlanHint = notInPlan ? (t('main.picker.notInPlanHint', { provider: providerName(target.providerId, t) }) as string) : undefined;
+                  // A country-wide location is named after the country, in the UI language.
+                  const name = locationName(target, language);
                   return (
                     <div
                       key={target.key}
@@ -282,7 +288,7 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                           onChange={() => toggle(target)}
                         />
                         <span className="city">
-                          {target.city}
+                          {name}
                           <small className="pool">
                             {unavailable
                               ? unavailableLabel
@@ -300,11 +306,11 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                       {notInPlan && (
                         // Shown, but nothing to step: no port can be added here.
                         <div className="stepper is-disabled" role="group" aria-disabled="true" aria-label={notInPlanHint} title={notInPlanHint}>
-                          <button type="button" disabled aria-label={t('main.picker.fewer', { location: target.city }) as string}>
+                          <button type="button" disabled aria-label={t('main.picker.fewer', { location: name }) as string}>
                             −
                           </button>
-                          <input type="number" value={0} disabled readOnly aria-label={t('main.picker.qty', { location: target.city }) as string} />
-                          <button type="button" disabled aria-label={t('main.picker.more', { location: target.city }) as string}>
+                          <input type="number" value={0} disabled readOnly aria-label={t('main.picker.qty', { location: name }) as string} />
+                          <button type="button" disabled aria-label={t('main.picker.more', { location: name }) as string}>
                             +
                           </button>
                         </div>
@@ -313,12 +319,12 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                         <div
                           className="stepper"
                           role="group"
-                          aria-label={t('main.picker.qty', { location: target.city }) as string}
+                          aria-label={t('main.picker.qty', { location: name }) as string}
                           title={t('main.picker.maxHint', { max }) as string}
                         >
                           <button
                             type="button"
-                            aria-label={t('main.picker.fewer', { location: target.city }) as string}
+                            aria-label={t('main.picker.fewer', { location: name }) as string}
                             disabled={count <= 1}
                             onClick={() => setCount(target, count - 1)}
                           >
@@ -330,12 +336,12 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                             min={1}
                             max={max}
                             value={count}
-                            aria-label={t('main.picker.qty', { location: target.city }) as string}
+                            aria-label={t('main.picker.qty', { location: name }) as string}
                             onChange={(e) => setCount(target, Number(e.target.value))}
                           />
                           <button
                             type="button"
-                            aria-label={t('main.picker.more', { location: target.city }) as string}
+                            aria-label={t('main.picker.more', { location: name }) as string}
                             disabled={count >= max}
                             onClick={() => setCount(target, count + 1)}
                           >

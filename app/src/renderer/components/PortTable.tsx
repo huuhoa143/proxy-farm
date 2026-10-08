@@ -9,6 +9,7 @@ import { ChangeIpMenu } from './ChangeIpMenu';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
+import { locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 
 export interface PortTableProps {
@@ -122,6 +123,7 @@ export function PortTable({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsed, toggleCollapsed] = useCollapsedGroups();
   const groups = useMemo(() => groupPorts(rows, targets, language), [rows, targets, language]);
+  const targetByKey = useMemo(() => new Map(targets.map((tg) => [tg.key, tg])), [targets]);
   const remaining = useMemo(() => remainingByProvider(rows, limits), [rows, limits]);
 
   // Spec §4.2 "live retry countdown": tick once a second, but only while at
@@ -161,7 +163,7 @@ export function PortTable({
   }
 
   function renderGroupHeader(group: PortGroup, isCollapsed: boolean) {
-    const location = group.city;
+    const location = group.name;
     const keys = group.rows.map((r) => r.key);
     const picked = keys.filter((k) => selectedKeys.has(k)).length;
     const allPicked = picked === keys.length;
@@ -203,10 +205,14 @@ export function PortTable({
             >
               <Icon name="chevron" className="grp-chev" />
               <Flag country={group.country} />
-              <span className="grp-name" title={`${group.city} · ${countryName(group.country, language)} · ${provider}`}>
-                <b>{group.city}</b>
+              <span
+                className="grp-name"
+                title={group.countryWide ? `${group.name} · ${provider}` : `${group.name} · ${countryName(group.country, language)} · ${provider}`}
+              >
+                <b>{group.name}</b>
                 <span className="grp-sub">
-                  {countryName(group.country, language)}
+                  {/* A country-wide location is already named after the country. */}
+                  {!group.countryWide && countryName(group.country, language)}
                   <span className={`psw ${group.providerId}`} aria-hidden="true" />
                   {provider}
                 </span>
@@ -264,7 +270,8 @@ export function PortTable({
         const isOpen = expanded.has(row.key);
         const n = portNumber(row);
         const serverIp = row.serverIp ?? row.server;
-        const portLabel = n ? (t('main.port.label', { location: row.city, n }) as string) : row.label;
+        const rowLocation = locationName({ ...row, countryWide: targetByKey.get(row.locationKey)?.countryWide }, language);
+        const portLabel = n ? (t('main.port.label', { location: rowLocation, n }) as string) : row.label;
         // Change IP picks another server: useful when online and when stuck
         // retrying / failed on a bad server; not while stopped or mid-connect.
         const canChangeIp = state.kind === 'online' || state.kind === 'retrying' || state.kind === 'failed';
@@ -388,6 +395,7 @@ export function PortTable({
                     row={row}
                     api={api}
                     rows={rows}
+                    locationName={rowLocation}
                     disabled={!canChangeIp}
                     busy={rotatingKeys?.has(row.key)}
                     onChange={onRotate}

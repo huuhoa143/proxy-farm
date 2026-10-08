@@ -89,6 +89,16 @@ describe('ChangeIpMenu', () => {
     expect(onChange).toHaveBeenCalledWith(row, undefined);
   });
 
+  it('the heading names the location as the table does (a localised country for a country-wide one)', async () => {
+    const api = createFakeProxyFarmApi();
+    const rows = await api.listPorts();
+    const row = { ...(rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow), city: 'Japan' };
+    render(<ChangeIpMenu row={row} api={api} rows={rows} onChange={() => {}} locationName="Nhật Bản" />);
+    await openMenu(screen.getByTestId('change-ip-hma:JP-TOKYO#1'));
+    expect(screen.getByText('Servers in Nhật Bản')).toBeInTheDocument();
+    expect(screen.queryByText('Servers in Japan')).toBeNull();
+  });
+
   it('tags a free-tier server (not to be confused with an unheld, "free" one)', async () => {
     const { api, trigger } = await setup();
     vi.spyOn(api, 'listServers').mockResolvedValue([

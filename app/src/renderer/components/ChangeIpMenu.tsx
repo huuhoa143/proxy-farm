@@ -16,6 +16,8 @@ export interface ChangeIpMenuProps {
   busy?: boolean;
   /** `toServer` undefined = let the controller pick the next free server. */
   onChange: (row: PortRow, toServer?: string) => void;
+  /** How the UI names the port's location (localised for a country-wide one). @default row.city */
+  locationName?: string;
 }
 
 const HEALTH_TONE: Record<ServerHealth, StatusTone> = {
@@ -37,7 +39,7 @@ type Placement = { top?: number; bottom?: number; right: number };
  * focusable but are aria-disabled with the reason as the item's description.
  * Keyboard: ↑/↓/Home/End move, Enter/Space pick, Esc/Tab close.
  */
-export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: ChangeIpMenuProps) {
+export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange, locationName }: ChangeIpMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<ServerInfo[] | null>(null);
@@ -231,7 +233,7 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
             <div className="cim-sep" role="separator" />
             <div role="group" aria-labelledby={`${menuId}-h`}>
               <div className="cim-h" id={`${menuId}-h`}>
-                <span>{t('main.changeIp.heading', { city: row.city })}</span>
+                <span>{t('main.changeIp.heading', { city: locationName ?? row.city })}</span>
                 {freeCount != null && <span className="cim-free">{t('main.group.free', { count: freeCount })}</span>}
               </div>
               {failed ? (

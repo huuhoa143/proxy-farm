@@ -21,6 +21,9 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The location picker marks a location whose every server refused every account of its
   provider as "Not in your plan", with the reason as a tooltip and its quantity stepper
   disabled; its "+ Add port" says the same. The Change IP menu tags free-tier servers.
+- A location that covers a whole country (most ZoogVPN locations) is named after the
+  country in the UI language: "Đức", not "Germany" or "Germany Đức", in the picker, the
+  group header, the port labels and the Change IP menu heading.
 
 ### Fixed
 

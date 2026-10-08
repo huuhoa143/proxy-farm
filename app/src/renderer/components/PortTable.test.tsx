@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { PortTable } from './PortTable';
 import { createFakeProxyFarmApi } from '../api';
-import { initI18n } from '../i18n';
+import { changeLanguage, initI18n } from '../i18n';
 import type { PortRow, PortState, ProxyFarmApi, Target } from '../../shared/contracts';
 
 beforeAll(() => {
@@ -405,6 +405,26 @@ describe('PortTable', () => {
       expect(blocked).toHaveAttribute('title', 'Every server in Hanoi is already in use or unavailable.');
       fireEvent.click(blocked);
       expect(onAddPort).toHaveBeenCalledTimes(1);
+    });
+
+    it('a country-wide location is headed by the localised country, once ("Đức", not "Germany Đức")', async () => {
+      const germany: Target = { ...hanoi, key: 'zoogvpn:DE', country: 'DE', city: 'Germany', label: 'Germany', countryWide: true, servers: ['de3.webunlim.com'] };
+      const de = row('zoogvpn:DE#1', { kind: 'online', since: Date.now(), exitIp: '185.1.1.1', country: 'DE' }, {
+        locationKey: 'zoogvpn:DE', providerId: 'zoogvpn', country: 'DE', city: 'Germany', server: 'de3.webunlim.com', serverIp: '185.1.1.1', proxyPort: 29009,
+      });
+      await act(() => changeLanguage('vi'));
+      try {
+        renderGrouped({ rows: [de], targets: [germany] });
+        const header = screen.getByTestId('group-zoogvpn:DE');
+        expect(header).toHaveTextContent('Đức');
+        expect(header).not.toHaveTextContent('Germany');
+        expect(header.textContent!.match(/Đức/g)).toHaveLength(1);
+        expect(within(screen.getByTestId('port-row-zoogvpn:DE#1')).getAllByRole('checkbox')[0]).toHaveAccessibleName('Đức · cổng #1');
+        fireEvent.click(screen.getByTestId('change-ip-zoogvpn:DE#1'));
+        expect(await screen.findByText('Máy chủ ở Đức')).toBeInTheDocument();
+      } finally {
+        await act(() => changeLanguage('en'));
+      }
     });
 
     it('+ Add port says so when the location is not in the plan', () => {

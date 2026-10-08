@@ -60,12 +60,14 @@ export function groupLocations(servers: ZoogServer[]): Target[] {
     if (existing) {
       if (!existing.servers.includes(s.host)) existing.servers.push(s.host);
     } else {
+      const countryWide = s.city === s.countryName || s.city === '';
       byKey.set(key, {
         key,
         providerId: 'zoogvpn',
         country: s.country,
         city: s.city,
-        label: s.city === s.countryName || s.city === '' ? s.countryName : `${s.countryName} — ${s.city}`,
+        label: countryWide ? s.countryName : `${s.countryName} — ${s.city}`,
+        ...(countryWide ? { countryWide: true } : {}),
         servers: [s.host],
       });
     }
