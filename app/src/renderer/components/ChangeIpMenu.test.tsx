@@ -37,6 +37,13 @@ describe('ChangeIpMenu', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it("asks for the pool with this port's key, so health is for the port's own account", async () => {
+    const { api, trigger } = await setup();
+    const spy = vi.spyOn(api, 'listServers');
+    await openMenu(trigger);
+    expect(spy).toHaveBeenCalledWith('hma:JP-TOKYO', 'hma:JP-TOKYO#1');
+  });
+
   it("lists the location's servers with health and holder, marking the current one", async () => {
     const { trigger } = await setup();
     await openMenu(trigger);

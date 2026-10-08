@@ -104,8 +104,10 @@ export interface PortManager {
    */
   addPort(target: Target, accountId: string, opts?: { atLimit?: () => boolean }): Promise<PortRow | undefined>;
   /** The location's pool with health, resolved IP (when known) and holder (spec §6.8).
-   * Synchronous: uses only already-resolved IPs, never the network. */
-  listServers(target: Target): ServerInfo[];
+   * Health is for `portKey`'s account when that port exists (its Change-IP menu), else
+   * merged over the accounts the location's ports use. Synchronous: uses only
+   * already-resolved IPs, never the network. */
+  listServers(target: Target, portKey?: string): ServerInfo[];
   /** Servers of `target` that some account of its provider may use and no enabled port holds. */
   freeServerCount(target: Target): number;
   setAutoRotate(key: string, minutes: number): Promise<void>;
@@ -953,11 +955,14 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     return { changed, from: beforeIp, to: afterIp, noteKey };
   }
 
-  function listServers(target: Target): ServerInfo[] {
+  function listServers(target: Target, portKey?: string): ServerInfo[] {
     const { accounts: all, ports } = deps.state.getState();
-    // Health is for the accounts this location's ports use; with no port yet, for every
-    // account of the provider (any of them may take the next one).
-    const used = new Set(ports.filter((p) => p.locationKey === target.key).map((p) => p.accountId));
+    // Health is for one port's account when asked for (a server refused for another
+    // account is still a valid pick for this port), else for the accounts this
+    // location's ports use; with no port yet, for every account of the provider (any of
+    // them may take the next one).
+    const forPort = portKey === undefined ? undefined : ports.find((p) => p.key === portKey);
+    const used = new Set(forPort ? [forPort.accountId] : ports.filter((p) => p.locationKey === target.key).map((p) => p.accountId));
     const ofProvider = all.filter((a) => a.providerId === target.providerId);
     const accounts = used.size > 0 ? ofProvider.filter((a) => used.has(a.id)) : ofProvider;
     return target.servers.map((server) => {

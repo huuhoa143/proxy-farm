@@ -372,6 +372,21 @@ describe('port manager', () => {
       expect(manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3']))[2].health).toBe('refused');
     });
 
+    it("with a port key, health is for that port's account only (its Change-IP menu)", async () => {
+      const serverHealth = createServerHealth();
+      serverHealth.markRefused('z2', '10.0.0.3'); // refused for z2, unknown for z1
+      serverHealth.markDead('z1', '10.0.0.4'); // dead for z1, unknown for z2
+      const pool = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'];
+      const { manager, state } = twoPorts(pool, '10.0.0.2', { depsOverrides: { serverHealth } });
+      const z2: Account = { ...account, id: 'z2', secretRef: 'z2-secret' };
+      state.setState((s) => ({ ...s, accounts: [...s.accounts, z2], ports: s.ports.map((p) => (p.key === 'zoogvpn:nl-ams#2' ? { ...p, accountId: 'z2' } : p)) }));
+      const health = (portKey?: string) => manager.listServers(ams(pool), portKey).slice(2).map((s) => s.health);
+      expect(health()).toEqual(['unknown', 'unknown']); // merged: usable by one of z1/z2 each
+      expect(health('zoogvpn:nl-ams#1')).toEqual(['unknown', 'dead']);
+      expect(health('zoogvpn:nl-ams#2')).toEqual(['refused', 'unknown']);
+      expect(health('zoogvpn:nl-ams#9')).toEqual(['unknown', 'unknown']); // unknown port: merged
+    });
+
     it('one round-robin hostname (a Surfshark cluster before discovery) can back two ports on different IPs', async () => {
       let n = 0;
       const { manager } = setup({ targets: [], depsOverrides: { resolveServer: async () => `203.0.113.${++n}` } });

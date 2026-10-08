@@ -394,7 +394,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       }));
     },
 
-    async listServers(locationKey) {
+    // The fake keeps one health map for every account, so `portKey` changes nothing here.
+    async listServers(locationKey, _portKey) {
       const target = findTarget(locationKey);
       return (target?.servers ?? []).map((server) => {
         const h = health.get(server) ?? { health: 'unknown' as const };

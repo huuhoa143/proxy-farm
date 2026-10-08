@@ -356,7 +356,7 @@ describe('controller facade', () => {
   });
 
   it('listServers / listTargets come from the port manager, with freeServers filled in', async () => {
-    const { facade } = setup();
+    const { facade, portManager } = setup();
     await facade.connectHma();
     await facade.addPorts('hma:NL-AMS', 1);
     expect((await facade.listServers('hma:NL-AMS')).map((s) => [s.server, s.heldBy])).toEqual([
@@ -365,6 +365,9 @@ describe('controller facade', () => {
       ['10.0.0.3', undefined],
     ]);
     expect(await facade.listServers('hma:NOPE')).toEqual([]);
+    const spy = vi.spyOn(portManager, 'listServers');
+    await facade.listServers('hma:NL-AMS', 'hma:NL-AMS#1');
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ key: 'hma:NL-AMS' }), 'hma:NL-AMS#1');
     const targets = await facade.listTargets('hma');
     expect(targets.map((t) => [t.key, t.freeServers])).toEqual([
       ['hma:NL-AMS', 2],

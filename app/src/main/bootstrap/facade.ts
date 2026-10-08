@@ -313,9 +313,9 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       return out;
     },
 
-    async listServers(locationKey) {
+    async listServers(locationKey, portKey) {
       const target = await findTarget(locationKey);
-      return target ? deps.portManager.listServers(target) : [];
+      return target ? deps.portManager.listServers(target, portKey) : [];
     },
 
     async listPorts() {

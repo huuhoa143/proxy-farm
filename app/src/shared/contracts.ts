@@ -285,8 +285,10 @@ export interface ProxyFarmApi {
    * starts them. `added` may be shorter than `count`; `noteKey` then says why
    * ('no-free-server' | 'limit-reached'). */
   addPorts(locationKey: string, count: number): Promise<{ added: PortRow[]; noteKey?: string }>;
-  /** The location's server pool with health and which port holds each server. */
-  listServers(locationKey: string): Promise<ServerInfo[]>;
+  /** The location's server pool with health and which port holds each server. Health
+   * is for `portKey`'s account when given (the Change-IP menu of that port), else merged
+   * over the accounts the location's ports use. */
+  listServers(locationKey: string, portKey?: string): Promise<ServerInfo[]>;
   /** Starts existing ports. A bare location key (no `#n`) is accepted for compatibility
    * and means "add one port to that location". */
   startPorts(portKeys: string[]): Promise<void>;

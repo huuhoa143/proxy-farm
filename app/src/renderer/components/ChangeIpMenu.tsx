@@ -77,14 +77,16 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
   useEffect(() => {
     if (!open) return undefined;
     let live = true;
-    api.listServers(row.locationKey).then(
+    // Health for this port's own account: a server refused for another account is
+    // still a valid pick here.
+    api.listServers(row.locationKey, row.key).then(
       (list) => live && setServers(list),
       () => live && setFailed(true),
     );
     return () => {
       live = false;
     };
-  }, [open, api, row.locationKey]);
+  }, [open, api, row.locationKey, row.key]);
 
   // Focus the default action as soon as the menu exists.
   useLayoutEffect(() => {

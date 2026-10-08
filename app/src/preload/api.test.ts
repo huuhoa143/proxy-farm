@@ -47,6 +47,11 @@ describe('preload API surface (spec §3)', () => {
 
     await api.listProviders();
     expect(ipc.invoke).toHaveBeenCalledWith('listProviders');
+
+    await api.listServers('hma:jp-tok', 'hma:jp-tok#2');
+    expect(ipc.invoke).toHaveBeenCalledWith('listServers', 'hma:jp-tok', 'hma:jp-tok#2');
+    await api.listServers('hma:jp-tok');
+    expect(ipc.invoke).toHaveBeenLastCalledWith('listServers', 'hma:jp-tok');
   });
 
   it('onPortsChanged subscribes on the right channel and unwraps the event arg', () => {

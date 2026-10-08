@@ -25,7 +25,8 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
       ipcRenderer.invoke('importConfigFile', name, content, country) as ReturnType<ProxyFarmApi['importConfigFile']>,
     listTargets: (providerId) => ipcRenderer.invoke('listTargets', providerId) as ReturnType<ProxyFarmApi['listTargets']>,
 
-    listServers: (locationKey) => ipcRenderer.invoke('listServers', locationKey) as ReturnType<ProxyFarmApi['listServers']>,
+    listServers: (locationKey, portKey) =>
+      ipcRenderer.invoke('listServers', locationKey, ...(portKey === undefined ? [] : [portKey])) as ReturnType<ProxyFarmApi['listServers']>,
 
     listPorts: () => ipcRenderer.invoke('listPorts') as ReturnType<ProxyFarmApi['listPorts']>,
     addPorts: (locationKey, count) => ipcRenderer.invoke('addPorts', locationKey, count) as ReturnType<ProxyFarmApi['addPorts']>,
