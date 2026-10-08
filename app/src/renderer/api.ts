@@ -54,8 +54,8 @@ function makeTarget(key: string, providerId: ProviderId, country: string, city: 
 
 /**
  * Sample locations, each with a pool of servers (spec §6.8): one server = one
- * fixed exit IP. ZoogVPN pools are hostnames (resolved via SAMPLE_RESOLVE), the
- * others are IP literals. Tokyo is deliberately the richest pool, with one
+ * fixed exit IP. ZoogVPN keys are `zoogvpn:<CC>` or `zoogvpn:<CC>-<CITY>` and its
+ * pools are hostnames (resolved via SAMPLE_RESOLVE); the others are IP literals. Tokyo is deliberately the richest pool, with one
  * refused and one dead server, so the Change-IP menu shows every health state.
  */
 const SAMPLE_TARGETS: Target[] = [
@@ -69,8 +69,8 @@ const SAMPLE_TARGETS: Target[] = [
   ]),
   makeTarget('hma:US-NYC', 'hma', 'US', 'New York', ['203.0.113.20']),
   makeTarget('hma:SG-SIN', 'hma', 'SG', 'Singapore', ['203.0.113.30', '203.0.113.31']),
-  makeTarget('zoogvpn:NL-AMS', 'zoogvpn', 'NL', 'Amsterdam', ['nl1.zoog.example']),
-  makeTarget('zoogvpn:VN-HAN', 'zoogvpn', 'VN', 'Hanoi', ['vn1.zoog.example', 'vn2.zoog.example']),
+  makeTarget('zoogvpn:NL', 'zoogvpn', 'NL', 'Amsterdam', ['nl1.webunlim.com']),
+  makeTarget('zoogvpn:VN-HAN', 'zoogvpn', 'VN', 'Hanoi', ['vn1.webunlim.com', 'vn2.webunlim.com']),
   makeTarget('surfshark:DE-FRA', 'surfshark', 'DE', 'Frankfurt', ['192.0.2.10', '192.0.2.11', '192.0.2.12']),
   // Same-country sibling of hma:US-NYC: exercises Change IP's "moved to another
   // city" path (spec §6.5 step 2) once New York's only server is taken.
@@ -78,9 +78,9 @@ const SAMPLE_TARGETS: Target[] = [
 ];
 
 const SAMPLE_RESOLVE: Record<string, string> = {
-  'nl1.zoog.example': '198.51.100.10',
-  'vn1.zoog.example': '198.51.100.20',
-  'vn2.zoog.example': '198.51.100.21',
+  'nl1.webunlim.com': '198.51.100.10',
+  'vn1.webunlim.com': '198.51.100.20',
+  'vn2.webunlim.com': '198.51.100.21',
 };
 
 function resolveServer(server: string): string {
@@ -174,7 +174,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         attempt: 2,
         reasonKey: 'portState.failed.no-server.guidance',
       }),
-      samplePortRow(SAMPLE_TARGETS[3], 1, 'nl1.zoog.example', 'zoogvpn-1', 29003, {
+      samplePortRow(SAMPLE_TARGETS[3], 1, 'nl1.webunlim.com', 'zoogvpn-1', 29003, {
         kind: 'failed',
         reason: 'auth',
         untilMs: now + 30 * 60_000,
@@ -197,7 +197,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
   for (const target of SAMPLE_TARGETS) {
     for (const server of target.servers) health.set(server, { health: 'unknown' });
   }
-  for (const server of ['203.0.113.10', '203.0.113.11', '203.0.113.12', '203.0.113.20', 'nl1.zoog.example']) {
+  for (const server of ['203.0.113.10', '203.0.113.11', '203.0.113.12', '203.0.113.20', 'nl1.webunlim.com']) {
     health.set(server, { health: 'ok', lastOk: now - 60_000 });
   }
   health.set('203.0.113.13', { health: 'refused' });

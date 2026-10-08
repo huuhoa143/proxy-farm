@@ -306,12 +306,12 @@ describe('PortTable', () => {
       country: 'VN',
       city: 'Hanoi',
       label: 'Hanoi, Vietnam',
-      servers: ['vn1.example'],
+      servers: ['vn1.webunlim.com'],
       freeServers: 0,
     };
     const online = (ip: string): PortState => ({ kind: 'online', since: Date.now(), exitIp: ip, country: 'JP' });
     const rows: PortRow[] = [
-      row('zoogvpn:VN-HAN#1', { kind: 'stopped' }, { locationKey: 'zoogvpn:VN-HAN', providerId: 'zoogvpn', country: 'VN', city: 'Hanoi', server: 'vn1.example', serverIp: '198.51.100.20', proxyPort: 29003 }),
+      row('zoogvpn:VN-HAN#1', { kind: 'stopped' }, { locationKey: 'zoogvpn:VN-HAN', providerId: 'zoogvpn', country: 'VN', city: 'Hanoi', server: 'vn1.webunlim.com', serverIp: '198.51.100.20', proxyPort: 29003 }),
       row('hma:JP-TOKYO#2', online('10.0.0.2'), { locationKey: 'hma:JP-TOKYO', server: '10.0.0.2', serverIp: '10.0.0.2', proxyPort: 29002 }),
       row('hma:JP-TOKYO#1', { kind: 'connecting', since: Date.now() }, { locationKey: 'hma:JP-TOKYO', server: '10.0.0.1', serverIp: '10.0.0.1', proxyPort: 29001 }),
     ];
@@ -359,7 +359,7 @@ describe('PortTable', () => {
       renderGrouped();
       const r = screen.getByTestId('port-row-zoogvpn:VN-HAN#1');
       expect(r).toHaveTextContent('#1');
-      expect(within(r).getByText('198.51.100.20')).toHaveAttribute('title', expect.stringContaining('vn1.example'));
+      expect(within(r).getByText('198.51.100.20')).toHaveAttribute('title', expect.stringContaining('vn1.webunlim.com'));
       expect(within(r).getByRole('checkbox')).toHaveAccessibleName('Hanoi · port #1');
     });
 

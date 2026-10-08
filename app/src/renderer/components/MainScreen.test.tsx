@@ -151,9 +151,9 @@ describe('MainScreen', () => {
 
   it('shows a rotate-result note: no free server', async () => {
     await renderMain();
-    await changeIp('zoogvpn:NL-AMS#1');
+    await changeIp('zoogvpn:NL#1');
     await waitFor(() =>
-      expect(screen.getByTestId('rotate-note-zoogvpn:NL-AMS#1')).toHaveTextContent(
+      expect(screen.getByTestId('rotate-note-zoogvpn:NL#1')).toHaveTextContent(
         'No free server left for this location — the IP stays the same.',
       ),
     );
@@ -170,7 +170,7 @@ describe('MainScreen', () => {
 
   it('bulk Change IP summarises changed / moved-to-another-city / unavailable', async () => {
     await renderMain();
-    for (const key of [TOKYO_1, 'hma:US-NYC#1', 'zoogvpn:NL-AMS#1']) {
+    for (const key of [TOKYO_1, 'hma:US-NYC#1', 'zoogvpn:NL#1']) {
       fireEvent.click(within(screen.getByTestId(`port-row-${key}`)).getByRole('checkbox'));
     }
 

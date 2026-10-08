@@ -167,7 +167,7 @@ describe('createFakeProxyFarmApi', () => {
   });
 
   it('rotatePort reports no server available when there is truly no alternative (§6.5 step 3)', async () => {
-    const result = await api.rotatePort('zoogvpn:NL-AMS#1');
+    const result = await api.rotatePort('zoogvpn:NL#1');
     expect(result.changed).toBe(false);
     expect(result.noteKey).toBe('main.rotateResult.unchangedNote');
   });
