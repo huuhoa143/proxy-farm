@@ -1,1027 +1,236 @@
 {
+  "scanned": "2026-10-08",
   "servers": [
-    {
-      "key": "AE-AE2",
-      "host": "ae2.webunlim.com",
-      "country": "AE",
-      "countryName": "United Arab Emirates",
-      "city": "United Arab Emirates",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "AM-AM1",
-      "host": "am1.webunlim.com",
-      "country": "AM",
-      "countryName": "Armenia",
-      "city": "Armenia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "AR-AR1",
-      "host": "ar1.webunlim.com",
-      "country": "AR",
-      "countryName": "Argentina",
-      "city": "Argentina",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "AT-AT1",
-      "host": "at1.webunlim.com",
-      "country": "AT",
-      "countryName": "Austria",
-      "city": "Austria",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "AU-AU1",
-      "host": "au1.webunlim.com",
-      "country": "AU",
-      "countryName": "Australia",
-      "city": "Australia",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "BE-BE2",
-      "host": "be2.webunlim.com",
-      "country": "BE",
-      "countryName": "Belgium",
-      "city": "Belgium",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "BG-BG1",
-      "host": "bg1.webunlim.com",
-      "country": "BG",
-      "countryName": "Bulgaria",
-      "city": "Bulgaria",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "BH-BH1",
-      "host": "bh1.webunlim.com",
-      "country": "BH",
-      "countryName": "Bahrain",
-      "city": "Bahrain",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "BO-BO1",
-      "host": "bo1.webunlim.com",
-      "country": "BO",
-      "countryName": "Bolivia",
-      "city": "Bolivia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "BR-BR1",
-      "host": "br1.webunlim.com",
-      "country": "BR",
-      "countryName": "Brazil",
-      "city": "Brazil",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "CA-CA1",
-      "host": "ca1.zoogvpn.com",
-      "country": "CA",
-      "countryName": "Canada",
-      "city": "Canada",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "CA-CA2",
-      "host": "ca2.webunlim.com",
-      "country": "CA",
-      "countryName": "Canada",
-      "city": "Canada",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "CH-CH2",
-      "host": "ch2.webunlim.com",
-      "country": "CH",
-      "countryName": "Switzerland",
-      "city": "Switzerland",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "CL-CL1",
-      "host": "cl1.webunlim.com",
-      "country": "CL",
-      "countryName": "Chile",
-      "city": "Chile",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "CY-CY1",
-      "host": "cy1.webunlim.com",
-      "country": "CY",
-      "countryName": "Cyprus",
-      "city": "Cyprus",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "CZ-CZ1",
-      "host": "cz1.webunlim.com",
-      "country": "CZ",
-      "countryName": "Czechia",
-      "city": "Czechia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "DE-DE1",
-      "host": "de1.webunlim.com",
-      "country": "DE",
-      "countryName": "Germany",
-      "city": "Germany",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "DE-DE2",
-      "host": "de2.zoogvpn.com",
-      "country": "DE",
-      "countryName": "Germany",
-      "city": "Germany",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "DE-DE3",
-      "host": "de3.webunlim.com",
-      "country": "DE",
-      "countryName": "Germany",
-      "city": "Germany",
-      "protos": {
-        "tcp": 80,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "DE-DE4",
-      "host": "de4.webunlim.com",
-      "country": "DE",
-      "countryName": "Germany",
-      "city": "Germany",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "DK-DK1",
-      "host": "dk1.webunlim.com",
-      "country": "DK",
-      "countryName": "Denmark",
-      "city": "Denmark",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "EC-EC1",
-      "host": "ec1.webunlim.com",
-      "country": "EC",
-      "countryName": "Ecuador",
-      "city": "Ecuador",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "EE-EE1",
-      "host": "ee1.webunlim.com",
-      "country": "EE",
-      "countryName": "Estonia",
-      "city": "Estonia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "ES-ES1",
-      "host": "es1.webunlim.com",
-      "country": "ES",
-      "countryName": "Spain",
-      "city": "Spain",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "ES-ES2",
-      "host": "es2.webunlim.com",
-      "country": "ES",
-      "countryName": "Spain",
-      "city": "Spain",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "ES-ES3",
-      "host": "es3.webunlim.com",
-      "country": "ES",
-      "countryName": "Spain",
-      "city": "Spain",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "FI-FI1",
-      "host": "fi1.webunlim.com",
-      "country": "FI",
-      "countryName": "Finland",
-      "city": "Finland",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "FR-FR2",
-      "host": "fr2.webunlim.com",
-      "country": "FR",
-      "countryName": "France",
-      "city": "France",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "GB-UK",
-      "host": "uk.zgfree.info",
-      "country": "GB",
-      "countryName": "United Kingdom",
-      "city": "United Kingdom",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "GB-UK2",
-      "host": "uk2.webunlim.com",
-      "country": "GB",
-      "countryName": "United Kingdom",
-      "city": "United Kingdom",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "GB-UK3",
-      "host": "uk3.webunlim.com",
-      "country": "GB",
-      "countryName": "United Kingdom",
-      "city": "United Kingdom",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "GE-GE1",
-      "host": "ge1.webunlim.com",
-      "country": "GE",
-      "countryName": "Georgia",
-      "city": "Georgia",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "GR-GR1",
-      "host": "gr1.webunlim.com",
-      "country": "GR",
-      "countryName": "Greece",
-      "city": "Greece",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "GT-GT1",
-      "host": "gt1.webunlim.com",
-      "country": "GT",
-      "countryName": "Guatemala",
-      "city": "Guatemala",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "HK-HK1",
-      "host": "hk1.webunlim.com",
-      "country": "HK",
-      "countryName": "Hong Kong",
-      "city": "Hong Kong",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "HU-HU1",
-      "host": "hu1.webunlim.com",
-      "country": "HU",
-      "countryName": "Hungary",
-      "city": "Hungary",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "ID-ID1",
-      "host": "id1.webunlim.com",
-      "country": "ID",
-      "countryName": "Indonesia",
-      "city": "Indonesia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "IE-IE1",
-      "host": "ie1.webunlim.com",
-      "country": "IE",
-      "countryName": "Ireland",
-      "city": "Ireland",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "IL-IL2",
-      "host": "il2.webunlim.com",
-      "country": "IL",
-      "countryName": "Israel",
-      "city": "Israel",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "IN-IN1",
-      "host": "in1.webunlim.com",
-      "country": "IN",
-      "countryName": "India",
-      "city": "India",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "IQ-IQ1",
-      "host": "iq1.webunlim.com",
-      "country": "IQ",
-      "countryName": "Iraq",
-      "city": "Iraq",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "IT-IT1",
-      "host": "it1.webunlim.com",
-      "country": "IT",
-      "countryName": "Italy",
-      "city": "Italy",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "IT-IT3",
-      "host": "it3.webunlim.com",
-      "country": "IT",
-      "countryName": "Italy",
-      "city": "Italy",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "JP-JP1",
-      "host": "jp1.webunlim.com",
-      "country": "JP",
-      "countryName": "Japan",
-      "city": "Japan",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "JP-JP3",
-      "host": "jp3.webunlim.com",
-      "country": "JP",
-      "countryName": "Japan",
-      "city": "Japan",
-      "protos": {
-        "tcp": 80,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "KR-KR1",
-      "host": "kr1.webunlim.com",
-      "country": "KR",
-      "countryName": "South Korea",
-      "city": "South Korea",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "KR-KR2",
-      "host": "kr2.webunlim.com",
-      "country": "KR",
-      "countryName": "South Korea",
-      "city": "South Korea",
-      "protos": {
-        "tcp": 80,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "KZ-KZ1",
-      "host": "kz1.webunlim.com",
-      "country": "KZ",
-      "countryName": "Kazakhstan",
-      "city": "Kazakhstan",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "KZ-KZ2",
-      "host": "kz2.webunlim.com",
-      "country": "KZ",
-      "countryName": "Kazakhstan",
-      "city": "Kazakhstan",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "LT-LT1",
-      "host": "lt1.webunlim.com",
-      "country": "LT",
-      "countryName": "Lithuania",
-      "city": "Lithuania",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "LV-LV1",
-      "host": "lv1.webunlim.com",
-      "country": "LV",
-      "countryName": "Latvia",
-      "city": "Latvia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "MA-MA1",
-      "host": "ma1.webunlim.com",
-      "country": "MA",
-      "countryName": "Morocco",
-      "city": "Morocco",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "MD-MD1",
-      "host": "md1.webunlim.com",
-      "country": "MD",
-      "countryName": "Moldova",
-      "city": "Moldova",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "MX-MX1",
-      "host": "mx1.webunlim.com",
-      "country": "MX",
-      "countryName": "Mexico",
-      "city": "Mexico",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "MY-MY1",
-      "host": "my1.webunlim.com",
-      "country": "MY",
-      "countryName": "Malaysia",
-      "city": "Malaysia",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "NL-NL",
-      "host": "nl.zgfree.info",
-      "country": "NL",
-      "countryName": "Netherlands",
-      "city": "Netherlands",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "NL-NL1",
-      "host": "nl1.webunlim.com",
-      "country": "NL",
-      "countryName": "Netherlands",
-      "city": "Netherlands",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "NL-NL2",
-      "host": "nl2.webunlim.com",
-      "country": "NL",
-      "countryName": "Netherlands",
-      "city": "Netherlands",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "NL-NL3",
-      "host": "nl3.zoogvpn.com",
-      "country": "NL",
-      "countryName": "Netherlands",
-      "city": "Netherlands",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "NO-NO1",
-      "host": "no1.webunlim.com",
-      "country": "NO",
-      "countryName": "Norway",
-      "city": "Norway",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "NZ-NZ1",
-      "host": "nz1.zoogvpn.com",
-      "country": "NZ",
-      "countryName": "New Zealand",
-      "city": "New Zealand",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "OM-OM2",
-      "host": "om2.webunlim.com",
-      "country": "OM",
-      "countryName": "Oman",
-      "city": "Oman",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "PE-PE1",
-      "host": "pe1.webunlim.com",
-      "country": "PE",
-      "countryName": "Peru",
-      "city": "Peru",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "PH-PH1",
-      "host": "ph1.webunlim.com",
-      "country": "PH",
-      "countryName": "Philippines",
-      "city": "Philippines",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "PK-PK1",
-      "host": "pk1.webunlim.com",
-      "country": "PK",
-      "countryName": "Pakistan",
-      "city": "Pakistan",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "PL-PL1",
-      "host": "pl1.webunlim.com",
-      "country": "PL",
-      "countryName": "Poland",
-      "city": "Poland",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "PR-PR1",
-      "host": "pr1.webunlim.com",
-      "country": "PR",
-      "countryName": "Puerto Rico",
-      "city": "Puerto Rico",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "PT-PT2",
-      "host": "pt2.webunlim.com",
-      "country": "PT",
-      "countryName": "Portugal",
-      "city": "Portugal",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "QA-QA1",
-      "host": "qa1.webunlim.com",
-      "country": "QA",
-      "countryName": "Qatar",
-      "city": "Qatar",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "RS-RS1",
-      "host": "rs1.webunlim.com",
-      "country": "RS",
-      "countryName": "Serbia",
-      "city": "Serbia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "RU-RU1",
-      "host": "ru1.webunlim.com",
-      "country": "RU",
-      "countryName": "Russia",
-      "city": "Russia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "RU-RU2",
-      "host": "ru2.webunlim.com",
-      "country": "RU",
-      "countryName": "Russia",
-      "city": "Russia",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "SE-SE1",
-      "host": "se1.webunlim.com",
-      "country": "SE",
-      "countryName": "Sweden",
-      "city": "Sweden",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "SG-SG1",
-      "host": "sg1.webunlim.com",
-      "country": "SG",
-      "countryName": "Singapore",
-      "city": "Singapore",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "SK-SK1",
-      "host": "sk1.webunlim.com",
-      "country": "SK",
-      "countryName": "Slovakia",
-      "city": "Slovakia",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "TH-TH1",
-      "host": "th1.webunlim.com",
-      "country": "TH",
-      "countryName": "Thailand",
-      "city": "Thailand",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "TR-TR1",
-      "host": "tr1.zoogvpn.com",
-      "country": "TR",
-      "countryName": "Turkey",
-      "city": "Turkey",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "TW-TW1",
-      "host": "tw1.webunlim.com",
-      "country": "TW",
-      "countryName": "Taiwan",
-      "city": "Taiwan",
-      "protos": {
-        "tcp": 80,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "UA-UA1",
-      "host": "ua1.zoogvpn.com",
-      "country": "UA",
-      "countryName": "Ukraine",
-      "city": "Ukraine",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "UA-UA2",
-      "host": "ua2.zoogvpn.com",
-      "country": "UA",
-      "countryName": "Ukraine",
-      "city": "Ukraine",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "UA-UA3",
-      "host": "ua3.webunlim.com",
-      "country": "UA",
-      "countryName": "Ukraine",
-      "city": "Ukraine",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "UA-UA5",
-      "host": "ua5.webunlim.com",
-      "country": "UA",
-      "countryName": "Ukraine",
-      "city": "Ukraine",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "US-US",
-      "host": "us.zgfree.info",
-      "country": "US",
-      "countryName": "United States",
-      "city": "United States",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "US-US1-CENTRAL",
-      "host": "us1.central.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "Central",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "US-US1-EAST",
-      "host": "us1.east.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "East",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "US-US1-WEST",
-      "host": "us1.west.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "West",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "US-US2-EAST",
-      "host": "us2.east.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "East",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "US-US2-WEST",
-      "host": "us2.west.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "West",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "US-US3-CENTRAL",
-      "host": "us3.central.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "Central",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "US-US4-CENTRAL",
-      "host": "us4.central.webunlim.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "Central",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "US-US4-EAST",
-      "host": "us4.east.zoogvpn.com",
-      "country": "US",
-      "countryName": "United States",
-      "city": "East",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    },
-    {
-      "key": "VN-VN1",
-      "host": "vn1.webunlim.com",
-      "country": "VN",
-      "countryName": "Vietnam",
-      "city": "Vietnam",
-      "protos": {
-        "tcp": 443,
-        "udp": 1194
-      }
-    },
-    {
-      "key": "ZA-ZA2",
-      "host": "za2.webunlim.com",
-      "country": "ZA",
-      "countryName": "South Africa",
-      "city": "South Africa",
-      "protos": {
-        "udp": 1194,
-        "tcp": 443
-      }
-    }
+    {"host":"ae1.webunlim.com","country":"AE","countryName":"United Arab Emirates","city":"United Arab Emirates","protos":{"udp":1194}},
+    {"host":"ae2.webunlim.com","country":"AE","countryName":"United Arab Emirates","city":"United Arab Emirates","protos":{"tcp":443,"udp":1194}},
+    {"host":"ae3.webunlim.com","country":"AE","countryName":"United Arab Emirates","city":"United Arab Emirates","protos":{"udp":1194}},
+    {"host":"ae4.webunlim.com","country":"AE","countryName":"United Arab Emirates","city":"United Arab Emirates","protos":{"udp":1194}},
+    {"host":"ae5.webunlim.com","country":"AE","countryName":"United Arab Emirates","city":"United Arab Emirates","protos":{"udp":1194}},
+    {"host":"am1.webunlim.com","country":"AM","countryName":"Armenia","city":"Armenia","protos":{"udp":1194,"tcp":443}},
+    {"host":"am2.webunlim.com","country":"AM","countryName":"Armenia","city":"Armenia","protos":{"udp":1194}},
+    {"host":"ar1.webunlim.com","country":"AR","countryName":"Argentina","city":"Argentina","protos":{"tcp":443,"udp":1194}},
+    {"host":"ar3.webunlim.com","country":"AR","countryName":"Argentina","city":"Argentina","protos":{"udp":1194}},
+    {"host":"at1.webunlim.com","country":"AT","countryName":"Austria","city":"Austria","protos":{"tcp":443,"udp":1194}},
+    {"host":"at2.webunlim.com","country":"AT","countryName":"Austria","city":"Austria","protos":{"udp":1194}},
+    {"host":"au1.webunlim.com","country":"AU","countryName":"Australia","city":"Australia","protos":{"tcp":443,"udp":1194}},
+    {"host":"au2.webunlim.com","country":"AU","countryName":"Australia","city":"Australia","protos":{"udp":1194}},
+    {"host":"au3.webunlim.com","country":"AU","countryName":"Australia","city":"Australia","protos":{"udp":1194}},
+    {"host":"be1.zoogvpn.com","country":"BE","countryName":"Belgium","city":"Belgium","protos":{"udp":1194}},
+    {"host":"be2.webunlim.com","country":"BE","countryName":"Belgium","city":"Belgium","protos":{"tcp":443,"udp":1194}},
+    {"host":"bg1.webunlim.com","country":"BG","countryName":"Bulgaria","city":"Bulgaria","protos":{"udp":1194,"tcp":443}},
+    {"host":"bg2.webunlim.com","country":"BG","countryName":"Bulgaria","city":"Bulgaria","protos":{"udp":1194}},
+    {"host":"bh1.webunlim.com","country":"BH","countryName":"Bahrain","city":"Bahrain","protos":{"udp":1194,"tcp":443}},
+    {"host":"bh2.webunlim.com","country":"BH","countryName":"Bahrain","city":"Bahrain","protos":{"udp":1194}},
+    {"host":"bo1.webunlim.com","country":"BO","countryName":"Bolivia","city":"Bolivia","protos":{"udp":1194,"tcp":443}},
+    {"host":"bo2.webunlim.com","country":"BO","countryName":"Bolivia","city":"Bolivia","protos":{"udp":1194}},
+    {"host":"br1.webunlim.com","country":"BR","countryName":"Brazil","city":"Brazil","protos":{"tcp":443,"udp":1194}},
+    {"host":"br2.webunlim.com","country":"BR","countryName":"Brazil","city":"Brazil","protos":{"udp":1194}},
+    {"host":"ca1.zoogvpn.com","country":"CA","countryName":"Canada","city":"Canada","protos":{"udp":1194,"tcp":443}},
+    {"host":"ca2.webunlim.com","country":"CA","countryName":"Canada","city":"Canada","protos":{"udp":1194,"tcp":443}},
+    {"host":"ca3.webunlim.com","country":"CA","countryName":"Canada","city":"Canada","protos":{"udp":1194}},
+    {"host":"ch1.webunlim.com","country":"CH","countryName":"Switzerland","city":"Switzerland","protos":{"udp":1194}},
+    {"host":"ch2.webunlim.com","country":"CH","countryName":"Switzerland","city":"Switzerland","protos":{"udp":1194,"tcp":443}},
+    {"host":"ch3.webunlim.com","country":"CH","countryName":"Switzerland","city":"Switzerland","protos":{"udp":1194}},
+    {"host":"cl1.webunlim.com","country":"CL","countryName":"Chile","city":"Chile","protos":{"tcp":443,"udp":1194}},
+    {"host":"cy1.webunlim.com","country":"CY","countryName":"Cyprus","city":"Cyprus","protos":{"udp":1194,"tcp":443}},
+    {"host":"cy3.webunlim.com","country":"CY","countryName":"Cyprus","city":"Cyprus","protos":{"udp":1194}},
+    {"host":"cz1.webunlim.com","country":"CZ","countryName":"Czechia","city":"Czechia","protos":{"udp":1194,"tcp":443}},
+    {"host":"cz2.webunlim.com","country":"CZ","countryName":"Czechia","city":"Czechia","protos":{"udp":1194}},
+    {"host":"cz3.webunlim.com","country":"CZ","countryName":"Czechia","city":"Czechia","protos":{"udp":1194}},
+    {"host":"cz4.webunlim.com","country":"CZ","countryName":"Czechia","city":"Czechia","protos":{"udp":1194}},
+    {"host":"cz5.webunlim.com","country":"CZ","countryName":"Czechia","city":"Czechia","protos":{"udp":1194}},
+    {"host":"de1.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"tcp":443,"udp":1194}},
+    {"host":"de2.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"de3.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"tcp":80,"udp":1194}},
+    {"host":"de4.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194,"tcp":443}},
+    {"host":"de5.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"de6.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"de7.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"de8.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"de9.webunlim.com","country":"DE","countryName":"Germany","city":"Germany","protos":{"udp":1194}},
+    {"host":"dk1.webunlim.com","country":"DK","countryName":"Denmark","city":"Denmark","protos":{"tcp":443,"udp":1194}},
+    {"host":"dk2.webunlim.com","country":"DK","countryName":"Denmark","city":"Denmark","protos":{"udp":1194}},
+    {"host":"ec1.webunlim.com","country":"EC","countryName":"Ecuador","city":"Ecuador","protos":{"udp":1194,"tcp":443}},
+    {"host":"ec2.webunlim.com","country":"EC","countryName":"Ecuador","city":"Ecuador","protos":{"udp":1194}},
+    {"host":"ee1.webunlim.com","country":"EE","countryName":"Estonia","city":"Estonia","protos":{"udp":1194,"tcp":443}},
+    {"host":"ee2.webunlim.com","country":"EE","countryName":"Estonia","city":"Estonia","protos":{"udp":1194}},
+    {"host":"ee3.webunlim.com","country":"EE","countryName":"Estonia","city":"Estonia","protos":{"udp":1194}},
+    {"host":"ee4.webunlim.com","country":"EE","countryName":"Estonia","city":"Estonia","protos":{"udp":1194}},
+    {"host":"es1.webunlim.com","country":"ES","countryName":"Spain","city":"Spain","protos":{"tcp":443,"udp":1194}},
+    {"host":"es2.webunlim.com","country":"ES","countryName":"Spain","city":"Spain","protos":{"udp":1194,"tcp":443}},
+    {"host":"es3.webunlim.com","country":"ES","countryName":"Spain","city":"Spain","protos":{"tcp":443,"udp":1194}},
+    {"host":"es4.webunlim.com","country":"ES","countryName":"Spain","city":"Spain","protos":{"udp":1194}},
+    {"host":"es5.webunlim.com","country":"ES","countryName":"Spain","city":"Spain","protos":{"udp":1194}},
+    {"host":"fi1.webunlim.com","country":"FI","countryName":"Finland","city":"Finland","protos":{"udp":1194,"tcp":443}},
+    {"host":"fi2.webunlim.com","country":"FI","countryName":"Finland","city":"Finland","protos":{"udp":1194}},
+    {"host":"fi3.webunlim.com","country":"FI","countryName":"Finland","city":"Finland","protos":{"udp":1194}},
+    {"host":"fi4.webunlim.com","country":"FI","countryName":"Finland","city":"Finland","protos":{"udp":1194}},
+    {"host":"fi5.webunlim.com","country":"FI","countryName":"Finland","city":"Finland","protos":{"udp":1194}},
+    {"host":"fr1.webunlim.com","country":"FR","countryName":"France","city":"France","protos":{"udp":1194}},
+    {"host":"fr2.webunlim.com","country":"FR","countryName":"France","city":"France","protos":{"udp":1194,"tcp":443}},
+    {"host":"fr3.webunlim.com","country":"FR","countryName":"France","city":"France","protos":{"udp":1194}},
+    {"host":"fr4.webunlim.com","country":"FR","countryName":"France","city":"France","protos":{"udp":1194}},
+    {"host":"uk1.webunlim.com","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"udp":1194}},
+    {"host":"uk2.webunlim.com","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"udp":1194,"tcp":443}},
+    {"host":"uk3.webunlim.com","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"tcp":443,"udp":1194}},
+    {"host":"uk4.webunlim.com","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"udp":1194}},
+    {"host":"uk5.webunlim.com","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"udp":1194}},
+    {"host":"uk.zgfree.info","country":"GB","countryName":"United Kingdom","city":"United Kingdom","protos":{"udp":1194,"tcp":443}},
+    {"host":"ge1.webunlim.com","country":"GE","countryName":"Georgia","city":"Georgia","protos":{"tcp":443,"udp":1194}},
+    {"host":"ge2.webunlim.com","country":"GE","countryName":"Georgia","city":"Georgia","protos":{"udp":1194}},
+    {"host":"gr1.webunlim.com","country":"GR","countryName":"Greece","city":"Greece","protos":{"udp":1194,"tcp":443}},
+    {"host":"gt1.webunlim.com","country":"GT","countryName":"Guatemala","city":"Guatemala","protos":{"udp":1194,"tcp":443}},
+    {"host":"gt2.webunlim.com","country":"GT","countryName":"Guatemala","city":"Guatemala","protos":{"udp":1194}},
+    {"host":"gt3.webunlim.com","country":"GT","countryName":"Guatemala","city":"Guatemala","protos":{"udp":1194}},
+    {"host":"hk1.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"tcp":443,"udp":1194}},
+    {"host":"hk2.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk3.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk4.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk5.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk6.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk7.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk8.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hk9.webunlim.com","country":"HK","countryName":"Hong Kong","city":"Hong Kong","protos":{"udp":1194}},
+    {"host":"hu1.webunlim.com","country":"HU","countryName":"Hungary","city":"Hungary","protos":{"udp":1194,"tcp":443}},
+    {"host":"hu2.webunlim.com","country":"HU","countryName":"Hungary","city":"Hungary","protos":{"udp":1194}},
+    {"host":"id1.webunlim.com","country":"ID","countryName":"Indonesia","city":"Indonesia","protos":{"udp":1194,"tcp":443}},
+    {"host":"id2.webunlim.com","country":"ID","countryName":"Indonesia","city":"Indonesia","protos":{"udp":1194}},
+    {"host":"ie1.webunlim.com","country":"IE","countryName":"Ireland","city":"Ireland","protos":{"udp":1194,"tcp":443}},
+    {"host":"ie2.webunlim.com","country":"IE","countryName":"Ireland","city":"Ireland","protos":{"udp":1194}},
+    {"host":"il1.webunlim.com","country":"IL","countryName":"Israel","city":"Israel","protos":{"udp":1194}},
+    {"host":"il2.webunlim.com","country":"IL","countryName":"Israel","city":"Israel","protos":{"tcp":443,"udp":1194}},
+    {"host":"in1.webunlim.com","country":"IN","countryName":"India","city":"India","protos":{"udp":1194,"tcp":443}},
+    {"host":"in2.webunlim.com","country":"IN","countryName":"India","city":"India","protos":{"udp":1194}},
+    {"host":"iq1.webunlim.com","country":"IQ","countryName":"Iraq","city":"Iraq","protos":{"tcp":443,"udp":1194}},
+    {"host":"it1.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"tcp":443,"udp":1194}},
+    {"host":"it2.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"udp":1194}},
+    {"host":"it3.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"tcp":443,"udp":1194}},
+    {"host":"it4.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"udp":1194}},
+    {"host":"it5.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"udp":1194}},
+    {"host":"it6.webunlim.com","country":"IT","countryName":"Italy","city":"Italy","protos":{"udp":1194}},
+    {"host":"jp1.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"tcp":443,"udp":1194}},
+    {"host":"jp2.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp3.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"tcp":80,"udp":1194}},
+    {"host":"jp4.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp5.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp6.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp7.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp8.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp9.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"jp10.webunlim.com","country":"JP","countryName":"Japan","city":"Japan","protos":{"udp":1194}},
+    {"host":"kr1.webunlim.com","country":"KR","countryName":"South Korea","city":"South Korea","protos":{"udp":1194,"tcp":443}},
+    {"host":"kr2.webunlim.com","country":"KR","countryName":"South Korea","city":"South Korea","protos":{"tcp":80,"udp":1194}},
+    {"host":"kr3.webunlim.com","country":"KR","countryName":"South Korea","city":"South Korea","protos":{"udp":1194}},
+    {"host":"kz1.webunlim.com","country":"KZ","countryName":"Kazakhstan","city":"Kazakhstan","protos":{"udp":1194,"tcp":443}},
+    {"host":"kz2.webunlim.com","country":"KZ","countryName":"Kazakhstan","city":"Kazakhstan","protos":{"tcp":443,"udp":1194}},
+    {"host":"kz3.webunlim.com","country":"KZ","countryName":"Kazakhstan","city":"Kazakhstan","protos":{"udp":1194}},
+    {"host":"lt1.webunlim.com","country":"LT","countryName":"Lithuania","city":"Lithuania","protos":{"udp":1194,"tcp":443}},
+    {"host":"lt2.webunlim.com","country":"LT","countryName":"Lithuania","city":"Lithuania","protos":{"udp":1194}},
+    {"host":"lt3.webunlim.com","country":"LT","countryName":"Lithuania","city":"Lithuania","protos":{"udp":1194}},
+    {"host":"lv1.webunlim.com","country":"LV","countryName":"Latvia","city":"Latvia","protos":{"udp":1194,"tcp":443}},
+    {"host":"lv2.webunlim.com","country":"LV","countryName":"Latvia","city":"Latvia","protos":{"udp":1194}},
+    {"host":"lv3.webunlim.com","country":"LV","countryName":"Latvia","city":"Latvia","protos":{"udp":1194}},
+    {"host":"lv4.webunlim.com","country":"LV","countryName":"Latvia","city":"Latvia","protos":{"udp":1194}},
+    {"host":"ma1.webunlim.com","country":"MA","countryName":"Morocco","city":"Morocco","protos":{"udp":1194,"tcp":443}},
+    {"host":"ma2.webunlim.com","country":"MA","countryName":"Morocco","city":"Morocco","protos":{"udp":1194}},
+    {"host":"md1.webunlim.com","country":"MD","countryName":"Moldova","city":"Moldova","protos":{"udp":1194,"tcp":443}},
+    {"host":"md2.webunlim.com","country":"MD","countryName":"Moldova","city":"Moldova","protos":{"udp":1194}},
+    {"host":"mx1.webunlim.com","country":"MX","countryName":"Mexico","city":"Mexico","protos":{"tcp":443,"udp":1194}},
+    {"host":"my1.webunlim.com","country":"MY","countryName":"Malaysia","city":"Malaysia","protos":{"tcp":443,"udp":1194}},
+    {"host":"my2.webunlim.com","country":"MY","countryName":"Malaysia","city":"Malaysia","protos":{"udp":1194}},
+    {"host":"my3.webunlim.com","country":"MY","countryName":"Malaysia","city":"Malaysia","protos":{"udp":1194}},
+    {"host":"nl1.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194,"tcp":443}},
+    {"host":"nl2.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"tcp":443,"udp":1194}},
+    {"host":"nl3.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl3.zoogvpn.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194,"tcp":443}},
+    {"host":"nl4.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl5.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl5.zoogvpn.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl6.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl7.webunlim.com","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"udp":1194}},
+    {"host":"nl.zgfree.info","country":"NL","countryName":"Netherlands","city":"Netherlands","protos":{"tcp":443,"udp":1194}},
+    {"host":"no1.webunlim.com","country":"NO","countryName":"Norway","city":"Norway","protos":{"udp":1194,"tcp":443}},
+    {"host":"no1.zoogvpn.com","country":"NO","countryName":"Norway","city":"Norway","protos":{"udp":1194}},
+    {"host":"no2.webunlim.com","country":"NO","countryName":"Norway","city":"Norway","protos":{"udp":1194}},
+    {"host":"no3.webunlim.com","country":"NO","countryName":"Norway","city":"Norway","protos":{"udp":1194}},
+    {"host":"nz1.zoogvpn.com","country":"NZ","countryName":"New Zealand","city":"New Zealand","protos":{"udp":1194,"tcp":443}},
+    {"host":"om1.webunlim.com","country":"OM","countryName":"Oman","city":"Oman","protos":{"udp":1194}},
+    {"host":"om2.webunlim.com","country":"OM","countryName":"Oman","city":"Oman","protos":{"udp":1194,"tcp":443}},
+    {"host":"pe1.webunlim.com","country":"PE","countryName":"Peru","city":"Peru","protos":{"udp":1194,"tcp":443}},
+    {"host":"ph1.webunlim.com","country":"PH","countryName":"Philippines","city":"Philippines","protos":{"udp":1194,"tcp":443}},
+    {"host":"pk1.webunlim.com","country":"PK","countryName":"Pakistan","city":"Pakistan","protos":{"udp":1194,"tcp":443}},
+    {"host":"pk2.webunlim.com","country":"PK","countryName":"Pakistan","city":"Pakistan","protos":{"udp":1194}},
+    {"host":"pl1.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194,"tcp":443}},
+    {"host":"pl2.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194}},
+    {"host":"pl3.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194}},
+    {"host":"pl4.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194}},
+    {"host":"pl5.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194}},
+    {"host":"pl6.webunlim.com","country":"PL","countryName":"Poland","city":"Poland","protos":{"udp":1194}},
+    {"host":"pr1.webunlim.com","country":"PR","countryName":"Puerto Rico","city":"Puerto Rico","protos":{"tcp":443,"udp":1194}},
+    {"host":"pr2.webunlim.com","country":"PR","countryName":"Puerto Rico","city":"Puerto Rico","protos":{"udp":1194}},
+    {"host":"pt1.webunlim.com","country":"PT","countryName":"Portugal","city":"Portugal","protos":{"udp":1194}},
+    {"host":"pt2.webunlim.com","country":"PT","countryName":"Portugal","city":"Portugal","protos":{"udp":1194,"tcp":443}},
+    {"host":"qa1.webunlim.com","country":"QA","countryName":"Qatar","city":"Qatar","protos":{"tcp":443,"udp":1194}},
+    {"host":"qa2.webunlim.com","country":"QA","countryName":"Qatar","city":"Qatar","protos":{"udp":1194}},
+    {"host":"rs1.webunlim.com","country":"RS","countryName":"Serbia","city":"Serbia","protos":{"udp":1194,"tcp":443}},
+    {"host":"ru1.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194,"tcp":443}},
+    {"host":"ru2.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"tcp":443,"udp":1194}},
+    {"host":"ru3.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194}},
+    {"host":"ru4.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194}},
+    {"host":"ru5.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194}},
+    {"host":"ru6.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194}},
+    {"host":"ru7.webunlim.com","country":"RU","countryName":"Russia","city":"Russia","protos":{"udp":1194}},
+    {"host":"se1.webunlim.com","country":"SE","countryName":"Sweden","city":"Sweden","protos":{"udp":1194,"tcp":443}},
+    {"host":"se2.webunlim.com","country":"SE","countryName":"Sweden","city":"Sweden","protos":{"udp":1194}},
+    {"host":"sg1.webunlim.com","country":"SG","countryName":"Singapore","city":"Singapore","protos":{"udp":1194,"tcp":443}},
+    {"host":"sg2.webunlim.com","country":"SG","countryName":"Singapore","city":"Singapore","protos":{"udp":1194}},
+    {"host":"sg3.webunlim.com","country":"SG","countryName":"Singapore","city":"Singapore","protos":{"udp":1194}},
+    {"host":"sg4.webunlim.com","country":"SG","countryName":"Singapore","city":"Singapore","protos":{"udp":1194}},
+    {"host":"sg5.webunlim.com","country":"SG","countryName":"Singapore","city":"Singapore","protos":{"udp":1194}},
+    {"host":"sk1.webunlim.com","country":"SK","countryName":"Slovakia","city":"Slovakia","protos":{"udp":1194,"tcp":443}},
+    {"host":"th1.webunlim.com","country":"TH","countryName":"Thailand","city":"Thailand","protos":{"udp":1194,"tcp":443}},
+    {"host":"th2.webunlim.com","country":"TH","countryName":"Thailand","city":"Thailand","protos":{"udp":1194}},
+    {"host":"tr1.zoogvpn.com","country":"TR","countryName":"Turkey","city":"Turkey","protos":{"tcp":443,"udp":1194}},
+    {"host":"tr2.webunlim.com","country":"TR","countryName":"Turkey","city":"Turkey","protos":{"udp":1194}},
+    {"host":"tr3.webunlim.com","country":"TR","countryName":"Turkey","city":"Turkey","protos":{"udp":1194}},
+    {"host":"tw1.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"tcp":80,"udp":1194}},
+    {"host":"tw2.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw3.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw4.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw5.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw6.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw7.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw8.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw9.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"tw10.webunlim.com","country":"TW","countryName":"Taiwan","city":"Taiwan","protos":{"udp":1194}},
+    {"host":"ua1.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua2.zoogvpn.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194,"tcp":443}},
+    {"host":"ua3.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"tcp":443,"udp":1194}},
+    {"host":"ua4.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua5.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"tcp":443,"udp":1194}},
+    {"host":"ua6.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua7.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua8.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua9.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua10.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua11.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua12.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua13.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua14.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua15.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua16.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua17.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua18.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua19.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"ua20.webunlim.com","country":"UA","countryName":"Ukraine","city":"Ukraine","protos":{"udp":1194}},
+    {"host":"us4.central.zoogvpn.com","country":"US","countryName":"United States","city":"Central","protos":{"udp":1194}},
+    {"host":"us4.east.zoogvpn.com","country":"US","countryName":"United States","city":"East","protos":{"udp":1194,"tcp":443}},
+    {"host":"us5.east.zoogvpn.com","country":"US","countryName":"United States","city":"East","protos":{"udp":1194}},
+    {"host":"us.zgfree.info","country":"US","countryName":"United States","city":"United States","protos":{"tcp":443,"udp":1194}},
+    {"host":"vn1.webunlim.com","country":"VN","countryName":"Vietnam","city":"Vietnam","protos":{"tcp":443,"udp":1194}},
+    {"host":"vn2.webunlim.com","country":"VN","countryName":"Vietnam","city":"Vietnam","protos":{"udp":1194}},
+    {"host":"vn3.webunlim.com","country":"VN","countryName":"Vietnam","city":"Vietnam","protos":{"udp":1194}},
+    {"host":"za1.webunlim.com","country":"ZA","countryName":"South Africa","city":"South Africa","protos":{"udp":1194}},
+    {"host":"za2.webunlim.com","country":"ZA","countryName":"South Africa","city":"South Africa","protos":{"udp":1194,"tcp":443}}
   ]
 }
