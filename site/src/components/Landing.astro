@@ -1,6 +1,6 @@
 ---
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { Picture, Image } from 'astro:assets';
 import Switchboard from './Switchboard.astro';
 import Arrow from './Arrow.astro';
@@ -32,10 +32,11 @@ const shots = {
 }[lang];
 
 // The demo section switches from placeholder to player as soon as the mp4 lands in public/media/.
-const publicDir = new URL('../../public/', import.meta.url);
-const hasFile = (p: string) => existsSync(fileURLToPath(new URL(p.slice(1), publicDir)));
+// Resolved from the project root: import.meta.url points into the build output at build time.
+const hasFile = (p: string) => existsSync(join(process.cwd(), 'public', p));
 const hasVideo = hasFile(media.video);
 const hasPoster = hasFile(media.poster);
+const hasWebm = hasFile(media.webm);
 const hasTracks = { vi: hasFile(media.tracks.vi), en: hasFile(media.tracks.en) };
 
 const widths = [640, 960, 1280, 1600];
@@ -120,6 +121,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
               poster={hasPoster ? media.poster : undefined}
               aria-describedby="demo-note"
             >
+              {hasWebm && <source src={media.webm} type="video/webm" />}
               <source src={media.video} type="video/mp4" />
               {hasTracks.vi && <track kind="captions" src={media.tracks.vi} srclang="vi" label="Tiếng Việt" default={lang === 'vi'} />}
               {hasTracks.en && <track kind="captions" src={media.tracks.en} srclang="en" label="English" default={lang === 'en'} />}
