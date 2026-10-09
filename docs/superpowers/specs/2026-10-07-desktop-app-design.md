@@ -150,6 +150,39 @@ Each unit is independently testable:
 - **All strings come from `i18n/{en,vi}.json`**; no hard-coded copy. A unit test enforces key parity between the two files.
 - The redesign uses the impeccable skill. Screenshots are approved by the owner before merge.
 
+### 4.5 Filters, Check all and export (2026-10-09)
+
+- **Filter bar** above the port table: status chips with counts — All · Alive · Dead ·
+  Connecting · Stopped — a provider dropdown (providers that have ports) and a search
+  over the location name in either UI language (accent-insensitive, the picker's
+  normaliser), exit IP, server IP and local port. Parts combine (AND); the filter is
+  kept in `localStorage` (`proxyfarm.portFilter`). Chip counts follow provider + search.
+  Groups show only matching rows and are hidden when none match; an empty result offers
+  "Clear filters".
+- **Buckets** (`shared/portBucket.ts`, one per port): alive = online and the latest
+  Check, if any, passed; dead = failed, retrying, or online with a failed Check;
+  connecting = queued/connecting/verifying; stopped = stopped.
+- **Selection.** Select-all and group checkboxes act on visible rows only. Hidden
+  selections are kept, the bulk bar shows "N selected (M hidden)", bulk actions apply to
+  all selected.
+- **Check all / bulk Check.** `testPort(key, false)` on each online port (others count
+  as skipped), 4 at a time, queued in the renderer (`runQueue`): main's `testPort` is
+  already one probe per call and Stop is a renderer concern. Stop drops queued checks;
+  in-flight ones finish. One run at a time, walking the ports in on-screen order (groups,
+  then port number). Results and a running check live in an app-level store
+  (`checkStore.ts`, memory only) so they survive switching tabs; keyed by port and tied
+  to the state's `since`: a reconnect or Change IP drops them. The
+  summary banner offers "Select dead ports" (Dead filter + those ports selected).
+- **Export.** The toolbar button exports the selection, else the visible ports. The modal
+  has "Alive ports only" (default on, same buckets) and says how many were left out.
+  CSV (`host,port,username,password,location,provider,exit_ip,country,status,latency_ms`,
+  RFC 4180, CRLF) is built in main (`export-format.ts`) from main's state; the renderer
+  passes its current Check results (`{[key]: {ok, latencyMs}}`, sanitised in main) as the
+  only input main cannot derive. `location` is the city, `provider` the provider id.
+  "Save to file…" calls `saveExportFile(text, format)`: main opens the save dialog
+  (default `proxy-farm-<yyyy-mm-dd-hhmm>.<txt|csv>` in Downloads) and writes the given
+  string to the dialog's path only; failures come back as an inline error.
+
 ## 5. Providers
 
 ### 5.1 HMA — OpenVPN with device credentials

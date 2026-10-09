@@ -12,6 +12,7 @@ import {
   type Provider,
   type ProviderId,
   type RotateResult,
+  type SaveExportResult,
   type Settings,
   type Target,
 } from '../../shared/contracts';
@@ -58,6 +59,8 @@ export interface FacadeDeps {
   /** Auto-updater (spec §9). The renderer's "Check for updates" / "Restart & install"
    * buttons come through here. */
   updater: FacadeUpdater;
+  /** "Save to file…" in the Export modal: native save dialog + write (save-export.ts). */
+  saveExport(text: unknown, format: unknown): Promise<SaveExportResult>;
   /** Versions/OS for "Copy diagnostics"; the facade adds the redacted counts. */
   diagnosticsEnv(): DiagnosticsEnv;
   log?: (msg: string, err?: unknown) => void;
@@ -461,7 +464,9 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       return deps.engineLogs(key);
     },
 
-    exportPorts: (keys, format) => deps.portManager.exportPorts(keys, format),
+    exportPorts: (keys, format, checks) => deps.portManager.exportPorts(keys, format, checks),
+
+    saveExportFile: (text, format) => deps.saveExport(text, format),
 
     async getSettings() {
       return deps.state.getState().settings;

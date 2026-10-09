@@ -5,6 +5,7 @@ import { getProxyFarmApi } from './api';
 import { initI18n, changeLanguage } from './i18n';
 import { Onboarding } from './components/Onboarding';
 import { MainScreen } from './components/MainScreen';
+import { CheckStoreProvider, createCheckStore } from './checkStore';
 import { SettingsScreen } from './components/SettingsScreen';
 import { FirstRunNotice } from './components/FirstRunNotice';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -14,6 +15,8 @@ import { Icon, type IconName } from './ui/Icon';
 type Screen = 'onboarding' | 'main' | 'settings';
 
 const api = getProxyFarmApi();
+// Check results and a running Check all outlive a switch away from the Ports screen.
+const checkStore = createCheckStore();
 // Initialise synchronously (Vietnamese, the default) so the very first render —
 // including this loading screen — already has a working `t()`. The real
 // persisted language preference is applied once settings load, below.
@@ -147,7 +150,11 @@ export function App() {
         )}
         {needsNotice && <FirstRunNotice api={api} onAcknowledged={() => setNeedsNotice(false)} />}
         {screen === 'onboarding' && <Onboarding api={api} onDone={() => setScreen('main')} />}
-        {screen === 'main' && <MainScreen api={api} />}
+        {screen === 'main' && (
+          <CheckStoreProvider value={checkStore}>
+            <MainScreen api={api} />
+          </CheckStoreProvider>
+        )}
         {screen === 'settings' && <SettingsScreen api={api} />}
       </div>
     </div>

@@ -41,8 +41,9 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     setLimit: (providerId, limit) => ipcRenderer.invoke('setLimit', providerId, limit) as ReturnType<ProxyFarmApi['setLimit']>,
     testPort: (targetKey, speed) => ipcRenderer.invoke('testPort', targetKey, speed) as ReturnType<ProxyFarmApi['testPort']>,
     getLogs: (targetKey) => ipcRenderer.invoke('getLogs', targetKey) as ReturnType<ProxyFarmApi['getLogs']>,
-    exportPorts: (targetKeys, format) =>
-      ipcRenderer.invoke('exportPorts', targetKeys, format) as ReturnType<ProxyFarmApi['exportPorts']>,
+    exportPorts: (targetKeys, format, checks) =>
+      ipcRenderer.invoke('exportPorts', targetKeys, format, ...(checks === undefined ? [] : [checks])) as ReturnType<ProxyFarmApi['exportPorts']>,
+    saveExportFile: (text, format) => ipcRenderer.invoke('saveExportFile', text, format) as ReturnType<ProxyFarmApi['saveExportFile']>,
 
     getSettings: () => ipcRenderer.invoke('getSettings') as ReturnType<ProxyFarmApi['getSettings']>,
     setSettings: (patch) => ipcRenderer.invoke('setSettings', patch) as ReturnType<ProxyFarmApi['setSettings']>,

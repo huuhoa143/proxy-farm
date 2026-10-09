@@ -135,7 +135,7 @@ describe('MainScreen', () => {
     fireEvent.click(within(row).getByRole('checkbox'));
 
     expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('1 port selected');
-    fireEvent.click(screen.getByText('Export'));
+    fireEvent.click(within(screen.getByTestId('bulk-action-bar')).getByText('Export'));
 
     await waitFor(() =>
       expect(screen.getByTestId('export-text')).toHaveValue('127.0.0.1:29001:proxyfarm:demo-pass-1234'),

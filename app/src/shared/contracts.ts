@@ -354,7 +354,29 @@ export interface PortRow {
   autoRotateMin: number; // 0 = off
 }
 
-export type ExportFormat = 'hostPortUserPass' | 'socks5Url' | 'hostPort' | 'curl';
+export type ExportFormat = 'hostPortUserPass' | 'socks5Url' | 'hostPort' | 'curl' | 'csv';
+
+/** A port's bucket on the main screen's status filter and in the CSV export
+ * (`portBucket` in shared/portBucket.ts). */
+export type PortBucket = 'alive' | 'dead' | 'connecting' | 'stopped';
+
+/**
+ * A "Check" result the renderer holds for a port (spec §4.1 "Check all"). Checks live
+ * in the renderer only; it hands `exportPorts` the ones still current so the CSV's
+ * status/latency agree with the screen. Main derives everything else from its own state.
+ */
+export interface PortCheck {
+  ok: boolean;
+  latencyMs?: number;
+}
+
+/** What "Save to file…" in the Export modal ended with. `saved: false` with no `error`
+ * means the user cancelled the dialog. */
+export interface SaveExportResult {
+  saved: boolean;
+  path?: string;
+  error?: string;
+}
 
 export interface RotateResult {
   changed: boolean;
@@ -491,7 +513,11 @@ export interface ProxyFarmApi {
   setLimit(providerId: ProviderId, limit: number): Promise<void>;
   testPort(targetKey: string, speed: boolean): Promise<{ ok: boolean; exitIp?: string; latencyMs?: number; mbps?: number }>;
   getLogs(targetKey: string): Promise<string[]>;
-  exportPorts(targetKeys: string[], format: ExportFormat): Promise<string>;
+  /** `checks` (CSV only): the renderer's current Check results, by port key. */
+  exportPorts(targetKeys: string[], format: ExportFormat, checks?: Record<string, PortCheck>): Promise<string>;
+  /** Asks where to save with the native save dialog, then writes `text` there. The path
+   * comes from the dialog only; `format` picks the default name and file filter. */
+  saveExportFile(text: string, format: ExportFormat): Promise<SaveExportResult>;
 
   // settings & environment
   getSettings(): Promise<Settings>;
@@ -532,7 +558,7 @@ export const IPC = {
   invoke: [
     'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
     'listPorts', 'addPorts', 'listServers', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
-    'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
+    'testPort', 'getLogs', 'exportPorts', 'saveExportFile', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',
   ] as const,
   events: {

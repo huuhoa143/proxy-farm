@@ -194,6 +194,7 @@ describe('controller facade', () => {
       speedTest,
       onSettingsChanged,
       appStatus: () => ({ secretsUnavailable: true }),
+      saveExport: async () => ({ saved: true, path: '/tmp/x.csv' }),
       updater,
       diagnosticsEnv: () => ({
         appVersion: '1.2.3',
@@ -646,6 +647,16 @@ describe('controller facade', () => {
     expect(next.basePort).toBe(30001);
     expect((await facade.getSettings()).basePort).toBe(30001);
     expect(onSettingsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('exportPorts forwards the check results; saveExportFile goes to the save dialog dep', async () => {
+    const saveExport = vi.fn(async () => ({ saved: true, path: '/tmp/x.csv' }));
+    const { facade, portManager } = setup({ saveExport });
+    const spy = vi.spyOn(portManager, 'exportPorts');
+    await facade.exportPorts(['k#1'], 'csv', { 'k#1': { ok: false } });
+    expect(spy).toHaveBeenCalledWith(['k#1'], 'csv', { 'k#1': { ok: false } });
+    expect(await facade.saveExportFile('a,b', 'csv')).toEqual({ saved: true, path: '/tmp/x.csv' });
+    expect(saveExport).toHaveBeenCalledWith('a,b', 'csv');
   });
 
   it('getDiagnostics reports versions and per-provider counts, and nothing identifying', async () => {

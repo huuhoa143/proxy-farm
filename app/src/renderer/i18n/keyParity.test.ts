@@ -30,6 +30,12 @@ describe('i18n key parity', () => {
     expect(emptyEn).toEqual([]);
     expect(emptyVi).toEqual([]);
   });
+
+  it('spells "khóa" and "xóa" one way in vi.json (accent on the o)', () => {
+    const values = flattenKeys(vi).map((k) => String(getPath(vi, k)));
+    expect(values.filter((v) => /[kK]hoá/.test(v))).toEqual([]);
+    expect(values.filter((v) => /[xX]oá/.test(v))).toEqual([]);
+  });
 });
 
 function getPath(obj: unknown, path: string): unknown {

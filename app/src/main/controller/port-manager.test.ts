@@ -729,6 +729,19 @@ describe('port manager', () => {
       const out = await manager.exportPorts(['nope'], 'hostPort');
       expect(out).toBe('');
     });
+
+    it('CSV takes the state from main and only well-formed check results from the renderer', async () => {
+      const { manager, state } = setup({ targets: [] });
+      state.setState((s) => ({ ...s, settings: { ...s.settings, proxyUser: 'proxy', proxyPass: 'pw' } }));
+      const header = 'host,port,username,password,location,provider,exit_ip,country,status,latency_ms';
+      const plain = await manager.exportPorts(['zoogvpn:nl-ams'], 'csv');
+      expect(plain.split('\r\n')[0]).toBe(header);
+      expect(plain.split('\r\n')).toHaveLength(2);
+      const checked = await manager.exportPorts(['zoogvpn:nl-ams'], 'csv', { 'zoogvpn:nl-ams': { ok: false } });
+      expect(checked.split('\r\n')[1]).toMatch(/,(dead|connecting|stopped),$/);
+      const junk = await manager.exportPorts(['zoogvpn:nl-ams'], 'csv', { 'zoogvpn:nl-ams': { ok: 'yes', latencyMs: 5 } } as never);
+      expect(junk).toBe(plain);
+    });
   });
 
   describe('testPort', () => {
