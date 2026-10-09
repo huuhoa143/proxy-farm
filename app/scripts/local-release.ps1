@@ -342,6 +342,18 @@ try {
     State-MarkDone $state 'gh_release'
   } else { Green '6/6  gh release (skipped)' }
 
+  # Both platforms update from /releases/latest/download, i.e. from the newest release
+  # only: while it lacks latest-mac.yml, macOS clients see no update at all.
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $names = @(gh release view "v$Version" --repo $GhRepo --json assets -q '.assets[].name' 2>$null)
+  } finally { $ErrorActionPreference = $prevEap }
+  if ($names -notcontains 'latest-mac.yml') {
+    Warn "v$Version has no latest-mac.yml yet: macOS clients see no update until"
+    Warn "scripts/local-release.sh (or release-with-x64.sh) runs for v$Version (it adds its assets to this release)."
+  }
+
   Write-Host ''
   Green "Windows release v$Version complete"
   Write-Host "    https://github.com/$GhRepo/releases/tag/v$Version"

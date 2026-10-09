@@ -491,7 +491,9 @@ proxy-farm/
   2. `electron-forge make` → per-user NSIS, **unsigned** like lingoreup, with a signing hook kept in the maker config.
   3. Smoke: packaged sing-box version and tags, the app starts and quits through `--quit` with no engine left, `latest.yml` carries the installer sha512.
   4. Upload `Setup.exe` + `latest.yml` + `.blockmap` + the sing-box source tarball. `-DryRun` stops before git and GitHub.
-- **Updates**: electron-updater against GitHub Releases.
+- **Updates**: electron-updater against GitHub Releases (`/releases/latest/download`): check at start and daily, download and install on the user's click, every engine stopped first. Both platforms read the **newest** release only, so each version is **one** release carrying every platform's assets: whichever script runs second adds its files to the release the first created (`gh release upload --clobber`), and each script warns while the other platform's channel file (`latest.yml` / `latest-mac.yml`) is still missing, since until then that platform's clients see no update.
+  - ✅ Windows verified end to end 2026-10-09 through a local feed: an installed 0.1.0 found 0.1.1, downloaded it, quit (engines stopped, exit 0), the NSIS installer replaced the files (exe, registry `DisplayVersion`, new resources) and relaunched the app with `--updated`; no UAC. HMA support's task kept working (same executable path). A second instance on another profile (tests only; one per user otherwise) holds the files open and makes the installer wait.
+  - ⚠️ No release carries Windows assets yet (v0.1.1 is macOS only): Windows clients report "up to date" until the first `local-release.ps1` run.
 - **sing-box**: version, per-platform sha256 and source-tarball sha256 are pinned in `prebuild-singbox.mjs`. Upgrade only after the live smoke (§10) passes.
 
 ## 10. Testing
