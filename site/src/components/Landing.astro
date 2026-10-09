@@ -13,10 +13,13 @@ import mainLightEn from '../assets/shots/main-light-en.png';
 import mainDarkEn from '../assets/shots/main-dark-en.png';
 import poolsVi from '../assets/shots/main-server-pools-vi.png';
 import poolsEn from '../assets/shots/main-server-pools-en.png';
-import pickerVi from '../assets/shots/picker-light-vi.png';
-import pickerEn from '../assets/shots/picker-dark-en.png';
-import onboardVi from '../assets/shots/onboarding-connected-light-vi.png';
-import onboardEn from '../assets/shots/onboarding-dark-en.png';
+// Step rasters are crops of the real v2 screenshots, framed on the panel each step names.
+import step1Vi from '../assets/steps/step1-vi.png';
+import step2Vi from '../assets/steps/step2-vi.png';
+import step3Vi from '../assets/steps/step3-vi.png';
+import step1En from '../assets/steps/step1-en.png';
+import step2En from '../assets/steps/step2-en.png';
+import step3En from '../assets/steps/step3-en.png';
 
 interface Props {
   lang: Lang;
@@ -27,8 +30,8 @@ const t = copy[lang];
 const other: Lang = lang === 'vi' ? 'en' : 'vi';
 
 const shots = {
-  vi: { light: mainLightVi, dark: mainDarkVi, pools: poolsVi, steps: [onboardVi, pickerVi, mainLightVi] },
-  en: { light: mainLightEn, dark: mainDarkEn, pools: poolsEn, steps: [onboardEn, pickerEn, mainDarkEn] },
+  vi: { light: mainLightVi, dark: mainDarkVi, pools: poolsVi, steps: [step1Vi, step2Vi, step3Vi] },
+  en: { light: mainLightEn, dark: mainDarkEn, pools: poolsEn, steps: [step1En, step2En, step3En] },
 }[lang];
 
 // The demo section switches from placeholder to player as soon as the mp4 lands in public/media/.
@@ -40,8 +43,8 @@ const hasWebm = hasFile(media.webm);
 const hasTracks = { vi: hasFile(media.tracks.vi), en: hasFile(media.tracks.en) };
 
 const widths = [640, 960, 1280, 1600];
-// Zoom each step thumbnail onto the panel its text names (provider cards, picker, port rows).
-const stepFocus = ['--fx: 22%; --fy: 18%', '--fx: 92%; --fy: 22%', '--fx: 38%; --fy: 42%'];
+// Narrowest width at which each crop's in-shot text stays legible; narrower screens scroll it.
+const stepFrame = ['--minw: 560px; --maxw: 680px', '--minw: 440px; --maxw: 520px', '--minw: 640px; --maxw: 100%'];
 const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
 ---
 
@@ -162,15 +165,17 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
         {
           t.how.steps.map((s, i) => (
             <li class="step">
-              <span class="step-n" aria-hidden="true">{i + 1}</span>
-              <h3>{s.title}</h3>
-              <p>{s.body}</p>
-              <div class="step-shot" style={stepFocus[i]}>
+              <div class="step-text">
+                <span class="step-n" aria-hidden="true">{i + 1}</span>
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
+              </div>
+              <div class="step-shot" style={stepFrame[i]} tabindex="0" role="group" aria-label={s.alt}>
                 <Picture
                   src={shots.steps[i]}
                   formats={["avif"]} fallbackFormat="webp"
-                  widths={[480, 720, 960]}
-                  sizes="(min-width: 1000px) 380px, calc(100vw - 2.5rem)"
+                  widths={[480, 720, 960, 1400].filter((w) => w <= shots.steps[i].width)}
+                  sizes="(min-width: 1000px) 720px, 640px"
                   alt={s.alt}
                   loading="lazy"
                   decoding="async"
@@ -692,20 +697,25 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   /* How */
   .steps {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: clamp(1.5rem, 3vw, 2.5rem);
+    gap: clamp(2.5rem, 5vw, 4rem);
     margin: 0;
     padding: 0;
     list-style: none;
-    counter-reset: none;
   }
 
   .step {
     display: grid;
-    grid-template-rows: auto auto 1fr auto;
-    gap: 0.75rem;
-    padding-top: 1.25rem;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 1.5rem clamp(2rem, 5vw, 4.5rem);
+    align-items: start;
+    padding-top: 1.5rem;
     border-top: 2px solid var(--ink);
+  }
+
+  .step-text {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 30rem;
   }
 
   .step-n {
@@ -721,22 +731,19 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   }
 
   .step-shot {
-    margin-top: 0.75rem;
+    width: min(100%, var(--maxw));
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
     border: 1px solid var(--rule);
     background: var(--paper);
     box-shadow: 0 14px 24px -18px rgb(13 20 36 / 0.35);
-    aspect-ratio: 4 / 3;
+    scrollbar-width: thin;
   }
 
   .step-shot :global(img) {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: var(--fx) var(--fy);
-    transform: scale(1.75);
-    transform-origin: var(--fx) var(--fy);
+    max-width: none;
+    min-width: var(--minw);
   }
 
   /* Features */
@@ -1256,12 +1263,8 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     .dl-more {
       grid-column: auto;
     }
-    .steps {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 3rem;
-    }
     .step {
-      grid-template-rows: auto;
+      grid-template-columns: minmax(0, 1fr);
     }
     .shot-pools {
       grid-template-columns: minmax(0, 1fr);
