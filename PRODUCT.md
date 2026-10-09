@@ -47,10 +47,11 @@ Proxy Farm turns the user's own VPN subscription into many local SOCKS5/HTTP pro
   - NordVPN, with an access token or NordLynx key.
   - ExpressVPN, with its Manual-configuration OpenVPN username and password.
   - Imported OpenVPN `.ovpn` and WireGuard `.conf` files.
-- **Platforms:** macOS 12+ (Apple silicon and Intel; signed and notarized by Apple) and Windows x64 (per-user installer, not code-signed, so SmartScreen warns).
+- **Platforms:** macOS 12+ (Apple silicon and Intel; signed and notarized by Apple) and Windows x64.
+- **Windows signing:** the .exe is intentionally unsigned (the owner's decision), so SmartScreen warns; the site shows a SmartScreen note next to the Windows download and in the FAQ.
 - **Release state:**
-  - Current public release: v0.2.0 (2026-10-09), with every provider, filters, Check all and CSV export.
-  - Download buttons link to the GitHub release assets; the version lives in `site/src/data/site.ts`.
+  - Current public release: v0.2.0 (2026-10-09). It includes every provider (HMA, ZoogVPN, Surfshark, NordVPN, ExpressVPN, files), filters, Check all and CSV export.
+  - Download buttons link to the v0.2.0 GitHub release assets; the version lives in `release` in `site/src/data/site.ts`.
 - **Constraints:**
   - Users must follow their VPN provider's terms of service.
   - Proxy Farm is not affiliated with any provider.
