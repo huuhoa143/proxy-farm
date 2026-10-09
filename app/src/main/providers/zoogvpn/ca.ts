@@ -11,22 +11,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { resourcePath } from '../../resources-root';
-
-function linesOfPemBlock(text: string): string[] {
-  const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((l) => l.startsWith('-----BEGIN'));
-  const end = lines.findIndex((l) => l.startsWith('-----END'));
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error('zoogvpn: expected a -----BEGIN/-----END PEM block');
-  }
-  return lines.slice(start, end + 1);
-}
+import { linesOfPemBlock } from '../pem';
 
 export function loadCaLines(caPath: string = resourcePath('ca', 'zoogvpn-ca.pem')): string[] {
-  return linesOfPemBlock(readFileSync(caPath, 'utf8'));
+  return linesOfPemBlock(readFileSync(caPath, 'utf8'), 'zoogvpn');
 }
 
 /** tls-auth key lines, with the leading `#` comment lines stripped. */
 export function loadTlsAuthLines(keyPath: string = resourcePath('ca', 'zoogvpn-tls-auth.key')): string[] {
-  return linesOfPemBlock(readFileSync(keyPath, 'utf8'));
+  return linesOfPemBlock(readFileSync(keyPath, 'utf8'), 'zoogvpn');
 }

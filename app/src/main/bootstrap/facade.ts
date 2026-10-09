@@ -29,7 +29,7 @@ import type { UpdateStatus } from '../../shared/contracts';
 import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
 
-export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'];
+export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'];
 
 /** The slice of the `UpdaterService` the facade drives from IPC (spec §9). */
 export interface FacadeUpdater {

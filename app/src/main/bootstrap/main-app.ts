@@ -204,6 +204,7 @@ export function runApp(): void {
     registerAllProviders({
       surfsharkCachePath: path.join(userData, 'cache', 'surfshark-clusters.json'),
       nordvpnCachePath: path.join(userData, 'cache', 'nordvpn-servers.json'),
+      expressvpnPoolPath: path.join(userData, 'cache', 'expressvpn-pools.json'),
     });
     const providers = { get: getProvider };
 

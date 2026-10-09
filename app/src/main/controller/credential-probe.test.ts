@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Account, AccountSecret, EndpointSpec, PortState, Provider, RenderInput, Target } from '../../shared/contracts';
-import { createCredentialProbe, freeHosts, isProbeKey, orderByProximity, PROBE_KEY_PREFIX, type CredentialProbeDeps } from './credential-probe';
+import { createCredentialProbe, freeHosts, isProbeKey, loginCheckHosts, orderByProximity, PROBE_KEY_PREFIX, type CredentialProbeDeps } from './credential-probe';
 import type { Engine } from './ports';
 
 const account: Account = { id: 'zoogvpn-1', providerId: 'zoogvpn', label: 'me@example.com', meta: {}, secretRef: 'account:zoogvpn-1' };
@@ -115,6 +115,14 @@ describe('free hosts and proximity', () => {
     expect(order('')).toEqual(['GB', 'NL', 'US']);
   });
 
+  it('from Asia, a host in Asia comes before Europe; free-tier order is unchanged (none in Asia)', () => {
+    const asia = loc('expressvpn:SG', 'SG', ['203.0.113.5']);
+    const order = (tz: string) => orderByProximity([...freeHosts(catalog), { server: '203.0.113.5', country: 'SG', target: asia }], tz).map((h) => h.country);
+    expect(order('Asia/Ho_Chi_Minh')).toEqual(['SG', 'GB', 'NL', 'US']);
+    expect(order('Europe/Amsterdam')).toEqual(['GB', 'NL', 'US', 'SG']);
+    expect(order('America/New_York')).toEqual(['US', 'GB', 'NL', 'SG']);
+  });
+
   it('probe keys never look like port keys', () => {
     expect(isProbeKey(`${PROBE_KEY_PREFIX}zoogvpn-1:1`)).toBe(true);
     expect(isProbeKey('zoogvpn:NL#1')).toBe(false);
@@ -219,3 +227,43 @@ describe('credential probe (spec §5.2)', () => {
     expect(e.started).toHaveLength(0);
   });
 });
+
+describe('credential probe: a provider whose every server checks the login (ExpressVPN, spec §5.6)', () => {
+  const xloc = (key: string, country: string, servers: string[], virtual = false): Target => ({
+    key,
+    providerId: 'expressvpn',
+    country,
+    city: '',
+    label: country,
+    servers,
+    ...(virtual ? { virtualLocation: true } : {}),
+  });
+  const express: Target[] = [
+    xloc('expressvpn:AL', 'AL', ['192.0.2.1']),
+    xloc('expressvpn:IN-VIA-SINGAPORE', 'IN', ['192.0.2.9'], true),
+    xloc('expressvpn:VN', 'VN', ['192.0.2.20', '192.0.2.21']),
+    xloc('expressvpn:US-NEW-YORK', 'US', ['usa-newyork-ca-version-2.expressnetw.com']),
+  ];
+  const anyServer = (targets: Target[]) => ({ ...provider(targets), id: 'expressvpn' as const, anyServerChecksLogin: true });
+
+  it('asks the first server of each location that is not virtual; free-tier providers keep their free hosts only', () => {
+    expect(loginCheckHosts(express, anyServer(express)).map((h) => h.server)).toEqual(['192.0.2.1', '192.0.2.20', 'usa-newyork-ca-version-2.expressnetw.com']);
+    expect(loginCheckHosts(express, provider(express))).toEqual([]);
+    expect(loginCheckHosts(catalog, { ...provider(), anyServerChecksLogin: true }).map((h) => h.server)).toEqual(['uk.zgfree.info', 'nl.zgfree.info', 'us.zgfree.info']);
+  });
+
+  it('a server that brings the tunnel up → ok, one handshake, nearest location first', async () => {
+    const e = scriptedEngine([verifying]);
+    const p = anyServer(express);
+    const result = await createCredentialProbe(deps(e.engine, { resolveServer: async (s) => s }))(account, secret, p);
+    expect(result).toEqual({ outcome: 'ok', host: '192.0.2.20' });
+    expect(e.started).toHaveLength(1);
+  });
+
+  it('an auth failure → auth (wrong username or password)', async () => {
+    const e = scriptedEngine([authFailed]);
+    const result = await createCredentialProbe(deps(e.engine, { resolveServer: async (s) => s }))(account, secret, anyServer(express));
+    expect(result.outcome).toBe('auth');
+  });
+});
+

@@ -1780,7 +1780,9 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function checkCredentials(account: Account, secret: AccountSecret): Promise<CredentialVerdict> {
     const verdict = await runProbe(account, secret);
-    if (verdict !== 'unsupported') freeTierProviders.set(account.providerId, true);
+    // A probe ran, so the provider has a free tier — unless it checked on an ordinary
+    // server of a provider without plans (ExpressVPN), where an auth failure is the login.
+    if (verdict !== 'unsupported' && !deps.providers.get(account.providerId)?.anyServerChecksLogin) freeTierProviders.set(account.providerId, true);
     return verdict;
   }
 

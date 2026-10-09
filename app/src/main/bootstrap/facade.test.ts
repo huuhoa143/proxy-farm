@@ -211,12 +211,13 @@ describe('controller facade', () => {
     const { facade, state } = setup();
     state.setState((s) => ({ ...s, limits: { ...s.limits, zoogvpn: 3 } }));
     const list = await facade.listProviders();
-    expect(list.map((p) => p.id)).toEqual(['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file']);
+    expect(list.map((p) => p.id)).toEqual(['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file']);
     expect(list[0].detected).toEqual({ found: true });
     expect(list[1].limit).toBe(3);
     expect(list[2].limit).toBe(0);
-    // NordVPN's default limit until the user sets one; an explicit 0 (unlimited) wins.
+    // NordVPN's and ExpressVPN's default limits until the user sets one; an explicit 0 (unlimited) wins.
     expect(list[3].limit).toBe(6);
+    expect(list[4].limit).toBe(8);
     state.setState((s) => ({ ...s, limits: { ...s.limits, nordvpn: 0 } }));
     expect((await facade.listProviders())[3].limit).toBe(0);
   });
@@ -671,6 +672,7 @@ describe('controller facade', () => {
       { id: 'zoogvpn', accounts: 1, ports: 1, portStates: { stopped: 1 } },
       { id: 'surfshark', accounts: 0, ports: 0, portStates: {} },
       { id: 'nordvpn', accounts: 0, ports: 0, portStates: {} },
+      { id: 'expressvpn', accounts: 0, ports: 0, portStates: {} },
       { id: 'file', accounts: 0, ports: 0, portStates: {} },
     ]);
 

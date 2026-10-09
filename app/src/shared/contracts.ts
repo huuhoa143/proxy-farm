@@ -5,7 +5,7 @@
  * agreement: every exported name here is relied on by at least two modules.
  *   engine/     renderConfig, invariants, ports, supervisor, pid registry   (spec §6.1–6.3)
  *   health/     log signals, /delay, exit-IP, state machine, backoff        (spec §6.4)
- *   providers/  hma, zoogvpn, surfshark, nordvpn, file + catalogs           (spec §5)
+ *   providers/  hma, zoogvpn, surfshark, nordvpn, expressvpn, file + catalogs (spec §5)
  *   controller/ store, accounts, port manager, power, webhook, IPC          (spec §3, §4, §6.5–6.7)
  *   renderer/   React UI + i18n, talks only to `window.proxyFarm`           (spec §4)
  */
@@ -80,13 +80,14 @@ export interface RenderInput {
 
 // ───────────────────────── providers & catalogs (spec §5) ─────────────────────────
 
-export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'file';
+export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
 
 /**
  * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
- * unlimited. An explicit user value, 0 included, always wins.
+ * unlimited. An explicit user value, 0 included, always wins. ExpressVPN: a plan allows
+ * 10 devices at once; 8 leaves 2 for the user's own devices (spec §5.6).
  */
-export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6 };
+export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6, expressvpn: 8 };
 
 /** The port limit in force for a provider: the user's, else the default, else 0. */
 export function portLimitOf(limits: Partial<Record<ProviderId, number>>, providerId: ProviderId): number {
@@ -95,7 +96,9 @@ export function portLimitOf(limits: Partial<Record<ProviderId, number>>, provide
 
 /**
  * How a provider's exit IP relates to the server a port pins (spec §5, §6.8):
- *   server   — the exit is the server's own IP, for good (HMA, ZoogVPN).
+ *   server   — one exit per server, for good: the server's own IP (HMA, ZoogVPN) or
+ *              another IP that server always uses (ExpressVPN: .69 always exits as .47).
+ *              Either way an exit seen once identifies the server.
  *   server+1 — the server's IP + 1, stable per server (Surfshark).
  *   session  — chosen when the tunnel connects: fixed while it stays connected, but a
  *              new connection to the same server may get another one (NordVPN). Also
@@ -112,6 +115,7 @@ export const EXIT_IP_MODELS: Record<ProviderId, ExitIpModel> = {
   zoogvpn: 'server',
   surfshark: 'server+1',
   nordvpn: 'session',
+  expressvpn: 'server',
   file: 'session',
 };
 
@@ -229,6 +233,13 @@ export interface Provider {
    * key). Never rejects. Providers without it get their input checked as typed.
    */
   resolveInput?(input: Record<string, string>): Promise<{ input: Record<string, string> } | { reasonKey: string }>;
+  /**
+   * The provider has no plans that limit servers: every server takes every valid login,
+   * so one test connection to any server checks the credentials (spec §5.6, ExpressVPN).
+   * Unlike a free tier (`Target.freeTierServers`) this tells the credential probe where
+   * it may ask; an auth failure still just means the login is wrong. Absent = false.
+   */
+  anyServerChecksLogin?: boolean;
   /** Validate user input (format only, no network) and normalise it. */
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */

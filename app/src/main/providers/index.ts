@@ -9,6 +9,7 @@ import { hmaProvider } from './hma';
 import { zoogvpnProvider } from './zoogvpn';
 import { createSurfsharkProvider } from './surfshark';
 import { createNordvpnProvider } from './nordvpn';
+import { createExpressvpnProvider } from './expressvpn';
 import { fileProvider } from './file';
 
 export interface RegisterAllProvidersOptions {
@@ -24,6 +25,11 @@ export interface RegisterAllProvidersOptions {
    * `nordvpn-servers.json` in the same folder as `surfsharkCachePath`.
    */
   nordvpnCachePath?: string;
+  /**
+   * Where ExpressVPN's discovered server pools live (spec §5.6). Defaults to
+   * `expressvpn-pools.json` in the same folder as `surfsharkCachePath`.
+   */
+  expressvpnPoolPath?: string;
 }
 
 export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
@@ -33,6 +39,11 @@ export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
   registerProvider(
     createNordvpnProvider({
       cachePath: opts.nordvpnCachePath ?? path.join(path.dirname(opts.surfsharkCachePath), 'nordvpn-servers.json'),
+    }),
+  );
+  registerProvider(
+    createExpressvpnProvider({
+      poolPath: opts.expressvpnPoolPath ?? path.join(path.dirname(opts.surfsharkCachePath), 'expressvpn-pools.json'),
     }),
   );
   registerProvider(fileProvider);
