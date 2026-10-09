@@ -89,6 +89,13 @@ export interface Target {
    * provider's language (ZoogVPN "Germany"). The UI shows the localised country name. */
   countryWide?: boolean;
   /**
+   * The provider marks the location virtual: its servers stand in another country and
+   * only present as `country` (NordVPN's `virtual_location`, Surfshark's `virtual` tag).
+   * `country` is still what the location is sold as, and what the UI tags its exits
+   * with. Optional; absent = not marked.
+   */
+  virtualLocation?: boolean;
+  /**
    * The location's server pool, best first (spec §6.8). Each entry is one server = one
    * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname
    * (ZoogVPN, file remotes) that the controller resolves before bind.

@@ -47,6 +47,7 @@ function toTarget(loc: NordLocation): Target {
     city: loc.city,
     label: `${loc.countryName} — ${loc.city}`,
     servers: loc.servers.map((s) => s.ip),
+    ...(loc.virtual ? { virtualLocation: true } : {}),
   };
 }
 

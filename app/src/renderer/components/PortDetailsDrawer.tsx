@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
+import { countryName } from '../ui/countryName';
 
 export interface PortDetailsDrawerProps {
   row: PortRow;
@@ -22,7 +23,8 @@ interface TestOutcome {
  * PortTable, expanded only while this row's Details button is toggled on.
  */
 export function PortDetailsDrawer({ row, api, colSpan = 7 }: PortDetailsDrawerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.language || 'en';
   const [logs, setLogs] = useState<string[] | null>(null);
   const [testResult, setTestResult] = useState<TestOutcome | null>(null);
   const [testing, setTesting] = useState<'none' | 'basic' | 'speed'>('none');
@@ -70,6 +72,22 @@ export function PortDetailsDrawer({ row, api, colSpan = 7 }: PortDetailsDrawerPr
               <Icon name="activity" />
               {t('main.test.title')}
             </h4>
+            {row.state.kind === 'online' && (
+              // The probe's raw answer, kept here although the row tags the exit with the
+              // location's country (ui/exitCountry.ts).
+              <dl className="exit-facts" data-testid={`exit-facts-${row.key}`}>
+                <dt>{t('main.exitFacts.ip')}</dt>
+                <dd className="mono">{row.state.exitIp}</dd>
+                <dt>{t('main.exitFacts.location')}</dt>
+                <dd>{row.country ? `${countryName(row.country, language)} (${row.country})` : '—'}</dd>
+                <dt>{t('main.exitFacts.geo')}</dt>
+                <dd>
+                  {/^[A-Z]{2}$/.test(row.state.country)
+                    ? `${countryName(row.state.country, language)} (${row.state.country})`
+                    : t('main.exitFacts.geoUnknown')}
+                </dd>
+              </dl>
+            )}
             <div className="btns">
               <button className="btn sm" disabled={testing !== 'none'} onClick={() => void runTest(false)}>
                 {testing === 'basic' ? t('main.test.running') : t('main.test.run')}

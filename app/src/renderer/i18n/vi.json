@@ -284,8 +284,18 @@
     "port": {
       "label": "{{location}} · cổng #{{n}}",
       "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
-      "noServer": "Chọn khi bật lần đầu"
+      "noServer": "Chọn khi bật lần đầu",
+      "geoHint": "IP định vị ở {{country}}",
+      "geoHintTitle": "Cơ sở dữ liệu IP xếp {{ip}} vào {{geo}}, không phải {{country}}. Các cơ sở dữ liệu này thường không khớp nhau, và nhà cung cấp VPN hay bán vị trí ảo: máy chủ đặt ở nước khác nhưng hiện ra là nước bạn chọn. Nhãn hiển thị quốc gia của vị trí bạn đã chọn."
     },
+    "exitFacts": {
+      "ip": "IP thoát",
+      "location": "Vị trí",
+      "geo": "Định vị IP",
+      "geoUnknown": "Không rõ"
+    },
+    "virtualLocation": "vị trí ảo",
+    "virtualLocationHint": "{{provider}} ghi đây là vị trí ảo: máy chủ đặt ở nước khác và hiện ra là nước này. Trang web tra IP có thể xếp nó vào nước khác.",
     "changeIp": {
       "menuLabel": "Đổi IP cho cổng #{{n}}",
       "next": "Máy chủ trống tiếp theo",

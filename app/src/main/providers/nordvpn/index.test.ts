@@ -84,8 +84,10 @@ describe('nordvpn provider: targets', () => {
       city: 'Hanoi',
       label: 'Vietnam — Hanoi',
       servers: ['192.0.2.1', '192.0.2.3'],
+      virtualLocation: true,
     });
     expect(targets[2].servers).toEqual(['198.51.100.45', '198.51.100.111', '198.51.100.67']);
+    expect(targets[0].virtualLocation).toBeUndefined(); // São Paulo is not marked
   });
 
   it('concurrent calls (one per account) share a single fetch, and the cache serves the next ones', async () => {

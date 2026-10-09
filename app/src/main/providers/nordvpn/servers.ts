@@ -29,6 +29,10 @@ const FIELDS = [
   'servers.locations.country.city.name',
   'servers.technologies.identifier',
   'servers.technologies.metadata',
+  // `{identifier:'virtual_location', values:[{value:'true'}]}` marks a virtual location ✅
+  // 2026-10-09 (vn52, vn53, vn56: Vietnam servers whose IPs geolocate elsewhere).
+  'servers.specifications.identifier',
+  'servers.specifications.values',
 ];
 
 /** The full NordLynx server list, trimmed to the fields above. `limit` is far above the
@@ -49,6 +53,9 @@ export interface NordServer {
   load: number;
   /** The server's WireGuard public key. */
   publicKey: string;
+  /** Nord marks the server a virtual location: it stands in another country and only
+   * presents as this one. Absent when not marked (or cached before the flag was read). */
+  virtual?: true;
 }
 
 export interface NordLocation {
@@ -58,6 +65,16 @@ export interface NordLocation {
   city: string;
   /** Least loaded first. */
   servers: NordServer[];
+  /** Every server of the location is a virtual location. */
+  virtual?: true;
+}
+
+/** The server's `virtual_location` specification says `true`. */
+function isVirtualServer(rec: Record<string, unknown>): boolean {
+  if (!Array.isArray(rec.specifications)) return false;
+  const spec = (rec.specifications as Array<Record<string, unknown>>).find((s) => s?.identifier === 'virtual_location');
+  const values = Array.isArray(spec?.values) ? (spec.values as Array<Record<string, unknown>>) : [];
+  return values.some((v) => v?.value === true || v?.value === 'true');
 }
 
 export interface ServersCacheFile {
@@ -118,10 +135,13 @@ export function parseServers(payload: unknown): NordLocation[] {
     }
     if (location.servers.some((s) => s.ip === ip)) continue;
     const load = typeof rec.load === 'number' && Number.isFinite(rec.load) ? rec.load : 100;
-    location.servers.push({ ip, hostname: str(rec.hostname), load, publicKey });
+    location.servers.push({ ip, hostname: str(rec.hostname), load, publicKey, ...(isVirtualServer(rec) ? { virtual: true as const } : {}) });
   }
   const ipNum = (ip: string) => ip.split('.').reduce((n, o) => n * 256 + Number(o), 0);
-  for (const l of byKey.values()) l.servers.sort((a, b) => a.load - b.load || ipNum(a.ip) - ipNum(b.ip));
+  for (const l of byKey.values()) {
+    l.servers.sort((a, b) => a.load - b.load || ipNum(a.ip) - ipNum(b.ip));
+    if (l.servers.every((s) => s.virtual)) l.virtual = true;
+  }
   return [...byKey.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 

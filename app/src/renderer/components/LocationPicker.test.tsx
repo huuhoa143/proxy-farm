@@ -166,6 +166,15 @@ describe('LocationPicker', () => {
     }
   });
 
+  it('marks a virtual location, with what that means as a tooltip', () => {
+    const hanoi: Target = { ...target('nordvpn:VN-HANOI', 'Hanoi', 2, 2, 'nordvpn'), country: 'VN', virtualLocation: true };
+    const { row } = renderPicker({ targets: [hanoi, TOKYO] });
+    const pill = within(row('nordvpn:VN-HANOI')).getByTestId('virtual-nordvpn:VN-HANOI');
+    expect(pill).toHaveTextContent('virtual location');
+    expect(pill.getAttribute('title')).toMatch(/^NordVPN lists this as a virtual location/);
+    expect(within(row('hma:JP-TOKYO')).queryByText('virtual location')).toBeNull();
+  });
+
   it('names, sorts and finds cities by their Vietnamese name where there is one', async () => {
     const vn = (key: string, city: string): Target => ({ ...target(key, city, 2, 2, 'nordvpn'), country: 'VN' });
     const targets = [vn('nordvpn:VN-HO-CHI-MINH-CITY', 'Ho Chi Minh City'), vn('nordvpn:VN-NHA-TRANG', 'Nha Trang'), vn('nordvpn:VN-HANOI', 'Hanoi')];

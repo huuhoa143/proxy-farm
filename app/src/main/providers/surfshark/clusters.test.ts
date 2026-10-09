@@ -26,6 +26,13 @@ describe('parseClusters', () => {
     expect(typeof first.location).toBe('string');
   });
 
+  it('keeps the `virtual` tag (a location whose servers stand elsewhere)', () => {
+    const parsed = parseClusters(sampleClusters as unknown);
+    expect(parsed.find((c) => c.connectionName === 'al-tia.prod.surfshark.com')?.virtual).toBe(true);
+    const untagged = (sampleClusters as Array<{ connectionName: string; tags?: string[] }>).filter((c) => !c.tags?.includes('virtual'));
+    for (const c of untagged) expect(parsed.find((p) => p.connectionName === c.connectionName)?.virtual).toBeUndefined();
+  });
+
   it('rejects a non-array payload', () => {
     expect(() => parseClusters({ not: 'an array' })).toThrow();
   });

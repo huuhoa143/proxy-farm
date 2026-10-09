@@ -169,6 +169,7 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
           label: `${cluster.country} — ${cluster.location}`,
           servers: pool.length > 0 ? pool : [cluster.connectionName],
           poolHostnames: true,
+          ...(cluster.virtual ? { virtualLocation: true } : {}),
         };
       });
     },

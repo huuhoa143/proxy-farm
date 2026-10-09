@@ -1150,6 +1150,38 @@ table.port-table {
   font-weight: 600;
   color: var(--mut);
 }
+/* Where IP geolocation puts the exit, when it disagrees with the location: a hint only. */
+.ip .geo-hint {
+  font-size: 10.5px;
+  color: var(--mut);
+  opacity: 0.85;
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+}
+.pill.virt {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  cursor: help;
+}
+.exit-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px;
+  font-size: 12px;
+}
+.exit-facts dt {
+  color: var(--mut);
+}
+.exit-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .lat {
   font-family: var(--fm);
   font-size: 12.5px;
@@ -2379,7 +2411,8 @@ a.btn {
     padding-left: 10px;
     padding-right: 10px;
   }
-  .ip .cc {
+  .ip .cc,
+  .ip .geo-hint {
     display: none;
   }
 }

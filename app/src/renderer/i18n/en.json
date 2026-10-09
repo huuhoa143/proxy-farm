@@ -284,8 +284,18 @@
     "port": {
       "label": "{{location}} · port #{{n}}",
       "serverTitle": "Pinned to server {{server}}. This port keeps this exit IP until you change it.",
-      "noServer": "Chosen on first start"
+      "noServer": "Chosen on first start",
+      "geoHint": "IP geolocates to {{country}}",
+      "geoHintTitle": "IP databases place {{ip}} in {{geo}}, not {{country}}. They often disagree with each other, and VPN providers commonly sell virtual locations: servers that stand in another country but present as the one you chose. The tag shows the country of the location you picked."
     },
+    "exitFacts": {
+      "ip": "Exit IP",
+      "location": "Location",
+      "geo": "IP geolocation",
+      "geoUnknown": "Unknown"
+    },
+    "virtualLocation": "virtual location",
+    "virtualLocationHint": "{{provider}} lists this as a virtual location: its servers stand in another country and present as this one. Sites that look the IP up may place it elsewhere.",
     "changeIp": {
       "menuLabel": "Change IP for port #{{n}}",
       "next": "Next free server",

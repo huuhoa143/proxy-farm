@@ -9,6 +9,7 @@ import { ChangeIpMenu } from './ChangeIpMenu';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
+import { exitCountry, type ExitCountryView } from '../ui/exitCountry';
 import { locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 
@@ -213,6 +214,11 @@ export function PortTable({
                 <span className="grp-sub">
                   {/* A country-wide location is already named after the country. */}
                   {!group.countryWide && countryName(group.country, language)}
+                  {target?.virtualLocation && (
+                    <span className="pill virt" title={t('main.virtualLocationHint', { provider }) as string} data-testid={`virtual-${group.locationKey}`}>
+                      {t('main.virtualLocation')}
+                    </span>
+                  )}
                   <span className={`psw ${group.providerId}`} aria-hidden="true" />
                   {provider}
                 </span>
@@ -278,6 +284,8 @@ export function PortTable({
         const n = portNumber(row);
         const serverIp = row.serverIp ?? row.server;
         const rowLocation = locationName({ ...row, countryWide: targetByKey.get(row.locationKey)?.countryWide }, language);
+        // Tagged with the location's country; the probe's geolocation is only a hint.
+        const exit: ExitCountryView = state.kind === 'online' ? exitCountry(row.country, state.country) : {};
         const portLabel = n ? (t('main.port.label', { location: rowLocation, n }) as string) : row.label;
         // Change IP picks another server: useful when online and when stuck
         // retrying / failed on a bad server; not while stopped or mid-connect.
@@ -381,9 +389,26 @@ export function PortTable({
                 {state.kind === 'online' ? (
                   <span className="ip">
                     <span className="mono">{state.exitIp}</span>
-                    <span className="cc" title={countryName(state.country, language)}>
-                      ({state.country})
-                    </span>
+                    {exit.tag && (
+                      <span className="cc" title={countryName(exit.tag, language)} data-testid={`exit-cc-${row.key}`}>
+                        ({exit.tag})
+                      </span>
+                    )}
+                    {exit.tag && exit.geo && (
+                      <span
+                        className="geo-hint"
+                        data-testid={`geo-hint-${row.key}`}
+                        title={
+                          t('main.port.geoHintTitle', {
+                            ip: state.exitIp,
+                            geo: countryName(exit.geo, language),
+                            country: countryName(exit.tag, language),
+                          }) as string
+                        }
+                      >
+                        {t('main.port.geoHint', { country: exit.geo })}
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span className="none">—</span>

@@ -28,7 +28,16 @@ describe('parseServers', () => {
     // equal load: ordered by IP, numerically
     const hcmc = locations.find((l) => l.key === 'nordvpn:VN-HO-CHI-MINH-CITY')!;
     expect(hcmc.servers.map((s) => s.ip)).toEqual(['198.51.100.45', '198.51.100.111', '198.51.100.67']);
-    expect(hcmc.servers[0]).toEqual({ ip: '198.51.100.45', hostname: 'vn56.nordvpn.com', load: 12, publicKey: PK_HCMC });
+    expect(hcmc.servers[0]).toEqual({ ip: '198.51.100.45', hostname: 'vn56.nordvpn.com', load: 12, publicKey: PK_HCMC, virtual: true });
+  });
+
+  it("reads Nord's virtual_location flag: per server, and a location whose servers all carry it", () => {
+    const locations = parseServers(samplePayload());
+    expect(locations.find((l) => l.key === 'nordvpn:VN-HANOI')!.virtual).toBe(true);
+    const sao = locations.find((l) => l.key === 'nordvpn:BR-SAO-PAULO')!;
+    expect(sao.virtual).toBeUndefined();
+    expect(sao.servers[0].virtual).toBeUndefined();
+    expect(SERVERS_URL).toContain('fields[servers.specifications.identifier]');
   });
 
   it('rejects a payload that is not an array', () => {

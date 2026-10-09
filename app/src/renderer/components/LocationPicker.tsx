@@ -295,6 +295,15 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                               : t('main.picker.servers', { count: target.servers.length, free })}
                           </small>
                         </span>
+                        {target.virtualLocation && (
+                          <span
+                            className="pill virt"
+                            title={t('main.virtualLocationHint', { provider: providerName(target.providerId, t) }) as string}
+                            data-testid={`virtual-${target.key}`}
+                          >
+                            {t('main.virtualLocation')}
+                          </span>
+                        )}
                         {have > 0 && <span className="pill ok">{t('main.picker.portsHere', { count: have })}</span>}
                         {!on && (
                           <span className="prov">
