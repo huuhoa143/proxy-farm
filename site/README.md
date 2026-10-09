@@ -42,12 +42,23 @@ When any url is set, the hero button drops its "coming soon" pill.
 
 ## Demo video
 
-Put these files in `public/media/` and rebuild. The demo section switches from the
-placeholder to the player at build time when the mp4 exists:
+The poster and captions are static files in `public/media/`:
 
-- `proxy-farm-demo.mp4` (H.264, 16:9)
 - `proxy-farm-demo-poster.jpg` (16:9)
-- `proxy-farm-demo.vi.vtt` and `proxy-farm-demo.en.vtt` (captions; each is optional)
+- `proxy-farm-demo.vi.vtt` and `proxy-farm-demo.en.vtt` (captions)
+
+The video files (`proxy-farm-demo.mp4`, H.264 16:9, and `proxy-farm-demo.webm`) are not in
+git. They are hosted on TeleCloud (telecloud.lingoreup.com, folder `proxy-farm-site`),
+which serves byte ranges (HTTP 206); Safari and iOS need those to play and seek a
+`<video>`, and Workers static assets answer 200 only. Their links are in
+`src/data/site.ts` (`media.video`, `media.webm`), and `public/_headers` allows the host
+in `media-src`.
+
+To replace a video, upload it with the TeleCloud upload API (`POST /api/upload-api/upload`,
+fields `file`, `path=proxy-farm-site`, `share=public`) and put the returned `direct_link`
+in `site.ts`. Upload files larger than a few MB from the TeleCloud host itself
+(`http://127.0.0.1:8091` on the server): through Cloudflare the request times out
+after 100 s (HTTP 524).
 
 ## Custom domain
 
