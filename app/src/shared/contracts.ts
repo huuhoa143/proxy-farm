@@ -78,6 +78,28 @@ export function portLimitOf(limits: Partial<Record<ProviderId, number>>, provide
   return limits[providerId] ?? DEFAULT_PORT_LIMITS[providerId] ?? 0;
 }
 
+/**
+ * How a provider's exit IP relates to the server a port pins (spec §5, §6.8):
+ *   server   — the exit is the server's own IP, for good (HMA, ZoogVPN).
+ *   server+1 — the server's IP + 1, stable per server (Surfshark).
+ *   session  — chosen when the tunnel connects: fixed while it stays connected, but a
+ *              new connection to the same server may get another one (NordVPN). Also
+ *              the safe assumption for an imported file, whose provider is unknown.
+ * For `session` providers an exit seen once says nothing about the server's next
+ * session: it is not a server identity, and a different exit after a reconnect is
+ * normal, never an error.
+ */
+export type ExitIpModel = 'server' | 'server+1' | 'session';
+
+/** Static per provider, like `DEFAULT_PORT_LIMITS`: main and the renderer both read it. */
+export const EXIT_IP_MODELS: Record<ProviderId, ExitIpModel> = {
+  hma: 'server',
+  zoogvpn: 'server',
+  surfshark: 'server+1',
+  nordvpn: 'session',
+  file: 'session',
+};
+
 /** One selectable exit location. `key` is stable across catalog refreshes. */
 export interface Target {
   key: string; // e.g. 'hma:JP-40-TOKYO-ULT', 'surfshark:jp-tok', 'file:<id>'

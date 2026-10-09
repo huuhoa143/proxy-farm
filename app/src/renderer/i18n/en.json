@@ -284,6 +284,8 @@
     "port": {
       "label": "{{location}} · port #{{n}}",
       "serverTitle": "Pinned to server {{server}}. This port keeps this exit IP until you change it.",
+      "serverTitleSession": "Pinned to server {{server}}. {{provider}} picks the exit IP when the port connects: it stays the same while the port is connected, and may change when the port reconnects.",
+      "sessionExitTitle": "Exit IP of this connection. {{provider}} keeps it while the port stays connected; after a reconnect (a retry, Change IP, or a restart) it may be a different one, even on the same server.",
       "noServer": "Chosen on first start",
       "geoHint": "IP geolocates to {{country}}",
       "geoHintTitle": "IP databases place {{ip}} in {{geo}}, not {{country}}. They often disagree with each other, and VPN providers commonly sell virtual locations: servers that stand in another country but present as the one you chose. The tag shows the country of the location you picked."
@@ -325,7 +327,8 @@
       "pick": "Move this port to {{server}}",
       "freeTier": "Free tier",
       "freeTierHint": "A free-tier server: it works on every plan.",
-      "noneFreeNoAltHint": "None free here, and no other location in this country — the port keeps its server"
+      "noneFreeNoAltHint": "None free here, and no other location in this country — the port keeps its server",
+      "sessionExitNote": "{{provider}} picks the exit IP when the port connects, not per server: it stays the same while the port is connected, and may change whenever the port reconnects, even to the same server."
     },
     "addResult": {
       "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",

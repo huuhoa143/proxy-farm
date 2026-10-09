@@ -12,10 +12,12 @@
  * own WireGuard public key, kept in the on-disk cache, so `bind()` reads it from there
  * synchronously and deterministically, like Surfshark's cluster cache.
  *
- * A server's exit IP is NOT the server IP (vn52 at .1 exited from .22, and from .15 in a
- * later session) but kept across reconnects within a session and differs between
- * servers ✅ 2026-10-09, so ports pin servers as usual and the observed exit IP is what
- * the UI shows and the duplicate-exit check compares.
+ * A server's exit IP is NOT the server IP, and it belongs to the tunnel, not the server
+ * (`EXIT_IP_MODELS.nordvpn = 'session'`) ✅ 2026-10-09: constant while a tunnel stays up
+ * (vn53 kept .28 for 35+ min), but a new connection to the same server may get another
+ * (vn52: .22, then .15 for three reconnects within a minute, then .7). Ports pin servers
+ * as usual; the observed exit IP is what the UI shows and the duplicate-exit check
+ * compares, and a change after a reconnect is normal.
  */
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { ACCESS_TOKEN_RE, exchangeAccessToken, WG_KEY_RE } from './credentials';

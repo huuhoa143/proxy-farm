@@ -284,6 +284,8 @@
     "port": {
       "label": "{{location}} · cổng #{{n}}",
       "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
+      "serverTitleSession": "Đang gắn với máy chủ {{server}}. {{provider}} chọn IP thoát khi cổng kết nối: IP giữ nguyên khi cổng còn kết nối, và có thể đổi khi cổng kết nối lại.",
+      "sessionExitTitle": "IP thoát của lần kết nối này. {{provider}} giữ IP này khi cổng còn kết nối; sau khi kết nối lại (thử lại, Đổi IP hoặc khởi động lại) IP có thể khác, kể cả trên cùng máy chủ.",
       "noServer": "Chọn khi bật lần đầu",
       "geoHint": "IP định vị ở {{country}}",
       "geoHintTitle": "Cơ sở dữ liệu IP xếp {{ip}} vào {{geo}}, không phải {{country}}. Các cơ sở dữ liệu này thường không khớp nhau, và nhà cung cấp VPN hay bán vị trí ảo: máy chủ đặt ở nước khác nhưng hiện ra là nước bạn chọn. Nhãn hiển thị quốc gia của vị trí bạn đã chọn."
@@ -325,7 +327,8 @@
       "pick": "Chuyển cổng này sang {{server}}",
       "freeTier": "Miễn phí",
       "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói.",
-      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ"
+      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ",
+      "sessionExitNote": "{{provider}} chọn IP thoát khi cổng kết nối, không cố định theo máy chủ: IP giữ nguyên khi cổng còn kết nối, và có thể đổi mỗi khi cổng kết nối lại, kể cả với cùng máy chủ."
     },
     "addResult": {
       "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",

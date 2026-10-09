@@ -211,4 +211,34 @@ describe('ChangeIpMenu', () => {
     expect(trigger).toBeDisabled();
     expect(trigger).toHaveTextContent('Changing…');
   });
+
+  it('says that a session-exit provider (NordVPN) picks the exit IP per connection, not per server', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'listServers').mockResolvedValue([{ server: '192.0.2.1', health: 'ok', heldBy: 'nordvpn:VN-HANOI#1' }]);
+    const nord: PortRow = {
+      key: 'nordvpn:VN-HANOI#1',
+      locationKey: 'nordvpn:VN-HANOI',
+      server: '192.0.2.1',
+      providerId: 'nordvpn',
+      accountId: 'nordvpn-1',
+      label: 'Hanoi',
+      country: 'VN',
+      city: 'Hanoi',
+      proxyPort: 29001,
+      enabled: true,
+      state: { kind: 'online', since: 1, exitIp: '192.0.2.22', country: 'VN' },
+      autoRotateMin: 0,
+    };
+    render(<ChangeIpMenu row={nord} api={api} rows={[nord]} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('change-ip-nordvpn:VN-HANOI#1'));
+    expect(await screen.findByTestId('session-exit-note')).toHaveTextContent(
+      'NordVPN picks the exit IP when the port connects, not per server: it stays the same while the port is connected, and may change whenever the port reconnects',
+    );
+  });
+
+  it('no such note for a provider whose exit is the server (HMA)', async () => {
+    const { trigger } = await setup();
+    await openMenu(trigger);
+    expect(screen.queryByTestId('session-exit-note')).toBeNull();
+  });
 });

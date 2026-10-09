@@ -2588,6 +2588,39 @@ describe('port manager', () => {
       expect(ctx.engine.started).toHaveLength(3);
     });
 
+    describe('a session exit IP (spec §5.5): fixed while connected, may change on reconnect', () => {
+      it('a different exit after a reconnect is just the new exit: no failover, no error', async () => {
+        const ctx = nSetup();
+        await ctx.manager.startPort(NKEY);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 1, exitIp: '10.2.0.22', country: 'VN' });
+        ctx.engine.fireState(NKEY, timeout);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 2, exitIp: '10.2.0.15', country: 'VN' });
+        await new Promise((r) => setTimeout(r, 10));
+        expect(stateOf(ctx)).toMatchObject({ kind: 'online', exitIp: '10.2.0.15' });
+        expect(ctx.engine.started).toHaveLength(1);
+        expect(ctx.state.getState().ports.find((p) => p.key === NKEY)!.server).toBe('10.2.0.1');
+      });
+
+      it("an exit a server had in an earlier session does not make it look like another port's server", async () => {
+        const ctx = nSetup();
+        await ctx.manager.startPort(NKEY);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 1, exitIp: '10.2.0.40', country: 'VN' });
+        // #1 moves on to 10.2.0.3; 10.2.0.1's last exit (.40) is history now.
+        ctx.state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === NKEY ? { ...p, server: '10.2.0.3', serverIp: '10.2.0.3' } : p)) }));
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 2, exitIp: '10.2.0.66', country: 'VN' });
+        // #2's session on 10.2.0.2 happens to draw .40.
+        const k2 = 'nordvpn:VN-HANOI#2';
+        ctx.state.setState((s) => ({
+          ...s,
+          ports: [...s.ports, basePort({ key: k2, locationKey: 'nordvpn:VN-HANOI', providerId: 'nordvpn', accountId: 'n1', proxyPort: 29002, server: '10.2.0.2', serverIp: '10.2.0.2', state: { kind: 'stopped' } })],
+        }));
+        ctx.engine.fireState(k2, { kind: 'online', since: 3, exitIp: '10.2.0.40', country: 'VN' });
+        expect(ctx.state.getState().ports.find((p) => p.key === k2)!.state).toMatchObject({ kind: 'online' });
+        // Free: 10.2.0.1 and 10.2.0.4 (#1 holds .3, #2 holds .2).
+        expect(ctx.manager.freeServerCount(nTargets[0])).toBe(2);
+      });
+    });
+
     it('its engine starts take from the per-account attempt budget', async () => {
       const timers: number[] = [];
       const ctx = nSetup({

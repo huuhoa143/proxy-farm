@@ -2848,6 +2848,13 @@ svg.i.spin {
 .cim-msg.bad {
   color: var(--bad);
 }
+.cim-msg.cim-note {
+  display: block;
+  max-width: 340px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
 
 /* picker: per-location quantity */
 .opt {

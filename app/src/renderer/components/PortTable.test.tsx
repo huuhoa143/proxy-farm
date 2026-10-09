@@ -223,6 +223,17 @@ describe('PortTable', () => {
       expect(facts).toHaveTextContent('Hong Kong SAR China (HK)');
     });
 
+    it("a NordVPN exit's tooltip says it is fixed while connected and may change on reconnect; HMA's has none", () => {
+      const hma = row('hma:JP-TOKYO#1', { kind: 'online', since: 1, exitIp: '203.0.113.5', country: 'JP' }, { server: '203.0.113.5' });
+      renderRows([{ ...vnRow('VN'), server: '192.0.2.1' }, hma]);
+      expect(screen.getByTestId('exit-ip-nordvpn:VN-HANOI#1').getAttribute('title')).toMatch(
+        /^Exit IP of this connection\. NordVPN keeps it while the port stays connected; after a reconnect .* it may be a different one/,
+      );
+      expect(screen.getByTestId('exit-ip-hma:JP-TOKYO#1')).not.toHaveAttribute('title');
+      expect(screen.getByTitle(/^Pinned to server 192\.0\.2\.1\. NordVPN picks the exit IP when the port connects/)).toBeInTheDocument();
+      expect(screen.getByTitle('Pinned to server 203.0.113.5. This port keeps this exit IP until you change it.')).toBeInTheDocument();
+    });
+
     it('in Vietnamese', async () => {
       await act(() => changeLanguage('vi'));
       try {

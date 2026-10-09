@@ -2,6 +2,7 @@ import { lookup, resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import {
+  EXIT_IP_MODELS,
   isTerminalState,
   makePortKey,
   splitPortKey,
@@ -1045,7 +1046,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * equals another enabled port's of the same provider moves to another server. */
   function onOnline(port: PortRow & { server: string }, exitIp: string): void {
     const serverIp = port.serverIp ?? knownIp(port.server);
-    if (serverIp) exitByIp.set(serverIp, exitIp);
+    // A session exit (NordVPN) is the tunnel's, not the server's: remembered as the
+    // server's identity, a stale one could make another server look like this machine
+    // once its own session drew that exit. Its live value still counts below.
+    if (serverIp && EXIT_IP_MODELS[port.providerId] !== 'session') exitByIp.set(serverIp, exitIp);
     if (rotatingKeys.has(port.key)) return;
     const clash = deps.state
       .getState()
