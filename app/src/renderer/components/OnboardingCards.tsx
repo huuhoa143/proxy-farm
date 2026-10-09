@@ -5,6 +5,7 @@ import { Icon } from '../ui/Icon';
 import { Flag } from '../ui/Flag';
 import { countryName } from '../ui/countryName';
 import { accountLabel } from '../ui/accountLabel';
+import { expressvpnCountryFromFilename } from '../ui/expressvpnCountry';
 import { PROVIDER_LINKS } from '../../shared/links';
 import { CredentialGuide } from './CredentialGuide';
 
@@ -515,9 +516,13 @@ export interface FileCardProps {
 /**
  * Simple 2-letter-token heuristic (ruling B): split the basename on
  * non-letter characters and take the first all-letter token of length 2,
- * e.g. 'mullvad-se-got.conf' -> 'SE', 'us-nyc.ovpn' -> 'US'.
+ * e.g. 'mullvad-se-got.conf' -> 'SE', 'us-nyc.ovpn' -> 'US'. ExpressVPN's downloads
+ * (`my_expressvpn_vietnam_udp.ovpn`) are read from its catalog instead: their "my" is
+ * not Malaysia.
  */
 export function guessCountryFromFilename(name: string): string {
+  const express = expressvpnCountryFromFilename(name);
+  if (express !== null) return express;
   const base = name.replace(/\.[^.]+$/, '');
   const tokens = base.split(/[^a-zA-Z]+/).filter(Boolean);
   const twoLetter = tokens.find((token) => token.length === 2);

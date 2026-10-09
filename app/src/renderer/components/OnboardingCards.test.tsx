@@ -20,6 +20,20 @@ describe('guessCountryFromFilename', () => {
   it('returns an empty string when no 2-letter token exists', () => {
     expect(guessCountryFromFilename('myconfig.ovpn')).toBe('');
   });
+
+  it("reads ExpressVPN's download names from the catalog, not 'my' (Malaysia)", () => {
+    expect(guessCountryFromFilename('my_expressvpn_vietnam_udp.ovpn')).toBe('VN');
+    expect(guessCountryFromFilename('my_expressvpn_usa-newyork_udp.ovpn')).toBe('US');
+    expect(guessCountryFromFilename('my_expressvpn_usa_-_new_york_udp.ovpn')).toBe('US');
+    expect(guessCountryFromFilename('my_expressvpn_uk-london_tcp.ovpn')).toBe('GB');
+    expect(guessCountryFromFilename('my_expressvpn_ukraine_udp.ovpn')).toBe('UA');
+    expect(guessCountryFromFilename('my_expressvpn_india-sg_udp.ovpn')).toBe('IN');
+    expect(guessCountryFromFilename('my_expressvpn_malaysia_udp.ovpn')).toBe('MY');
+  });
+
+  it('guesses nothing for an ExpressVPN name the catalog does not know (its "my" is not a country)', () => {
+    expect(guessCountryFromFilename('my_expressvpn_atlantis_udp.ovpn')).toBe('');
+  });
 });
 
 function makeFile(name: string, content: string): File {
