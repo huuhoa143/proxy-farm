@@ -61,15 +61,19 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
                 </svg>
               </button>
               <span class="port-text">
-                <span class="port-addr mono">
-                  <span class="dim">127.0.0.1:</span>
-                  {p.port}
+                <span class="band" style={`--c: var(--pc-${s.provider})`}>
+                  <b class="mono">
+                    <span class="sr-only">127.0.0.1</span>:{p.port}
+                  </b>
+                  <span class="b-loc"> · {s.city}</span>
+                  <span class="b-cc"> · {s.cc}</span>
+                  <span class="b-prov"> · {s.label}</span>
+                  <span class="b-ms"> · {p.ms} ms</span>
                 </span>
                 <span class="port-exit mono">
                   <span class="sr-only">{t.exit}: </span>
-                  <i class="dot" style={`background: var(--pc-${s.provider})`} aria-hidden="true" />
+                  <span aria-hidden="true" class="arrow">→&nbsp;</span>
                   <span data-exit>{s.ip}</span>
-                  <span class="ms">· {p.ms} ms</span>
                 </span>
               </span>
               <span class="jack" aria-hidden="true" />
@@ -98,17 +102,10 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
         servers.map((s, j) => {
           const first = j === 0 || servers[j - 1].city !== s.city;
           return (
-            <li class:list={['server', { 'group-start': first, free: !used.has(j) }]} data-server-row={j} data-city={s.city}>
+            <li class:list={['server', { 'group-start': first, free: !used.has(j) }]} data-server-row={j}>
               <span class="jack" aria-hidden="true" />
               <span class="server-ip mono">{s.ip}</span>
-              {first ? (
-                <span class="server-loc">
-                  <i class="dot" style={`background: var(--pc-${s.provider})`} />
-                  {s.city}
-                </span>
-              ) : (
-                <span class="server-free">{t.free}</span>
-              )}
+              <span class="server-free">{t.free}</span>
             </li>
           );
         })
@@ -254,7 +251,7 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
 
   .board-body {
     display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(56px, 0.5fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(0, 1.65fr) minmax(44px, 0.3fr) minmax(0, 0.75fr);
     grid-template-rows: minmax(0, 1fr);
     height: calc(var(--row) * var(--ports));
   }
@@ -294,36 +291,55 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
     line-height: 1.3;
   }
 
-  .port-addr {
-    font-size: 0.9375rem;
-    color: #fff;
+  /* A cable label: the provider's colour leads a tinted strip that names the port. */
+  .band {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.1rem 0.55rem 0.1rem 0;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--c) 16%, var(--plate-2));
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--plate-tx);
     white-space: nowrap;
+    overflow: hidden;
   }
 
-  .port-addr .dim {
-    color: var(--plate-mut);
+  .band::before {
+    content: '';
+    align-self: stretch;
+    width: 6px;
+    margin-right: 0.5rem;
+    border-radius: 5px 0 0 5px;
+    background: var(--c);
+    flex: none;
+  }
+
+  .band b {
+    font-size: 0.8125rem;
+    color: #fff;
+  }
+
+  .band > span {
+    white-space: pre;
+  }
+
+  .band > .b-cc {
+    display: none;
   }
 
   .port-exit {
+    margin-top: 0.2rem;
     font-size: 0.8125rem;
     color: var(--green);
     white-space: nowrap;
     transition: color 200ms var(--ease-out);
   }
 
-  .port-exit {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .port-exit .ms {
+  .port-exit .arrow {
     color: var(--plate-mut);
-  }
-
-  .port-exit .dot {
-    width: 0.45rem;
-    height: 0.45rem;
   }
 
   .port.changed .port-exit {
@@ -471,17 +487,6 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
     color: var(--plate-mut);
   }
 
-  .server-loc {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    color: var(--plate-mut);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   .server-free {
     font-size: 0.75rem;
     color: var(--green);
@@ -522,21 +527,10 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
   }
 
   @media (max-width: 1100px) {
-    .server-loc {
+    .b-ms,
+    .b-prov,
+    .server-free {
       display: none;
-    }
-    .server.group-start .server-free {
-      display: none;
-    }
-  }
-
-  @media (max-width: 1100px) {
-    .server.group-start::after {
-      content: attr(data-city);
-      position: absolute;
-      right: 0;
-      font-size: 0.6875rem;
-      color: var(--plate-mut);
     }
   }
 
@@ -546,24 +540,29 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
       border-radius: 16px;
     }
     .board-body {
-      grid-template-columns: minmax(0, 1.25fr) minmax(36px, 0.45fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.6fr) minmax(24px, 0.2fr) minmax(0, 0.95fr);
     }
     .port {
       gap: 0.5rem;
       padding-right: 0.6rem;
     }
-    .port-addr {
-      font-size: 0.8125rem;
+    .band {
+      font-size: 0.6875rem;
+      padding-right: 0.4rem;
     }
-    .port-addr .dim {
-      display: none;
+    .band::before {
+      width: 4px;
+      margin-right: 0.35rem;
     }
-    .port-exit {
+    .band b {
       font-size: 0.75rem;
     }
-    .port-exit .ms,
-    .port-exit .dot {
+    .b-prov {
       display: none;
+    }
+    .rotate {
+      width: 34px;
+      height: 34px;
     }
     .port-exit {
       font-size: 0.6875rem;
@@ -574,9 +573,22 @@ const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`
     .server-ip {
       font-size: 0.75rem;
     }
-    .server.group-start::after,
     .server-free {
       display: none;
+    }
+  }
+  @media (max-width: 380px) {
+    .band > .b-loc {
+      display: none;
+    }
+    .band > .b-cc {
+      display: inline;
+    }
+    .server-ip {
+      font-size: 0.6875rem;
+    }
+    .server {
+      padding-left: 0.55rem;
     }
   }
 </style>

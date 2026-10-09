@@ -102,7 +102,7 @@ const vi: Copy = {
   board: {
     label: 'Minh hoạ cách Proxy Farm nối cổng với máy chủ',
     caption: 'Minh hoạ. Địa chỉ IP là dải dành cho tài liệu.',
-    ports: 'Cổng trên máy bạn',
+    ports: 'Cổng trên máy bạn · 127.0.0.1',
     servers: 'Máy chủ VPN',
     changeIp: 'Đổi IP',
     changeIpFor: (port) => `Đổi IP cho cổng ${port}`,
@@ -285,7 +285,7 @@ const en: Copy = {
   board: {
     label: 'Illustration of how Proxy Farm wires ports to servers',
     caption: 'Illustration. IP addresses are from documentation ranges.',
-    ports: 'Ports on your computer',
+    ports: 'Ports on your computer · 127.0.0.1',
     servers: 'VPN servers',
     changeIp: 'Change IP',
     changeIpFor: (port) => `Change IP for port ${port}`,
