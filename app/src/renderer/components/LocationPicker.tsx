@@ -7,6 +7,7 @@ import { countryName } from '../ui/countryName';
 import { isCountryWide, locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 import { useModalFocusTrap } from '../ui/useModalFocusTrap';
+import { normaliseSearch } from '../ui/searchText';
 import { addableCount } from '../portGroups';
 
 /** "Add `count` ports to this location" (spec §4.1, §6.8). */
@@ -29,15 +30,6 @@ interface CountryGroup {
   country: string;
   name: string;
   targets: Target[];
-}
-
-function normalise(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toLowerCase();
 }
 
 /**
@@ -69,13 +61,13 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
   }, [targets]);
 
   const groups = useMemo<CountryGroup[]>(() => {
-    const q = normalise(query.trim());
+    const q = normaliseSearch(query.trim());
     const byCountry = new Map<string, CountryGroup>();
     for (const target of targets) {
       if (provider !== 'all' && target.providerId !== provider) continue;
       const name = countryName(target.country, language);
       if (q) {
-        const haystack = normalise(`${name} ${target.country} ${target.city} ${locationName(target, language)} ${target.label}`);
+        const haystack = normaliseSearch(`${name} ${target.country} ${target.city} ${locationName(target, language)} ${target.label}`);
         if (!haystack.includes(q)) continue;
       }
       let group = byCountry.get(target.country);
