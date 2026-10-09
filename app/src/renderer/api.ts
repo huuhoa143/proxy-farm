@@ -313,7 +313,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   const api: FakeProxyFarmApi = {
     async listProviders() {
-      return (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as ProviderId[]).map((id) => ({
+      return (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'] as ProviderId[]).map((id) => ({
         id,
         accounts: accounts.filter((a) => a.account.providerId === id).map((a) => a.account),
         detected: id === 'hma' ? { found: true } : undefined,
@@ -369,6 +369,23 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
           secretRef: `nordvpn-${accounts.length + 1}`,
         };
         accounts.push({ account, secret: { kind: 'wgkey', privateKey } });
+        return { ok: true, account, label: account.label };
+      }
+      if (providerId === 'expressvpn') {
+        // Same rules as main/providers/expressvpn, minus the live check.
+        const username = (input.username ?? '').trim();
+        const password = (input.password ?? '').trim();
+        if (!username) return { ok: false, reasonKey: 'expressvpn.check.missingUsername' };
+        if (!password) return { ok: false, reasonKey: 'expressvpn.check.missingPassword' };
+        if (username.includes('@')) return { ok: false, reasonKey: 'expressvpn.check.notManualCredentials' };
+        const account: Account = {
+          id: `expressvpn-${accounts.length + 1}`,
+          providerId,
+          label: `user …${username.slice(-6)}`,
+          meta: {},
+          secretRef: `expressvpn-${accounts.length + 1}`,
+        };
+        accounts.push({ account, secret: { kind: 'userpass', username, password } });
         return { ok: true, account, label: account.label };
       }
       return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
@@ -644,7 +661,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         os: { platform: 'fake', release: '0', arch: 'fake' },
         versions: { electron: 'fake', chrome: 'fake', node: 'fake' },
         singBox: '1.14.2',
-        providers: (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as ProviderId[]).map((id) => {
+        providers: (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'] as ProviderId[]).map((id) => {
           const own = rows.filter((r) => r.providerId === id);
           const portStates: Partial<Record<PortRow['state']['kind'], number>> = {};
           for (const r of own) portStates[r.state.kind] = (portStates[r.state.kind] ?? 0) + 1;

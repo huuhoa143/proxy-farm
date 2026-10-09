@@ -25,6 +25,12 @@ describe('accountLabel', () => {
     expect(accountLabel(i18next.t, 'pubkey …qqbTmo')).toBe('Public key …qqbTmo');
   });
 
+  it('renders the stored ExpressVPN username label in the active language', async () => {
+    expect(accountLabel(i18next.t, 'user …a1b2c3')).toBe('Username …a1b2c3');
+    await i18next.changeLanguage('vi');
+    expect(accountLabel(i18next.t, 'user …a1b2c3')).toBe('Username …a1b2c3');
+  });
+
   it('never shows the private-key suffix of a legacy label', async () => {
     expect(accountLabel(i18next.t, 'key …xyz12=')).toBe('WireGuard key');
     await i18next.changeLanguage('vi');

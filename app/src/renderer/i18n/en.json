@@ -69,10 +69,18 @@
         "description": "Paste the WireGuard private key from your Surfshark account, or import the WireGuard config you downloaded with it.",
         "keyLabel": "WireGuard private key",
         "keyPlaceholder": "Paste the private key, or the whole WireGuard config",
+        "guide": {
+          "title": "How to get the private key",
+          "step1": "Sign in at https://my.surfshark.com.",
+          "step2": "Go to VPN → Manual setup → Desktop or mobile → WireGuard.",
+          "step3": "Choose “I don't have a key pair” and generate a new key pair.",
+          "step4": "Copy the private key and paste it here.",
+          "step5": "Optional: download a location's config with the key, for its Address line — or import that .conf here directly.",
+          "noteLabels": "Button names on the page may differ slightly; follow the instructions there.",
+          "link": "Open my.surfshark.com"
+        },
         "add": "Add",
         "initials": "S",
-        "hintLead": "Find it at",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
         "addressLabel": "Interface address (optional)",
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "The Address line of the config Surfshark gave you with this key, e.g. 10.14.0.2/16 or 10.64.x.y/16. Each key has its own. Empty means 10.14.0.2/16.",
@@ -84,12 +92,39 @@
         "description": "Paste an access token from your Nord Account, or your NordLynx private key.",
         "credentialLabel": "Access token or NordLynx private key",
         "credentialPlaceholder": "64-character token, or the 44-character key",
-        "hintLead": "Get a token at",
-        "hintPath": "Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token",
-        "hintStored": "A token is used once to fetch your NordLynx key and is not kept; only the key is stored.",
+        "guide": {
+          "title": "How to get an access token",
+          "step1": "Sign in at https://my.nordaccount.com.",
+          "step2": "Choose NordVPN in the menu on the left.",
+          "step3": "Scroll down to Advanced settings → Set up NordVPN manually (Nord emails you a verification code).",
+          "step4": "On the Access token tab: Generate new token → choose how long it lasts → Copy, and paste it here.",
+          "noteStored": "The token is used once to fetch your NordLynx key and is not kept; you can delete it in your Nord Account after adding.",
+          "noteService": "The username and password under “Service credentials” are for OpenVPN — Proxy Farm doesn't use them.",
+          "noteKey": "Already have your NordLynx private key? You can paste the key instead.",
+          "link": "Open Nord Account"
+        },
         "add": "Add",
         "adding": "Adding…",
         "initials": "N"
+      },
+      "expressvpn": {
+        "name": "ExpressVPN",
+        "description": "Sign in with the username and password from your ExpressVPN account's Manual configuration (OpenVPN) page.",
+        "username": "Username",
+        "password": "Password",
+        "check": "Check",
+        "checking": "Checking…",
+        "initials": "E",
+        "guide": {
+          "title": "How to get the username and password",
+          "step1": "Sign in at https://www.expressvpn.com/setup (your ExpressVPN account page).",
+          "step2": "Choose Manual configuration (under Set up devices / Advanced setup).",
+          "step3": "Choose the OpenVPN tab.",
+          "step4": "Copy the Username and Password from section 1 and paste them here. They are not your sign-in email and password, and not the activation code.",
+          "noteActivation": "An activation code alone isn't enough: you need to sign in to the website with the account's email.",
+          "noteOvpn": "You can also download a .ovpn file from section 2 and import it under Config file.",
+          "link": "Open expressvpn.com/setup"
+        }
       },
       "file": {
         "name": "Config file",
@@ -115,7 +150,11 @@
       "note": "Cap how many ports each provider may run at the same time.",
       "fieldLabel": "Port limit — {{provider}}",
       "ports_one": "at most {{count}} port",
-      "ports_other": "at most {{count}} ports"
+      "ports_other": "at most {{count}} ports",
+      "why": {
+        "nordvpn": "Default 6: three tunnels on one key were verified together.",
+        "expressvpn": "Default 8: an ExpressVPN plan allows 10 devices at once, so 2 stay free for your own devices."
+      }
     },
     "continueHint": "Connect at least one provider to continue.",
     "status": {
@@ -359,6 +398,7 @@
         "guidance": {
           "hma": "HMA rejected the device credentials — open the HMA app and check you're signed in.",
           "zoogvpn": "ZoogVPN rejected this account's password — check it in the ZoogVPN app or website.",
+          "expressvpn": "ExpressVPN rejected this username or password. Copy them again from Manual configuration → OpenVPN on the ExpressVPN website (not your account email or activation code), then add the account again.",
           "generic": "The provider rejected these credentials — check your sign-in details.",
           "locationRejected": "Your account works at other locations, but this one refused it — try a different location."
         }
@@ -568,6 +608,17 @@
       "invalidInput": "That isn't a NordVPN access token (64 characters, 0–9 and a–f) or a NordLynx private key (44 characters ending in =)."
     }
   },
+  "expressvpn": {
+    "userLabel": "Username …{{suffix}}",
+    "check": {
+      "missingUsername": "Enter the ExpressVPN username.",
+      "missingPassword": "Enter the ExpressVPN password.",
+      "notManualCredentials": "That looks like your account email. Use the username and password from Manual configuration → OpenVPN on the ExpressVPN website instead.",
+      "tooLong": "ExpressVPN accepts at most 128 bytes per username or password. Use the Manual configuration (OpenVPN) username and password, not a token from the ExpressVPN app.",
+      "wrongCredentials": "ExpressVPN says this username or password is wrong. Use the ones under Manual configuration → OpenVPN on the ExpressVPN website — not your account email and password, and not the activation code.",
+      "unverified": "Added, but the sign-in couldn't be checked right now: no ExpressVPN server answered. Proxy Farm checks it when a port connects."
+    }
+  },
   "file": {
     "unsupportedDirective": "This file uses a setting Proxy Farm doesn't support: {{label}}",
     "check": {
@@ -607,7 +658,7 @@
     "title": "Privacy",
     "collectsNothing": "Proxy Farm collects nothing about you. There is no telemetry, no analytics and no crash reporting, and there is no Proxy Farm server.",
     "local": "Your accounts, ports and settings stay on this computer. Passwords, keys and tokens are encrypted by your operating system (Keychain on macOS, DPAPI on Windows).",
-    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. NordVPN ports download NordVPN's public server list from api.nordvpn.com, without your account; adding a NordVPN access token sends it once to api.nordvpn.com to fetch your NordLynx key, and the token is not kept. These requests come from your own IP address.",
+    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. NordVPN ports download NordVPN's public server list from api.nordvpn.com, without your account; adding a NordVPN access token sends it once to api.nordvpn.com to fetch your NordLynx key, and the token is not kept. ExpressVPN ports look up ExpressVPN server names (expressnetw.com) through Google Public DNS (dns.google) as well as your normal DNS; there is no other ExpressVPN request besides the VPN connection itself. These requests come from your own IP address.",
     "ipCheck": "To confirm a tunnel works, Proxy Farm checks its exit IP and reachability through that tunnel, with api.ipify.org, ifconfig.co, ipinfo.io and www.gstatic.com. They see the tunnel's exit IP, not yours.",
     "optional": "The speed test (only when you run it) downloads a test file from speed.cloudflare.com through the port. The update check asks GitHub for the latest release, on start and once a day; you can turn it off under Updates.",
     "delete": "To delete all data: remove your accounts and ports, quit Proxy Farm, then delete its data folder: ~/Library/Application Support/Proxy Farm on macOS, %APPDATA%\\Proxy Farm on Windows.",
@@ -620,7 +671,7 @@
     "ownAccounts": "Use your own VPN accounts, on your own computer. How you use the tool is your decision and your responsibility: follow your VPN provider's terms of service and the laws where you live. Most providers forbid sharing or reselling a subscription.",
     "suspension": "Providers may suspend or close accounts they consider abusive, including too many connections or reconnects in a short time. That risk is yours, not the project's.",
     "noGuarantee": "There is no guarantee of availability, speed, number of IP addresses or compatibility with any provider. Providers can change their systems and stop the tool from working at any time.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, ExpressVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
     "full": "Full disclaimer"
   },
   "firstRun": {
@@ -629,7 +680,7 @@
     "terms": "Follow your provider's terms: sharing or reselling a subscription is usually forbidden.",
     "suspension": "Providers may suspend accounts for abuse, including excessive reconnects.",
     "asIs": "Proxy Farm is provided as is, with no warranty.",
-    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark, ZoogVPN or NordVPN / Nord Security.",
+    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark, ZoogVPN, NordVPN / Nord Security or ExpressVPN.",
     "acknowledge": "I understand",
     "readFull": "Read the full disclaimer"
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
+import { ExpressVpnCard, FileCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
 
@@ -178,14 +178,42 @@ describe('SurfsharkCard', () => {
   });
 });
 
+describe('ExpressVpnCard', () => {
+  it('sends the trimmed username and password, masks the password, then clears both', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'addAccount');
+    const onAdded = vi.fn();
+    render(<ExpressVpnCard api={api} onAdded={onAdded} />);
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+    expect(screen.getByText('Check').closest('button')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: ' abcdefghijkl0123456789ab ' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'zyxwvutsrq0987654321zyxw' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(onAdded).toHaveBeenCalled());
+    expect(spy).toHaveBeenCalledWith('expressvpn', { username: 'abcdefghijkl0123456789ab', password: 'zyxwvutsrq0987654321zyxw' });
+    expect(screen.getByTestId('expressvpn-message')).toHaveTextContent('Username …6789ab');
+    expect(screen.getByLabelText('Username')).toHaveValue('');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+  });
+
+  it('explains a rejected email in place of the manual-configuration username', async () => {
+    render(<ExpressVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'me@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(screen.getByTestId('expressvpn-message')).toHaveTextContent('Manual configuration → OpenVPN'));
+  });
+});
+
 describe('NordVpnCard', () => {
   const TOKEN = 'ab'.repeat(32);
 
-  it('shows the Nord Account path as plain text, with no link', () => {
+  it('walks through getting a token, and links only to Nord Account (opened in the system browser)', () => {
     render(<NordVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
     const card = screen.getByTestId('provider-card-nordvpn');
-    expect(card).toHaveTextContent('Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token');
-    expect(card.querySelector('a')).toBeNull();
+    expect(card).toHaveTextContent('Advanced settings → Set up NordVPN manually');
+    expect(card).toHaveTextContent('Generate new token');
+    expect([...card.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['https://my.nordaccount.com/']);
     expect(screen.getByLabelText('Access token or NordLynx private key')).toHaveAttribute('type', 'password');
   });
 
