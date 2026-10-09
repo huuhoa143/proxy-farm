@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "proxy-farm-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  // Production custom domain (approved by the owner 2026-10-09).
+  "routes": [{ "pattern": "proxyfarm.lingoreup.com", "custom_domain": true }]
+}

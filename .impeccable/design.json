@@ -1,0 +1,636 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-09T13:19:26+00:00",
+  "title": "Design System: Proxy Farm",
+  "extensions": {
+    "provenance": {
+      "directionAuthority": "delegated",
+      "delegation": "Team-lead message relaying the user, 2026-10-09: \"executive-grade (chuẩn CEO), beautiful, professional; visual direction delegated\".",
+      "run": "unattended; no decision page",
+      "form": "telephone switchboard (ordered list position 7)",
+      "seed": "06ce52f9",
+      "production": "code-led, no image generation",
+      "paletteSource": "app/src/renderer/styles.css (brand green #00dd8a / #009a5b, navy #080b13 / #0f1524, --pc-* provider colours)",
+      "evidence": [
+        "site/src/styles/global.css",
+        "site/src/components/Landing.astro",
+        "site/src/components/Switchboard.astro",
+        "site/src/layouts/Base.astro",
+        ".impeccable/review/desktop.png",
+        ".impeccable/review/mobile.png",
+        ".impeccable/review/desktop-en.png"
+      ]
+    },
+    "colorMeta": {
+      "green": {
+        "role": "primary",
+        "displayName": "Live-Line Green",
+        "canonical": "#00dd8a",
+        "oklch": "oklch(79.0% 0.186 157.6)",
+        "tonalRamp": [
+          "#001104",
+          "#012e19",
+          "#064f2f",
+          "#007446",
+          "#099b60",
+          "#16c37b",
+          "#30ec98",
+          "#c4ffdb"
+        ]
+      },
+      "green-deep": {
+        "role": "primary",
+        "displayName": "Deep Line Green",
+        "canonical": "#007a48",
+        "oklch": "oklch(51.0% 0.122 156.7)",
+        "tonalRamp": [
+          "#001104",
+          "#012e18",
+          "#00502d",
+          "#037445",
+          "#349864",
+          "#5bbc85",
+          "#81e1a9",
+          "#c5ffda"
+        ],
+        "note": "App light-theme accent is #009a5b; site deepened to #007a48 for AA text contrast on porcelain."
+      },
+      "green-ink": {
+        "role": "primary",
+        "displayName": "Green Ink",
+        "canonical": "#03150e",
+        "oklch": "oklch(17.7% 0.030 166.9)",
+        "tonalRamp": [
+          "#000f08",
+          "#162a22",
+          "#33473f",
+          "#51675e",
+          "#72887e",
+          "#94aba1",
+          "#b8d0c5",
+          "#dcf5ea"
+        ]
+      },
+      "porcelain-ground": {
+        "role": "neutral",
+        "displayName": "Porcelain Ground",
+        "canonical": "#eef1f7",
+        "oklch": "oklch(95.8% 0.009 264.5)",
+        "tonalRamp": [
+          "#090b0f",
+          "#232529",
+          "#404247",
+          "#5f6166",
+          "#808288",
+          "#a2a5ab",
+          "#c6c9cf",
+          "#ebeef4"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0d1424",
+        "oklch": "oklch(19.3% 0.034 265.4)",
+        "tonalRamp": [
+          "#050a1a",
+          "#1d2536",
+          "#394255",
+          "#586175",
+          "#788298",
+          "#9ba5bb",
+          "#bec9e0",
+          "#e8effc"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#2f3a52",
+        "oklch": "oklch(34.9% 0.045 265.2)",
+        "tonalRamp": [
+          "#040a1e",
+          "#1a243b",
+          "#36425a",
+          "#55617b",
+          "#75829e",
+          "#97a5c2",
+          "#bbc9e7",
+          "#e8effc"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#545f78",
+        "oklch": "oklch(48.6% 0.043 266.3)",
+        "tonalRamp": [
+          "#040a1d",
+          "#1b243a",
+          "#374259",
+          "#56617a",
+          "#76829d",
+          "#99a5c1",
+          "#bcc9e6",
+          "#e7effe"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#d3d9e6",
+        "oklch": "oklch(88.5% 0.019 266.0)",
+        "tonalRamp": [
+          "#080b13",
+          "#21252f",
+          "#3d424c",
+          "#5c616c",
+          "#7d828e",
+          "#9fa5b1",
+          "#c3c9d6",
+          "#e8effc"
+        ]
+      },
+      "plate": {
+        "role": "neutral",
+        "displayName": "Plate",
+        "canonical": "#0a0f1b",
+        "oklch": "oklch(17.0% 0.026 266.4)",
+        "tonalRamp": [
+          "#060b16",
+          "#1f2532",
+          "#3b4250",
+          "#5a6171",
+          "#7b8293",
+          "#9da5b6",
+          "#c1c9db",
+          "#e8effe"
+        ]
+      },
+      "plate-2": {
+        "role": "neutral",
+        "displayName": "Plate 2",
+        "canonical": "#111a2b",
+        "oklch": "oklch(21.8% 0.036 262.5)",
+        "tonalRamp": [
+          "#040b1a",
+          "#1b2537",
+          "#384256",
+          "#566276",
+          "#778399",
+          "#99a6bc",
+          "#bdcae1",
+          "#e7effd"
+        ]
+      },
+      "plate-rule": {
+        "role": "neutral",
+        "displayName": "Plate Rule",
+        "canonical": "#233049",
+        "oklch": "oklch(31.0% 0.049 262.8)",
+        "tonalRamp": [
+          "#020a1f",
+          "#18253d",
+          "#34425c",
+          "#53617d",
+          "#7383a0",
+          "#95a6c4",
+          "#b9caea",
+          "#e6efff"
+        ]
+      },
+      "plate-text": {
+        "role": "neutral",
+        "displayName": "Plate Text",
+        "canonical": "#e9eef9",
+        "oklch": "oklch(94.9% 0.016 266.3)",
+        "tonalRamp": [
+          "#080b12",
+          "#21252d",
+          "#3e424b",
+          "#5d616b",
+          "#7e828c",
+          "#a0a5af",
+          "#c4c9d4",
+          "#e9eef9"
+        ]
+      },
+      "plate-muted": {
+        "role": "neutral",
+        "displayName": "Plate Muted",
+        "canonical": "#9aa6c2",
+        "oklch": "oklch(72.5% 0.043 267.0)",
+        "tonalRamp": [
+          "#040a1d",
+          "#1c243a",
+          "#384159",
+          "#56617a",
+          "#77829d",
+          "#99a5c1",
+          "#bdc9e6",
+          "#e7eeff"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Status Amber",
+        "canonical": "#f6b53d",
+        "oklch": "oklch(81.4% 0.149 78.5)",
+        "tonalRamp": [
+          "#150800",
+          "#342100",
+          "#593c00",
+          "#7f5909",
+          "#aa7808",
+          "#d79804",
+          "#fdbc46",
+          "#fdecd2"
+        ]
+      },
+      "amber-deep": {
+        "role": "secondary",
+        "displayName": "Amber Deep",
+        "canonical": "#8a5a06",
+        "oklch": "oklch(50.8% 0.106 72.6)",
+        "tonalRamp": [
+          "#160700",
+          "#352000",
+          "#5c3a00",
+          "#855600",
+          "#a97730",
+          "#ce9a55",
+          "#f4be79",
+          "#feebd5"
+        ]
+      },
+      "provider-hma": {
+        "role": "tertiary",
+        "displayName": "HMA Yellow",
+        "canonical": "#ffcc33",
+        "oklch": "oklch(86.7% 0.165 88.7)",
+        "tonalRamp": [
+          "#130900",
+          "#302300",
+          "#523f04",
+          "#785d03",
+          "#a17d00",
+          "#ca9f10",
+          "#f5c221",
+          "#ffedc1"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      },
+      "provider-zoogvpn": {
+        "role": "tertiary",
+        "displayName": "ZoogVPN Blue",
+        "canonical": "#5aa8ff",
+        "oklch": "oklch(72.0% 0.149 252.8)",
+        "tonalRamp": [
+          "#000a25",
+          "#00254c",
+          "#02427c",
+          "#0461b2",
+          "#3584d8",
+          "#5ea8fc",
+          "#a5cdfc",
+          "#e3f0ff"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      },
+      "provider-surfshark": {
+        "role": "tertiary",
+        "displayName": "Surfshark Teal",
+        "canonical": "#2fd3c6",
+        "oklch": "oklch(78.5% 0.129 186.6)",
+        "tonalRamp": [
+          "#000f0d",
+          "#002c29",
+          "#074d47",
+          "#0b7069",
+          "#10968c",
+          "#14beb1",
+          "#49e4d7",
+          "#bafef6"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      },
+      "provider-nordvpn": {
+        "role": "tertiary",
+        "displayName": "NordVPN Indigo",
+        "canonical": "#8f9bff",
+        "oklch": "oklch(72.2% 0.145 276.9)",
+        "tonalRamp": [
+          "#080036",
+          "#1b0d69",
+          "#33338d",
+          "#4f55b2",
+          "#6e77d8",
+          "#8f9bff",
+          "#bbc5fe",
+          "#ebeefd"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      },
+      "provider-expressvpn": {
+        "role": "tertiary",
+        "displayName": "ExpressVPN Red",
+        "canonical": "#ff6b6b",
+        "oklch": "oklch(71.2% 0.181 22.8)",
+        "tonalRamp": [
+          "#210001",
+          "#4e0008",
+          "#7f0217",
+          "#b11d2c",
+          "#d9484c",
+          "#fe7371",
+          "#fdb3af",
+          "#fde9e8"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      },
+      "provider-file": {
+        "role": "tertiary",
+        "displayName": "Config-File Grey",
+        "canonical": "#a6b2cc",
+        "oklch": "oklch(76.3% 0.040 265.8)",
+        "tonalRamp": [
+          "#040a1c",
+          "#1c2538",
+          "#384257",
+          "#576178",
+          "#77829b",
+          "#99a5bf",
+          "#bdc9e4",
+          "#e8effc"
+        ],
+        "note": "Identical to app --pc-* token. Dots and cords only."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline only; second clause on its own line in green-deep."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "One per section. Support block uses clamp(1.625rem, 3vw, 2.25rem)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Step, use-case and spec-group titles."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "The paragraph under each headline, max 62ch, ink-2."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose; definition/table text at 1rem; FAQ answers max 66ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Table heads, captions, facts, board head. Sentence case, no tracking."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Ports, IPs, latency, step numbers, proxy strings only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "plate-lift",
+        "value": "0 0 0 1px rgb(255 255 255 / 0.04) inset, 0 1px 0 rgb(255 255 255 / 0.08) inset, 0 24px 32px -24px rgb(10 15 27 / 0.6), 0 8px 16px -10px rgb(10 15 27 / 0.4)",
+        "purpose": "Switchboard plate only."
+      },
+      {
+        "name": "screenshot-lift",
+        "value": "0 28px 32px -28px rgb(13 20 36 / 0.45), 0 10px 20px -14px rgb(13 20 36 / 0.25)",
+        "purpose": "Framed real app screenshots."
+      },
+      {
+        "name": "thumb-lift",
+        "value": "0 14px 24px -18px rgb(13 20 36 / 0.35)",
+        "purpose": "Step thumbnails."
+      },
+      {
+        "name": "screen-drop",
+        "value": "0 24px 32px -24px rgb(0 0 0 / 0.7)",
+        "purpose": "Demo video frame on the plate."
+      },
+      {
+        "name": "button-press",
+        "value": "0 1px 0 rgb(255 255 255 / 0.4) inset, 0 4px 10px -4px rgb(13 20 36 / 0.3)",
+        "purpose": "Primary button."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "House easing for every transition."
+      },
+      {
+        "name": "control",
+        "value": "160ms",
+        "purpose": "Button/chip background, border, lift."
+      },
+      {
+        "name": "disclosure",
+        "value": "300ms",
+        "purpose": "FAQ icon rotation, free-label fade."
+      },
+      {
+        "name": "cord-light",
+        "value": "400ms",
+        "purpose": "Cord opacity and stroke-width change."
+      },
+      {
+        "name": "rotate-icon",
+        "value": "500ms",
+        "purpose": "Rotate arrow turns -120deg on hover."
+      },
+      {
+        "name": "re-patch",
+        "value": "620ms, quartic ease-out (JS)",
+        "purpose": "Cord glides to new server; exit IP steps on completion; lit state holds 1.4s."
+      },
+      {
+        "name": "refuse",
+        "value": "360ms shake",
+        "purpose": "Rotate pressed with no free server."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "jump to end state",
+        "purpose": "All re-patch and smooth-scroll motion skipped."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "board-compact",
+        "value": "560px"
+      },
+      {
+        "name": "mobile",
+        "value": "640px"
+      },
+      {
+        "name": "single-column",
+        "value": "1000px"
+      },
+      {
+        "name": "nav-hidden",
+        "value": "1100px"
+      }
+    ],
+    "focus": {
+      "light": "2px solid #007a48, offset 3px, radius 6px",
+      "plate": "2px solid #00dd8a"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one green fill: download / main action; may carry a soon pill.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Tải Proxy Farm<span class=\"ds-pill\">Sắp ra mắt</span></a>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:.6rem;min-height:48px;padding:.7rem 1.25rem;border-radius:12px;border:1px solid transparent;background:#00dd8a;color:#03150e;font:700 1rem/1.2 'Be Vietnam Pro',system-ui,sans-serif;text-decoration:none;box-shadow:0 1px 0 rgb(255 255 255/.4) inset,0 4px 10px -4px rgb(13 20 36/.3);transition:background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),transform 160ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-btn-primary svg{width:18px;height:18px}.ds-btn-primary:hover{background:#14e898;transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid #007a48;outline-offset:3px}.ds-pill{padding:.15rem .55rem;border-radius:999px;font-size:.8125rem;font-weight:500;background:rgb(3 21 14/.12)}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action on porcelain (Watch demo).",
+      "html": "<a class=\"ds-btn-ghost\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8 5.5v13l10.5-6.5z\" fill=\"currentColor\"/></svg>Xem demo</a>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:.6rem;min-height:48px;padding:.7rem 1.25rem;border-radius:12px;border:1px solid #d3d9e6;background:#fff;color:#0d1424;font:500 1rem/1.2 'Be Vietnam Pro',system-ui,sans-serif;text-decoration:none;transition:border-color 160ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-btn-ghost svg{width:18px;height:18px}.ds-btn-ghost:hover{border-color:#aab4c8}.ds-btn-ghost:focus-visible{outline:2px solid #007a48;outline-offset:3px}"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "refersTo": "header-chip",
+      "description": "Brand, anchor nav, language chip, GitHub chip.",
+      "html": "<header class=\"ds-top\"><a class=\"ds-brand\" href=\"#\"><span class=\"ds-mark\"></span><b>Proxy Farm</b><span class=\"ds-by\">by LingoReUp</span></a><nav class=\"ds-nav\"><a href=\"#\">Cách hoạt động</a><a href=\"#\">Nhà cung cấp</a><a href=\"#\">Hỏi đáp</a></nav><a class=\"ds-chip\" href=\"#\"><span>VI</span><span class=\"ds-m\">/</span><span class=\"ds-m\">EN</span></a></header>",
+      "css": ".ds-top{display:flex;align-items:center;gap:2rem;padding:1.25rem 0;font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#0d1424}.ds-brand{display:inline-flex;align-items:center;gap:.65rem;margin-right:auto;text-decoration:none;color:inherit;font-size:1.125rem;letter-spacing:-.01em}.ds-mark{width:28px;height:28px;border-radius:8px;background:#0a0f1b;box-shadow:inset 0 0 0 7px #0a0f1b,inset 0 0 0 14px #00dd8a}.ds-by{font-size:.8125rem;color:#545f78;padding-left:.65rem;border-left:1px solid #d3d9e6}.ds-nav{display:flex;gap:1.75rem;font-size:.9375rem}.ds-nav a{color:#2f3a52;text-decoration:none;padding:.5rem 0}.ds-nav a:hover{color:#0d1424;text-decoration:underline;text-underline-offset:.22em}.ds-chip{display:inline-flex;gap:.35rem;align-items:center;min-height:40px;padding:.4rem .8rem;border-radius:10px;border:1px solid #d3d9e6;background:#fff;font-size:.875rem;font-weight:500;color:#0d1424;text-decoration:none;transition:border-color 160ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-chip:hover{border-color:#aab4c8}.ds-m{color:#545f78}.ds-nav a:focus-visible,.ds-chip:focus-visible{outline:2px solid #007a48;outline-offset:3px;border-radius:6px}"
+    },
+    {
+      "name": "Next-release Tag",
+      "kind": "chip",
+      "refersTo": "tag-next",
+      "description": "Labels features/providers not in the current release.",
+      "html": "<span class=\"ds-row\">NordVPN <span class=\"ds-tag-next\">Bản tới</span></span>",
+      "css": ".ds-row{font:700 1rem 'Be Vietnam Pro',system-ui,sans-serif;color:#0d1424}.ds-tag-next{display:inline-block;margin-left:.5rem;padding:.05rem .5rem;border:1px solid #e7c779;background:#fff6de;color:#8a5a06;border-radius:999px;font-size:.75rem;font-weight:500;line-height:1.6;vertical-align:.15em}"
+    },
+    {
+      "name": "Spec Row List",
+      "kind": "card",
+      "description": "Containers are ruled lists, not cards: green-deep group title over a 2px ink rule, 1px hairline rows.",
+      "html": "<section class=\"ds-spec\"><h3>Mỗi cổng một IP</h3><dl><div><dt>Một cổng, một máy chủ</dt><dd>Mỗi cổng giữ cố định một máy chủ VPN và một IP thoát.</dd></div><div><dt>SOCKS5 và HTTP</dt><dd>Trên cùng một cổng, có hoặc không có mật khẩu.</dd></div></dl></section>",
+      "css": ".ds-spec{font-family:'Be Vietnam Pro',system-ui,sans-serif;color:#0d1424}.ds-spec h3{margin:0;font-size:.9375rem;font-weight:700;color:#007a48;padding-bottom:.75rem;border-bottom:2px solid #0d1424}.ds-spec dl{margin:0}.ds-spec dl>div{display:grid;grid-template-columns:2fr 3fr;gap:.5rem 2rem;padding:1.1rem 0;border-bottom:1px solid #d3d9e6}.ds-spec dt{font-weight:700;line-height:1.45}.ds-spec dd{margin:0;color:#2f3a52}"
+    },
+    {
+      "name": "Switchboard Port Row",
+      "kind": "custom",
+      "refersTo": "rotate-control",
+      "description": "Signature: rotate control, mono port, green exit IP with provider dot, jack and cord, on the plate.",
+      "html": "<div class=\"ds-board\"><div class=\"ds-port\"><button class=\"ds-rotate\" type=\"button\" aria-label=\"Đổi IP cho cổng 29001\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 11a8 8 0 1 0-2.34 5.66\"/><path d=\"M20 4v7h-7\"/></svg></button><span class=\"ds-pt\"><span class=\"ds-addr\"><span class=\"ds-dim\">127.0.0.1:</span>29001</span><span class=\"ds-exit\"><i class=\"ds-dot\"></i>203.0.113.10 <span class=\"ds-dim\">· 42 ms</span></span></span><span class=\"ds-jack\"></span></div><svg class=\"ds-cord\" viewBox=\"0 0 100 64\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><path d=\"M0 32 C55 32 45 50 100 50\"/></svg></div>",
+      "css": ".ds-board{display:grid;grid-template-columns:1.15fr .5fr;max-width:420px;padding:1rem 1.5rem;border-radius:20px;background:linear-gradient(180deg,#111a2b,#0a0f1b 70%);box-shadow:0 0 0 1px rgb(255 255 255/.04) inset,0 1px 0 rgb(255 255 255/.08) inset,0 24px 32px -24px rgb(10 15 27/.6),0 8px 16px -10px rgb(10 15 27/.4);color:#e9eef9}.ds-port{position:relative;display:flex;align-items:center;gap:.75rem;height:64px;padding-right:.9rem}.ds-rotate{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:10px;border:1px solid #233049;background:#111a2b;color:#e9eef9;cursor:pointer;transition:border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),color 160ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-rotate svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform 500ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-rotate:hover{border-color:#00dd8a;color:#00dd8a}.ds-rotate:hover svg{transform:rotate(-120deg)}.ds-rotate:focus-visible{outline:2px solid #00dd8a;outline-offset:3px}.ds-pt{display:grid;line-height:1.3;font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:500;font-variant-numeric:tabular-nums}.ds-addr{font-size:.9375rem;color:#fff}.ds-exit{display:inline-flex;align-items:center;gap:.4rem;font-size:.8125rem;color:#00dd8a}.ds-dim{color:#9aa6c2}.ds-dot{width:.45rem;height:.45rem;border-radius:2px;background:#ffcc33}.ds-jack{position:absolute;right:-7px;top:50%;translate:0 -50%;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle,#05080f 0 3px,#5b6884 3.5px 5px,#2a3550 5.5px);box-shadow:0 0 0 1px rgb(255 255 255/.06);z-index:1}.ds-cord{width:100%;height:64px;overflow:visible}.ds-cord path{fill:none;stroke:#ffcc33;stroke-width:2.5;stroke-linecap:round;opacity:.88;vector-effect:non-scaling-stroke;transition:opacity 400ms cubic-bezier(0.16, 1, 0.3, 1),stroke-width 400ms cubic-bezier(0.16, 1, 0.3, 1)}.ds-board:hover .ds-cord path{opacity:1;stroke-width:4}"
+    },
+    {
+      "name": "Coming-soon Download Row",
+      "kind": "custom",
+      "description": "Download row on the plate; dashed badge with amber lamp until a build ships.",
+      "html": "<div class=\"ds-dlwrap\"><div class=\"ds-dl\"><span class=\"ds-os\"><b>macOS</b><span>Apple silicon và Intel, macOS 12 trở lên</span></span><span class=\"ds-soon\">Sắp ra mắt</span></div></div>",
+      "css": ".ds-dlwrap{background:#0a0f1b;padding:1rem 1.5rem;font-family:'Be Vietnam Pro',system-ui,sans-serif}.ds-dl{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 0;border-block:1px solid #233049}.ds-os{display:grid}.ds-os b{color:#fff}.ds-os span{font-size:.875rem;color:#9aa6c2}.ds-soon{display:inline-flex;align-items:center;gap:.5rem;min-height:40px;padding:.4rem .9rem;border-radius:10px;border:1px dashed #3a4867;font-size:.875rem;color:#9aa6c2;white-space:nowrap}.ds-soon::before{content:'';width:7px;height:7px;border-radius:50%;background:#f6b53d}"
+    },
+    {
+      "name": "Proxy String Strip",
+      "kind": "custom",
+      "refersTo": "proxy-string",
+      "description": "Raw proxy string shown in mono green on a plate strip.",
+      "html": "<p class=\"ds-ex\"><code>socks5://user:pass@127.0.0.1:29001</code></p>",
+      "css": ".ds-ex{margin:0;display:inline-block;max-width:100%;padding:.5rem .8rem;border-radius:8px;background:#0a0f1b;font-size:.875rem;overflow-wrap:anywhere}.ds-ex code{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:500;font-size:.9em;font-variant-numeric:tabular-nums;color:#00dd8a}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Switchboard Operator's Desk",
+    "overview": "**Creative North Star: \"The Switchboard Operator's Desk\"**\n\nProxy Farm's site is a light, orderly desk with one instrument on it. The desk is cool porcelain paper ruled with hairlines and heavy ink rules, laid out on a strict tabular grid so every address lines up in its column. The instrument is the ink-navy plate: the switchboard in the hero, the demo screen, the download panel and the footer. On the plate, local ports sit on the left as round jacks, VPN servers on the right grouped by city, and coloured cords run between them in each provider's colour. Brand green is the live line: the lamp on an exit IP, the primary action, the focus ring.\n\nThe visual direction was delegated to the agent (2026-10-09, \"executive-grade (chuẩn CEO), beautiful, professional\") and chosen without a decision page. The world was chosen to stay away from the category default of a dark neon network-globe hero, stat counters and icon-card grids. Nothing in the build uses those, and new surfaces should not bring them in. The palette is not new. It is the desktop app's palette carried to page scale, so the site and the app look like one product. One deliberate shift is that the light-ground action green is deepened to `green-deep` so that green text passes contrast on porcelain.\n\nDensity is calm and editorial: generous section padding, one headline per section, lists of facts written as definition rows and tables rather than cards. Motion is sparse and functional. One cord re-patches when the board first comes into view and never again. It also re-patches when a visitor presses a port's Change IP control.",
+    "keyCharacteristics": [
+      "Porcelain desk, ink-navy instrument plate; two grounds, never a third.",
+      "Brand green as the single live-line accent; amber only as a \"not yet\" lamp.",
+      "Provider colours appear only as small square dots and cords, always next to the provider's name in text.",
+      "Be Vietnam Pro for every word; JetBrains Mono only for ports, IPs, step numbers and proxy strings.",
+      "Structure from rules (1px hairlines, 2px ink heads), not from cards and shadows."
+    ],
+    "rules": [
+      {
+        "name": "The One Live Line Rule",
+        "body": "Green means \"connected / act here\". It fills exactly one kind of control (the primary button) and otherwise appears as text, lamps and focus. Never use it as a section background or decorative wash.",
+        "section": "colors"
+      },
+      {
+        "name": "The Wiring Not Paint Rule",
+        "body": "Provider colours are signal wire: dots and cords only, always labelled with the provider's name. They never colour text, buttons, backgrounds or headings.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Grounds Rule",
+        "body": "A section is porcelain/paper or it is plate. No third ground: no mid-grey bands and no tinted gradient sections.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is Data Rule",
+        "body": "JetBrains Mono appears only where a user could copy the text into a tool: addresses, ports, proxy strings, numbers. Never for headings, labels or flavour.",
+        "section": "typography"
+      },
+      {
+        "name": "The Size Is Billing Rule",
+        "body": "Each page has one display-scale line. Every other heading steps down to Headline or below.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Grid Rule",
+        "body": "Every address, port and fact sits in a row of a real grid, table or definition list and is separated by hairlines. Content is not floated into freeform cards.",
+        "section": "layout"
+      },
+      {
+        "name": "The Only Instruments Float Rule",
+        "body": "Only the switchboard, the demo screen and real screenshots cast shadows. Text blocks, lists, tables and sections never do.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** take colours from the app's own tokens first; new site tokens must sit next to `app/src/renderer/styles.css` so site and app stay one brand.",
+      "**Do** use `green-deep` for any green text or small mark on porcelain or paper; keep Live-Line Green for fills and for text on the plate.",
+      "**Do** put every address, port and proxy string in JetBrains Mono 500 with tabular numerals, aligned in a grid column.",
+      "**Do** head grouped content with a 2px `ink` rule and separate rows with 1px `rule` hairlines.",
+      "**Do** show a provider as its name plus a 0.55rem square dot in its `provider-*` colour.",
+      "**Do** mark unreleased things with the amber next-release tag or the dashed coming-soon badge, never with a disabled-looking primary button.",
+      "**Do** keep the motion vocabulary to the house ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`), 160ms for controls and 300–620ms for disclosures and re-patches, with a reduced-motion path that jumps to the end state."
+    ],
+    "donts": [
+      "**Don't** use a dark neon network-globe hero, stat counters, or grids of icon cards.",
+      "**Don't** use provider logos; provider identity is text plus colour dot.",
+      "**Don't** introduce a third ground colour or tinted gradient sections between porcelain/paper and plate.",
+      "**Don't** use green as a background wash or put green fills on anything other than the primary action.",
+      "**Don't** put shadows on text blocks, lists or tables; only the instrument, the demo screen and real screenshots lift.",
+      "**Don't** use uppercase tracked labels or small caps above headings; a section opens with its headline."
+    ]
+  }
+}

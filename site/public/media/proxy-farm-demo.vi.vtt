@@ -1,0 +1,54 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.400
+Proxy Farm — Biến gói VPN của bạn thành hàng chục proxy, mỗi cổng một IP
+
+2
+00:00:03.400 --> 00:00:10.085
+1. Thêm ExpressVPN — mở hướng dẫn lấy username/password từng bước
+
+3
+00:00:10.085 --> 00:00:17.439
+1. Nhập username/password (đã che) rồi bấm “Kiểm tra”
+
+4
+00:00:17.589 --> 00:00:25.557
+2. Chọn vị trí — mỗi cổng dùng một máy chủ riêng, một IP riêng
+
+5
+00:00:25.557 --> 00:00:36.644
+2. Việt Nam, Nhật Bản, Singapore, Mỹ: 5 cổng lần lượt chạy
+
+6
+00:00:36.794 --> 00:00:43.524
+3. Mỗi cổng là một proxy SOCKS5/HTTP — curl trả về đúng IP thoát
+
+7
+00:00:43.524 --> 00:00:50.562
+4. Đổi IP: giữ nguyên cổng, đổi sang máy chủ khác, IP thoát mới
+
+8
+00:00:50.562 --> 00:00:53.262
+5. Thêm một tệp WireGuard thử (máy chủ không tồn tại) để có cổng chết
+
+9
+00:00:53.262 --> 00:00:58.312
+5. Kiểm tra tất cả: tóm tắt cổng sống và chết
+
+10
+00:00:58.312 --> 00:01:04.245
+5. Lọc theo trạng thái: “Chết”, rồi “Sống”
+
+11
+00:01:04.245 --> 00:01:08.278
+5. Tìm theo vị trí, IP hoặc cổng: “viet”
+
+12
+00:01:08.378 --> 00:01:20.612
+6. Xuất → CSV → Chỉ cổng sống → Lưu ra file
+
+13
+00:01:20.612 --> 00:01:24.412
+Proxy Farm by LingoReUp · proxyfarm.lingoreup.com · Mã nguồn mở MIT
+
