@@ -51,10 +51,10 @@ placeholder to the player at build time when the mp4 exists:
 
 ## Custom domain
 
-The Worker deploys to its workers.dev URL only. To serve proxyfarm.lingoreup.com, the
-domain owner uncomments the `routes` entry in `wrangler.jsonc` and runs
-`npx wrangler deploy`. That one command creates the DNS record and certificate on the
-`lingoreup.com` zone.
+The Worker serves proxyfarm.lingoreup.com through the `routes` entry in
+`wrangler.jsonc` (a Workers custom domain on the `lingoreup.com` zone), and the
+workers.dev URL stays available as a preview. `npx wrangler deploy` updates both;
+Cloudflare manages the DNS record and certificate.
 
 After going live, submit `https://proxyfarm.lingoreup.com/sitemap-index.xml` in Google
 Search Console.
