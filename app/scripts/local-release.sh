@@ -313,17 +313,32 @@ ${GIT_LOG}
 Bundles sing-box ${SRC_FILE_NAME%-src.tar.gz} (SagerNet/sing-box, GPLv3). Its
 complete corresponding source is attached to this release as required by
 GPLv3 §6: $SRC_FILE_NAME."
-  gh release create "v$VERSION" \
-    --repo "$GH_REPO" \
-    --title "v$VERSION" \
-    --notes "$NOTES" \
-    "$ZIP_PATH" "$DMG_PATH" "$SRC_TARBALL"
-  gh release upload "v$VERSION" \
-    --repo "$GH_REPO" \
-    --clobber "$YML_PATH"
+  # One release per version carries every platform: the Windows script
+  # (local-release.ps1) may already have created it, so add to it instead.
+  if gh release view "v$VERSION" --repo "$GH_REPO" >/dev/null 2>&1; then
+    gh release upload "v$VERSION" \
+      --repo "$GH_REPO" \
+      --clobber "$ZIP_PATH" "$DMG_PATH" "$SRC_TARBALL" "$YML_PATH"
+  else
+    gh release create "v$VERSION" \
+      --repo "$GH_REPO" \
+      --title "v$VERSION" \
+      --notes "$NOTES" \
+      "$ZIP_PATH" "$DMG_PATH" "$SRC_TARBALL"
+    gh release upload "v$VERSION" \
+      --repo "$GH_REPO" \
+      --clobber "$YML_PATH"
+  fi
   state_mark_done "gh_release"
 else
   green "12/12 gh release (skipped)"
+fi
+
+# Both platforms update from /releases/latest/download, i.e. from the newest
+# release only: while it lacks latest.yml, Windows clients see no update at all.
+if ! gh release view "v$VERSION" --repo "$GH_REPO" --json assets -q '.assets[].name' 2>/dev/null | grep -qx 'latest.yml'; then
+  warn "v$VERSION has no latest.yml yet: Windows clients see no update until"
+  warn "scripts/local-release.ps1 runs for v$VERSION (it adds its assets to this release)."
 fi
 
 echo

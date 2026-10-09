@@ -73,8 +73,12 @@ pnpm test                # unit tests (vitest), hermetic: no network, no real VP
 pnpm exec tsc --noEmit   # type check
 pnpm package && pnpm test:e2e
                          # end-to-end tests against the packaged app, using local
-                         # WireGuard peers on 127.0.0.1 (no VPN account needed)
+                         # WireGuard peers on this computer (no VPN account needed)
 ```
+
+On Windows the e2e suite's WireGuard peers run from `%TEMP%\pf-e2e-wg-peer\`; Windows
+Firewall asks once to allow them (they listen on every interface). The app's own engines
+never trigger that prompt.
 
 Unit tests must not touch the network or real provider servers. Inject network access
 (see `PoolNet` in `providers/surfshark/pool.ts` or the probe functions in

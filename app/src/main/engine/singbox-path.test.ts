@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { singboxPath, assertSingboxVersion } from './singbox-path';
+import { singboxPath, assertSingboxVersion, hostPlatformKey } from './singbox-path';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const REAL_BIN = path.join(APP_ROOT, 'resources', 'sing-box', 'darwin-arm64', 'sing-box');
+const REAL_BIN = singboxPath({ appRoot: APP_ROOT, isPackaged: false });
+
+/** `sing-box version` output as the real binary prints it, with the given version and tags. */
+const versionOutput = (version: string, tags: string) =>
+  `sing-box version ${version}
+
+Environment: go1.26.8 ${hostPlatformKey(process.platform, process.arch).replace('-', '/')}
+Tags: ${tags}
+Revision: deadbeef
+CGO: enabled
+`;
 
 describe('singboxPath', () => {
   it('maps darwin-arm64 to the dev resources path', () => {
@@ -54,13 +64,13 @@ describe('assertSingboxVersion', () => {
   });
 
   it('rejects when the binary reports a different version', async () => {
-    const fakeBin = path.join(APP_ROOT, 'src', 'main', 'engine', '__fixtures__', 'fake-singbox-wrong-version.sh');
-    await expect(assertSingboxVersion(fakeBin)).rejects.toThrow(/1\.14\.2/);
+    const run = async () => versionOutput('1.13.0', 'with_gvisor,with_wireguard,with_openvpn');
+    await expect(assertSingboxVersion('fake-sing-box', run)).rejects.toThrow(/1\.14\.2/);
   });
 
   it('rejects when a required tag is missing', async () => {
-    const fakeBin = path.join(APP_ROOT, 'src', 'main', 'engine', '__fixtures__', 'fake-singbox-missing-tag.sh');
-    await expect(assertSingboxVersion(fakeBin)).rejects.toThrow(/with_wireguard|with_openvpn|with_gvisor/);
+    const run = async () => versionOutput('1.14.2', 'with_gvisor,with_openvpn,with_quic');
+    await expect(assertSingboxVersion('fake-sing-box', run)).rejects.toThrow(/with_wireguard/);
   });
 
   it('rejects when the binary does not exist', async () => {

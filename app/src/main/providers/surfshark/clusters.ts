@@ -7,9 +7,9 @@
  * Only `generic` and `static` cluster types are kept — `obfuscated` isn't a
  * WireGuard endpoint and isn't in scope here.
  */
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { writeFileAtomic } from '../../store/atomic-write';
 
 export const CLUSTERS_URL = 'https://api.surfshark.com/v4/server/clusters/all';
 export const CLUSTER_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
@@ -77,8 +77,7 @@ async function readCache(cachePath: string): Promise<CacheFile | undefined> {
 }
 
 async function writeCache(cachePath: string, cache: CacheFile): Promise<void> {
-  await mkdir(path.dirname(cachePath), { recursive: true });
-  await writeFile(cachePath, JSON.stringify(cache), 'utf8');
+  await writeFileAtomic(cachePath, JSON.stringify(cache));
 }
 
 /**

@@ -1,0 +1,8 @@
+# Check out every text file with LF on all platforms. Windows clones with
+# core.autocrlf=true otherwise get CRLF, which breaks shebangs, the shell-script
+# test fixtures and makes the bundled CA files differ from the macOS build.
+* text=auto eol=lf
+
+# cmd.exe needs CRLF to parse labels reliably.
+*.bat text eol=crlf
+*.cmd text eol=crlf

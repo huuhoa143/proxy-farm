@@ -15,6 +15,15 @@ const fsModule = createRequire(import.meta.url)('node:fs') as typeof import('nod
 const FAKE_BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__', 'fake-singbox.mjs');
 const NONEXISTENT_BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__', 'does-not-exist-xyz');
 
+const IS_WIN = process.platform === 'win32';
+
+/**
+ * Spawns the fake stub the way EngineProcess spawns sing-box. Windows can't execute a
+ * `.mjs` file directly, so there it runs through node with the same arguments.
+ */
+const runFake = ((bin: string, args: readonly string[], opts: object) =>
+  IS_WIN ? realSpawn(process.execPath, [bin, ...args], opts) : realSpawn(bin, args, opts)) as unknown as typeof realSpawn;
+
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -62,7 +71,7 @@ function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
 
 describe('EngineProcess', () => {
   it('spawns the binary, pipes configJson to stdin, and surfaces its log lines', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     const received: string[] = [];
     engine.onLog((line) => received.push(line));
 
@@ -76,7 +85,7 @@ describe('EngineProcess', () => {
   });
 
   it('redacts credentials before they ever reach onLog or .logs', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     const received: string[] = [];
     engine.onLog((line) => received.push(line));
 
@@ -91,7 +100,7 @@ describe('EngineProcess', () => {
   });
 
   it('calls onExit when the child process exits on its own', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
     engine.onExit((info) => exits.push(info));
 
@@ -102,7 +111,7 @@ describe('EngineProcess', () => {
   });
 
   it('clears .child on a natural (crash) exit, so a fresh start() is allowed afterwards', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     const exits: unknown[] = [];
     engine.onExit((info) => exits.push(info));
 
@@ -120,7 +129,7 @@ describe('EngineProcess', () => {
   });
 
   it('delivers the final log line before onExit fires, even when the child exits immediately after writing it (reports on "close", not "exit")', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     let logsAtExitTime: string[] | null = null;
     engine.onExit(() => {
       // Captured synchronously inside the onExit callback itself — if
@@ -141,7 +150,7 @@ describe('EngineProcess', () => {
   });
 
   it('stop() sends SIGINT on non-win32 and resolves once the child exits', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'darwin' });
     const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
     engine.onExit((info) => exits.push(info));
     const logged: string[] = [];
@@ -155,8 +164,9 @@ describe('EngineProcess', () => {
     expect(exits[0].signal === 'SIGINT' || exits[0].code === 0).toBe(true);
   });
 
-  it('hard-kills after the timeout if the child ignores SIGINT/SIGTERM', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin', hardKillTimeoutMs: 150 });
+  // Windows has no catchable SIGINT/SIGTERM or SIGSTOP: every kill there is immediate.
+  it.skipIf(IS_WIN)('hard-kills after the timeout if the child ignores SIGINT/SIGTERM', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'darwin', hardKillTimeoutMs: 150 });
     const logged: string[] = [];
     engine.onLog((l) => logged.push(l));
 
@@ -172,6 +182,7 @@ describe('EngineProcess', () => {
     let taskkillCalledWith: number | undefined;
     const engine = new EngineProcess({
       binPath: FAKE_BIN,
+      spawn: runFake,
       platform: 'win32',
       taskkill: async (pid) => {
         taskkillCalledWith = pid;
@@ -189,7 +200,7 @@ describe('EngineProcess', () => {
   });
 
   it('onLog/onExit subscriptions can be unsubscribed', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     const cb = vi.fn();
     const unsubscribe = engine.onLog(cb);
     unsubscribe();
@@ -231,7 +242,7 @@ describe('EngineProcess', () => {
   });
 
   it('exposes .pid while running and clears it after a natural exit', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake });
     expect(engine.pid).toBeUndefined();
 
     const exits: unknown[] = [];
@@ -262,7 +273,7 @@ describe('EngineProcess', () => {
     const spawnSpy = ((...args: Parameters<typeof realSpawn>) => {
       calls.push(args);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (realSpawn as any)(...args);
+      return (runFake as any)(...args);
     }) as typeof realSpawn;
 
     const writeFileSpy = vi.spyOn(fsModule, 'writeFile');
@@ -285,8 +296,9 @@ describe('EngineProcess', () => {
     await engine.stop();
   });
 
-  it('after a hard-kill, the child process is actually gone', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin', hardKillTimeoutMs: 150 });
+  // Windows has no catchable SIGINT/SIGTERM or SIGSTOP: every kill there is immediate.
+  it.skipIf(IS_WIN)('after a hard-kill, the child process is actually gone', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'darwin', hardKillTimeoutMs: 150 });
     const logged: string[] = [];
     engine.onLog((l) => logged.push(l));
 
@@ -298,8 +310,9 @@ describe('EngineProcess', () => {
     expect(isAlive(pid)).toBe(false);
   }, 10000);
 
-  it('kill() SIGKILLs a frozen (SIGSTOPped) child after the grace and reports the exit via onExit', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
+  // Windows has no catchable SIGINT/SIGTERM or SIGSTOP: every kill there is immediate.
+  it.skipIf(IS_WIN)('kill() SIGKILLs a frozen (SIGSTOPped) child after the grace and reports the exit via onExit', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'darwin' });
     const logged: string[] = [];
     const exits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
     engine.onLog((l) => logged.push(l));
@@ -317,7 +330,7 @@ describe('EngineProcess', () => {
   }, 10000);
 
   it('kill() ends a responsive child with SIGTERM, without waiting out the grace', async () => {
-    const engine = new EngineProcess({ binPath: FAKE_BIN, platform: 'darwin' });
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'darwin' });
     const logged: string[] = [];
     engine.onLog((l) => logged.push(l));
     engine.start(JSON.stringify({}));
@@ -326,6 +339,19 @@ describe('EngineProcess', () => {
     const startedAt = Date.now();
     await engine.kill(5000);
     expect(Date.now() - startedAt).toBeLessThan(4000);
+    expect(engine.pid).toBeUndefined();
+  }, 10000);
+
+  it.runIf(IS_WIN)('on win32 the real taskkill ends the child and stop() resolves', async () => {
+    const engine = new EngineProcess({ binPath: FAKE_BIN, spawn: runFake, platform: 'win32' });
+    const logged: string[] = [];
+    engine.onLog((l) => logged.push(l));
+    engine.start(JSON.stringify({}));
+    await waitFor(() => logged.length >= 1);
+    const pid = engine.pid!;
+
+    await engine.stop();
+    expect(isAlive(pid)).toBe(false);
     expect(engine.pid).toBeUndefined();
   }, 10000);
 });

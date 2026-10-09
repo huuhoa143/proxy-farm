@@ -3,38 +3,33 @@
   Local end-to-end Windows x64 release for Proxy Farm (UNSIGNED NSIS).
 
 .DESCRIPTION
-  Windows counterpart of scripts/local-release.sh (macOS). Ported from
-  lingoreup's scripts/local-release.ps1, with every Python/venv/cythonize/
-  wasm stage DROPPED (Proxy Farm has none of that) and one stage ADDED that
-  lingoreup never needed: building the Go Windows helper (spec §7) before
-  packaging, since forge needs it present as an extraResource.
+  Windows counterpart of scripts/local-release.sh (macOS), ported from
+  lingoreup's scripts/local-release.ps1 without its Python/venv/cythonize/wasm
+  stages (Proxy Farm has none). HMA support on Windows needs no extra binary:
+  the app registers its credentials task itself (src/main/bootstrap/hma-windows.ts).
 
-  The macOS-only stages (Apple codesign / notarytool / stapler / spctl /
-  create-dmg) are intentionally absent here, same as lingoreup v1: this
-  ships an UNSIGNED NSIS installer. Users see a one-time SmartScreen
-  prompt; Authenticode is a later addition via the maker's own
-  `config.codesigning` hook (left in forge.config.ts, untouched by this
-  script — spec §9: "a signing hook kept in the maker config").
+  Unsigned like lingoreup v1: users see a one-time SmartScreen prompt;
+  Authenticode can be added later through the NSIS maker's `codesigning`
+  option in forge.config.ts (spec section 9).
 
-  THIS SCRIPT RUNS ON WINDOWS. It was authored and syntax-reviewed on
-  macOS (no pwsh available in that environment to execute it) — treat it
-  as unverified until it runs for real on a Windows box. See the release
-  report for exactly what was and wasn't checked.
+  This file is ASCII only: Windows PowerShell 5.1 reads a BOM-less script in
+  the ANSI code page, where UTF-8 punctuation can turn into quote characters.
 
-  Pipeline (~5-10 min, no Apple steps):
-    1. Prereqs check (pnpm, gh, node, git) + clean git tree
-    2. Build the Go helper (helper/) — SKIPPED with a clear message if
-       helper/ doesn't exist yet (it's built in a later track; do not fail)
-    3. Version bump + commit + tag + push
-    4. pnpm run make → NSIS installer (@electron-addons/electron-forge-maker-nsis,
-       UNSIGNED — signing hook stays in forge.config.ts for later)
-    5. gh release create/upload: Setup.exe + latest.yml + .blockmap + the
-       sing-box source tarball (GPLv3 §6)
+  Pipeline:
+    1. Prereqs (pnpm, node, git; gh unless -DryRun) + clean git tree
+    2. Release gate: type check + unit tests
+    3. Version bump + commit + tag + push              (skipped by -DryRun)
+    4. electron-forge make -> NSIS installer + latest.yml + .blockmap
+    5. Smoke: the packaged sing-box is the pinned build; the packaged app
+       starts, opens its window and quits cleanly through `--quit`
+       leaving no engine behind; latest.yml matches the installer
+    6. gh release create/upload: Setup.exe + latest.yml + .blockmap + the
+       sing-box source tarball (GPLv3 section 6)    (skipped by -DryRun)
 
   Usage:
-    powershell -ExecutionPolicy Bypass -File scripts\local-release.ps1 0.1.0
-    ... 0.1.0 -Resume     # resume after a transient failure
-    ... 0.1.0 -DryRun     # rehearse through build, no git/GitHub writes
+    powershell -ExecutionPolicy Bypass -File scripts\local-release.ps1 0.2.0
+    ... 0.2.0 -Resume     # resume after a transient failure
+    ... 0.2.0 -DryRun     # build + smoke only: no git or GitHub writes
 
   GH_TOKEN is derived from `gh auth token -u huuhoa143` when unset.
 #>
@@ -53,22 +48,20 @@ if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
   throw "VERSION must be X.Y.Z (got: $Version)"
 }
 
-# scripts\local-release.ps1 lives at app\scripts\ — ROOT is app\, REPO_ROOT
-# is one level above it (where helper\ lives per spec §8).
+# scripts\local-release.ps1 lives at app\scripts\: ROOT is app\.
 $ROOT = Split-Path -Parent $PSScriptRoot
-$REPO_ROOT = Split-Path -Parent $ROOT
 Set-Location $ROOT
 $StatePath = Join-Path $ROOT '.release-state-win.json'
 $GhRepo = 'huuhoa143/proxy-farm'
-$ProductSlug = 'ProxyFarm'
+$PackagedDir = Join-Path $ROOT 'out\Proxy Farm-win32-x64'
 
-# ─── console helpers ──────────────────────────────────────────────────────
+# --- console helpers -------------------------------------------------------
 function Bold($m) { Write-Host "`n=== $m ===" -ForegroundColor Cyan }
 function Green($m) { Write-Host $m -ForegroundColor Green }
 function Warn($m) { Write-Host $m -ForegroundColor Yellow }
 function Red($m) { Write-Host $m -ForegroundColor Red }
 
-# ─── state (JSON) ──────────────────────────────────────────────────────────
+# --- state (JSON) ----------------------------------------------------------
 function State-Load {
   if (Test-Path $StatePath) {
     return Get-Content $StatePath -Raw | ConvertFrom-Json
@@ -90,25 +83,21 @@ function State-MarkDone($state, $step) {
     State-Save $state
   }
 }
-function State-Set($state, $key, $val) {
-  $state.data | Add-Member -NotePropertyName $key -NotePropertyValue $val -Force
-  State-Save $state
-}
-function State-Get($state, $key) {
-  if ($state.data.PSObject.Properties.Name -contains $key) { return $state.data.$key }
-  return $null
-}
+
+# Every running sing-box.exe (the app's engines).
+function Get-Engines { @(Get-Process -Name 'sing-box' -ErrorAction SilentlyContinue) }
 
 try {
-  # ══════════════════════════════════════════════════════════════════════
-  # Step 1 — Prereqs
-  # ══════════════════════════════════════════════════════════════════════
-  Bold '1/5  Checking prerequisites'
-  $required = @('pnpm', 'gh', 'node', 'git')
+  # =====================================================================
+  # Step 1 - Prereqs
+  # =====================================================================
+  Bold '1/6  Checking prerequisites'
+  $required = @('pnpm', 'node', 'git')
+  if (-not $DryRun) { $required += 'gh' }
   $missing = $required | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
   if ($missing) { throw "Missing required tools: $($missing -join ', ')" }
 
-  if (-not $env:GH_TOKEN) {
+  if ((-not $DryRun) -and (-not $env:GH_TOKEN)) {
     $ghAuthOk = $false
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -123,7 +112,7 @@ try {
   }
 
   if (-not (Test-Path (Join-Path $ROOT 'node_modules'))) {
-    Warn 'node_modules missing — running pnpm install…'
+    Warn 'node_modules missing - running pnpm install...'
     pnpm install
     if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
   }
@@ -147,49 +136,26 @@ try {
     }
     $state = State-Init $Version
   }
+  if (Get-Engines) { throw 'A sing-box engine is running: quit Proxy Farm first (the smoke step counts engines).' }
   Green "Prereqs OK ($currentVersion -> $Version; dry-run=$DryRun; resume=$Resume)"
 
-  # ══════════════════════════════════════════════════════════════════════
-  # Step 2 — Build the Go helper (skip, don't fail, if helper/ is absent)
-  # ══════════════════════════════════════════════════════════════════════
-  # spec §7/§8: helper/ is a Go Windows service + installer/uninstaller exe,
-  # built on a later track. Until it lands, this step is a documented no-op
-  # rather than a hard failure, so this script stays runnable throughout
-  # the parallel build.
-  Bold '2/5  Build Go helper (helper/)'
-  $helperDir = Join-Path $REPO_ROOT 'helper'
-  if (-not (Test-Path $helperDir)) {
-    Warn "helper/ not found at $helperDir — skipping (built in a later track, see spec §7/§8)"
-  } elseif (-not (Get-Command go -ErrorAction SilentlyContinue)) {
-    Warn "helper/ exists but Go toolchain not found on PATH — skipping helper build"
-  } elseif (Test-Path (Join-Path $helperDir 'build.ps1')) {
-    if ($DryRun) {
-      Write-Host "  [dry-run] Would run helper\build.ps1"
-    } else {
-      & (Join-Path $helperDir 'build.ps1')
-      if ($LASTEXITCODE -ne 0) { throw 'helper\build.ps1 failed' }
-    }
-    Green '  helper built via helper\build.ps1'
-  } elseif (Test-Path (Join-Path $helperDir 'go.mod')) {
-    if ($DryRun) {
-      Write-Host "  [dry-run] Would run: go build -o helper.exe . (in helper\)"
-    } else {
-      Push-Location $helperDir
-      try {
-        go build -o helper.exe .
-        if ($LASTEXITCODE -ne 0) { throw 'go build (helper) failed' }
-      } finally { Pop-Location }
-    }
-    Green '  helper built via go build'
-  } else {
-    Warn "helper/ exists but has neither build.ps1 nor go.mod — don't know how to build it, skipping"
-  }
+  # =====================================================================
+  # Step 2 - Release gate: type check + unit tests
+  # =====================================================================
+  if (-not (State-IsDone $state 'gate')) {
+    Bold '2/6  Release gate (tsc --noEmit + vitest)'
+    pnpm exec tsc --noEmit
+    if ($LASTEXITCODE -ne 0) { throw 'type check failed' }
+    pnpm test
+    if ($LASTEXITCODE -ne 0) { throw 'unit tests failed' }
+    State-MarkDone $state 'gate'
+  } else { Green '2/6  Release gate (skipped)' }
 
-  # ══════════════════════════════════════════════════════════════════════
-  # Step 3 — Bump + commit + tag + push
-  # ══════════════════════════════════════════════════════════════════════
+  # =====================================================================
+  # Step 3 - Bump + commit + tag + push
+  # =====================================================================
   if (-not (State-IsDone $state 'bump')) {
-    Bold '3/5  Version bump + commit + tag + push'
+    Bold '3/6  Version bump + commit + tag + push'
     if ($DryRun) {
       Write-Host "  [dry-run] Would bump $currentVersion -> $Version + commit + tag + push"
     } else {
@@ -205,59 +171,129 @@ try {
       git push origin $branch
       if ($LASTEXITCODE -ne 0) { throw "git push origin $branch failed" }
       git tag "v$Version"
-      if ($LASTEXITCODE -ne 0) { throw "git tag v$Version failed — tag already exists? If attaching a Windows build to an existing release, seed .release-state-win.json with steps_done:['bump'] and use -Resume." }
+      if ($LASTEXITCODE -ne 0) { throw "git tag v$Version failed - tag already exists? To attach a Windows build to an existing release, seed .release-state-win.json with steps_done:['gate','bump'] and use -Resume." }
       git push origin "v$Version"
       if ($LASTEXITCODE -ne 0) { throw "git push origin v$Version failed" }
       Green "Tag v$Version pushed"
     }
     State-MarkDone $state 'bump'
-  } else { Green '3/5  Bump (skipped)' }
+  } else { Green '3/6  Bump (skipped)' }
 
-  # ══════════════════════════════════════════════════════════════════════
-  # Step 4 — electron-forge make → NSIS installer (win32/x64, UNSIGNED)
-  # ══════════════════════════════════════════════════════════════════════
+  # =====================================================================
+  # Step 4 - electron-forge make -> NSIS installer (win32/x64, UNSIGNED)
+  # =====================================================================
   if (-not (State-IsDone $state 'make')) {
-    Bold '4/5  pnpm run make (Vite + Electron pack + NSIS)'
+    Bold '4/6  electron-forge make (Vite + Electron pack + NSIS)'
     Set-Location $ROOT
     if (Test-Path (Join-Path $ROOT 'out')) { Remove-Item -Recurse -Force (Join-Path $ROOT 'out') }
-    # Do NOT set CI: the NSIS maker (electron-builder) auto-publishes to
-    # GitHub when it detects CI and then fails without GH_TOKEN wired the
-    # way it expects. `pnpm exec electron-forge make` is invoked directly
-    # so forge builds without attempting to publish itself.
+    # Do NOT set CI: the NSIS maker (electron-builder) auto-publishes to GitHub when it
+    # detects CI and then fails without GH_TOKEN wired the way it expects.
     Remove-Item Env:\CI -ErrorAction SilentlyContinue
-    if ($DryRun) {
-      Write-Host "  [dry-run] Would run: pnpm exec electron-forge make"
-    } else {
-      pnpm exec electron-forge make
-      if ($LASTEXITCODE -ne 0) { throw 'electron-forge make failed' }
-    }
+    # The pinned sing-box (and its source tarball) must be present: forge's hook copies it.
+    node scripts/prebuild-singbox.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'sing-box prebuild failed' }
+    pnpm exec electron-forge make
+    if ($LASTEXITCODE -ne 0) { throw 'electron-forge make failed' }
     State-MarkDone $state 'make'
-  } else { Green '4/5  pnpm make (skipped)' }
+  } else { Green '4/6  make (skipped)' }
+
+  $nsisDir = Get-ChildItem (Join-Path $ROOT 'out\make\nsis') -Recurse -Directory -ErrorAction SilentlyContinue |
+    Where-Object { Get-ChildItem $_.FullName -Filter '*.exe' -ErrorAction SilentlyContinue } |
+    Select-Object -First 1 -ExpandProperty FullName
+  if (-not $nsisDir) {
+    $nsisRoot = Join-Path $ROOT 'out\make\nsis'
+    if ((Test-Path $nsisRoot) -and (Get-ChildItem $nsisRoot -Filter '*.exe' -ErrorAction SilentlyContinue)) { $nsisDir = $nsisRoot }
+  }
+  if (-not $nsisDir) { throw 'NSIS output dir not found under out\make\nsis' }
+
+  # =====================================================================
+  # Step 5 - Smoke the packaged bits before anything is uploaded
+  # =====================================================================
+  if (-not (State-IsDone $state 'smoke')) {
+    Bold '5/6  Smoke - packaged sing-box, app start + --quit, latest.yml'
+    $exe = Join-Path $PackagedDir 'Proxy Farm.exe'
+    if (-not (Test-Path -LiteralPath $exe)) { throw "packaged app missing: $exe" }
+
+    # (a) the bundled engine is the pinned build with every required tag.
+    $pins = Get-Content (Join-Path $ROOT 'scripts\singbox.pins.json') -Raw | ConvertFrom-Json
+    $singbox = Join-Path $PackagedDir 'resources\sing-box\windows-amd64\sing-box.exe'
+    $versionOut = (& $singbox version) -join "`n"
+    if ($versionOut -notmatch "sing-box version $([regex]::Escape($pins.version))") { throw "packaged sing-box is not $($pins.version): $versionOut" }
+    foreach ($tag in 'with_gvisor', 'with_wireguard', 'with_openvpn') {
+      if ($versionOut -notmatch $tag) { throw "packaged sing-box lacks $tag" }
+    }
+    foreach ($res in 'ca\sectigo-r46.pem', 'ca\zoogvpn-ca.pem', 'ca\zoogvpn-tls-auth.key', 'ca\expressvpn-ca.pem', 'ca\expressvpn-client.crt', 'ca\expressvpn-client.key', 'ca\expressvpn-tls-auth.key', 'catalogs\hma-ovpn-seed.json', 'catalogs\zoogvpn-servers.json', 'catalogs\expressvpn-servers.json', 'app-update.yml') {
+      if (-not (Test-Path -LiteralPath (Join-Path $PackagedDir "resources\$res"))) { throw "packaged resource missing: $res" }
+    }
+    Green "  sing-box $($pins.version) with gvisor/wireguard/openvpn; resources present"
+
+    # (b) the app starts with a throwaway profile, opens its window, then quits cleanly.
+    $smokeProfile = Join-Path $env:TEMP "pf-release-smoke-$([guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $smokeProfile | Out-Null
+    $prevProfile = $env:PROXYFARM_USER_DATA_DIR
+    $env:PROXYFARM_USER_DATA_DIR = $smokeProfile
+    try {
+      $proc = Start-Process -FilePath $exe -ArgumentList '--remote-debugging-port=0' -PassThru
+      $portFile = Join-Path $smokeProfile 'DevToolsActivePort'
+      $deadline = (Get-Date).AddSeconds(60)
+      $rendererUp = $false
+      while ((Get-Date) -lt $deadline -and -not $proc.HasExited) {
+        if (Test-Path -LiteralPath $portFile) {
+          $port = (Get-Content -LiteralPath $portFile | Select-Object -First 1)
+          try {
+            $targets = Invoke-RestMethod -Uri "http://127.0.0.1:$port/json/list" -TimeoutSec 3
+            if (@($targets | Where-Object { $_.type -eq 'page' -and $_.url -match 'index\.html' }).Count -gt 0) { $rendererUp = $true; break }
+          } catch { }
+        }
+        Start-Sleep -Milliseconds 500
+      }
+      if ($proc.HasExited) { throw "packaged app exited during startup (code $($proc.ExitCode))" }
+      if (-not $rendererUp) { throw 'packaged app never showed its window within 60 s' }
+      Green '  app started and loaded its window'
+
+      $quitter = Start-Process -FilePath $exe -ArgumentList '--quit' -PassThru
+      if (-not $proc.WaitForExit(30000)) { throw 'packaged app did not quit within 30 s of --quit' }
+      $null = $quitter.WaitForExit(10000)
+      if (Get-Engines) { throw 'a sing-box engine outlived the app' }
+      Green "  --quit exited cleanly (code $($proc.ExitCode)), no engine left"
+    } finally {
+      if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+      $env:PROXYFARM_USER_DATA_DIR = $prevProfile
+      Start-Sleep -Milliseconds 500
+      Remove-Item -Recurse -Force -LiteralPath $smokeProfile -ErrorAction SilentlyContinue
+    }
+
+    # (c) latest.yml names the installer and carries its sha512.
+    $installer = Get-ChildItem $nsisDir -File -Filter '*.exe' | Select-Object -First 1
+    $ymlPath = Join-Path $nsisDir 'latest.yml'
+    if (-not (Test-Path -LiteralPath $ymlPath)) { throw 'latest.yml missing next to the installer' }
+    $yml = Get-Content -LiteralPath $ymlPath -Raw
+    $sha512 = [Convert]::ToBase64String([Security.Cryptography.SHA512]::Create().ComputeHash([IO.File]::ReadAllBytes($installer.FullName)))
+    if (-not $yml.Contains($sha512)) { throw "latest.yml does not carry the installer's sha512" }
+    if ($yml -notmatch "version:\s*$([regex]::Escape((Get-Content (Join-Path $ROOT 'package.json') -Raw | ConvertFrom-Json).version))") { throw 'latest.yml version differs from package.json' }
+    Green "  latest.yml matches $($installer.Name) ($([math]::Round($installer.Length / 1MB, 1)) MB)"
+    State-MarkDone $state 'smoke'
+  } else { Green '5/6  Smoke (skipped)' }
 
   if ($DryRun) {
     Write-Host ''
-    Warn '[dry-run] complete — rehearsed prereqs + helper-build decision + make.'
+    Warn '[dry-run] complete: prereqs + gate + make + smoke.'
+    Warn "[dry-run] Installer: $nsisDir"
     Warn '[dry-run] Skipped: git bump/tag/push, gh release.'
+    if (Test-Path $StatePath) { Remove-Item -Force $StatePath }
     return
   }
 
-  # ══════════════════════════════════════════════════════════════════════
-  # Step 5 — gh release create/upload (Setup.exe + latest.yml + .blockmap + sing-box source)
-  # ══════════════════════════════════════════════════════════════════════
+  # =====================================================================
+  # Step 6 - gh release create/upload (Setup.exe + latest.yml + .blockmap + sing-box source)
+  # =====================================================================
   if (-not (State-IsDone $state 'gh_release')) {
-    Bold '5/5  gh release create + upload'
-    $nsisDir = Get-ChildItem (Join-Path $ROOT 'out\make\nsis') -Recurse -Directory |
-      Where-Object { Get-ChildItem $_.FullName -Filter '*.exe' -ErrorAction SilentlyContinue } |
-      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $nsisDir) { throw 'NSIS output dir not found under out\make\nsis' }
+    Bold '6/6  gh release create + upload'
 
-    # Installer filename parity (space -> dot): electron-builder names the
-    # installer "<productName> Setup <ver>.exe" (WITH spaces — "Proxy Farm"
-    # has one even in the product name itself) and writes that exact spaced
-    # name into latest.yml's url/path. GitHub replaces spaces with dots on
-    # asset upload, so the uploaded asset no longer matches the name inside
-    # latest.yml and electron-updater 404s on the %20 URL (verified failure
-    # mode in lingoreup v0.3.6). Rename locally + rewrite latest.yml to match.
+    # Installer filename parity (space -> dot): electron-builder names the installer
+    # "<productName> Setup <ver>.exe" and writes that spaced name into latest.yml. GitHub
+    # replaces spaces with dots on upload, so electron-updater would 404 on the %20 URL
+    # (lingoreup v0.3.6). Rename locally and rewrite latest.yml to match.
     $installer = Get-ChildItem $nsisDir -File -Filter '*.exe' | Select-Object -First 1
     if ($installer -and ($installer.Name -match ' ')) {
       $oldExe = $installer.Name
@@ -273,8 +309,7 @@ try {
       Warn "  Normalized installer name: '$oldExe' -> '$newExe' (GitHub asset/latest.yml parity)"
     }
 
-    # sing-box GPL source tarball (GPLv3 §6) — fetched/pinned by
-    # scripts/prebuild-singbox.mjs into app\resources\sing-box-src\.
+    # sing-box GPL source tarball (GPLv3 section 6), pinned by scripts/prebuild-singbox.mjs.
     $pins = Get-Content (Join-Path $ROOT 'scripts\singbox.pins.json') -Raw | ConvertFrom-Json
     $srcTarball = Join-Path $ROOT "resources\sing-box-src\$($pins.sourceTarball.fileName)"
     if (-not (Test-Path $srcTarball)) {
@@ -283,8 +318,7 @@ try {
 
     $assets = @(Get-ChildItem $nsisDir -File | Where-Object { $_.Extension -in '.exe', '.blockmap' -or $_.Name -eq 'latest.yml' })
     $assets += Get-Item $srcTarball
-    if (-not $assets) { throw "No NSIS artifacts found in $nsisDir" }
-    Write-Host "  Artifacts:"; $assets | ForEach-Object { Write-Host "    $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)" }
+    Write-Host '  Artifacts:'; $assets | ForEach-Object { Write-Host "    $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)" }
 
     $assetPaths = $assets | ForEach-Object { $_.FullName }
     $releaseExists = $false
@@ -306,7 +340,19 @@ try {
     }
     Green "Release assets uploaded to v$Version"
     State-MarkDone $state 'gh_release'
-  } else { Green '5/5  gh release (skipped)' }
+  } else { Green '6/6  gh release (skipped)' }
+
+  # Both platforms update from /releases/latest/download, i.e. from the newest release
+  # only: while it lacks latest-mac.yml, macOS clients see no update at all.
+  $prevEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $names = @(gh release view "v$Version" --repo $GhRepo --json assets -q '.assets[].name' 2>$null)
+  } finally { $ErrorActionPreference = $prevEap }
+  if ($names -notcontains 'latest-mac.yml') {
+    Warn "v$Version has no latest-mac.yml yet: macOS clients see no update until"
+    Warn "scripts/local-release.sh (or release-with-x64.sh) runs for v$Version (it adds its assets to this release)."
+  }
 
   Write-Host ''
   Green "Windows release v$Version complete"

@@ -14,12 +14,13 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DISCLAIMER_NOTICE_VERSION, type PortRow, type Settings } from '../../src/shared/contracts';
-import { APP_ROOT, BUNDLED_SINGBOX, launchPackagedApp, type RunningApp } from './helpers/packaged-app';
+import { APP_ROOT, BUNDLED_SINGBOX, IS_WIN, launchPackagedApp, type RunningApp } from './helpers/packaged-app';
 import { curlThrough, isAlive, singboxProcesses } from './helpers/procs';
-import { startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
+import { secondPeerHost, startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
 
 const SHOTS = path.join(APP_ROOT, '..', 'docs', 'screenshots', 'v2');
 const HMA_TOKEN = '/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json';
+const WIN_HMA_DIR = path.join(process.env.ProgramData ?? 'C:\\ProgramData', 'Privax', 'HMA VPN');
 
 let userData: string;
 let work: string;
@@ -50,7 +51,7 @@ test.describe.serial('packaged Proxy Farm', () => {
     expect(singboxProcesses(), 'no Proxy Farm engine may be running before the suite').toEqual([]);
     userData = mkdtempSync(path.join(tmpdir(), 'pf-e2e-userdata-'));
     work = mkdtempSync(path.join(tmpdir(), 'pf-e2e-wg-'));
-    peers = [startLocalWgPeer(BUNDLED_SINGBOX, work, 51991), startLocalWgPeer(BUNDLED_SINGBOX, work, 51992)];
+    peers = [startLocalWgPeer(BUNDLED_SINGBOX, work, 51991), startLocalWgPeer(BUNDLED_SINGBOX, work, 51992, secondPeerHost())];
     app = await launchPackagedApp(userData);
     // A fresh profile starts in Vietnamese with the first-run notice up; this suite
     // drives the English UI. Both settings persist, so relaunches below stay English.
@@ -73,8 +74,15 @@ test.describe.serial('packaged Proxy Farm', () => {
     expect(status.engineError).toBeUndefined();
     const providers = await page.evaluate(() => window.proxyFarm.listProviders());
     const hma = providers.find((p) => p.id === 'hma')!;
-    expect(hma.detected?.found).toBe(existsSync(HMA_TOKEN));
-    if (existsSync(HMA_TOKEN)) await expect(page.getByTestId('hma-detected')).toBeVisible();
+    if (IS_WIN) {
+      // Installed HMA is either found (HMA support on, or the app runs elevated) or offers
+      // "Enable HMA support"; without HMA there is nothing to detect.
+      if (existsSync(WIN_HMA_DIR)) expect(hma.detected?.found || hma.detected?.hintKey === 'hma.helperMissing').toBe(true);
+      else expect(hma.detected?.found).toBe(false);
+    } else {
+      expect(hma.detected?.found).toBe(existsSync(HMA_TOKEN));
+      if (existsSync(HMA_TOKEN)) await expect(page.getByTestId('hma-detected')).toBeVisible();
+    }
     expect(providers.every((p) => p.limit === 0)).toBe(true);
     await shot(page, 'onboarding');
   });
@@ -99,18 +107,9 @@ test.describe.serial('packaged Proxy Farm', () => {
     await shot(page, 'settings');
   });
 
-  test('a port limit round-trips through listProviders (Ruling C)', async () => {
-    const { page } = app;
-    await page.getByRole('button', { name: 'Providers' }).click();
-    await page.getByLabel('Port limit — Config file').fill('3');
-    await page.getByTestId('provider-limit-file').getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByTestId('provider-limit-saved-file')).toBeVisible();
-    const providers = await page.evaluate(() => window.proxyFarm.listProviders());
-    expect(providers.find((p) => p.id === 'file')!.limit).toBe(3);
-  });
-
   test('import a local WireGuard .conf through the file card, with a country override', async () => {
     const { page } = app;
+    await page.getByRole('button', { name: 'Providers' }).click();
     await page.getByTestId('file-dropzone').locator('input[type=file]').setInputFiles({
       name: 'local-peer-a.conf',
       mimeType: 'text/plain',
@@ -118,7 +117,7 @@ test.describe.serial('packaged Proxy Farm', () => {
     });
     await expect(page.getByTestId('file-pending')).toBeVisible();
     await page.locator('#file-country').fill('VN');
-    await page.getByRole('button', { name: 'Import' }).click();
+    await page.getByTestId('file-pending').getByRole('button', { name: 'Import' }).click();
     await expect(page.getByTestId('file-message')).toContainText('127.0.0.1:51991');
     // second peer (same country) is the rotate fallback target, imported via the API
     const b = await page.evaluate((conf) => window.proxyFarm.importConfigFile('local-peer-b.conf', conf, 'VN'), peers[1].conf);
@@ -127,15 +126,28 @@ test.describe.serial('packaged Proxy Farm', () => {
     await expect(page.getByTestId('main-screen')).toBeVisible();
   });
 
+  // Port limits show once a provider is connected (the onboarding gates them).
+  test('a port limit round-trips through listProviders (Ruling C)', async () => {
+    const { page } = app;
+    await page.getByRole('button', { name: 'Providers' }).click();
+    await page.getByLabel('Port limit — Config file').fill('3');
+    await page.getByTestId('provider-limit-file').getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('provider-limit-saved-file')).toBeVisible();
+    const providers = await page.evaluate(() => window.proxyFarm.listProviders());
+    expect(providers.find((p) => p.id === 'file')!.limit).toBe(3);
+    await page.getByRole('button', { name: 'Ports', exact: true }).click();
+    await expect(page.getByTestId('main-screen')).toBeVisible();
+  });
+
   test('start a port from the picker; it goes online and curl through it with proxy auth gets 200', async () => {
     const { page } = app;
     await page.getByRole('button', { name: 'Add locations' }).first().click();
     await expect(page.getByTestId('location-picker')).toBeVisible();
     await page.getByTestId('location-picker').getByText('local-peer-a').click();
-    await page.getByRole('button', { name: 'Start 1 port' }).click();
+    await page.getByRole('button', { name: 'Add 1 port' }).click();
     const rows = await waitForPort(page, (r) => r.length === 1 && r[0].state.kind === 'online');
     const row = rows[0];
-    expect(row.key).toBe('file:file-1');
+    expect(row.key).toBe('file:file-1#1');
     expect(row.proxyPort).toBe(29001);
     const s = await settings(page);
     expect(curlThrough(row.proxyPort, s.proxyUser, s.proxyPass, 'https://www.gstatic.com/generate_204')).toBe('204');
@@ -143,21 +155,21 @@ test.describe.serial('packaged Proxy Farm', () => {
     // and the proxy refuses a client without credentials
     expect(curlThrough(row.proxyPort, s.proxyUser, 'wrong', 'https://api.ipify.org')).not.toBe('200');
     expect(singboxProcesses()).toHaveLength(1);
-    await expect(page.getByTestId('port-row-file:file-1')).toContainText('Online');
+    await expect(page.getByTestId('port-row-file:file-1#1')).toContainText('Online');
     await shot(page, 'main-online');
   });
 
   test('test + speed test through the port, and the Details drawer shows engine logs', async () => {
     const { page } = app;
-    const result = await page.evaluate(() => window.proxyFarm.testPort('file:file-1', true));
+    const result = await page.evaluate(() => window.proxyFarm.testPort('file:file-1#1', true));
     expect(result.ok).toBe(true);
     expect(result.exitIp).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
     expect(result.mbps).toBeGreaterThan(0);
-    const logs = await page.evaluate(() => window.proxyFarm.getLogs('file:file-1'));
+    const logs = await page.evaluate(() => window.proxyFarm.getLogs('file:file-1#1'));
     expect(logs.join('\n')).toContain('sing-box started');
     expect(logs.join('\n')).not.toContain((await settings(page)).proxyPass);
-    await page.getByTestId('port-row-file:file-1').getByRole('button', { name: 'Details' }).click();
-    await expect(page.getByTestId('details-file:file-1')).toBeVisible();
+    await page.getByTestId('port-row-file:file-1#1').getByRole('button', { name: 'Details' }).click();
+    await expect(page.getByTestId('details-file:file-1#1')).toBeVisible();
     await shot(page, 'details');
     await page.keyboard.press('Escape');
   });
@@ -165,18 +177,19 @@ test.describe.serial('packaged Proxy Farm', () => {
   test('export gives host:port:user:pass for the running port', async () => {
     const { page } = app;
     const s = await settings(page);
-    const text = await page.evaluate(() => window.proxyFarm.exportPorts(['file:file-1'], 'hostPortUserPass'));
+    const text = await page.evaluate(() => window.proxyFarm.exportPorts(['file:file-1#1'], 'hostPortUserPass'));
     expect(text.trim()).toBe(`127.0.0.1:29001:${s.proxyUser}:${s.proxyPass}`);
   });
 
   test('rotate moves the port onto the other server in the same country and it comes back online', async () => {
     const { page } = app;
     const before = singboxProcesses();
-    const result = await page.evaluate(() => window.proxyFarm.rotatePort('file:file-1'));
-    // both local peers exit through this Mac's own IP, so the exit IP cannot change —
-    // but the port must have been re-bound to the other location and be online again.
-    expect(result.noteKey).toBe('rotate.exit-ip-unchanged');
-    const rows = await waitForPort(page, (r) => r[0]?.key === 'file:file-2' && r[0].state.kind === 'online');
+    const result = await page.evaluate(() => window.proxyFarm.rotatePort('file:file-1#1'));
+    // Each file is a location with one server, so Change IP falls back to the other
+    // location of the same country (§6.5). Both local peers exit through this computer's
+    // own IP, so the exit IP cannot change — but the port must be re-bound and online.
+    expect(result.noteKey).toBe('main.rotateResult.sameCityNote');
+    const rows = await waitForPort(page, (r) => r[0]?.key === 'file:file-2#1' && r[0].state.kind === 'online');
     expect(rows[0].proxyPort).toBe(29001);
     const after = singboxProcesses();
     expect(after).toHaveLength(1);
@@ -187,7 +200,7 @@ test.describe.serial('packaged Proxy Farm', () => {
 
   test('stop ends the engine and the port refuses connections', async () => {
     const { page } = app;
-    await page.evaluate(() => window.proxyFarm.stopPorts(['file:file-2']));
+    await page.evaluate(() => window.proxyFarm.stopPorts(['file:file-2#1']));
     await waitForPort(page, (r) => r[0].state.kind === 'stopped' && !r[0].enabled);
     expect(singboxProcesses()).toEqual([]);
     const s = await settings(page);
@@ -196,7 +209,7 @@ test.describe.serial('packaged Proxy Farm', () => {
 
   test('quitting leaves NO sing-box process', async () => {
     const { page } = app;
-    await page.evaluate(() => window.proxyFarm.startPorts(['file:file-2']));
+    await page.evaluate(() => window.proxyFarm.startPorts(['file:file-2#1']));
     await waitForPort(page, (r) => r[0].state.kind === 'online');
     expect(singboxProcesses()).toHaveLength(1);
     const code = await app.quit();
@@ -204,7 +217,30 @@ test.describe.serial('packaged Proxy Farm', () => {
     expect(singboxProcesses()).toEqual([]);
   });
 
+  // Windows: Node puts every child in a kill-on-close job object, so an engine cannot
+  // outlive a killed app there; the orphan reaping below is the macOS safety net.
+  test('on Windows, killing the app outright also ends its engine, and the next launch restarts the port', async () => {
+    test.skip(!IS_WIN, 'Windows only');
+    app = await launchPackagedApp(userData);
+    await waitForPort(app.page, (r) => r[0]?.state.kind === 'online');
+    const [engine] = singboxProcesses();
+    expect(engine).toBeDefined();
+
+    process.kill(app.pid, 'SIGKILL');
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(isAlive(app.pid)).toBe(false);
+    expect(isAlive(engine.pid), 'the engine dies with its app').toBe(false);
+    expect(singboxProcesses()).toEqual([]);
+
+    app = await launchPackagedApp(userData);
+    await waitForPort(app.page, (r) => r[0]?.state.kind === 'online');
+    expect(singboxProcesses()).toHaveLength(1);
+    expect(await app.quit()).toBe(0);
+    expect(singboxProcesses()).toEqual([]);
+  });
+
   test('relaunch restarts the port; kill -9 orphans its engine; the next launch reaps it', async () => {
+    test.skip(IS_WIN, 'an engine cannot outlive its app on Windows (see above)');
     app = await launchPackagedApp(userData);
     await waitForPort(app.page, (r) => r[0]?.state.kind === 'online');
     const [orphan] = singboxProcesses();

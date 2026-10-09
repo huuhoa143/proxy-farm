@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDeviceCreds } from './token';
+import { parseAuthFile, parseDeviceCreds } from './token';
 
 // Dummy fixture constructed by this test, not copied from any real device.
 // Shape mirrors tokenCoreSE.json: a top-level JSON object with the single key
@@ -44,5 +44,24 @@ describe('parseDeviceCreds', () => {
     const b64 = Buffer.from(JSON.stringify(inner), 'utf8').toString('base64');
     const fileText = JSON.stringify({ 'DeviceManager.device': b64 });
     expect(() => parseDeviceCreds(fileText)).toThrow(/udid/);
+  });
+});
+
+describe('parseAuthFile (Windows HmaProVpn\auth)', () => {
+  // Same shape as the Windows file: username line, password line (upper-case hex there).
+  const WIN_USER = 'U1.00000000-0000-4000-8000-000000000000.hma101.DEADBEEFCAFEF00DFEEDFACEDEADBEEFCAFEF00DFEEDFACEDEADBEEFCAFE0000';
+  const WIN_PASS = 'A1B2C3D4E5F60718293A4B5C6D7E8F90'.repeat(2);
+
+  it('reads the username and password lines (CRLF, as Windows writes them)', () => {
+    expect(parseAuthFile(`${WIN_USER}\r\n${WIN_PASS}\r\n`)).toEqual({ udid: WIN_USER, password: WIN_PASS });
+  });
+
+  it('tolerates LF endings, a BOM and surrounding spaces', () => {
+    expect(parseAuthFile(`﻿ ${WIN_USER} \n${WIN_PASS}`)).toEqual({ udid: WIN_USER, password: WIN_PASS });
+  });
+
+  it('rejects an empty file or a missing password line', () => {
+    expect(() => parseAuthFile('')).toThrow(/username/);
+    expect(() => parseAuthFile(`${WIN_USER}\r\n`)).toThrow(/password/);
   });
 });

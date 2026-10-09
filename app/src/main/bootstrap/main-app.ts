@@ -38,6 +38,7 @@ import { createControllerFacade, rotateNoteKey } from './facade';
 import { createSaveExport } from './save-export';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
+import { createHmaWindowsSupport } from './hma-windows';
 import { mainStrings, resolveMainLanguage, type MainLanguage } from './main-strings';
 import { observeStateStore } from './observed-state';
 import { createSessionSecretStore } from './session-secrets';
@@ -52,6 +53,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 const DEFAULT_WEBHOOK_PORT = 29000;
+const QUIT_ARG = '--quit';
 
 function log(msg: string, err?: unknown): void {
   try {
@@ -102,15 +104,26 @@ export function runApp(): void {
   const userDataOverride = process.env.PROXYFARM_USER_DATA_DIR;
   if (userDataOverride) app.setPath('userData', userDataOverride);
 
+  // `Proxy Farm --quit` asks a running instance to stop its engines and exit: Windows
+  // has no SIGTERM for GUI apps, so scripts and the e2e suite quit it this way.
+  const quitRequested = process.argv.includes(QUIT_ARG);
+
   // 1. single instance — a second launch focuses the existing window (spec §4.3, §6.3).
-  if (!app.requestSingleInstanceLock()) {
+  if (!app.requestSingleInstanceLock() || quitRequested) {
     app.quit();
     return;
   }
 
   let mainWindow: BrowserWindow | null = null;
   let showWindow: () => void = () => undefined;
-  app.on('second-instance', () => showWindow());
+  app.on('second-instance', (_event, argv) => {
+    if (argv.includes(QUIT_ARG)) {
+      log(`${QUIT_ARG}: quitting`);
+      app.quit();
+      return;
+    }
+    showWindow();
+  });
 
   // Stop every engine and wait before the process exits (spec §6.3) — also the hook a
   // future electron-updater `quitAndInstall` must await first.
@@ -285,6 +298,8 @@ export function runApp(): void {
 
     // HMA local credentials: detection, connect, lazy apply on change (spec §5.1).
     const hma = createHmaLocalSource();
+    // Windows: HMA support's task refreshes the readable copy of HMA's credentials (spec §7).
+    const hmaWindows = process.platform === 'win32' ? createHmaWindowsSupport({ appExe: process.execPath }) : undefined;
     const hmaSync = createHmaCredsSync({
       source: hma,
       state,
@@ -294,7 +309,9 @@ export function runApp(): void {
       restartPort: (key) => restartPort(key, { retryTerminal: true }),
       onCredentialsChanged: (accountId) => portManager.credentialsChanged(accountId),
     });
-    void hmaSync.check().catch((err) => log('hma credential check failed', err));
+    void (hmaWindows?.refresh() ?? Promise.resolve())
+      .then(() => hmaSync.check())
+      .catch((err) => log('hma credential check failed', err));
 
     // Webhook (spec §6.6): only while enabled; rebuilt on LAN/webhook changes.
     let webhook: Webhook | undefined;
@@ -355,6 +372,7 @@ export function runApp(): void {
       engineLogs: (key) => engine.getLogs(key),
       hostVpn,
       hma,
+      hmaWindows,
       platform: process.platform,
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
       saveExport: createSaveExport({

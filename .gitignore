@@ -43,6 +43,6 @@ app/out/
 app/.vite/
 app/test-results/
 
-# Local release pipeline scratch (scripts/local-release.sh, release-with-x64.sh)
+# Local release pipeline scratch (scripts/local-release.sh, release-with-x64.sh, local-release.ps1)
 .release-state*.json
 .release-keep/

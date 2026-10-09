@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../store/atomic-write';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,10 +25,7 @@ async function loadRegistry(registryPath: string): Promise<Registry> {
 
 /** Writes via a temp file + rename so a crash mid-write never corrupts the registry. */
 async function saveRegistry(registryPath: string, registry: Registry): Promise<void> {
-  await mkdir(path.dirname(registryPath), { recursive: true });
-  const tmpPath = `${registryPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  await writeFile(tmpPath, JSON.stringify(registry, null, 2), 'utf8');
-  await rename(tmpPath, registryPath);
+  await writeFileAtomic(registryPath, JSON.stringify(registry, null, 2));
 }
 
 /**

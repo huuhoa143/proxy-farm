@@ -49,7 +49,7 @@
         "connecting": "Đang kết nối…",
         "enableSupport": "Bật hỗ trợ HMA",
         "enablingSupport": "Đang bật…",
-        "windowsHelperNote": "Thao tác này cài một dịch vụ hỗ trợ nhỏ và cần xác nhận quản trị viên một lần. Các lần cập nhật sau không cần xác nhận lại.",
+        "windowsHelperNote": "Thao tác này tạo một tác vụ nhỏ của Windows để giữ bản sao thông tin đăng nhập thiết bị HMA mà chỉ bạn và quản trị viên đọc được. Cần xác nhận quản trị viên một lần; các lần cập nhật sau không cần nữa.",
         "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…",
         "initials": "H"
       },
@@ -616,9 +616,16 @@
   },
   "hma": {
     "deviceLabel": "Thiết bị …{{suffix}}",
-    "windowsLater": "Hỗ trợ HMA trên Windows sẽ có ở phiên bản sau.",
     "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
     "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
+    "helperMissing": "Máy này chưa bật hỗ trợ HMA. Hãy bấm \"Bật hỗ trợ HMA\" trước.",
+    "untrusted": "Thư mục HMA trên Windows không thuộc quyền sở hữu của Windows hoặc quản trị viên nên Proxy Farm không đọc thông tin đăng nhập từ đó. Hãy cài lại HMA rồi thử lại.",
+    "enable": {
+      "cancelled": "Bạn đã huỷ xác nhận quản trị viên nên hỗ trợ HMA chưa được bật.",
+      "no-credentials": "Đã bật hỗ trợ HMA nhưng HMA chưa có thông tin đăng nhập thiết bị. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
+      "unsupported-location": "Proxy Farm đang chạy từ ổ mạng, ổ rời hoặc ổ ảo, nơi tác vụ của Windows không kiểm tra được. Hãy cài hoặc chuyển Proxy Farm sang ổ cục bộ (ví dụ C:) rồi thử lại.",
+      "failed": "Không bật được hỗ trợ HMA. Hãy thử lại, hoặc chạy Proxy Farm bằng quyền quản trị viên một lần."
+    },
     "check": {
       "invalidUdid": "Mã thiết bị HMA không hợp lệ.",
       "invalidPassword": "Mật khẩu thiết bị HMA không hợp lệ."

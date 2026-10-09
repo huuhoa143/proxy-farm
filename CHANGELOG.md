@@ -37,6 +37,15 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Locations that NordVPN or Surfshark list as virtual (servers standing in another
   country) are marked "virtual location" in the picker and on their group header.
 - The port details show the exit IP's geolocation next to the location's country.
+- Windows x64 support, checked end to end on Windows 10: per-user NSIS installer, the
+  engine, health checks, Change IP and the packaged e2e suite.
+- HMA on Windows: **Enable HMA support** (one administrator prompt) sets up a SYSTEM
+  scheduled task that keeps a copy of HMA's device credentials only the enabling user and
+  administrators can read. No service stays running; the task removes itself a day after
+  Proxy Farm is uninstalled.
+- "Other VPN on this computer" detection on Windows.
+- `Proxy Farm --quit` stops the engines of a running instance and exits it (Windows has
+  no SIGTERM for GUI apps).
 - Main screen filters: status chips with counts (All · Alive · Dead · Connecting ·
   Stopped), a provider filter and a search over location names (Vietnamese or English,
   accents optional), exit IP, server IP and local port. Filters combine and are
@@ -78,6 +87,11 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - An engine that exited while its port waited to retry stayed in the pid registry until
   the port stopped; it is now removed as soon as it exits.
+- Fresh clones build and test on Windows: text files check out with LF, and pnpm 10+
+  installs Electron and lays out `node_modules` the way electron-forge needs.
+- The packaged e2e suite matches the current UI and port model again.
+- The Windows release script runs under Windows PowerShell 5.1 and smoke-tests the
+  build before uploading.
 
 ## [0.1.1] — 2026-10-09
 

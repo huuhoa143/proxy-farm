@@ -93,10 +93,14 @@ const REQUIRED_TAGS = ['with_gvisor', 'with_wireguard', 'with_openvpn'] as const
  * This is a short-lived sing-box process (~0.25 s) at every app start, before any port
  * or credential probe runs: a process sampler sees it as an engine that exited at once.
  */
-export async function assertSingboxVersion(binPath: string = singboxPath()): Promise<void> {
+export async function assertSingboxVersion(
+  binPath: string = singboxPath(),
+  /** Runs `<bin> version` and returns its stdout. Overridable for tests. */
+  runVersion: (binPath: string) => Promise<string> = async (bin) => (await execFileAsync(bin, ['version'])).stdout,
+): Promise<void> {
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync(binPath, ['version']));
+    stdout = await runVersion(binPath);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`assertSingboxVersion: failed to run "${binPath} version": ${message}`);

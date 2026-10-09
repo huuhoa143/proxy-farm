@@ -29,6 +29,7 @@ import type { StateStore } from '../store/state';
 import type { UpdateStatus } from '../../shared/contracts';
 import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
+import type { HmaWindowsSupport } from './hma-windows';
 
 export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'];
 
@@ -50,6 +51,8 @@ export interface FacadeDeps {
   engineLogs(key: string): string[];
   hostVpn: HostVpnDetector;
   hma: HmaLocalSource;
+  /** Windows only: turns on HMA support (spec §7); absent elsewhere. */
+  hmaWindows?: HmaWindowsSupport;
   platform: NodeJS.Platform;
   /** Throughput through a port's own proxy (spec §4.2 speed test). */
   speedTest(proxyPort: number, auth?: { username: string; password: string }): Promise<number>;
@@ -147,9 +150,17 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   }
 
   async function detectHma(): Promise<{ found: boolean; hintKey?: string }> {
-    const r = await deps.hma.read();
+    let r = await deps.hma.read();
+    // Windows: a copy whose task has not reported lately reads as helper-missing. After a
+    // sleep the task may simply not have caught up yet: ask it for a run (returns at once
+    // when HMA support was never enabled) before offering to enable it again.
+    if (r.status === 'helper-missing' && deps.hmaWindows) {
+      await deps.hmaWindows.refresh().catch(() => undefined);
+      r = await deps.hma.read();
+    }
     if (r.status === 'found') return { found: true };
     if (r.status === 'helper-missing') return { found: false, hintKey: 'hma.helperMissing' };
+    if (r.status === 'untrusted') return { found: false, hintKey: 'hma.untrusted' };
     if (r.status === 'invalid') return { found: false, hintKey: 'hma.notSignedIn' };
     return { found: false };
   }
@@ -248,8 +259,13 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   }
 
   async function connectHma(): Promise<CheckResult & { account?: Account }> {
-    if (deps.platform !== 'darwin') return { ok: false, reasonKey: 'hma.windowsLater' };
+    if (deps.platform !== 'darwin' && deps.platform !== 'win32') return { ok: false, reasonKey: 'hma.notFound' };
+    // Windows: ask the task for a fresh copy first, so a Connect right after HMA rotated
+    // its credentials reads the new ones rather than the previous copy.
+    await deps.hmaWindows?.refresh().catch(() => undefined);
     const r = await deps.hma.read();
+    if (r.status === 'helper-missing') return { ok: false, reasonKey: 'hma.helperMissing' };
+    if (r.status === 'untrusted') return { ok: false, reasonKey: 'hma.untrusted' };
     if (r.status === 'missing') return { ok: false, reasonKey: 'hma.notFound' };
     if (r.status !== 'found') return { ok: false, reasonKey: 'hma.notSignedIn' };
     const provider = deps.providers.get('hma');
@@ -381,8 +397,11 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     connectHma,
 
     async enableHmaSupport() {
-      // spec §7: the Windows helper installer is a later track.
-      return { ok: false, reasonKey: 'hma.windowsLater' };
+      // spec §7: only Windows needs it (macOS reads HMA's file directly).
+      if (!deps.hmaWindows) return { ok: true };
+      const r = await deps.hmaWindows.enable();
+      if (r.ok) return { ok: true };
+      return { ok: false, reasonKey: `hma.enable.${r.reason}` };
     },
 
     importConfigFile,
