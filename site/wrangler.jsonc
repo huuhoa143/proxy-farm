@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "proxy-farm-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "workers_dev": true,
+  "preview_urls": true
+
+  // Custom domain: NOT active. Needs the owner's go-ahead (it creates DNS on lingoreup.com).
+  // To go live, uncomment the block below (add a comma after "preview_urls": true) and run
+  //   pnpm run deploy
+  // ,"routes": [{ "pattern": "proxyfarm.lingoreup.com", "custom_domain": true }]
+}
