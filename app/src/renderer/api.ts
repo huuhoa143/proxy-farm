@@ -345,7 +345,9 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         const account: Account = {
           id: `surfshark-${accounts.length + 1}`,
           providerId,
-          label: `key …${privateKey.slice(-4)}`,
+          // The real label is the end of the PUBLIC key (main/providers/wg-key.ts); the
+          // renderer cannot derive it, and nothing here may come from the private key.
+          label: `pubkey …fake${accounts.length + 1}`,
           meta: { address: input.address || '10.14.0.2/16' },
           secretRef: `surfshark-${accounts.length + 1}`,
         };
@@ -362,7 +364,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         const account: Account = {
           id: `nordvpn-${accounts.length + 1}`,
           providerId,
-          label: `key …${privateKey.slice(-6)}`,
+          label: `pubkey …fake${accounts.length + 1}`,
           meta: {},
           secretRef: `nordvpn-${accounts.length + 1}`,
         };

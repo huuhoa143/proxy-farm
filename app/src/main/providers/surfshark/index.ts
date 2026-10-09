@@ -33,6 +33,7 @@ import path from 'node:path';
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { getClusters, readClustersCacheSync, type SurfsharkCluster } from './clusters';
 import { createSurfsharkPools, type PoolNet, type SurfsharkPools } from './pool';
+import { wgKeyLabel } from '../wg-key';
 
 const WG_PORT = 51820;
 const WG_KEY_RE = /^[A-Za-z0-9+/]{43}=$/;
@@ -149,7 +150,7 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
       }
       return {
         ok: true,
-        label: `key …${privateKey.slice(-6)}`,
+        label: wgKeyLabel(privateKey),
         secret: { kind: 'wgkey', privateKey },
         meta: { address: address ?? DEFAULT_SURFSHARK_ADDRESS },
       };

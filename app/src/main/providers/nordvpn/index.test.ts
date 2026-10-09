@@ -7,6 +7,7 @@ import { renderConfig } from '../../engine/render-config';
 import { assertConfigInvariants } from '../../engine/invariants';
 import { createNordvpnProvider, NORDLYNX_ADDRESS } from './index';
 import { CREDENTIALS_URL } from './credentials';
+import { wgKeyLabel } from '../wg-key';
 import { SERVERS_URL, type FetchLike } from './servers';
 import { PK_HANOI, PK_HCMC, samplePayload } from './fixtures/sample-servers';
 
@@ -34,9 +35,9 @@ function fakeNord(creds: { status: number; body?: unknown } = { status: 200, bod
 }
 
 describe('nordvpn provider: adding an account', () => {
-  it('check() accepts a NordLynx private key and stores it as a wgkey secret, labelled by its tail', () => {
+  it('check() accepts a NordLynx private key and stores it as a wgkey secret, labelled by its PUBLIC key', () => {
     const provider = createNordvpnProvider({ cachePath, fetchImpl: fakeNord() });
-    expect(provider.check({ credential: ` ${KEY}\n` })).toEqual({ ok: true, label: `key …${KEY.slice(-6)}`, secret: SECRET, meta: {} });
+    expect(provider.check({ credential: ` ${KEY}\n` })).toEqual({ ok: true, label: wgKeyLabel(KEY), secret: SECRET, meta: {} });
     expect(provider.check({ privateKey: KEY }).ok).toBe(true);
   });
 

@@ -12,6 +12,7 @@ import { createStateStore, type StateStore } from '../store/state';
 import { createControllerFacade, guessCountry, rotateNoteKey, type FacadeDeps } from './facade';
 import type { HmaRead } from './hma-local';
 import { createNordvpnProvider } from '../providers/nordvpn';
+import { wgKeyLabel } from '../providers/wg-key';
 
 function memorySecrets(): SecretStore & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -290,7 +291,8 @@ describe('controller facade', () => {
     it('a token → the NordLynx key is stored as a wgkey secret; the token is nowhere', async () => {
       const { facade, state, secrets, fetchImpl, portManager } = nordSetup({ status: 200, body: { username: 'u', password: 'p', nordlynx_private_key: KEY } });
       const r = await facade.addAccount('nordvpn', { credential: ` ${TOKEN} ` });
-      expect(r).toMatchObject({ ok: true, label: `key …${KEY.slice(-6)}` });
+      expect(r).toMatchObject({ ok: true, label: wgKeyLabel(KEY) });
+      expect(r.label).not.toContain(KEY.slice(-6, -1));
       expect(fetchImpl).toHaveBeenCalledTimes(1);
       expect(JSON.parse(secrets.loadSecret(r.account!.secretRef)!)).toEqual({ kind: 'wgkey', privateKey: KEY });
       expect(JSON.stringify(state.getState())).not.toContain(TOKEN);

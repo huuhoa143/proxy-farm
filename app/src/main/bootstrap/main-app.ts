@@ -26,6 +26,7 @@ import { PortHealth } from '../health/state-machine';
 import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastTargetsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
 import { installPowerHooks, type PowerManager } from '../power/index';
 import { getProvider, registerAllProviders } from '../providers/index';
+import { migrateKeyLabels } from '../providers/wg-key';
 import { setResourcesRoot } from '../resources-root';
 import { createStateStore } from '../store/state';
 import { createTray, onlineCountLabel, trayLabels, type TrayHandle } from '../tray';
@@ -170,6 +171,9 @@ export function runApp(): void {
         ...p,
         state: p.enabled ? (isTerminalState(p.state) ? p.state : ({ kind: 'queued' } as const)) : ({ kind: 'stopped' } as const),
       })),
+      // Key accounts saved by earlier builds were labelled with the end of their PRIVATE
+      // key: relabel them after the public key.
+      accounts: migrateKeyLabels(s.accounts, (ref) => secrets.loadSecret(ref)),
     }));
 
     // 4. sing-box present, runnable (not quarantined) and the pinned version — or a

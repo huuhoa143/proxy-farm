@@ -536,7 +536,8 @@
     }
   },
   "surfshark": {
-    "keyLabel": "Key …{{suffix}}",
+    "keyLabel": "Public key …{{suffix}}",
+    "legacyKeyLabel": "WireGuard key",
     "check": {
       "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
       "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",

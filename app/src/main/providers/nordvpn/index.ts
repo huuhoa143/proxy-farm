@@ -20,6 +20,7 @@
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { ACCESS_TOKEN_RE, exchangeAccessToken, WG_KEY_RE } from './credentials';
 import { getServers, readServersCacheSync, type FetchLike, type NordLocation } from './servers';
+import { wgKeyLabel } from '../wg-key';
 
 const WG_PORT = 51820;
 /** NordLynx's interface address: the same for every key ✅ 2026-10-09. */
@@ -82,7 +83,7 @@ export function createNordvpnProvider(deps: NordvpnProviderDeps): Provider {
       if (!WG_KEY_RE.test(credential)) return { ok: false, reasonKey: 'nordvpn.check.invalidInput' };
       return {
         ok: true,
-        label: `key …${credential.slice(-6)}`,
+        label: wgKeyLabel(credential),
         secret: { kind: 'wgkey', privateKey: credential },
         meta: {},
       };

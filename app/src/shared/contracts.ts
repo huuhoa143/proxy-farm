@@ -170,7 +170,7 @@ export type AccountSecret =
 export interface CheckResult {
   ok: boolean;
   reasonKey?: string; // i18n key
-  label?: string; // human label for the account, e.g. 'key …AbC='
+  label?: string; // human label for the account, e.g. 'pubkey …qqbTmo' (never from a secret)
   /** i18n key of a caveat on an accepted result, e.g. the login could not be checked
    * live right now ('zoogvpn.check.unverified'). */
   noteKey?: string;

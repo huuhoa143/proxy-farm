@@ -536,7 +536,8 @@
     }
   },
   "surfshark": {
-    "keyLabel": "Khoá …{{suffix}}",
+    "keyLabel": "Khóa công khai …{{suffix}}",
+    "legacyKeyLabel": "Khóa WireGuard",
     "check": {
       "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
       "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",

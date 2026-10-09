@@ -157,7 +157,7 @@ describe('NordVpnCard', () => {
     await waitFor(() => expect(spy).toHaveBeenCalledWith('nordvpn', { credential: TOKEN }));
     await waitFor(() => expect(onAdded).toHaveBeenCalled());
     expect(field).toHaveValue('');
-    expect(screen.getByTestId('nordvpn-message')).toHaveTextContent(/^Key …/);
+    expect(screen.getByTestId('nordvpn-message')).toHaveTextContent(/^Public key …/);
   });
 
   it('shows a refused token in words', async () => {
