@@ -41,7 +41,7 @@ To run with a throwaway data folder instead of your real one, set
 app/
   src/
     main/          Electron main process
-      providers/   one folder per provider: hma, zoogvpn, surfshark, file
+      providers/   one folder per provider: hma, zoogvpn, surfshark, nordvpn, expressvpn, file
       controller/  port manager, Change IP, auto-rotate, server health, settings
       engine/      sing-box config renderer + invariants, supervisor, log ring, pid registry
       health/      /delay probe, exit-IP probe, back-off, port state machine
@@ -110,13 +110,17 @@ Proxy Farm runs on other companies' VPN infrastructure. Do not make it look like
 3. Register it in `app/src/main/providers/index.ts`.
 4. Add the onboarding card and form in `app/src/renderer/components/OnboardingCards.tsx`
    and `Onboarding.tsx`, the display name in `app/src/renderer/ui/providerName.ts`, and
-   all strings in both `en.json` and `vi.json`.
+   all strings in both `en.json` and `vi.json`. If the user has to fetch a credential
+   from the provider's website, give the card a `guide` (numbered steps, see
+   `CredentialGuide.tsx`) and add the page it starts on to `PROVIDER_LINKS` in
+   `app/src/shared/links.ts`: only listed URLs open in the browser.
 5. Add unit tests with recorded fixtures. The config invariants in
    `app/src/main/engine/invariants.ts` must pass for your provider's output.
 6. If the provider needs a new network endpoint, list it in [PRIVACY.md](PRIVACY.md).
 
-Look at `providers/zoogvpn` (OpenVPN, username/password) or `providers/surfshark`
-(WireGuard, public server API) for complete examples.
+Look at `providers/zoogvpn` (OpenVPN, username/password), `providers/expressvpn`
+(OpenVPN with a shared client certificate, bundled server list, DNS pools) or
+`providers/surfshark` (WireGuard, public server API) for complete examples.
 
 ## Commit messages
 

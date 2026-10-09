@@ -1915,6 +1915,28 @@ describe('port manager', () => {
         expect(stateOf()).not.toMatchObject({ kind: 'failed' });
       });
 
+      it('a provider whose every server checks the login (ExpressVPN): a login checked at add time does not make an auth failure a plan refusal', async () => {
+        const serverHealth = createServerHealth();
+        const probe = vi.fn(async () => ({ outcome: 'ok' as const, host: '10.0.0.4' }));
+        const provider = { ...fakeProvider([ams(['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'])]), anyServerChecksLogin: true };
+        const { manager, engine, state } = setup({
+          targets: [],
+          port: { enabled: false, state: { kind: 'stopped' } },
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, credentialProbe: probe, attemptLimiter: { take: () => 0 }, providers: { get: () => provider } },
+        });
+        await manager.startPort('zoogvpn:nl-ams');
+        // Re-added (say a new password) while the port runs.
+        expect(await manager.checkCredentials(account, { kind: 'userpass', username: 'u', password: 'p' })).toBe('verified');
+        engine.fireState('zoogvpn:nl-ams', authFailed);
+        // The login is wrong now (changed on the website): the port stops, it does not walk
+        // the location marking servers refused for a week.
+        await vi.waitFor(() => expect(state.getState().ports[0].state).toMatchObject({ kind: 'failed', reason: 'auth' }));
+        expect(engine.started).toHaveLength(1);
+        expect(serverHealth.serialize().refused).toEqual({});
+        expect(probe).toHaveBeenCalledTimes(1);
+      });
+
       it('engine events of a credential probe are not port events', async () => {
         const { engine, state } = checkSetup('ok');
         const before = JSON.stringify(state.getState().ports);

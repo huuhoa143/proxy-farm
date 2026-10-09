@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isAllowedExternalUrl, LINKS } from '../../shared/links';
+import { isAllowedExternalUrl, LINKS, PROVIDER_LINKS } from '../../shared/links';
 import { openExternalIfAllowed } from './external-links';
 
 describe('external link allowlist', () => {
@@ -8,6 +8,22 @@ describe('external link allowlist', () => {
     // The updater's manual-download fallback.
     expect(isAllowedExternalUrl('https://github.com/huuhoa143/proxy-farm/releases/latest')).toBe(true);
     expect(isAllowedExternalUrl('https://github.com/huuhoa143/proxy-farm')).toBe(true);
+  });
+
+  it('allows the provider account pages the credential guides open, exactly', () => {
+    for (const url of Object.values(PROVIDER_LINKS)) expect(isAllowedExternalUrl(url), url).toBe(true);
+    expect(isAllowedExternalUrl('https://my.nordaccount.com')).toBe(true); // the same page, normalised
+  });
+
+  it.each([
+    ['another page of an allowed provider site', 'https://www.expressvpn.com/order'],
+    ['an allowed page with a query', 'https://www.expressvpn.com/setup?next=https://evil.example'],
+    ['an allowed page with a fragment', 'https://my.surfshark.com/#x'],
+    ['an allowed page over http', 'http://www.expressvpn.com/setup'],
+    ['an allowed host with userinfo', 'https://evil@my.nordaccount.com/'],
+    ['a look-alike provider host', 'https://www.expressvpn.com.evil.example/setup'],
+  ])('rejects %s', (_label, url) => {
+    expect(isAllowedExternalUrl(url)).toBe(false);
   });
 
   it.each([

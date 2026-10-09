@@ -69,10 +69,18 @@
         "description": "Dán khóa riêng WireGuard từ tài khoản Surfshark của bạn, hoặc nhập tệp cấu hình WireGuard đã tải về cùng khóa đó.",
         "keyLabel": "Khóa riêng WireGuard",
         "keyPlaceholder": "Dán khóa riêng, hoặc toàn bộ tệp cấu hình WireGuard",
+        "guide": {
+          "title": "Cách lấy khóa riêng (private key)",
+          "step1": "Đăng nhập https://my.surfshark.com.",
+          "step2": "Vào VPN → Manual setup → Desktop or mobile → WireGuard.",
+          "step3": "Chọn “I don't have a key pair” rồi tạo cặp khóa mới (Generate a new key pair).",
+          "step4": "Copy Private key rồi dán vào đây.",
+          "step5": "Tùy chọn: tải tệp cấu hình của một địa điểm cùng khóa đó để lấy dòng Address — hoặc nhập thẳng tệp .conf đó ở đây.",
+          "noteLabels": "Tên nút trên trang có thể khác đôi chút — làm theo hướng dẫn trên trang.",
+          "link": "Mở my.surfshark.com"
+        },
         "add": "Thêm",
         "initials": "S",
-        "hintLead": "Tìm tại",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
         "addressLabel": "Địa chỉ giao diện (không bắt buộc)",
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
@@ -84,12 +92,39 @@
         "description": "Dán mã truy cập (access token) từ Nord Account của bạn, hoặc khóa riêng NordLynx.",
         "credentialLabel": "Mã truy cập hoặc khóa riêng NordLynx",
         "credentialPlaceholder": "Mã 64 ký tự, hoặc khóa 44 ký tự",
-        "hintLead": "Lấy mã tại",
-        "hintPath": "Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token",
-        "hintStored": "Mã truy cập chỉ được dùng một lần để lấy khóa NordLynx và không được giữ lại; chỉ khóa được lưu.",
+        "guide": {
+          "title": "Cách lấy mã truy cập (access token)",
+          "step1": "Đăng nhập https://my.nordaccount.com.",
+          "step2": "Chọn NordVPN ở menu bên trái.",
+          "step3": "Kéo xuống Advanced settings → Set up NordVPN manually (Nord gửi mã xác minh về email).",
+          "step4": "Tab Access token → Generate new token → chọn thời hạn → Copy, dán vào đây.",
+          "noteStored": "Mã chỉ dùng một lần để lấy khóa NordLynx và không được lưu; có thể xóa token trên Nord Account sau khi thêm.",
+          "noteService": "Username/password “Service credentials” là cho OpenVPN — Proxy Farm không dùng.",
+          "noteKey": "Nếu đã có khóa riêng NordLynx, có thể dán thẳng khóa đó.",
+          "link": "Mở Nord Account"
+        },
         "add": "Thêm",
         "adding": "Đang thêm…",
         "initials": "N"
+      },
+      "expressvpn": {
+        "name": "ExpressVPN",
+        "description": "Đăng nhập bằng username và password ở trang Manual configuration (OpenVPN) trong tài khoản ExpressVPN.",
+        "username": "Username",
+        "password": "Password",
+        "check": "Kiểm tra",
+        "checking": "Đang kiểm tra…",
+        "initials": "E",
+        "guide": {
+          "title": "Cách lấy username/password",
+          "step1": "Đăng nhập https://www.expressvpn.com/setup (trang tài khoản ExpressVPN).",
+          "step2": "Chọn Manual configuration (trong Set up devices / Advanced setup).",
+          "step3": "Chọn tab OpenVPN.",
+          "step4": "Copy Username và Password ở mục 1 rồi dán vào đây. Đây không phải email/mật khẩu đăng nhập, cũng không phải mã kích hoạt (activation code).",
+          "noteActivation": "Chỉ có mã kích hoạt thì không lấy được — cần đăng nhập trang web bằng email của tài khoản.",
+          "noteOvpn": "Có thể tải tệp .ovpn ở mục 2 và nhập qua Tệp cấu hình.",
+          "link": "Mở expressvpn.com/setup"
+        }
       },
       "file": {
         "name": "Tệp cấu hình",
@@ -101,7 +136,10 @@
         "countryInvalid": "Nhập mã quốc gia 2 chữ cái (ví dụ US, DE).",
         "import": "Nhập",
         "initials": "T",
-        "chooseAnother": "Chọn tệp khác"
+        "chooseAnother": "Chọn tệp khác",
+        "username": "Tên đăng nhập VPN",
+        "password": "Mật khẩu VPN",
+        "signInNote": "Tệp này đăng nhập bằng tên đăng nhập và mật khẩu. Dùng bộ mà nhà cung cấp cho để cài OpenVPN thủ công; chúng được lưu mã hóa cùng tệp."
       }
     },
     "portLimit": {
@@ -112,7 +150,11 @@
       "note": "Giới hạn số cổng mỗi nhà cung cấp được chạy cùng lúc.",
       "fieldLabel": "Giới hạn cổng — {{provider}}",
       "ports_one": "tối đa {{count}} cổng",
-      "ports_other": "tối đa {{count}} cổng"
+      "ports_other": "tối đa {{count}} cổng",
+      "why": {
+        "nordvpn": "Mặc định 6: đã kiểm chứng ba đường hầm cùng lúc trên một khóa.",
+        "expressvpn": "Mặc định 8: gói ExpressVPN cho phép 10 thiết bị cùng lúc, chừa 2 cho thiết bị của bạn."
+      }
     },
     "continueHint": "Kết nối ít nhất một nhà cung cấp để tiếp tục.",
     "status": {
@@ -356,6 +398,7 @@
         "guidance": {
           "hma": "HMA từ chối thông tin đăng nhập thiết bị — mở ứng dụng HMA và kiểm tra bạn đã đăng nhập chưa.",
           "zoogvpn": "ZoogVPN từ chối mật khẩu tài khoản này — kiểm tra lại trong ứng dụng hoặc trang web ZoogVPN.",
+          "expressvpn": "ExpressVPN từ chối username hoặc password này. Copy lại từ Manual configuration → OpenVPN trên trang web ExpressVPN (không phải email tài khoản hay mã kích hoạt), rồi thêm lại tài khoản.",
           "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập.",
           "locationRejected": "Tài khoản của bạn hoạt động ở vị trí khác, nhưng vị trí này từ chối — hãy thử vị trí khác."
         }
@@ -565,10 +608,21 @@
       "invalidInput": "Đây không phải mã truy cập NordVPN (64 ký tự, gồm 0–9 và a–f) hay khóa riêng NordLynx (44 ký tự, kết thúc bằng =)."
     }
   },
+  "expressvpn": {
+    "userLabel": "Username …{{suffix}}",
+    "check": {
+      "missingUsername": "Nhập username ExpressVPN.",
+      "missingPassword": "Nhập password ExpressVPN.",
+      "notManualCredentials": "Đây có vẻ là email tài khoản. Hãy dùng username và password ở Manual configuration → OpenVPN trên trang web ExpressVPN.",
+      "tooLong": "ExpressVPN chỉ nhận username hoặc password dài tối đa 128 byte. Hãy dùng username/password ở Manual configuration (OpenVPN), không phải mã từ ứng dụng ExpressVPN.",
+      "wrongCredentials": "ExpressVPN báo sai username hoặc password. Hãy dùng bộ ở Manual configuration → OpenVPN trên trang web ExpressVPN — không phải email/mật khẩu đăng nhập, cũng không phải mã kích hoạt.",
+      "unverified": "Đã thêm, nhưng lúc này chưa kiểm tra được đăng nhập vì không máy chủ ExpressVPN nào phản hồi. Proxy Farm sẽ kiểm tra khi một cổng kết nối."
+    }
+  },
   "file": {
     "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
     "check": {
-      "needsCredentials": "File .ovpn này cần tên đăng nhập và mật khẩu, hiện chưa được hỗ trợ.",
+      "needsCredentials": "Tệp .ovpn này đăng nhập bằng tên đăng nhập và mật khẩu. Nhập chúng rồi bấm Nhập lại.",
       "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
       "parseError": "Không đọc được file này."
     }
@@ -604,7 +658,7 @@
     "title": "Quyền riêng tư",
     "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
     "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khóa và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
-    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Cổng ExpressVPN phân giải tên máy chủ ExpressVPN (expressnetw.com) qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn; ngoài chính kết nối VPN, không có yêu cầu nào khác tới ExpressVPN. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
     "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
     "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
     "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
@@ -617,7 +671,7 @@
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
     "suspension": "Nhà cung cấp có thể tạm khóa hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
     "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, ExpressVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
     "full": "Bản miễn trừ trách nhiệm đầy đủ"
   },
   "firstRun": {
@@ -626,7 +680,7 @@
     "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
     "suspension": "Nhà cung cấp có thể khóa tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
     "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
-    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark, ZoogVPN hay NordVPN / Nord Security.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark, ZoogVPN, NordVPN / Nord Security hay ExpressVPN.",
     "acknowledge": "Tôi đã hiểu",
     "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
   },

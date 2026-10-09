@@ -1,15 +1,16 @@
 /**
  * Parse a dropped `.ovpn` file into the pieces needed to build an
  * OpenVpnEndpoint (spec §5.4): remote, proto, cipher, auth, inline ca,
- * inline tls-auth/tls-crypt, and auth-user-pass (which means "prompt the
- * user for credentials" rather than anything embedded in the file).
+ * inline tls-auth/tls-crypt, an inline client certificate and key
+ * (`<cert>` + `<key>`, both or neither), `fragment`, `mssfix`, `comp-lzo no`,
+ * `verify-x509-name`, `ns-cert-type server`, and auth-user-pass (which means
+ * "prompt the user for credentials" rather than anything embedded in the file).
  *
  * Directives this app doesn't act on, but which don't affect the rendered
  * endpoint, are silently ignored (IGNORABLE_DIRECTIVES). Anything else —
- * shell hooks (`up`/`down`), client-certificate auth (`<cert>`/`<key>`),
- * externally-referenced CA/key files, routing/DNS overrides, etc. — is
- * rejected with `UnsupportedDirectiveError` rather than silently dropped,
- * per spec §5.4.
+ * shell hooks (`up`/`down`), PKCS#12 bundles, externally-referenced CA/key
+ * files, routing/DNS overrides, etc. — is rejected with
+ * `UnsupportedDirectiveError` rather than silently dropped, per spec §5.4.
  *
  * Every `remote` line is kept (spec §5.4 rev 3): the file's server pool is the
  * distinct hosts of its remotes, in file order. `bind()` only receives the
@@ -44,6 +45,23 @@ export interface ParsedOvpn {
   needsAuthUserPass: boolean;
   /** Raw `tun-mtu <n>` value, if present and numeric. Clamping/defaulting happens in endpoint-builder.ts. */
   tunMtu?: number;
+  /** Inline `<cert>` / `<key>`: client-certificate auth. Always both or neither. */
+  clientCertLines?: string[];
+  clientKeyLines?: string[];
+  /** `fragment <n>`; `fragment 0` (no fragmentation, OpenVPN's default) leaves it unset. */
+  fragment?: number;
+  /** `mssfix <n> [mtu|fixed]`; a bare `mssfix` (OpenVPN's default) leaves all three unset. */
+  mssFix?: number;
+  mssFixMode?: 'mtu' | 'fixed';
+  /** `mssfix 0`: no clamping. Distinct from unset, where sing-box clamps by default. */
+  mssFixDisabled?: true;
+  /** `comp-lzo no`. Other `comp-lzo` values stay ignored, as they always were. */
+  compressionLzo?: 'no';
+  /** `verify-x509-name <name> [subject|name|name-prefix]`; OpenVPN's default type is subject. */
+  serverName?: string;
+  serverNameType?: 'subject' | 'name' | 'name-prefix';
+  /** `ns-cert-type server`. */
+  nsCertType?: 'server';
 }
 
 const IGNORABLE_DIRECTIVES = new Set([
@@ -61,19 +79,72 @@ const IGNORABLE_DIRECTIVES = new Set([
   'auth-nocache',
   'explicit-exit-notify',
   'remote-cert-tls',
-  'mssfix',
-  'comp-lzo',
   'compress',
   'float',
   'tls-client',
   'tls-version-min',
   // Order of the remotes only; the controller picks servers from the pool itself.
   'remote-random',
+  // A client always pulls its options; `client` implies it.
+  'pull',
+  // Windows route installation and socket buffer sizes: sing-box installs no routes
+  // (route_no_pull) and sizes its own sockets.
+  'route-method',
+  'route-delay',
+  'sndbuf',
+  'rcvbuf',
 ]);
 
-// Blocks (<tag>...</tag>) we understand. `cert`/`key`/`pkcs12`/`extra-certs`
-// imply client-certificate auth, which OpenVpnEndpoint has no field for.
-const SUPPORTED_BLOCKS = new Set(['ca', 'tls-auth', 'tls-crypt']);
+// Blocks (<tag>...</tag>) we understand. `pkcs12`/`extra-certs` have no
+// OpenVpnEndpoint field.
+const SUPPORTED_BLOCKS = new Set(['ca', 'tls-auth', 'tls-crypt', 'cert', 'key']);
+
+const X509_NAME_TYPES = new Set(['subject', 'name', 'name-prefix']);
+
+// sing-box refuses a smaller `fragment` when the tunnel starts.
+const MIN_FRAGMENT = 68;
+// `mssfix <n> fixed` subtracts the IPv4 and TCP headers from n; sing-box doesn't check it.
+const MIN_FIXED_MSSFIX = 41;
+
+/** A whole number of bytes (0 allowed: OpenVPN's "off"), or an `UnsupportedDirectiveError` naming `directive`. */
+function byteCount(directive: string, arg: string): number {
+  const n = Number(arg);
+  if (!/^\d+$/.test(arg) || n > 65535) throw new UnsupportedDirectiveError(directive, `"${arg}" is not a size in bytes`);
+  return n;
+}
+
+/** `fragment <n> [mtu]`; undefined for `fragment 0`. sing-box has no field for the `mtu` mode. */
+function parseFragment(args: string[]): number | undefined {
+  if (args.length !== 1) throw new UnsupportedDirectiveError('fragment', `"${args.join(' ')}" (only a size is supported)`);
+  const n = byteCount('fragment', args[0]);
+  if (n === 0) return undefined;
+  if (n < MIN_FRAGMENT) throw new UnsupportedDirectiveError('fragment', `${n} is below ${MIN_FRAGMENT} bytes`);
+  return n;
+}
+
+/** `mssfix <n> [mtu|fixed]` (not bare `mssfix`), read as OpenVPN 2.6 does: 0 turns clamping off. */
+function parseMssfix(args: string[]): Pick<ParsedOvpn, 'mssFix' | 'mssFixMode' | 'mssFixDisabled'> {
+  const [size, mode, ...extra] = args;
+  if (extra.length > 0 || (mode !== undefined && mode !== 'mtu' && mode !== 'fixed')) {
+    throw new UnsupportedDirectiveError('mssfix', `"${args.join(' ')}"`);
+  }
+  const n = byteCount('mssfix', size);
+  if (n === 0) return { mssFixDisabled: true };
+  if (mode === 'fixed' && n < MIN_FIXED_MSSFIX) {
+    throw new UnsupportedDirectiveError('mssfix', `${n} fixed leaves no room for the IPv4 and TCP headers`);
+  }
+  return { mssFix: n, ...(mode ? { mssFixMode: mode } : {}) };
+}
+
+/** `verify-x509-name` arguments: a name, possibly quoted (subjects contain spaces), then an optional type. */
+function parseX509Name(arg: string): { name: string; type: 'subject' | 'name' | 'name-prefix' } {
+  const m = arg.match(/^(?:"([^"]*)"|'([^']*)'|(\S+))\s*(\S+)?$/);
+  const name = m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+  const type = m?.[4] ?? 'subject';
+  if (!name) throw new UnsupportedDirectiveError('verify-x509-name', 'a name is required');
+  if (!X509_NAME_TYPES.has(type)) throw new UnsupportedDirectiveError('verify-x509-name', `type ${type}`);
+  return { name, type: type as 'subject' | 'name' | 'name-prefix' };
+}
 
 function isCommentOrBlank(line: string): boolean {
   const t = line.trim();
@@ -95,6 +166,13 @@ export function parseOvpn(content: string): ParsedOvpn {
   let keyDirection: string | undefined;
   let needsAuthUserPass = false;
   let tunMtu: number | undefined;
+  let clientCertLines: string[] | undefined;
+  let clientKeyLines: string[] | undefined;
+  let fragment: number | undefined;
+  let mss: Pick<ParsedOvpn, 'mssFix' | 'mssFixMode' | 'mssFixDisabled'> = {};
+  let compressionLzo: 'no' | undefined;
+  let x509Name: { name: string; type: 'subject' | 'name' | 'name-prefix' } | undefined;
+  let nsCertType: 'server' | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -113,12 +191,14 @@ export function parseOvpn(content: string): ParsedOvpn {
         throw new Error(`file: unterminated <${tag}> block`);
       }
       if (!SUPPORTED_BLOCKS.has(tag)) {
-        throw new UnsupportedDirectiveError(`<${tag}>`, 'client-certificate or unrecognised inline block');
+        throw new UnsupportedDirectiveError(`<${tag}>`, 'unrecognised inline block');
       }
       const pemLines = extractPemLines(blockLines);
       if (tag === 'ca') caLines = pemLines;
       if (tag === 'tls-auth') tlsAuthLines = pemLines;
       if (tag === 'tls-crypt') tlsCryptLines = pemLines;
+      if (tag === 'cert') clientCertLines = pemLines;
+      if (tag === 'key') clientKeyLines = pemLines;
       i = j; // skip past the closing tag
       continue;
     }
@@ -169,6 +249,25 @@ export function parseOvpn(content: string): ParsedOvpn {
         if (Number.isFinite(n)) tunMtu = n;
         break;
       }
+      case 'fragment':
+        fragment = parseFragment(rest);
+        break;
+      case 'mssfix':
+        // A bare `mssfix` means OpenVPN's default, which sing-box applies on its own.
+        mss = rest.length > 0 ? parseMssfix(rest) : {};
+        break;
+      case 'comp-lzo':
+        // Only `no` is mapped (compression framing, no compression); every other value
+        // was ignored before client-certificate profiles were supported, and still is.
+        if (arg === 'no') compressionLzo = 'no';
+        break;
+      case 'verify-x509-name':
+        x509Name = parseX509Name(arg);
+        break;
+      case 'ns-cert-type':
+        if (arg !== 'server') throw new UnsupportedDirectiveError('ns-cert-type', arg);
+        nsCertType = 'server';
+        break;
       case 'ca':
       case 'tls-auth':
       case 'tls-crypt':
@@ -195,6 +294,9 @@ export function parseOvpn(content: string): ParsedOvpn {
   if (!caLines) {
     throw new Error('file: .ovpn is missing an inline <ca> block');
   }
+  if (Boolean(clientCertLines) !== Boolean(clientKeyLines)) {
+    throw new UnsupportedDirectiveError(clientCertLines ? '<cert>' : '<key>', 'a client certificate needs both <cert> and <key>');
+  }
 
   // `keyDirection` (0/1/bidirectional) only ever maps to 'client' here: sing-box's
   // control_wrap direction field has no other literal in contracts.ts, and every
@@ -217,6 +319,12 @@ export function parseOvpn(content: string): ParsedOvpn {
     controlWrapDirection: tlsAuthLines || tlsCryptLines ? 'client' : undefined,
     needsAuthUserPass,
     tunMtu,
+    ...(clientCertLines && clientKeyLines ? { clientCertLines, clientKeyLines } : {}),
+    ...(fragment !== undefined ? { fragment } : {}),
+    ...mss,
+    ...(compressionLzo ? { compressionLzo } : {}),
+    ...(x509Name ? { serverName: x509Name.name, serverNameType: x509Name.type } : {}),
+    ...(nsCertType ? { nsCertType } : {}),
   };
 }
 

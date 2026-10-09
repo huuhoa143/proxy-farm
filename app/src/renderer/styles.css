@@ -44,6 +44,7 @@
   --pc-zoogvpn: #5aa8ff;
   --pc-surfshark: #2fd3c6;
   --pc-nordvpn: #8f9bff;
+  --pc-expressvpn: #ff6b6b;
   --pc-file: #a6b2cc;
 }
 [data-theme='light'] {
@@ -78,6 +79,7 @@
   --pc-zoogvpn: #2b74c9;
   --pc-surfshark: #12a497;
   --pc-nordvpn: #4b57d1;
+  --pc-expressvpn: #d63c3c;
   --pc-file: #68738c;
 }
 
@@ -1070,6 +1072,10 @@ table.port-table {
 .pv-nordvpn {
   --pc: var(--pc-nordvpn);
 }
+.psw.expressvpn,
+.pv-expressvpn {
+  --pc: var(--pc-expressvpn);
+}
 .psw.file,
 .pv-file {
   --pc: var(--pc-file);
@@ -1870,6 +1876,47 @@ table.port-table {
   gap: 10px;
   margin-top: auto;
   flex-wrap: wrap;
+}
+/* add-account credential guide (CredentialGuide.tsx) */
+.cred-guide {
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.cred-guide > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+  cursor: pointer;
+  list-style: none;
+}
+.cred-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.cred-guide > summary span {
+  flex: 1;
+}
+.cred-guide > summary svg:last-child {
+  transition: transform 0.15s var(--ease);
+}
+.cred-guide[open] > summary svg:last-child {
+  transform: rotate(90deg);
+}
+.cred-guide-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 12px 12px;
+}
+.cred-guide .steps li {
+  align-items: flex-start;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .state-line {
   display: flex;

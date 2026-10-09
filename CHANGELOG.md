@@ -21,6 +21,19 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   connected and may change when the port reconnects, even to the same server. The
   port's tooltips and the Change IP menu say so, and such a change is never treated
   as an error.
+- ExpressVPN provider (OpenVPN). Add an account with the username and password from
+  your ExpressVPN account's Manual configuration → OpenVPN page (not your email and
+  password, and not the activation code). "Check" makes one short test connection to
+  the nearest ExpressVPN location before the account is saved: a wrong username or
+  password is rejected with that message, and if no server answers the account is
+  added as unverified. Locations are the 145 of the bundled server list (ExpressVPN
+  publishes none; the hostnames come from gluetun); each location's servers are found
+  through DNS and each port pins one, so its exit IP stays the same across reconnects.
+  The default port limit is 8, leaving 2 of a plan's 10 devices for your own.
+- Every add-account card that needs a credential from the provider's website
+  (ExpressVPN, NordVPN, Surfshark) has a "How to get …" guide: numbered steps in
+  Vietnamese or English, and a button that opens the provider's page in your browser.
+  The port-limit field explains a provider's default limit in its tooltip.
 - Locations that NordVPN or Surfshark list as virtual (servers standing in another
   country) are marked "virtual location" in the picker and on their group header.
 - The port details show the exit IP's geolocation next to the location's country.
@@ -39,6 +52,12 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   launch.
 - The port-limit tooltip points to the Providers screen, where the limit is set, not
   to Settings.
+- Importing an `.ovpn` file: profiles that sign in with a client certificate
+  (`<cert>` + `<key>`) and use `fragment`, `mssfix`, `comp-lzo no`, `verify-x509-name`
+  or `ns-cert-type server` are now accepted, so ExpressVPN's own `.ovpn` downloads
+  import and connect. A file with `auth-user-pass` no longer fails with "not supported
+  yet": the file card asks for the username and password and keeps them, encrypted,
+  with the file.
 
 ### Fixed
 

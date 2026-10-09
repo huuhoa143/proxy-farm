@@ -5,7 +5,7 @@
  * agreement: every exported name here is relied on by at least two modules.
  *   engine/     renderConfig, invariants, ports, supervisor, pid registry   (spec §6.1–6.3)
  *   health/     log signals, /delay, exit-IP, state machine, backoff        (spec §6.4)
- *   providers/  hma, zoogvpn, surfshark, nordvpn, file + catalogs           (spec §5)
+ *   providers/  hma, zoogvpn, surfshark, nordvpn, expressvpn, file + catalogs (spec §5)
  *   controller/ store, accounts, port manager, power, webhook, IPC          (spec §3, §4, §6.5–6.7)
  *   renderer/   React UI + i18n, talks only to `window.proxyFarm`           (spec §4)
  */
@@ -25,7 +25,15 @@ export interface OpenVpnEndpoint {
   tls: {
     certificate: string[]; // inline PEM lines (never a path — §6.1.1)
     server_name?: string;
+    /** How `server_name` is matched against the server certificate (OpenVPN
+     * `verify-x509-name <name> <type>`); sing-box's default is the full subject. */
+    server_name_type?: 'subject' | 'name' | 'name-prefix';
+    /** Client-certificate auth (OpenVPN `<cert>` / `<key>`): inline PEM lines, both or neither. */
+    client_certificate?: string[];
+    client_key?: string[];
     remote_certificate_tls?: 'server';
+    /** OpenVPN `ns-cert-type server`: the legacy Netscape check on the server certificate. */
+    ns_certificate_type?: 'server';
     control_wrap?: {
       type: 'tls_auth' | 'tls_crypt';
       key: string[]; // inline key lines
@@ -35,6 +43,16 @@ export interface OpenVpnEndpoint {
   data_ciphers: string[];
   data_ciphers_fallback?: string;
   auth?: string; // e.g. 'SHA256'
+  /** OpenVPN `fragment N`: split data packets above N bytes. A server configured with it
+   * needs the client to match, or the tunnel comes up and carries nothing (ExpressVPN). */
+  fragment?: number;
+  /** OpenVPN `mssfix N [mtu|fixed]`. Unset, sing-box clamps by default (from `fragment`, else 1492). */
+  mss_fix?: number;
+  mss_fix_mode?: 'mtu' | 'fixed';
+  /** OpenVPN `mssfix 0`: no clamping. Excludes `mss_fix` and `mss_fix_mode`. */
+  mss_fix_disabled?: true;
+  /** OpenVPN `comp-lzo no`: compression framing on, compression off. */
+  compression_lzo?: 'no';
   route_no_pull: true;
   explicit_exit_notify?: number;
   mtu: number;
@@ -65,13 +83,14 @@ export interface RenderInput {
 
 // ───────────────────────── providers & catalogs (spec §5) ─────────────────────────
 
-export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'file';
+export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
 
 /**
  * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
- * unlimited. An explicit user value, 0 included, always wins.
+ * unlimited. An explicit user value, 0 included, always wins. ExpressVPN: a plan allows
+ * 10 devices at once; 8 leaves 2 for the user's own devices (spec §5.6).
  */
-export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6 };
+export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6, expressvpn: 8 };
 
 /** The port limit in force for a provider: the user's, else the default, else 0. */
 export function portLimitOf(limits: Partial<Record<ProviderId, number>>, providerId: ProviderId): number {
@@ -80,7 +99,9 @@ export function portLimitOf(limits: Partial<Record<ProviderId, number>>, provide
 
 /**
  * How a provider's exit IP relates to the server a port pins (spec §5, §6.8):
- *   server   — the exit is the server's own IP, for good (HMA, ZoogVPN).
+ *   server   — one exit per server, for good: the server's own IP (HMA, ZoogVPN) or
+ *              another IP that server always uses (ExpressVPN: .69 always exits as .47).
+ *              Either way an exit seen once identifies the server.
  *   server+1 — the server's IP + 1, stable per server (Surfshark).
  *   session  — chosen when the tunnel connects: fixed while it stays connected, but a
  *              new connection to the same server may get another one (NordVPN). Also
@@ -97,6 +118,7 @@ export const EXIT_IP_MODELS: Record<ProviderId, ExitIpModel> = {
   zoogvpn: 'server',
   surfshark: 'server+1',
   nordvpn: 'session',
+  expressvpn: 'server',
   file: 'session',
 };
 
@@ -214,6 +236,13 @@ export interface Provider {
    * key). Never rejects. Providers without it get their input checked as typed.
    */
   resolveInput?(input: Record<string, string>): Promise<{ input: Record<string, string> } | { reasonKey: string }>;
+  /**
+   * The provider has no plans that limit servers: every server takes every valid login,
+   * so one test connection to any server checks the credentials (spec §5.6, ExpressVPN).
+   * Unlike a free tier (`Target.freeTierServers`) this tells the credential probe where
+   * it may ask; an auth failure still just means the login is wrong. Absent = false.
+   */
+  anyServerChecksLogin?: boolean;
   /** Validate user input (format only, no network) and normalise it. */
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */
@@ -429,7 +458,14 @@ export interface ProxyFarmApi {
   /** Windows only: runs the elevated helper installer (spec §7, one UAC). Shown when `detected.hintKey`
    * says the helper is missing. Stubbed until the Windows track: returns `{ok:false, reasonKey:'hma.windowsLater'}`. */
   enableHmaSupport(): Promise<CheckResult>;
-  importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
+  /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
+   * Without them such a file answers `file.check.needsCredentials`. */
+  importConfigFile(
+    name: string,
+    content: string,
+    country?: string,
+    credentials?: { username: string; password: string },
+  ): Promise<CheckResult & { account?: Account }>;
   /** Locations with `freeServers` filled in (spec §6.8). */
   listTargets(providerId?: ProviderId): Promise<Target[]>;
 

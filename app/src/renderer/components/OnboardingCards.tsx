@@ -5,6 +5,9 @@ import { Icon } from '../ui/Icon';
 import { Flag } from '../ui/Flag';
 import { countryName } from '../ui/countryName';
 import { accountLabel } from '../ui/accountLabel';
+import { expressvpnCountryFromFilename } from '../ui/expressvpnCountry';
+import { PROVIDER_LINKS } from '../../shared/links';
+import { CredentialGuide } from './CredentialGuide';
 
 interface Message {
   ok: boolean;
@@ -71,6 +74,26 @@ function CardShell({ providerId, ready, accountCount = 0, children }: CardShellP
       </div>
       <div className="pc-body">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A card's credential guide, from `onboarding.providers.<id>.guide`: `title`, `step1`…,
+ * any `note…` keys (in file order) and `link`, the label of the `PROVIDER_LINKS` button.
+ */
+function ProviderGuide({ providerId }: { providerId: keyof typeof PROVIDER_LINKS }) {
+  const { t } = useTranslation();
+  const guide = t(`onboarding.providers.${providerId}.guide`, { returnObjects: true }) as Record<string, string>;
+  const keys = Object.keys(guide);
+  const steps = keys.filter((k) => /^step\d+$/.test(k)).sort((a, b) => Number(a.slice(4)) - Number(b.slice(4)));
+  return (
+    <CredentialGuide
+      title={guide.title}
+      steps={steps.map((k) => guide[k])}
+      notes={keys.filter((k) => k.startsWith('note')).map((k) => guide[k])}
+      link={{ href: PROVIDER_LINKS[providerId], label: guide.link }}
+      testId={`${providerId}-guide`}
+    />
   );
 }
 
@@ -297,11 +320,8 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
           spellCheck={false}
           onChange={(e) => setKey(e.target.value)}
         />
-        <p className="hint">
-          {t('onboarding.providers.surfshark.hintLead')}{' '}
-          <span className="path">{t('onboarding.providers.surfshark.hintPath')}</span>
-        </p>
       </div>
+      <ProviderGuide providerId="surfshark" />
       <div className="field">
         <label htmlFor="surfshark-address">{t('onboarding.providers.surfshark.addressLabel')}</label>
         <input
@@ -395,12 +415,8 @@ export function NordVpnCard({ api, onAdded, accountCount }: NordVpnCardProps) {
             value={credential}
             onChange={(e) => setCredential(e.target.value)}
           />
-          <p className="hint">
-            {t('onboarding.providers.nordvpn.hintLead')}{' '}
-            <span className="path">{t('onboarding.providers.nordvpn.hintPath')}</span>
-          </p>
-          <p className="hint">{t('onboarding.providers.nordvpn.hintStored')}</p>
         </div>
+        <ProviderGuide providerId="nordvpn" />
         <div className="pc-actions">
           <button className="btn primary" type="submit" disabled={busy || !credential.trim()}>
             <Icon name="key" />
@@ -409,6 +425,84 @@ export function NordVpnCard({ api, onAdded, accountCount }: NordVpnCardProps) {
         </div>
       </form>
       <ResultLine message={message} testId="nordvpn-message" />
+    </CardShell>
+  );
+}
+
+export interface ExpressVpnCardProps {
+  api: ProxyFarmApi;
+  onAdded: () => void;
+  accountCount?: number;
+}
+
+/** spec §5.6: the "Manual configuration → OpenVPN" username and password, checked live
+ * once (one test connection) before they are stored. */
+export function ExpressVpnCard({ api, onAdded, accountCount }: ExpressVpnCardProps) {
+  const { t } = useTranslation();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function check() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.addAccount('expressvpn', { username: username.trim(), password: password.trim() });
+      setMessage(resultMessage(t, result));
+      if (result.ok) {
+        setUsername('');
+        setPassword('');
+        onAdded();
+      }
+    } catch (err) {
+      setMessage(errorMessage(t, err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const ready = username.trim() !== '' && password.trim() !== '';
+  return (
+    <CardShell providerId="expressvpn" accountCount={accountCount}>
+      <form
+        className="pc-body"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!busy && ready) void check();
+        }}
+      >
+        <div className="field">
+          <label htmlFor="expressvpn-username">{t('onboarding.providers.expressvpn.username')}</label>
+          <input
+            id="expressvpn-username"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="expressvpn-password">{t('onboarding.providers.expressvpn.password')}</label>
+          <input
+            id="expressvpn-password"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <ProviderGuide providerId="expressvpn" />
+        <div className="pc-actions">
+          <button className="btn primary" type="submit" disabled={busy || !ready}>
+            <Icon name="check" />
+            {busy ? t('onboarding.providers.expressvpn.checking') : t('onboarding.providers.expressvpn.check')}
+          </button>
+        </div>
+      </form>
+      <ResultLine message={message} testId="expressvpn-message" />
     </CardShell>
   );
 }
@@ -422,9 +516,13 @@ export interface FileCardProps {
 /**
  * Simple 2-letter-token heuristic (ruling B): split the basename on
  * non-letter characters and take the first all-letter token of length 2,
- * e.g. 'mullvad-se-got.conf' -> 'SE', 'us-nyc.ovpn' -> 'US'.
+ * e.g. 'mullvad-se-got.conf' -> 'SE', 'us-nyc.ovpn' -> 'US'. ExpressVPN's downloads
+ * (`my_expressvpn_vietnam_udp.ovpn`) are read from its catalog instead: their "my" is
+ * not Malaysia.
  */
 export function guessCountryFromFilename(name: string): string {
+  const express = expressvpnCountryFromFilename(name);
+  if (express !== null) return express;
   const base = name.replace(/\.[^.]+$/, '');
   const tokens = base.split(/[^a-zA-Z]+/).filter(Boolean);
   const twoLetter = tokens.find((token) => token.length === 2);
@@ -436,6 +534,11 @@ interface PendingFile {
   content: string;
 }
 
+/** An `.ovpn` that signs in with a username and password (a bare `auth-user-pass` line). */
+function needsSignIn(file: PendingFile): boolean {
+  return /\.ovpn$/i.test(file.name) && /^\s*auth-user-pass\s*$/m.test(file.content);
+}
+
 export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
   const { t, i18n } = useTranslation();
   const [dragOver, setDragOver] = useState(false);
@@ -443,15 +546,30 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [country, setCountry] = useState('');
   const [busy, setBusy] = useState(false);
+  // The VPN username/password an `.ovpn` with `auth-user-pass` signs in with (spec §5.4).
+  const [askSignIn, setAskSignIn] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  function reset() {
+    setPending(null);
+    setCountry('');
+    setAskSignIn(false);
+    setUsername('');
+    setPassword('');
+  }
 
   async function stageFile(file: File) {
     const content = await file.text();
-    setPending({ name: file.name, content });
+    const staged = { name: file.name, content };
+    setPending(staged);
     setCountry(guessCountryFromFilename(file.name));
+    setAskSignIn(needsSignIn(staged));
     setMessage(null);
   }
 
   const validCountry = /^[A-Z]{2}$/.test(country);
+  const signInReady = !askSignIn || (username.trim() !== '' && password !== '');
 
   async function confirmImport() {
     if (!pending) return;
@@ -464,12 +582,15 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await api.importConfigFile(pending.name, pending.content, country);
+      const result = askSignIn
+        ? await api.importConfigFile(pending.name, pending.content, country, { username: username.trim(), password })
+        : await api.importConfigFile(pending.name, pending.content, country);
       setMessage(resultMessage(t, result));
       if (result.ok) {
-        setPending(null);
-        setCountry('');
+        reset();
         onAdded();
+      } else if (result.reasonKey === 'file.check.needsCredentials') {
+        setAskSignIn(true);
       }
     } catch (err) {
       setMessage(errorMessage(t, err));
@@ -518,13 +639,7 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
             <span className="nm" title={pending.name}>
               {pending.name}
             </span>
-            <button
-              className="btn ghost sm"
-              onClick={() => {
-                setPending(null);
-                setCountry('');
-              }}
-            >
+            <button className="btn ghost sm" onClick={reset}>
               {t('onboarding.providers.file.chooseAnother')}
             </button>
           </div>
@@ -551,10 +666,36 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
               </p>
             )}
           </div>
+          {askSignIn && (
+            <div className="pc-body" data-testid="file-credentials">
+              <div className="field">
+                <label htmlFor="file-username">{t('onboarding.providers.file.username')}</label>
+                <input
+                  id="file-username"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="file-password">{t('onboarding.providers.file.password')}</label>
+                <input
+                  id="file-password"
+                  type="password"
+                  autoComplete="off"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <p className="hint">{t('onboarding.providers.file.signInNote')}</p>
+              </div>
+            </div>
+          )}
           <div className="pc-actions">
             <button
               className="btn primary"
-              disabled={busy || !validCountry}
+              disabled={busy || !validCountry || !signInReady}
               onClick={() => void confirmImport()}
             >
               <Icon name="check" />

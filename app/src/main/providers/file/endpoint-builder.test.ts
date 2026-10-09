@@ -43,3 +43,62 @@ describe('buildOvpnEndpoint: mtu resolution from tun-mtu', () => {
     expect(buildOvpnEndpoint(baseParsed({ tunMtu: 1500 }), '203.0.113.1').mtu).toBe(1500);
   });
 });
+
+describe('buildOvpnEndpoint: client certificate and ExpressVPN-style options', () => {
+  const CERT = ['-----BEGIN CERTIFICATE-----', 'Y2VydA==', '-----END CERTIFICATE-----'];
+  const KEY = ['-----BEGIN PRIVATE KEY-----', 'a2V5', '-----END PRIVATE KEY-----'];
+
+  it('emits none of the new fields for a profile without them (unchanged output)', () => {
+    const ep = buildOvpnEndpoint(baseParsed(), '203.0.113.1');
+    expect(ep).toEqual({
+      type: 'openvpn-client',
+      server: '203.0.113.1',
+      server_port: 1194,
+      network: 'udp',
+      username: undefined,
+      password: undefined,
+      tls: { certificate: FAKE_CA_LINES, remote_certificate_tls: 'server' },
+      data_ciphers: ['AES-256-GCM'],
+      auth: undefined,
+      route_no_pull: true,
+      mtu: 1400,
+    });
+  });
+
+  it('maps each parsed option to its sing-box field', () => {
+    const ep = buildOvpnEndpoint(
+      baseParsed({
+        clientCertLines: CERT,
+        clientKeyLines: KEY,
+        serverName: 'Server',
+        serverNameType: 'name-prefix',
+        nsCertType: 'server',
+        fragment: 1300,
+        mssFix: 1200,
+        compressionLzo: 'no',
+        auth: 'SHA512',
+      }),
+      '203.0.113.1',
+      { username: 'u', password: 'p' },
+    );
+    expect(ep.tls).toMatchObject({
+      client_certificate: CERT,
+      client_key: KEY,
+      server_name: 'Server',
+      server_name_type: 'name-prefix',
+      ns_certificate_type: 'server',
+    });
+    expect(ep).toMatchObject({ fragment: 1300, mss_fix: 1200, compression_lzo: 'no', auth: 'SHA512', username: 'u', password: 'p' });
+  });
+
+  it('maps the mssfix mode, and mssfix 0 to mss_fix_disabled', () => {
+    expect(buildOvpnEndpoint(baseParsed({ mssFix: 1450, mssFixMode: 'mtu' }), '203.0.113.1')).toMatchObject({
+      mss_fix: 1450,
+      mss_fix_mode: 'mtu',
+    });
+    const disabled = buildOvpnEndpoint(baseParsed({ mssFixDisabled: true }), '203.0.113.1');
+    expect(disabled.mss_fix_disabled).toBe(true);
+    expect(disabled).not.toHaveProperty('mss_fix');
+    expect(disabled).not.toHaveProperty('mss_fix_mode');
+  });
+});

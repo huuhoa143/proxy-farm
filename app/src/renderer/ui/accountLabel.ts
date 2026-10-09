@@ -12,6 +12,8 @@ const TEMPLATED_LABELS: Array<{ re: RegExp; key: string }> = [
   // Earlier builds stored the end of the PRIVATE key: never shown, whatever happens to
   // the main-process migration that relabels it.
   { re: /^key …\S+$/, key: 'surfshark.legacyKeyLabel' },
+  // ExpressVPN: the end of the manual-configuration username.
+  { re: /^user …(\S+)$/, key: 'expressvpn.userLabel' },
 ];
 
 /**

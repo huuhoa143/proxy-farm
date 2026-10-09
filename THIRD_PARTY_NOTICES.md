@@ -80,9 +80,43 @@ They contain no secrets of any user.
 | `sectigo-r46.pem` | "Sectigo Public Server Authentication Root R46", a public root CA certificate (valid 2021–2046). Used to verify HMA's OpenVPN servers. | Sectigo Limited; exported from the macOS system root store |
 | `zoogvpn-ca.pem` | ZoogVPN's shared OpenVPN CA certificate ("Easy-RSA CA", valid 2022–2032) | ZoogVPN's public OpenVPN configuration files, as collected in [haugene/vpn-configs-contrib](https://github.com/haugene/vpn-configs-contrib) (`openvpn/zoogvpn/`) |
 | `zoogvpn-tls-auth.key` | ZoogVPN's shared OpenVPN `tls-auth` static key, identical in every customer's config file | Same as above |
+| `expressvpn-ca.pem` | ExpressVPN's OpenVPN CA certificate ("ExpressVPN CA3", valid 2024–2124) | ExpressVPN's "Manual configuration → OpenVPN" profile, identical for every customer; the same bytes are in [qdm12/gluetun](https://github.com/qdm12/gluetun) (`internal/provider/expressvpn/openvpnconf.go`, MIT, see below) |
+| `expressvpn-client.crt`, `expressvpn-client.key` | ExpressVPN's shared OpenVPN client certificate (CN `expressvpn_customer`, valid to 2066) and its key, identical in every customer's profile; accounts are told apart by their username and password only | Same as above |
+| `expressvpn-tls-auth.key` | ExpressVPN's shared OpenVPN `tls-auth` static key | Same as above |
+
+## Bundled server lists
+
+`app/resources/catalogs/expressvpn-servers.json` is the list of ExpressVPN server
+hostnames, countries and cities hard-coded in gluetun
+(`internal/provider/expressvpn/updater/hardcoded.go` at commit `26574b9`), with ISO
+country codes added. gluetun is distributed under the MIT License:
+
+```
+MIT License
+
+Copyright (c) 2018 Quentin McGaw
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Trademarks
 
-HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, NordLynx, Nord Security, WireGuard,
-OpenVPN, Electron and other names are trademarks of their owners. Proxy Farm is not
+HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, NordLynx, Nord Security, ExpressVPN,
+WireGuard, OpenVPN, Electron and other names are trademarks of their owners. Proxy Farm is not
 affiliated with or endorsed by them.

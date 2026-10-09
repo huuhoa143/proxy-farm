@@ -15,7 +15,7 @@ provide or resell VPN access.
   tunnels, or sharing your connection can get your VPN account suspended or closed by the
   provider.** Keep port limits conservative and stop ports you do not need.
 - This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord
-  Security or any other VPN provider.
+  Security, ExpressVPN or any other VPN provider.
 
 ## Disclaimer
 
@@ -35,7 +35,7 @@ purpose and non-infringement. You use it **at your own risk**.
   with any provider. Providers can change their systems and stop the tool from working at
   any time.
 - Trademarks (HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, NordLynx, Nord Security,
-  WireGuard, OpenVPN and others) belong
+  ExpressVPN, WireGuard, OpenVPN and others) belong
   to their owners. The project is **not sponsored, endorsed by or affiliated with** them.
 
 By using this software you **agree** to this disclaimer.
@@ -56,8 +56,8 @@ bán, không cung cấp và không bán lại quyền truy cập VPN.
 - Nhà cung cấp theo dõi các kiểu sử dụng bất thường. **Kết nối lại dồn dập, chạy quá
   nhiều tunnel cùng lúc, hay chia sẻ kết nối có thể khiến nhà cung cấp tạm khoá hoặc đóng
   tài khoản VPN của bạn.** Hãy đặt giới hạn số cổng vừa phải và tắt những cổng không dùng.
-- Dự án không liên quan tới HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security
-  hay bất kỳ nhà cung cấp VPN nào.
+- Dự án không liên quan tới HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security,
+  ExpressVPN hay bất kỳ nhà cung cấp VPN nào.
 
 ### Miễn trừ trách nhiệm
 
@@ -76,7 +76,7 @@ thể, hay không vi phạm. Bạn dùng công cụ này **với rủi ro của 
   kỳ nhà cung cấp nào; các nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt
   động bất kỳ lúc nào.
 - Các nhãn hiệu (HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, NordLynx, Nord Security,
-  WireGuard, OpenVPN, v.v.) thuộc về
+  ExpressVPN, WireGuard, OpenVPN, v.v.) thuộc về
   chủ sở hữu tương ứng; dự án **không được tài trợ, xác nhận hay liên kết** với họ.
 
 Dùng phần mềm này nghĩa là bạn **đồng ý** với các điều khoản miễn trừ trách nhiệm trên.

@@ -24,6 +24,7 @@ export { isTerminalFailure };
 function authGuidanceKey(providerId: ProviderId): string {
   if (providerId === 'hma') return 'portState.failed.auth.guidance.hma';
   if (providerId === 'zoogvpn') return 'portState.failed.auth.guidance.zoogvpn';
+  if (providerId === 'expressvpn') return 'portState.failed.auth.guidance.expressvpn';
   return 'portState.failed.auth.guidance.generic';
 }
 

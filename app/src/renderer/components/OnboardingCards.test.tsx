@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
+import { ExpressVpnCard, FileCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
 
@@ -19,6 +19,20 @@ describe('guessCountryFromFilename', () => {
 
   it('returns an empty string when no 2-letter token exists', () => {
     expect(guessCountryFromFilename('myconfig.ovpn')).toBe('');
+  });
+
+  it("reads ExpressVPN's download names from the catalog, not 'my' (Malaysia)", () => {
+    expect(guessCountryFromFilename('my_expressvpn_vietnam_udp.ovpn')).toBe('VN');
+    expect(guessCountryFromFilename('my_expressvpn_usa-newyork_udp.ovpn')).toBe('US');
+    expect(guessCountryFromFilename('my_expressvpn_usa_-_new_york_udp.ovpn')).toBe('US');
+    expect(guessCountryFromFilename('my_expressvpn_uk-london_tcp.ovpn')).toBe('GB');
+    expect(guessCountryFromFilename('my_expressvpn_ukraine_udp.ovpn')).toBe('UA');
+    expect(guessCountryFromFilename('my_expressvpn_india-sg_udp.ovpn')).toBe('IN');
+    expect(guessCountryFromFilename('my_expressvpn_malaysia_udp.ovpn')).toBe('MY');
+  });
+
+  it('guesses nothing for an ExpressVPN name the catalog does not know (its "my" is not a country)', () => {
+    expect(guessCountryFromFilename('my_expressvpn_atlantis_udp.ovpn')).toBe('');
   });
 });
 
@@ -67,6 +81,49 @@ describe('FileCard', () => {
     fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'US' } });
     expect(screen.queryByTestId('file-country-invalid')).toBeNull();
     expect(screen.getByText('Import').closest('button')).toBeEnabled();
+  });
+});
+
+describe('FileCard: an .ovpn that signs in with a username and password', () => {
+  it('asks for them when the file has auth-user-pass, and imports with them', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'importConfigFile');
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('vn_expressvpn_udp.ovpn', 'remote vietnam-ca-version-2.expressnetw.com 1195\nauth-user-pass\n');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId('file-credentials')).toBeInTheDocument());
+    expect(screen.getByLabelText('Country')).toHaveValue('VN');
+    expect(screen.getByText('Import').closest('button')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('VPN username'), { target: { value: 'me' } });
+    fireEvent.change(screen.getByLabelText('VPN password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByText('Import'));
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('vn_expressvpn_udp.ovpn', expect.any(String), 'VN', { username: 'me', password: 'pw' }));
+  });
+
+  it('shows the fields when main says the file needs them, though the UI did not spot it', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'importConfigFile').mockResolvedValueOnce({ ok: false, reasonKey: 'file.check.needsCredentials' });
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('us-nyc.ovpn', 'remote vpn.example.com 1194');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByTestId('file-pending')).toBeInTheDocument());
+    expect(screen.queryByTestId('file-credentials')).toBeNull();
+    fireEvent.click(screen.getByText('Import'));
+    await waitFor(() => expect(screen.getByTestId('file-credentials')).toBeInTheDocument());
+  });
+
+  it('asks for nothing for a file without auth-user-pass', async () => {
+    const api = createFakeProxyFarmApi();
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('mullvad-se-got.conf', '[Interface]\nPrivateKey = abc');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByTestId('file-pending')).toBeInTheDocument());
+    expect(screen.queryByTestId('file-credentials')).toBeNull();
   });
 });
 
@@ -135,14 +192,42 @@ describe('SurfsharkCard', () => {
   });
 });
 
+describe('ExpressVpnCard', () => {
+  it('sends the trimmed username and password, masks the password, then clears both', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'addAccount');
+    const onAdded = vi.fn();
+    render(<ExpressVpnCard api={api} onAdded={onAdded} />);
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
+    expect(screen.getByText('Check').closest('button')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: ' abcdefghijkl0123456789ab ' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'zyxwvutsrq0987654321zyxw' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(onAdded).toHaveBeenCalled());
+    expect(spy).toHaveBeenCalledWith('expressvpn', { username: 'abcdefghijkl0123456789ab', password: 'zyxwvutsrq0987654321zyxw' });
+    expect(screen.getByTestId('expressvpn-message')).toHaveTextContent('Username …6789ab');
+    expect(screen.getByLabelText('Username')).toHaveValue('');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+  });
+
+  it('explains a rejected email in place of the manual-configuration username', async () => {
+    render(<ExpressVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'me@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByText('Check'));
+    await waitFor(() => expect(screen.getByTestId('expressvpn-message')).toHaveTextContent('Manual configuration → OpenVPN'));
+  });
+});
+
 describe('NordVpnCard', () => {
   const TOKEN = 'ab'.repeat(32);
 
-  it('shows the Nord Account path as plain text, with no link', () => {
+  it('walks through getting a token, and links only to Nord Account (opened in the system browser)', () => {
     render(<NordVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
     const card = screen.getByTestId('provider-card-nordvpn');
-    expect(card).toHaveTextContent('Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token');
-    expect(card.querySelector('a')).toBeNull();
+    expect(card).toHaveTextContent('Advanced settings → Set up NordVPN manually');
+    expect(card).toHaveTextContent('Generate new token');
+    expect([...card.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['https://my.nordaccount.com/']);
     expect(screen.getByLabelText('Access token or NordLynx private key')).toHaveAttribute('type', 'password');
   });
 

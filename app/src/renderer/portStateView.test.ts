@@ -51,6 +51,13 @@ describe('describePortState', () => {
     expect(view.guidance).toContain('ZoogVPN');
   });
 
+  it('gives ExpressVPN guidance for failed(auth): where the manual-configuration login lives', () => {
+    const state: PortState = { kind: 'failed', reason: 'auth', untilMs: Date.now() + 1000, attempt: 3 };
+    const view = describePortState(state, 'expressvpn', i18next.t.bind(i18next));
+    expect(view.guidance).toContain('Manual configuration → OpenVPN');
+    expect(view.terminal).toBe(true);
+  });
+
   it('surfaces an action label for failed(port-in-use)', () => {
     const state: PortState = { kind: 'failed', reason: 'port-in-use', untilMs: Date.now() + 1000, attempt: 1 };
     const view = describePortState(state, 'surfshark', i18next.t.bind(i18next));

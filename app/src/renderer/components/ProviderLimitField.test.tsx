@@ -17,6 +17,13 @@ describe('ProviderLimitField', () => {
     expect(screen.getByLabelText('Port limit — ZoogVPN')).toBeInTheDocument();
   });
 
+  it('says why a provider has a default limit, as a tooltip; none where there is no default', () => {
+    render(<ProviderLimitField api={createFakeProxyFarmApi()} providerId="expressvpn" initialLimit={8} />);
+    expect(screen.getByText('at most 8 ports')).toHaveAttribute('title', expect.stringMatching(/10 devices/));
+    render(<ProviderLimitField api={createFakeProxyFarmApi()} providerId="hma" initialLimit={0} />);
+    expect(screen.getByTestId('provider-limit-hma').querySelector('.limit-hint')).not.toHaveAttribute('title');
+  });
+
   it('uses the i18n name for the file provider', () => {
     render(<ProviderLimitField api={createFakeProxyFarmApi()} providerId="file" />);
     expect(screen.getByTestId('provider-limit-file')).toHaveTextContent('Config file');

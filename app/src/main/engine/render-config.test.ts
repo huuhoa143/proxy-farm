@@ -19,6 +19,22 @@ describe('renderConfig', () => {
     expect(() => assertConfigInvariants(parsed)).not.toThrow();
   });
 
+  it('inlines a client certificate and key, and passes the new OpenVPN options through as given', () => {
+    const cert = ['-----BEGIN CERTIFICATE-----', 'Y2VydA==', '-----END CERTIFICATE-----'];
+    const key = ['-----BEGIN PRIVATE KEY-----', 'a2V5', '-----END PRIVATE KEY-----'];
+    const endpoint = {
+      ...sampleOpenVpnEndpoint,
+      tls: { ...sampleOpenVpnEndpoint.tls, server_name_type: 'name-prefix' as const, client_certificate: cert, client_key: key, ns_certificate_type: 'server' as const },
+      fragment: 1300,
+      mss_fix: 1200,
+      compression_lzo: 'no' as const,
+    };
+    const parsed = JSON.parse(renderConfig(baseInput(endpoint)));
+    expect(() => assertConfigInvariants(parsed)).not.toThrow();
+    expect(parsed.endpoints[0]).toMatchObject({ fragment: 1300, mss_fix: 1200, compression_lzo: 'no' });
+    expect(parsed.endpoints[0].tls).toMatchObject({ client_certificate: cert, client_key: key, server_name_type: 'name-prefix', ns_certificate_type: 'server' });
+  });
+
   it('returns valid JSON that passes assertConfigInvariants for a WireGuard endpoint', () => {
     const json = renderConfig(baseInput(sampleWireguardEndpoint));
     const parsed = JSON.parse(json);
