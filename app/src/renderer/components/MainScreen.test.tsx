@@ -153,6 +153,15 @@ describe('MainScreen', () => {
     expect(screen.getByTestId('bulk-action-bar')).toHaveTextContent('2 ports selected');
   });
 
+  it('re-reads the locations when main says server health changed, with no port change', async () => {
+    const api = (await renderMain()) as ReturnType<typeof createFakeProxyFarmApi>;
+    const real = await api.listTargets();
+    const tokyo = real.find((t) => t.key === 'hma:JP-TOKYO')!;
+    vi.spyOn(api, 'listTargets').mockResolvedValue(real.map((t) => (t === tokyo ? { ...t, freeServers: 0, notInPlan: true } : t)));
+    act(() => api.__emitTargetsChanged());
+    await waitFor(() => expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('Not in your plan'));
+  });
+
   it('Change IP → next free server moves the port to the best free server', async () => {
     await renderMain();
     expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toHaveTextContent('203.0.113.10');
@@ -262,6 +271,23 @@ describe('MainScreen', () => {
       expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent('No free server left here — the port moved to Osaka, in the same country.'),
     );
   });
+
+  it('a picked server that refused the account says so, and where the port went back to', async () => {
+    const api = await renderMain();
+    vi.spyOn(api, 'rotatePort').mockResolvedValueOnce({
+      changed: false,
+      noteKey: 'rotate.server-refused-returned',
+      refusedServer: 'de7.webunlim.com',
+      landedOn: 'de3.webunlim.com',
+    });
+    await changeIp(TOKYO_1);
+    await waitFor(() =>
+      expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent("de7.webunlim.com isn't in your plan — the port went back to de3.webunlim.com."),
+    );
+    // Unlike a routine "IP changed" note, it stays: wait past the 6 s fade.
+    await new Promise((r) => setTimeout(r, 6500));
+    expect(screen.getByTestId(`rotate-note-${TOKYO_1}`)).toHaveTextContent("isn't in your plan");
+  }, 15_000);
 
   it('bulk Change IP summarises changed / moved-to-another-city / unavailable', async () => {
     await renderMain();

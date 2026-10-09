@@ -67,17 +67,64 @@
       "surfshark": {
         "name": "Surfshark",
         "description": "Dán khóa riêng WireGuard từ tài khoản Surfshark của bạn, hoặc nhập tệp cấu hình WireGuard đã tải về cùng khóa đó.",
-        "keyLabel": "Khoá riêng WireGuard",
+        "keyLabel": "Khóa riêng WireGuard",
         "keyPlaceholder": "Dán khóa riêng, hoặc toàn bộ tệp cấu hình WireGuard",
+        "guide": {
+          "title": "Cách lấy khóa riêng (private key)",
+          "step1": "Đăng nhập https://my.surfshark.com.",
+          "step2": "Vào VPN → Manual setup → Desktop or mobile → WireGuard.",
+          "step3": "Chọn “I don't have a key pair” rồi tạo cặp khóa mới (Generate a new key pair).",
+          "step4": "Copy Private key rồi dán vào đây.",
+          "step5": "Tùy chọn: tải tệp cấu hình của một địa điểm cùng khóa đó để lấy dòng Address — hoặc nhập thẳng tệp .conf đó ở đây.",
+          "noteLabels": "Tên nút trên trang có thể khác đôi chút — làm theo hướng dẫn trên trang.",
+          "link": "Mở my.surfshark.com"
+        },
         "add": "Thêm",
         "initials": "S",
-        "hintLead": "Tìm tại",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
         "addressLabel": "Địa chỉ giao diện (không bắt buộc)",
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
         "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
         "importConf": "Nhập tệp .conf…"
+      },
+      "nordvpn": {
+        "name": "NordVPN",
+        "description": "Dán mã truy cập (access token) từ Nord Account của bạn, hoặc khóa riêng NordLynx.",
+        "credentialLabel": "Mã truy cập hoặc khóa riêng NordLynx",
+        "credentialPlaceholder": "Mã 64 ký tự, hoặc khóa 44 ký tự",
+        "guide": {
+          "title": "Cách lấy mã truy cập (access token)",
+          "step1": "Đăng nhập https://my.nordaccount.com.",
+          "step2": "Chọn NordVPN ở menu bên trái.",
+          "step3": "Kéo xuống Advanced settings → Set up NordVPN manually (Nord gửi mã xác minh về email).",
+          "step4": "Tab Access token → Generate new token → chọn thời hạn → Copy, dán vào đây.",
+          "noteStored": "Mã chỉ dùng một lần để lấy khóa NordLynx và không được lưu; có thể xóa token trên Nord Account sau khi thêm.",
+          "noteService": "Username/password “Service credentials” là cho OpenVPN — Proxy Farm không dùng.",
+          "noteKey": "Nếu đã có khóa riêng NordLynx, có thể dán thẳng khóa đó.",
+          "link": "Mở Nord Account"
+        },
+        "add": "Thêm",
+        "adding": "Đang thêm…",
+        "initials": "N"
+      },
+      "expressvpn": {
+        "name": "ExpressVPN",
+        "description": "Đăng nhập bằng username và password ở trang Manual configuration (OpenVPN) trong tài khoản ExpressVPN.",
+        "username": "Username",
+        "password": "Password",
+        "check": "Kiểm tra",
+        "checking": "Đang kiểm tra…",
+        "initials": "E",
+        "guide": {
+          "title": "Cách lấy username/password",
+          "step1": "Đăng nhập https://www.expressvpn.com/setup (trang tài khoản ExpressVPN).",
+          "step2": "Chọn Manual configuration (trong Set up devices / Advanced setup).",
+          "step3": "Chọn tab OpenVPN.",
+          "step4": "Copy Username và Password ở mục 1 rồi dán vào đây. Đây không phải email/mật khẩu đăng nhập, cũng không phải mã kích hoạt (activation code).",
+          "noteActivation": "Chỉ có mã kích hoạt thì không lấy được — cần đăng nhập trang web bằng email của tài khoản.",
+          "noteOvpn": "Có thể tải tệp .ovpn ở mục 2 và nhập qua Tệp cấu hình.",
+          "link": "Mở expressvpn.com/setup"
+        }
       },
       "file": {
         "name": "Tệp cấu hình",
@@ -89,7 +136,10 @@
         "countryInvalid": "Nhập mã quốc gia 2 chữ cái (ví dụ US, DE).",
         "import": "Nhập",
         "initials": "T",
-        "chooseAnother": "Chọn tệp khác"
+        "chooseAnother": "Chọn tệp khác",
+        "username": "Tên đăng nhập VPN",
+        "password": "Mật khẩu VPN",
+        "signInNote": "Tệp này đăng nhập bằng tên đăng nhập và mật khẩu. Dùng bộ mà nhà cung cấp cho để cài OpenVPN thủ công; chúng được lưu mã hóa cùng tệp."
       }
     },
     "portLimit": {
@@ -100,7 +150,11 @@
       "note": "Giới hạn số cổng mỗi nhà cung cấp được chạy cùng lúc.",
       "fieldLabel": "Giới hạn cổng — {{provider}}",
       "ports_one": "tối đa {{count}} cổng",
-      "ports_other": "tối đa {{count}} cổng"
+      "ports_other": "tối đa {{count}} cổng",
+      "why": {
+        "nordvpn": "Mặc định 6: đã kiểm chứng ba đường hầm cùng lúc trên một khóa.",
+        "expressvpn": "Mặc định 8: gói ExpressVPN cho phép 10 thiết bị cùng lúc, chừa 2 cho thiết bị của bạn."
+      }
     },
     "continueHint": "Kết nối ít nhất một nhà cung cấp để tiếp tục.",
     "status": {
@@ -250,7 +304,9 @@
       "addN_one": "Thêm {{count}} cổng",
       "addN_other": "Thêm {{count}} cổng",
       "picked": "Vị trí đã chọn",
-      "unpick": "Bỏ chọn {{location}}"
+      "unpick": "Bỏ chọn {{location}}",
+      "notInPlan": "Không có trong gói",
+      "notInPlanHint": "Gói {{provider}} của bạn không bao gồm vị trí này — mọi máy chủ ở đây đều từ chối tài khoản của bạn. Hãy chọn vị trí khác hoặc nâng cấp gói."
     },
     "group": {
       "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",
@@ -265,13 +321,25 @@
       "addPortLabel": "Thêm một cổng ở {{location}}",
       "addPortHint": "Thêm một cổng trên một máy chủ trống — thêm một IP thoát ở {{location}}.",
       "noFreeServer": "Mọi máy chủ ở {{location}} đều đang được dùng hoặc không khả dụng.",
-      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng trong Cài đặt."
+      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng ở màn hình VPN."
     },
     "port": {
       "label": "{{location}} · cổng #{{n}}",
       "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
-      "noServer": "Chọn khi bật lần đầu"
+      "serverTitleSession": "Đang gắn với máy chủ {{server}}. {{provider}} chọn IP thoát khi cổng kết nối: IP giữ nguyên khi cổng còn kết nối, và có thể đổi khi cổng kết nối lại.",
+      "sessionExitTitle": "IP thoát của lần kết nối này. {{provider}} giữ IP này khi cổng còn kết nối; sau khi kết nối lại (thử lại, Đổi IP hoặc khởi động lại) IP có thể khác, kể cả trên cùng máy chủ.",
+      "noServer": "Chọn khi bật lần đầu",
+      "geoHint": "IP định vị ở {{country}}",
+      "geoHintTitle": "Cơ sở dữ liệu IP xếp {{ip}} vào {{geo}}, không phải {{country}}. Các cơ sở dữ liệu này thường không khớp nhau, và nhà cung cấp VPN hay bán vị trí ảo: máy chủ đặt ở nước khác nhưng hiện ra là nước bạn chọn. Nhãn hiển thị quốc gia của vị trí bạn đã chọn."
     },
+    "exitFacts": {
+      "ip": "IP thoát",
+      "location": "Vị trí",
+      "geo": "Định vị IP",
+      "geoUnknown": "Không rõ"
+    },
+    "virtualLocation": "vị trí ảo",
+    "virtualLocationHint": "{{provider}} ghi đây là vị trí ảo: máy chủ đặt ở nước khác và hiện ra là nước này. Trang web tra IP có thể xếp nó vào nước khác.",
     "changeIp": {
       "menuLabel": "Đổi IP cho cổng #{{n}}",
       "next": "Máy chủ trống tiếp theo",
@@ -298,7 +366,11 @@
         "refused": "Máy chủ này đã từ chối tài khoản của bạn nên tạm bỏ qua 7 ngày.",
         "dead": "Máy chủ này không phản hồi nên tạm bỏ qua 2 giờ."
       },
-      "pick": "Chuyển cổng này sang {{server}}"
+      "pick": "Chuyển cổng này sang {{server}}",
+      "freeTier": "Miễn phí",
+      "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói.",
+      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ",
+      "sessionExitNote": "{{provider}} chọn IP thoát khi cổng kết nối, không cố định theo máy chủ: IP giữ nguyên khi cổng còn kết nối, và có thể đổi mỗi khi cổng kết nối lại, kể cả với cùng máy chủ."
     },
     "addResult": {
       "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
@@ -326,6 +398,7 @@
         "guidance": {
           "hma": "HMA từ chối thông tin đăng nhập thiết bị — mở ứng dụng HMA và kiểm tra bạn đã đăng nhập chưa.",
           "zoogvpn": "ZoogVPN từ chối mật khẩu tài khoản này — kiểm tra lại trong ứng dụng hoặc trang web ZoogVPN.",
+          "expressvpn": "ExpressVPN từ chối username hoặc password này. Copy lại từ Manual configuration → OpenVPN trên trang web ExpressVPN (không phải email tài khoản hay mã kích hoạt), rồi thêm lại tài khoản.",
           "generic": "Nhà cung cấp từ chối thông tin đăng nhập này — kiểm tra lại thông tin đăng nhập.",
           "locationRejected": "Tài khoản của bạn hoạt động ở vị trí khác, nhưng vị trí này từ chối — hãy thử vị trí khác."
         }
@@ -343,12 +416,27 @@
         "label": "Khóa không được phản hồi",
         "guidance": {
           "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark, địa chỉ khớp với tệp cấu hình của chính khóa đó, và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
+          "nordvpn": "NordVPN không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra tài khoản cấp khóa này vẫn còn gói NordVPN đang hoạt động, hoặc thêm lại tài khoản bằng mã truy cập mới. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
           "generic": "Máy chủ không phản hồi khóa WireGuard này sau 3 lần thử. Hãy kiểm tra khóa và địa chỉ trong tệp vẫn còn hợp lệ với nhà cung cấp. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần."
         }
       },
       "no-server": {
         "label": "Không có máy chủ khả dụng",
         "guidance": "Chưa kết nối được máy chủ nào hoạt động cho vị trí này. Hệ thống sẽ tiếp tục thử lại."
+      },
+      "detail": {
+        "wrong-credentials": {
+          "label": "Sai email hoặc mật khẩu",
+          "guidance": "{{provider}} từ chối email và mật khẩu này, kể cả trên máy chủ miễn phí, nên không phải do gói. Nhập lại trong thẻ {{provider}} rồi bấm Kiểm tra, sau đó bật lại cổng."
+        },
+        "unverified-login": {
+          "label": "Chưa xác minh được đăng nhập",
+          "guidance": "Nhiều máy chủ {{provider}} từ chối đăng nhập, và không kết nối được máy chủ miễn phí để phân biệt sai mật khẩu với giới hạn của gói. Hãy kiểm tra email và mật khẩu trong thẻ {{provider}}, hoặc bật lại cổng để thử lần nữa."
+        },
+        "location-not-in-plan": {
+          "label": "Không có trong gói",
+          "guidance": "Gói {{provider}} của bạn không bao gồm vị trí này — chọn vị trí khác hoặc nâng cấp gói."
+        }
       }
     },
     "attempt": "lần {{n}}",
@@ -368,7 +456,10 @@
       "server-refused": "Máy chủ này từ chối đăng nhập — đang chuyển sang máy chủ khác cùng vị trí.",
       "server-dead": "Máy chủ này không còn phản hồi — đang chuyển sang máy chủ khác cùng vị trí.",
       "duplicate-exit": "Một cổng khác đã dùng IP này — đang chuyển sang máy chủ khác.",
-      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên."
+      "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên.",
+      "server-not-in-plan": "Gói {{provider}} của bạn không bao gồm máy chủ này — đang chuyển sang máy chủ khác.",
+      "checking-sign-in": "Máy chủ từ chối đăng nhập — đang kiểm tra email và mật khẩu qua một máy chủ miễn phí của {{provider}}…",
+      "credentials-changed": "Thông tin đăng nhập vừa thay đổi — đang kết nối lại."
     }
   },
   "settings": {
@@ -423,7 +514,7 @@
       "system": "Máy tính này"
     },
     "lanSharingRequiresAuth": "Chia sẻ LAN cần tên đăng nhập và mật khẩu proxy.",
-    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự.",
+    "webhookBearerTooShort": "Khóa webhook phải có ít nhất 16 ký tự.",
     "update": {
       "title": "Cập nhật",
       "currentVersion": "Phiên bản hiện tại",
@@ -465,9 +556,12 @@
     "engineErrorTitle": "Bộ máy proxy không khởi động được",
     "engineErrorBody": "Bộ máy tích hợp của Proxy Farm bị thiếu hoặc bị macOS chặn. Hãy cài lại Proxy Farm từ bản tải chính thức rồi mở lại.",
     "engineErrorDetails": "Chi tiết kỹ thuật",
-    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khoá chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
+    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khóa chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
   },
   "rotate": {
+    "server-refused": "{{server}} không có trong gói của bạn, và ở đây không còn máy chủ trống nào dùng được — cổng không kết nối được.",
+    "server-refused-returned": "{{server}} không có trong gói của bạn — cổng đã quay lại {{to}}.",
+    "server-refused-moved": "{{server}} không có trong gói của bạn — cổng đã chuyển sang {{to}}.",
     "not-verified": "Đã đổi, nhưng không biết IP cũ nên không xác nhận được thay đổi.",
     "online-timeout": "Máy chủ mới không lên kịp.",
     "probe-failed": "Đã đổi, nhưng không kiểm tra được IP mới.",
@@ -476,6 +570,7 @@
     "port-disabled": "Hãy bật cổng trước khi đổi IP.",
     "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu.",
     "rate-limited": "Tài khoản này đã thử kết nối quá nhiều lần trong một phút qua — hãy thử lại sau ít phút.",
+    "needs-attention": "Cổng này cần bạn xử lý trước — hãy bật lại cổng để thử lại.",
     "key-rejected": "Proxy Farm đã ngừng thử lại khóa WireGuard này vì không nhận được phản hồi. Hãy bật cổng trong ứng dụng để thử thêm một lần."
   },
   "hma": {
@@ -496,21 +591,43 @@
   "zoogvpn": {
     "check": {
       "missingUsername": "Nhập email ZoogVPN.",
-      "missingPassword": "Nhập mật khẩu ZoogVPN."
+      "missingPassword": "Nhập mật khẩu ZoogVPN.",
+      "wrongCredentials": "ZoogVPN báo sai email hoặc mật khẩu. Hãy kiểm tra lại rồi thử lần nữa.",
+      "unverified": "Đã thêm, nhưng lúc này chưa kiểm tra được đăng nhập vì các máy chủ miễn phí của ZoogVPN không phản hồi. Proxy Farm sẽ kiểm tra lại khi một cổng kết nối."
     }
   },
   "surfshark": {
-    "keyLabel": "Khoá …{{suffix}}",
+    "keyLabel": "Khóa công khai …{{suffix}}",
+    "legacyKeyLabel": "Khóa WireGuard",
     "check": {
-      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
+      "invalidKey": "Đây không phải khóa riêng WireGuard (44 ký tự, kết thúc bằng =).",
       "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
       "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
+    }
+  },
+  "nordvpn": {
+    "check": {
+      "tokenRejected": "Nord từ chối mã truy cập này. Có thể mã bị gõ sai, đã hết hạn hoặc bị thu hồi — hãy tạo mã mới trong Nord Account rồi thử lại.",
+      "networkError": "Không kết nối được tới Nord để kiểm tra mã truy cập. Hãy kiểm tra kết nối mạng rồi thử lại.",
+      "noKey": "Nord chấp nhận mã nhưng không trả về khóa NordLynx. Hãy kiểm tra Nord Account này còn gói NordVPN đang hoạt động.",
+      "invalidInput": "Đây không phải mã truy cập NordVPN (64 ký tự, gồm 0–9 và a–f) hay khóa riêng NordLynx (44 ký tự, kết thúc bằng =)."
+    }
+  },
+  "expressvpn": {
+    "userLabel": "Username …{{suffix}}",
+    "check": {
+      "missingUsername": "Nhập username ExpressVPN.",
+      "missingPassword": "Nhập password ExpressVPN.",
+      "notManualCredentials": "Đây có vẻ là email tài khoản. Hãy dùng username và password ở Manual configuration → OpenVPN trên trang web ExpressVPN.",
+      "tooLong": "ExpressVPN chỉ nhận username hoặc password dài tối đa 128 byte. Hãy dùng username/password ở Manual configuration (OpenVPN), không phải mã từ ứng dụng ExpressVPN.",
+      "wrongCredentials": "ExpressVPN báo sai username hoặc password. Hãy dùng bộ ở Manual configuration → OpenVPN trên trang web ExpressVPN — không phải email/mật khẩu đăng nhập, cũng không phải mã kích hoạt.",
+      "unverified": "Đã thêm, nhưng lúc này chưa kiểm tra được đăng nhập vì không máy chủ ExpressVPN nào phản hồi. Proxy Farm sẽ kiểm tra khi một cổng kết nối."
     }
   },
   "file": {
     "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
     "check": {
-      "needsCredentials": "File .ovpn này cần tên đăng nhập và mật khẩu, hiện chưa được hỗ trợ.",
+      "needsCredentials": "Tệp .ovpn này đăng nhập bằng tên đăng nhập và mật khẩu. Nhập chúng rồi bấm Nhập lại.",
       "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
       "parseError": "Không đọc được file này."
     }
@@ -538,15 +655,15 @@
     "read": "Xem",
     "open": "Mở",
     "diagnostics": "Sao chép thông tin chẩn đoán",
-    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khoá, mật khẩu, địa chỉ IP hay tên tài khoản.",
+    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khóa, mật khẩu, địa chỉ IP hay tên tài khoản.",
     "diagnosticsCopied": "Đã sao chép",
     "diagnosticsFailed": "Không sao chép được vào bộ nhớ tạm. Hãy thử lại."
   },
   "privacy": {
     "title": "Quyền riêng tư",
     "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
-    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khoá và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
-    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khóa và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Cổng ExpressVPN phân giải tên máy chủ ExpressVPN (expressnetw.com) qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn; ngoài chính kết nối VPN, không có yêu cầu nào khác tới ExpressVPN. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
     "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
     "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
     "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
@@ -557,18 +674,18 @@
     "asIs": "Phần mềm được cung cấp “nguyên trạng” (AS IS), không kèm bất kỳ bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở khả năng bán được, sự phù hợp cho một mục đích cụ thể, hay không vi phạm. Bạn dùng công cụ này với rủi ro của chính mình.",
     "liability": "Dự án và những người đóng góp không chịu trách nhiệm cho bất kỳ thiệt hại, mất mát dữ liệu, gián đoạn dịch vụ, chi phí hay hậu quả nào phát sinh từ việc dùng hoặc không dùng được phần mềm.",
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
-    "suspension": "Nhà cung cấp có thể tạm khoá hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
+    "suspension": "Nhà cung cấp có thể tạm khóa hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
     "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, ExpressVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
     "full": "Bản miễn trừ trách nhiệm đầy đủ"
   },
   "firstRun": {
     "title": "Trước khi bắt đầu",
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn.",
     "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
-    "suspension": "Nhà cung cấp có thể khoá tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
+    "suspension": "Nhà cung cấp có thể khóa tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
     "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
-    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark, ZoogVPN, NordVPN / Nord Security hay ExpressVPN.",
     "acknowledge": "Tôi đã hiểu",
     "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
   },

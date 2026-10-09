@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
-import type { FailReason, PortState, ProviderId } from '../shared/contracts';
+import { isTerminalFailure, type FailReason, type PortState, type ProviderId } from '../shared/contracts';
+import { providerName } from './ui/providerName';
 
 export type StatusTone = 'neutral' | 'progress' | 'online' | 'warn' | 'bad';
 
@@ -17,18 +18,13 @@ export interface PortStateView {
   terminal?: boolean;
 }
 
-/**
- * Failures retrying can't fix — the user must change something (credentials, plan).
- * `port-in-use` and `no-server` are transient (the engine keeps retrying), so they
- * are NOT terminal and still show a countdown.
- */
-export function isTerminalFailure(reason: FailReason): boolean {
-  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
-}
+/** Failures retrying can't fix — the user must change something (credentials, plan). */
+export { isTerminalFailure };
 
 function authGuidanceKey(providerId: ProviderId): string {
   if (providerId === 'hma') return 'portState.failed.auth.guidance.hma';
   if (providerId === 'zoogvpn') return 'portState.failed.auth.guidance.zoogvpn';
+  if (providerId === 'expressvpn') return 'portState.failed.auth.guidance.expressvpn';
   return 'portState.failed.auth.guidance.generic';
 }
 
@@ -60,7 +56,8 @@ function reasonGuidanceKey(reason: FailReason, providerId: ProviderId): string {
     case 'no-server':
       return 'portState.failed.no-server.guidance';
     case 'key-rejected':
-      return providerId === 'surfshark' ? 'portState.failed.key-rejected.guidance.surfshark' : 'portState.failed.key-rejected.guidance.generic';
+      if (providerId === 'surfshark' || providerId === 'nordvpn') return `portState.failed.key-rejected.guidance.${providerId}`;
+      return 'portState.failed.key-rejected.guidance.generic';
     default:
       return 'portState.failed.no-server.guidance';
   }
@@ -82,6 +79,8 @@ export function describePortState(
   opts: DescribePortStateOptions = {},
 ): PortStateView {
   const now = Date.now();
+  // Copy that names the provider ("Your ZoogVPN plan doesn't include…").
+  const provider = providerName(providerId, t);
   switch (state.kind) {
     case 'queued':
       return { tone: 'neutral', label: t('portState.queued') };
@@ -97,7 +96,7 @@ export function describePortState(
         tone: 'warn',
         label: t('portState.retrying', { seconds }),
         // engine/controller reasons are bare keys ('unreachable'); older callers pass a full i18n key.
-        guidance: t([`portState.reason.${state.reasonKey}`, state.reasonKey], { defaultValue: state.reasonKey }),
+        guidance: t([`portState.reason.${state.reasonKey}`, state.reasonKey], { defaultValue: state.reasonKey, provider }),
         countdownSeconds: seconds,
       };
     }
@@ -107,11 +106,16 @@ export function describePortState(
       // An auth rejection while the same account is online elsewhere is a
       // location-specific refusal, not bad credentials — say so, and steer the
       // user to another location instead of to their (working) sign-in.
-      const locationRejected = state.reason === 'auth' && opts.accountHasWorkingPeer === true;
+      const locationRejected = state.reason === 'auth' && opts.accountHasWorkingPeer === true && state.detail === undefined;
+      // What the app found out about the failure (spec §5.2), when it knows more than the reason.
+      const detail = state.detail ? `portState.failed.detail.${state.detail}` : undefined;
       return {
         tone: 'bad',
-        label: t(locationRejected ? 'portState.failed.auth.labelLocation' : reasonLabelKey(state.reason)),
-        guidance: t(locationRejected ? 'portState.failed.auth.guidance.locationRejected' : reasonGuidanceKey(state.reason, providerId)),
+        label: t(detail ? `${detail}.label` : locationRejected ? 'portState.failed.auth.labelLocation' : reasonLabelKey(state.reason), { provider }),
+        guidance: t(
+          detail ? `${detail}.guidance` : locationRejected ? 'portState.failed.auth.guidance.locationRejected' : reasonGuidanceKey(state.reason, providerId),
+          { provider },
+        ),
         actionLabel:
           state.reason === 'port-in-use' ? t('portState.failed.port-in-use.action') : undefined,
         // Terminal failures don't retry, so they carry no countdown.

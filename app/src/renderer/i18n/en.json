@@ -69,15 +69,62 @@
         "description": "Paste the WireGuard private key from your Surfshark account, or import the WireGuard config you downloaded with it.",
         "keyLabel": "WireGuard private key",
         "keyPlaceholder": "Paste the private key, or the whole WireGuard config",
+        "guide": {
+          "title": "How to get the private key",
+          "step1": "Sign in at https://my.surfshark.com.",
+          "step2": "Go to VPN → Manual setup → Desktop or mobile → WireGuard.",
+          "step3": "Choose “I don't have a key pair” and generate a new key pair.",
+          "step4": "Copy the private key and paste it here.",
+          "step5": "Optional: download a location's config with the key, for its Address line — or import that .conf here directly.",
+          "noteLabels": "Button names on the page may differ slightly; follow the instructions there.",
+          "link": "Open my.surfshark.com"
+        },
         "add": "Add",
         "initials": "S",
-        "hintLead": "Find it at",
-        "hintPath": "my.surfshark.com → VPN → Manual setup → WireGuard",
         "addressLabel": "Interface address (optional)",
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "The Address line of the config Surfshark gave you with this key, e.g. 10.14.0.2/16 or 10.64.x.y/16. Each key has its own. Empty means 10.14.0.2/16.",
         "addressFromConf": "Taken from the config you pasted.",
         "importConf": "Import .conf…"
+      },
+      "nordvpn": {
+        "name": "NordVPN",
+        "description": "Paste an access token from your Nord Account, or your NordLynx private key.",
+        "credentialLabel": "Access token or NordLynx private key",
+        "credentialPlaceholder": "64-character token, or the 44-character key",
+        "guide": {
+          "title": "How to get an access token",
+          "step1": "Sign in at https://my.nordaccount.com.",
+          "step2": "Choose NordVPN in the menu on the left.",
+          "step3": "Scroll down to Advanced settings → Set up NordVPN manually (Nord emails you a verification code).",
+          "step4": "On the Access token tab: Generate new token → choose how long it lasts → Copy, and paste it here.",
+          "noteStored": "The token is used once to fetch your NordLynx key and is not kept; you can delete it in your Nord Account after adding.",
+          "noteService": "The username and password under “Service credentials” are for OpenVPN — Proxy Farm doesn't use them.",
+          "noteKey": "Already have your NordLynx private key? You can paste the key instead.",
+          "link": "Open Nord Account"
+        },
+        "add": "Add",
+        "adding": "Adding…",
+        "initials": "N"
+      },
+      "expressvpn": {
+        "name": "ExpressVPN",
+        "description": "Sign in with the username and password from your ExpressVPN account's Manual configuration (OpenVPN) page.",
+        "username": "Username",
+        "password": "Password",
+        "check": "Check",
+        "checking": "Checking…",
+        "initials": "E",
+        "guide": {
+          "title": "How to get the username and password",
+          "step1": "Sign in at https://www.expressvpn.com/setup (your ExpressVPN account page).",
+          "step2": "Choose Manual configuration (under Set up devices / Advanced setup).",
+          "step3": "Choose the OpenVPN tab.",
+          "step4": "Copy the Username and Password from section 1 and paste them here. They are not your sign-in email and password, and not the activation code.",
+          "noteActivation": "An activation code alone isn't enough: you need to sign in to the website with the account's email.",
+          "noteOvpn": "You can also download a .ovpn file from section 2 and import it under Config file.",
+          "link": "Open expressvpn.com/setup"
+        }
       },
       "file": {
         "name": "Config file",
@@ -89,7 +136,10 @@
         "countryInvalid": "Enter a 2-letter country code (e.g. US, DE).",
         "import": "Import",
         "initials": "F",
-        "chooseAnother": "Choose another"
+        "chooseAnother": "Choose another",
+        "username": "VPN username",
+        "password": "VPN password",
+        "signInNote": "This file signs in with a username and password. Use the ones your provider gives for manual OpenVPN setup; they are stored encrypted with the file."
       }
     },
     "portLimit": {
@@ -100,7 +150,11 @@
       "note": "Cap how many ports each provider may run at the same time.",
       "fieldLabel": "Port limit — {{provider}}",
       "ports_one": "at most {{count}} port",
-      "ports_other": "at most {{count}} ports"
+      "ports_other": "at most {{count}} ports",
+      "why": {
+        "nordvpn": "Default 6: three tunnels on one key were verified together.",
+        "expressvpn": "Default 8: an ExpressVPN plan allows 10 devices at once, so 2 stay free for your own devices."
+      }
     },
     "continueHint": "Connect at least one provider to continue.",
     "status": {
@@ -250,7 +304,9 @@
       "addN_one": "Add {{count}} port",
       "addN_other": "Add {{count}} ports",
       "picked": "Selected locations",
-      "unpick": "Remove {{location}} from the selection"
+      "unpick": "Remove {{location}} from the selection",
+      "notInPlan": "Not in your plan",
+      "notInPlanHint": "Your {{provider}} plan doesn't include this location — every server here refused your account. Pick another location or upgrade your plan."
     },
     "group": {
       "toggle": "Show or hide the ports in {{location}}",
@@ -265,13 +321,25 @@
       "addPortLabel": "Add a port in {{location}}",
       "addPortHint": "Adds one port on a free server — a new exit IP in {{location}}.",
       "noFreeServer": "Every server in {{location}} is already in use or unavailable.",
-      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it in Settings."
+      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it on the Providers screen."
     },
     "port": {
       "label": "{{location}} · port #{{n}}",
       "serverTitle": "Pinned to server {{server}}. This port keeps this exit IP until you change it.",
-      "noServer": "Chosen on first start"
+      "serverTitleSession": "Pinned to server {{server}}. {{provider}} picks the exit IP when the port connects: it stays the same while the port is connected, and may change when the port reconnects.",
+      "sessionExitTitle": "Exit IP of this connection. {{provider}} keeps it while the port stays connected; after a reconnect (a retry, Change IP, or a restart) it may be a different one, even on the same server.",
+      "noServer": "Chosen on first start",
+      "geoHint": "IP geolocates to {{country}}",
+      "geoHintTitle": "IP databases place {{ip}} in {{geo}}, not {{country}}. They often disagree with each other, and VPN providers commonly sell virtual locations: servers that stand in another country but present as the one you chose. The tag shows the country of the location you picked."
     },
+    "exitFacts": {
+      "ip": "Exit IP",
+      "location": "Location",
+      "geo": "IP geolocation",
+      "geoUnknown": "Unknown"
+    },
+    "virtualLocation": "virtual location",
+    "virtualLocationHint": "{{provider}} lists this as a virtual location: its servers stand in another country and present as this one. Sites that look the IP up may place it elsewhere.",
     "changeIp": {
       "menuLabel": "Change IP for port #{{n}}",
       "next": "Next free server",
@@ -298,7 +366,11 @@
         "refused": "This server turned your account away, so it is skipped for 7 days.",
         "dead": "This server didn't respond, so it is skipped for 2 hours."
       },
-      "pick": "Move this port to {{server}}"
+      "pick": "Move this port to {{server}}",
+      "freeTier": "Free tier",
+      "freeTierHint": "A free-tier server: it works on every plan.",
+      "noneFreeNoAltHint": "None free here, and no other location in this country — the port keeps its server",
+      "sessionExitNote": "{{provider}} picks the exit IP when the port connects, not per server: it stays the same while the port is connected, and may change whenever the port reconnects, even to the same server."
     },
     "addResult": {
       "no-free-server_one": "Added {{added}} of {{count}} port in {{location}} — no more free servers there.",
@@ -326,6 +398,7 @@
         "guidance": {
           "hma": "HMA rejected the device credentials — open the HMA app and check you're signed in.",
           "zoogvpn": "ZoogVPN rejected this account's password — check it in the ZoogVPN app or website.",
+          "expressvpn": "ExpressVPN rejected this username or password. Copy them again from Manual configuration → OpenVPN on the ExpressVPN website (not your account email or activation code), then add the account again.",
           "generic": "The provider rejected these credentials — check your sign-in details.",
           "locationRejected": "Your account works at other locations, but this one refused it — try a different location."
         }
@@ -343,12 +416,27 @@
         "label": "Key not answered",
         "guidance": {
           "surfshark": "Surfshark didn't answer this key on 3 servers. Check the key is listed under Manual setup → WireGuard in your Surfshark account, that the address matches the key's own config, and that your subscription is active. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
+          "nordvpn": "NordVPN didn't answer this key on 3 servers. Check that the account it came from still has an active NordVPN subscription, or add the account again with a fresh access token. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more.",
           "generic": "The server didn't answer this WireGuard key on 3 attempts. Check that the key and address in the file are still valid with your provider. Retrying too often can get an account suspended, so Proxy Farm stopped trying — start the port again to try once more."
         }
       },
       "no-server": {
         "label": "No server available",
         "guidance": "No working server could be reached for this location yet. It will keep retrying."
+      },
+      "detail": {
+        "wrong-credentials": {
+          "label": "Wrong email or password",
+          "guidance": "{{provider}} refused this email and password, on a free server too, so it's not your plan. Re-enter them on the {{provider}} card and press Check, then start the port."
+        },
+        "unverified-login": {
+          "label": "Sign-in couldn't be verified",
+          "guidance": "Several {{provider}} servers refused the sign-in, and the free servers that tell a wrong password from your plan couldn't be reached. Check your email and password on the {{provider}} card, or start the port to try again."
+        },
+        "location-not-in-plan": {
+          "label": "Not in your plan",
+          "guidance": "Your {{provider}} plan doesn't include this location — pick another location or upgrade your plan."
+        }
       }
     },
     "attempt": "attempt {{n}}",
@@ -368,7 +456,10 @@
       "server-refused": "This server refused the sign-in — moving to another server in the same location.",
       "server-dead": "This server stopped answering — moving to another server in the same location.",
       "duplicate-exit": "Another port already exits through this IP — moving to a different server.",
-      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often."
+      "rate-limited": "Waiting before the next try, so the provider isn't contacted too often.",
+      "server-not-in-plan": "Your {{provider}} plan doesn't include this server — moving to another one.",
+      "checking-sign-in": "The server refused the sign-in — checking your email and password on a {{provider}} free server…",
+      "credentials-changed": "Your sign-in details just changed — connecting again."
     }
   },
   "settings": {
@@ -468,6 +559,9 @@
     "secretsUnavailable": "This computer's secure storage isn't available, so your passwords and keys are kept in memory only. You'll need to add them again after you quit."
   },
   "rotate": {
+    "server-refused": "{{server}} isn't in your plan, and no other server here is free and usable — the port can't connect.",
+    "server-refused-returned": "{{server}} isn't in your plan — the port went back to {{to}}.",
+    "server-refused-moved": "{{server}} isn't in your plan — the port moved to {{to}} instead.",
     "not-verified": "Rotated, but the old exit IP was unknown, so the change couldn't be confirmed.",
     "online-timeout": "The new server didn't come online in time.",
     "probe-failed": "Rotated, but the new exit IP couldn't be checked.",
@@ -476,6 +570,7 @@
     "port-disabled": "Start the port before rotating it.",
     "decrypt-failed": "Your saved credentials couldn't be read.",
     "rate-limited": "Too many connection attempts on this account in the last minute — try again shortly.",
+    "needs-attention": "This port needs your attention first — start it again to retry.",
     "key-rejected": "Proxy Farm stopped retrying this WireGuard key after it got no answer. Start the port in the app to try once more."
   },
   "hma": {
@@ -496,21 +591,43 @@
   "zoogvpn": {
     "check": {
       "missingUsername": "Enter your ZoogVPN email.",
-      "missingPassword": "Enter your ZoogVPN password."
+      "missingPassword": "Enter your ZoogVPN password.",
+      "wrongCredentials": "ZoogVPN says this email or password is wrong. Check them and try again.",
+      "unverified": "Added, but the sign-in couldn't be checked right now: ZoogVPN's free servers didn't answer. Proxy Farm checks it again when a port connects."
     }
   },
   "surfshark": {
-    "keyLabel": "Key …{{suffix}}",
+    "keyLabel": "Public key …{{suffix}}",
+    "legacyKeyLabel": "WireGuard key",
     "check": {
       "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
       "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",
       "invalidConfig": "That WireGuard config has no PrivateKey line under [Interface]."
     }
   },
+  "nordvpn": {
+    "check": {
+      "tokenRejected": "Nord refused this access token. It may be mistyped, expired or revoked — create a new one in your Nord Account and try again.",
+      "networkError": "Couldn't reach Nord to check the access token. Check your connection and try again.",
+      "noKey": "Nord accepted the token but returned no NordLynx key. Check that this Nord Account has an active NordVPN subscription.",
+      "invalidInput": "That isn't a NordVPN access token (64 characters, 0–9 and a–f) or a NordLynx private key (44 characters ending in =)."
+    }
+  },
+  "expressvpn": {
+    "userLabel": "Username …{{suffix}}",
+    "check": {
+      "missingUsername": "Enter the ExpressVPN username.",
+      "missingPassword": "Enter the ExpressVPN password.",
+      "notManualCredentials": "That looks like your account email. Use the username and password from Manual configuration → OpenVPN on the ExpressVPN website instead.",
+      "tooLong": "ExpressVPN accepts at most 128 bytes per username or password. Use the Manual configuration (OpenVPN) username and password, not a token from the ExpressVPN app.",
+      "wrongCredentials": "ExpressVPN says this username or password is wrong. Use the ones under Manual configuration → OpenVPN on the ExpressVPN website — not your account email and password, and not the activation code.",
+      "unverified": "Added, but the sign-in couldn't be checked right now: no ExpressVPN server answered. Proxy Farm checks it when a port connects."
+    }
+  },
   "file": {
     "unsupportedDirective": "This file uses a setting Proxy Farm doesn't support: {{label}}",
     "check": {
-      "needsCredentials": "This .ovpn file needs a username and password, which isn't supported yet.",
+      "needsCredentials": "This .ovpn file signs in with a username and password. Enter them, then import again.",
       "unknownExtension": "Only .ovpn and .conf files are supported.",
       "parseError": "This file couldn't be read."
     }
@@ -546,7 +663,7 @@
     "title": "Privacy",
     "collectsNothing": "Proxy Farm collects nothing about you. There is no telemetry, no analytics and no crash reporting, and there is no Proxy Farm server.",
     "local": "Your accounts, ports and settings stay on this computer. Passwords, keys and tokens are encrypted by your operating system (Keychain on macOS, DPAPI on Windows).",
-    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. These requests come from your own IP address.",
+    "providers": "Each port connects to your VPN provider's servers with your own account. Surfshark ports also download Surfshark's public server list from api.surfshark.com, and Surfshark server names are looked up through Google Public DNS (dns.google) as well as your normal DNS. NordVPN ports download NordVPN's public server list from api.nordvpn.com, without your account; adding a NordVPN access token sends it once to api.nordvpn.com to fetch your NordLynx key, and the token is not kept. ExpressVPN ports look up ExpressVPN server names (expressnetw.com) through Google Public DNS (dns.google) as well as your normal DNS; there is no other ExpressVPN request besides the VPN connection itself. These requests come from your own IP address.",
     "ipCheck": "To confirm a tunnel works, Proxy Farm checks its exit IP and reachability through that tunnel, with api.ipify.org, ifconfig.co, ipinfo.io and www.gstatic.com. They see the tunnel's exit IP, not yours.",
     "optional": "The speed test (only when you run it) downloads a test file from speed.cloudflare.com through the port. The update check asks GitHub for the latest release, on start and once a day; you can turn it off under Updates.",
     "delete": "To delete all data: remove your accounts and ports, quit Proxy Farm, then delete its data folder: ~/Library/Application Support/Proxy Farm on macOS, %APPDATA%\\Proxy Farm on Windows.",
@@ -559,7 +676,7 @@
     "ownAccounts": "Use your own VPN accounts, on your own computer. How you use the tool is your decision and your responsibility: follow your VPN provider's terms of service and the laws where you live. Most providers forbid sharing or reselling a subscription.",
     "suspension": "Providers may suspend or close accounts they consider abusive, including too many connections or reconnects in a short time. That risk is yours, not the project's.",
     "noGuarantee": "There is no guarantee of availability, speed, number of IP addresses or compatibility with any provider. Providers can change their systems and stop the tool from working at any time.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, ExpressVPN, WireGuard and other names are trademarks of their owners. Proxy Farm is not affiliated with, sponsored by or endorsed by any of them.",
     "full": "Full disclaimer"
   },
   "firstRun": {
@@ -568,7 +685,7 @@
     "terms": "Follow your provider's terms: sharing or reselling a subscription is usually forbidden.",
     "suspension": "Providers may suspend accounts for abuse, including excessive reconnects.",
     "asIs": "Proxy Farm is provided as is, with no warranty.",
-    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark or ZoogVPN.",
+    "notAffiliated": "Proxy Farm is not affiliated with HMA / Gen Digital, Surfshark, ZoogVPN, NordVPN / Nord Security or ExpressVPN.",
     "acknowledge": "I understand",
     "readFull": "Read the full disclaimer"
   },

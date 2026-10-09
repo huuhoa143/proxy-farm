@@ -5,7 +5,7 @@
  * agreement: every exported name here is relied on by at least two modules.
  *   engine/     renderConfig, invariants, ports, supervisor, pid registry   (spec §6.1–6.3)
  *   health/     log signals, /delay, exit-IP, state machine, backoff        (spec §6.4)
- *   providers/  hma, zoogvpn, surfshark, file + catalogs                    (spec §5)
+ *   providers/  hma, zoogvpn, surfshark, nordvpn, expressvpn, file + catalogs (spec §5)
  *   controller/ store, accounts, port manager, power, webhook, IPC          (spec §3, §4, §6.5–6.7)
  *   renderer/   React UI + i18n, talks only to `window.proxyFarm`           (spec §4)
  */
@@ -25,7 +25,15 @@ export interface OpenVpnEndpoint {
   tls: {
     certificate: string[]; // inline PEM lines (never a path — §6.1.1)
     server_name?: string;
+    /** How `server_name` is matched against the server certificate (OpenVPN
+     * `verify-x509-name <name> <type>`); sing-box's default is the full subject. */
+    server_name_type?: 'subject' | 'name' | 'name-prefix';
+    /** Client-certificate auth (OpenVPN `<cert>` / `<key>`): inline PEM lines, both or neither. */
+    client_certificate?: string[];
+    client_key?: string[];
     remote_certificate_tls?: 'server';
+    /** OpenVPN `ns-cert-type server`: the legacy Netscape check on the server certificate. */
+    ns_certificate_type?: 'server';
     control_wrap?: {
       type: 'tls_auth' | 'tls_crypt';
       key: string[]; // inline key lines
@@ -35,6 +43,16 @@ export interface OpenVpnEndpoint {
   data_ciphers: string[];
   data_ciphers_fallback?: string;
   auth?: string; // e.g. 'SHA256'
+  /** OpenVPN `fragment N`: split data packets above N bytes. A server configured with it
+   * needs the client to match, or the tunnel comes up and carries nothing (ExpressVPN). */
+  fragment?: number;
+  /** OpenVPN `mssfix N [mtu|fixed]`. Unset, sing-box clamps by default (from `fragment`, else 1492). */
+  mss_fix?: number;
+  mss_fix_mode?: 'mtu' | 'fixed';
+  /** OpenVPN `mssfix 0`: no clamping. Excludes `mss_fix` and `mss_fix_mode`. */
+  mss_fix_disabled?: true;
+  /** OpenVPN `comp-lzo no`: compression framing on, compression off. */
+  compression_lzo?: 'no';
   route_no_pull: true;
   explicit_exit_notify?: number;
   mtu: number;
@@ -65,7 +83,44 @@ export interface RenderInput {
 
 // ───────────────────────── providers & catalogs (spec §5) ─────────────────────────
 
-export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'file';
+export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
+
+/**
+ * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
+ * unlimited. An explicit user value, 0 included, always wins. ExpressVPN: a plan allows
+ * 10 devices at once; 8 leaves 2 for the user's own devices (spec §5.6).
+ */
+export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6, expressvpn: 8 };
+
+/** The port limit in force for a provider: the user's, else the default, else 0. */
+export function portLimitOf(limits: Partial<Record<ProviderId, number>>, providerId: ProviderId): number {
+  return limits[providerId] ?? DEFAULT_PORT_LIMITS[providerId] ?? 0;
+}
+
+/**
+ * How a provider's exit IP relates to the server a port pins (spec §5, §6.8):
+ *   server   — one exit per server, for good: the server's own IP (HMA, ZoogVPN) or
+ *              another IP that server always uses (ExpressVPN: .69 always exits as .47).
+ *              Either way an exit seen once identifies the server.
+ *   server+1 — the server's IP + 1, stable per server (Surfshark).
+ *   session  — chosen when the tunnel connects: fixed while it stays connected, but a
+ *              new connection to the same server may get another one (NordVPN). Also
+ *              the safe assumption for an imported file, whose provider is unknown.
+ * For `session` providers an exit seen once says nothing about the server's next
+ * session: it is not a server identity, and a different exit after a reconnect is
+ * normal, never an error.
+ */
+export type ExitIpModel = 'server' | 'server+1' | 'session';
+
+/** Static per provider, like `DEFAULT_PORT_LIMITS`: main and the renderer both read it. */
+export const EXIT_IP_MODELS: Record<ProviderId, ExitIpModel> = {
+  hma: 'server',
+  zoogvpn: 'server',
+  surfshark: 'server+1',
+  nordvpn: 'session',
+  expressvpn: 'server',
+  file: 'session',
+};
 
 /** One selectable exit location. `key` is stable across catalog refreshes. */
 export interface Target {
@@ -74,6 +129,16 @@ export interface Target {
   country: string; // ISO-3166 alpha-2, upper case
   city: string;
   label: string;
+  /** The location covers the whole country: `city` is only the country's name, in the
+   * provider's language (ZoogVPN "Germany"). The UI shows the localised country name. */
+  countryWide?: boolean;
+  /**
+   * The provider marks the location virtual: its servers stand in another country and
+   * only present as `country` (NordVPN's `virtual_location`, Surfshark's `virtual` tag).
+   * `country` is still what the location is sold as, and what the UI tags its exits
+   * with. Optional; absent = not marked.
+   */
+  virtualLocation?: boolean;
   /**
    * The location's server pool, best first (spec §6.8). Each entry is one server = one
    * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname
@@ -87,8 +152,20 @@ export interface Target {
    * absent means every token is one server.
    */
   poolHostnames?: boolean;
+  /**
+   * Servers of `servers` on the provider's free tier: any valid login may use them,
+   * whatever its plan, so a handshake there checks the credentials alone (spec §5.2,
+   * ZoogVPN `*.zgfree.info`). Optional; absent means none.
+   */
+  freeTierServers?: string[];
   /** Filled by the controller in `listTargets`: usable servers not held by any port. */
   freeServers?: number;
+  /**
+   * Filled by the controller in `listTargets`: every server of the location has refused
+   * every account of its provider (spec §6.8, §5.2) — the location is not in the user's
+   * plan(s). Absent otherwise.
+   */
+  notInPlan?: boolean;
 }
 
 /** Health of one server for one account (spec §6.8). */
@@ -105,6 +182,8 @@ export interface ServerInfo {
   lastOk?: number;
   /** Key of the port currently pinned to this server, if any. */
   heldBy?: string;
+  /** On the provider's free tier (`Target.freeTierServers`): usable on any plan. */
+  freeTier?: boolean;
 }
 
 /** Separator between a location key and a port number in a port key (spec §6.8). */
@@ -142,11 +221,28 @@ export type AccountSecret =
 export interface CheckResult {
   ok: boolean;
   reasonKey?: string; // i18n key
-  label?: string; // human label for the account, e.g. 'key …AbC='
+  label?: string; // human label for the account, e.g. 'pubkey …qqbTmo' (never from a secret)
+  /** i18n key of a caveat on an accepted result, e.g. the login could not be checked
+   * live right now ('zoogvpn.check.unverified'). */
+  noteKey?: string;
 }
 
 export interface Provider {
   id: ProviderId;
+  /**
+   * Optional network step that runs once, before `check`, when an account is added
+   * (spec §5.5: NordVPN exchanges an access token for the account's NordLynx key).
+   * Resolves to the input `check` should validate instead, or to a refusal (an i18n
+   * key). Never rejects. Providers without it get their input checked as typed.
+   */
+  resolveInput?(input: Record<string, string>): Promise<{ input: Record<string, string> } | { reasonKey: string }>;
+  /**
+   * The provider has no plans that limit servers: every server takes every valid login,
+   * so one test connection to any server checks the credentials (spec §5.6, ExpressVPN).
+   * Unlike a free tier (`Target.freeTierServers`) this tells the credential probe where
+   * it may ask; an auth failure still just means the login is wrong. Absent = false.
+   */
+  anyServerChecksLogin?: boolean;
   /** Validate user input (format only, no network) and normalise it. */
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */
@@ -171,13 +267,39 @@ export type DelayResult = { code: 200; ms: number } | { code: 503 } | { code: 50
  */
 export type FailReason = 'auth' | 'not-in-plan' | 'port-in-use' | 'no-server' | 'key-rejected';
 
+/**
+ * What the app found out about a failure, beyond its reason (spec §5.2):
+ *   wrong-credentials    — `auth`: a free-tier server refused the login too, so the
+ *                          email/password are wrong (not the plan).
+ *   unverified-login     — `auth`: several servers refused the login and no free-tier
+ *                          server could be reached to tell a wrong password from the plan.
+ *   location-not-in-plan — `not-in-plan`: every server of the location refused an
+ *                          account whose login works.
+ */
+export type FailDetail = 'wrong-credentials' | 'unverified-login' | 'location-not-in-plan';
+
+/**
+ * Failures retrying cannot fix: the provider refused the login, the plan does not
+ * include the location's servers, or a WireGuard key got no answer. Nothing restarts
+ * such a port automatically (no timer, no engine) until the user acts: Start, Change
+ * IP, or new credentials. `port-in-use` and `no-server` are transient and keep retrying.
+ */
+export function isTerminalFailure(reason: FailReason): boolean {
+  return reason === 'auth' || reason === 'not-in-plan' || reason === 'key-rejected';
+}
+
+/** True for a `failed` state that is terminal (see `isTerminalFailure`). */
+export function isTerminalState(state: PortState): boolean {
+  return state.kind === 'failed' && isTerminalFailure(state.reason);
+}
+
 export type PortState =
   | { kind: 'queued' }
   | { kind: 'connecting'; since: number }
   | { kind: 'verifying'; since: number }
   | { kind: 'online'; since: number; exitIp: string; country: string; latencyMs?: number }
   | { kind: 'retrying'; untilMs: number; attempt: number; reasonKey: string }
-  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number }
+  | { kind: 'failed'; reason: FailReason; untilMs: number; attempt: number; detail?: FailDetail }
   | { kind: 'stopped' };
 
 export interface ExitIpResult {
@@ -244,6 +366,12 @@ export interface RotateResult {
    * (§6.5 step 2): that location's city. Reported even when `changed` is false (the new
    * exit IP could not be confirmed), so the move is never silent. */
   movedTo?: string;
+  /** Set when the server Change IP moved the port to refused its account (not in the
+   * plan, another tenant's server): that server. The port does not stay on it. */
+  refusedServer?: string;
+  /** With `refusedServer`: the server the port went to instead, once it was online
+   * again (the one it was on before when still usable). Absent when it found none. */
+  landedOn?: string;
 }
 
 export interface AppStatus {
@@ -331,7 +459,14 @@ export interface ProxyFarmApi {
    * says the helper is missing. Elsewhere there is nothing to enable: `{ok:true}`. Failures carry
    * `hma.enable.{cancelled|no-credentials|failed}`. */
   enableHmaSupport(): Promise<CheckResult>;
-  importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
+  /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
+   * Without them such a file answers `file.check.needsCredentials`. */
+  importConfigFile(
+    name: string,
+    content: string,
+    country?: string,
+    credentials?: { username: string; password: string },
+  ): Promise<CheckResult & { account?: Account }>;
   /** Locations with `freeServers` filled in (spec §6.8). */
   listTargets(providerId?: ProviderId): Promise<Target[]>;
 
@@ -386,6 +521,10 @@ export interface ProxyFarmApi {
   // push events (return an unsubscribe fn)
   onPortsChanged(cb: (rows: PortRow[]) => void): () => void;
   onHostVpnChanged(cb: (active: boolean) => void): () => void;
+  /** A server health mark changed (refused, dead, confirmed online, or a hostname
+   * resolved onto a marked machine): the locations' `freeServers`/`notInPlan` from
+   * `listTargets` may be out of date. Carries nothing; re-read what you show. */
+  onTargetsChanged(cb: () => void): () => void;
   onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
 }
 
@@ -397,7 +536,12 @@ export const IPC = {
     'testPort', 'getLogs', 'exportPorts', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',
   ] as const,
-  events: { portsChanged: 'pf:portsChanged', hostVpnChanged: 'pf:hostVpnChanged', updateStatus: 'pf:updateStatus' } as const,
+  events: {
+    portsChanged: 'pf:portsChanged',
+    hostVpnChanged: 'pf:hostVpnChanged',
+    targetsChanged: 'pf:targetsChanged',
+    updateStatus: 'pf:updateStatus',
+  } as const,
 } as const;
 
 declare global {

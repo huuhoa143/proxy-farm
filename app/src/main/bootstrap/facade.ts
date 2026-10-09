@@ -1,6 +1,8 @@
 import { isIP } from 'node:net';
 import path from 'node:path';
 import {
+  isTerminalState,
+  portLimitOf,
   splitPortKey,
   type Account,
   type AccountSecret,
@@ -15,8 +17,9 @@ import {
 } from '../../shared/contracts';
 import type { AccountPool } from '../accounts/pool';
 import type { HostVpnDetector } from '../controller/host-vpn';
-import type { PortManager } from '../controller/port-manager';
+import type { CredentialVerdict, PortManager } from '../controller/port-manager';
 import type { PortAllocator } from '../controller/ports';
+import { legacyKeyLabel } from '../providers/wg-key';
 import type { StartQueue } from '../controller/start-queue';
 import { applySettingsPatch } from '../controller/settings';
 import type { ControllerFacade } from '../ipc/index';
@@ -27,7 +30,7 @@ import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
 import type { HmaWindowsSupport } from './hma-windows';
 
-export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
+export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'];
 
 /** The slice of the `UpdaterService` the facade drives from IPC (spec §9). */
 export interface FacadeUpdater {
@@ -114,12 +117,25 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   }
 
   /** Overwrites an existing account's secret; if it really changed, server marks earned
-   * under the old credentials are dropped (a 7-day refusal must not outlive them). */
-  function replaceAccountSecret(account: Account, secret: AccountSecret): void {
+   * under the old credentials are dropped (a 7-day refusal must not outlive them).
+   * Returns whether it changed. */
+  function replaceAccountSecret(account: Account, secret: AccountSecret): boolean {
     const next = JSON.stringify(secret);
-    if (deps.secrets.loadSecret(account.secretRef) === next) return;
+    if (deps.secrets.loadSecret(account.secretRef) === next) return false;
     deps.secrets.saveSecret(account.secretRef, next);
     deps.portManager.credentialsChanged(account.id);
+    return true;
+  }
+
+  /** The user just fixed or re-checked an account's login: its ports that failed for
+   * good start again (a user action). With unchanged credentials only the sign-in
+   * failures do; a plan refusal still stands. */
+  function restartFailedPorts(accountId: string, credentialsChanged: boolean): void {
+    for (const p of deps.state.getState().ports) {
+      if (p.accountId !== accountId || !p.enabled || !isTerminalState(p.state)) continue;
+      if (!credentialsChanged && !(p.state.kind === 'failed' && p.state.reason === 'auth')) continue;
+      enqueueStart(p.key);
+    }
   }
 
   function createAccount(providerId: ProviderId, label: string, secret: AccountSecret, meta: Record<string, string>): Account {
@@ -256,10 +272,18 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     return { ok: true, label: account.label, account };
   }
 
-  async function importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }> {
+  async function importConfigFile(
+    name: string,
+    content: string,
+    country?: string,
+    credentials?: { username: string; password: string },
+  ): Promise<CheckResult & { account?: Account }> {
     const provider = deps.providers.get('file');
     if (!provider) return { ok: false, reasonKey: 'file.check.parseError' };
-    const check = provider.check({ name, content });
+    // From the renderer: only two strings get through, nothing else the check might read.
+    const { username, password } = credentials ?? {};
+    const creds: Record<string, string> = typeof username === 'string' && typeof password === 'string' ? { username, password } : {};
+    const check = provider.check({ name, content, ...creds });
     if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
     const cc = (country?.trim() || guessCountry(name) || '??').toUpperCase().slice(0, 2);
     const city = path.basename(name).replace(/\.[^.]+$/, '');
@@ -275,7 +299,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
         id,
         accounts: accounts().filter((a) => a.providerId === id),
         detected: id === 'hma' ? hmaDetected : undefined,
-        limit: limits[id] ?? 0,
+        limit: portLimitOf(limits, id),
       }));
     },
 
@@ -285,23 +309,64 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       const provider = deps.providers.get(providerId);
       if (!provider) return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
       // The ZoogVPN card labels its login field "email"; the provider calls it username.
-      const normalized = providerId === 'zoogvpn' && !input.username ? { ...input, username: input.email ?? '' } : input;
+      let normalized = providerId === 'zoogvpn' && !input.username ? { ...input, username: input.email ?? '' } : input;
+      // spec §5.5: some input must be exchanged over the network first (a NordVPN access
+      // token for its NordLynx key), once; what is exchanged is never stored.
+      if (provider.resolveInput) {
+        const resolved = await provider.resolveInput(normalized);
+        if ('reasonKey' in resolved) return { ok: false, reasonKey: resolved.reasonKey };
+        normalized = resolved.input;
+      }
       const check = provider.check(normalized);
       if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
-      const duplicate = accounts().find((a) => a.providerId === providerId && a.label === (check.label ?? ''));
+      const secret = check.secret;
+      // An account whose key could not be read at startup keeps its legacy private-key
+      // label (`migrateKeyLabels`); re-adding that key must still repair it, not add a twin.
+      const legacyLabel = secret.kind === 'wgkey' ? legacyKeyLabel(secret.privateKey) : undefined;
+      const duplicate = accounts().find(
+        (a) => a.providerId === providerId && (a.label === (check.label ?? '') || (legacyLabel !== undefined && a.label === legacyLabel)),
+      );
+
+      // spec §5.2: an email/password login is checked live, once, against a free-tier
+      // server before it is stored (ZoogVPN: plan refusals and a wrong password look the
+      // same on every other server). A rejected login is not stored at all.
+      let verdict: CredentialVerdict = 'unsupported';
+      if (secret.kind === 'userpass') {
+        const candidate: Account = duplicate ?? {
+          id: nextAccountId(providerId),
+          providerId,
+          label: check.label ?? providerId,
+          meta: check.meta ?? {},
+          secretRef: '',
+        };
+        verdict = await deps.portManager.checkCredentials(candidate, secret);
+        if (verdict === 'rejected') return { ok: false, reasonKey: `${providerId}.check.wrongCredentials`, label: check.label };
+      }
+      const note = verdict === 'unverified' ? { noteKey: `${providerId}.check.unverified` } : {};
+
       if (duplicate) {
-        replaceAccountSecret(duplicate, check.secret);
+        let changed = replaceAccountSecret(duplicate, secret);
         // Re-adding the same key with a corrected interface address (Surfshark) is a
         // credentials change too: what failed under the old address proves nothing.
         const meta = { ...duplicate.meta, ...(check.meta ?? {}) };
-        if (JSON.stringify(meta) === JSON.stringify(duplicate.meta)) return { ok: true, label: duplicate.label, account: duplicate };
-        const updated: Account = { ...duplicate, meta };
-        deps.state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === duplicate.id ? updated : a)) }));
-        deps.portManager.credentialsChanged(duplicate.id);
-        return { ok: true, label: updated.label, account: updated };
+        const metaChanged = JSON.stringify(meta) !== JSON.stringify(duplicate.meta);
+        const label = check.label ?? duplicate.label;
+        let account = duplicate;
+        if (metaChanged || label !== duplicate.label) {
+          account = { ...duplicate, label, meta };
+          deps.state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === duplicate.id ? account : a)) }));
+        }
+        if (metaChanged) {
+          deps.portManager.credentialsChanged(duplicate.id);
+          changed = true;
+        }
+        deps.portManager.recordCredentialCheck(account.id, verdict);
+        if (verdict !== 'unsupported') restartFailedPorts(account.id, changed);
+        return { ok: true, label: account.label, account, ...note };
       }
-      const account = createAccount(providerId, check.label ?? providerId, check.secret, check.meta ?? {});
-      return { ok: true, label: account.label, account };
+      const account = createAccount(providerId, check.label ?? providerId, secret, check.meta ?? {});
+      deps.portManager.recordCredentialCheck(account.id, verdict);
+      return { ok: true, label: account.label, account, ...note };
     },
 
     async removeAccount(accountId) {
@@ -312,6 +377,8 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
         await deps.portManager.removePort(p.key);
       }
       deps.secrets.deleteSecret(account.secretRef);
+      // Its server marks and login check go with it (an id may be reused by a new account).
+      deps.portManager.credentialsChanged(accountId);
       deps.state.setState((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== accountId) }));
     },
 
@@ -330,7 +397,12 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     async listTargets(providerId) {
       const ids = providerId ? [providerId] : PROVIDER_IDS;
       const out: Target[] = [];
-      for (const id of ids) for (const t of await targetsFor(id)) out.push({ ...t, freeServers: deps.portManager.freeServerCount(t) });
+      for (const id of ids) {
+        for (const t of await targetsFor(id)) {
+          const notInPlan = deps.portManager.locationNotInPlan(t);
+          out.push({ ...t, freeServers: deps.portManager.freeServerCount(t), ...(notInPlan ? { notInPlan } : {}) });
+        }
+      }
       return out;
     },
 

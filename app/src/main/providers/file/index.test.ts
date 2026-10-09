@@ -10,6 +10,7 @@ const GOOD_OVPN = readFileSync(path.join(FIXTURES, 'good.ovpn'), 'utf8');
 const BAD_OVPN = readFileSync(path.join(FIXTURES, 'bad-unsupported-directive.ovpn'), 'utf8');
 const GOOD_CONF = readFileSync(path.join(FIXTURES, 'good.conf'), 'utf8');
 const BAD_CONF = readFileSync(path.join(FIXTURES, 'bad-unsupported-directive.conf'), 'utf8');
+const EXPRESS_OVPN = readFileSync(path.join(FIXTURES, 'expressvpn-style.ovpn'), 'utf8');
 
 describe('file provider: check — .ovpn', () => {
   it('accepts a good .ovpn needing credentials, once credentials are supplied', () => {
@@ -112,5 +113,34 @@ describe('file provider: targets + bind round trip', () => {
     expect((endpoint as any).peers[0].address).toBe('203.0.113.9');
     const json = JSON.stringify(endpoint);
     expect(json).not.toMatch(/_path/);
+  });
+});
+
+describe('file provider: an ExpressVPN-style .ovpn (client certificate + username/password)', () => {
+  it('asks for a username and password, then renders a config sing-box accepts the shape of', async () => {
+    expect(fileProvider.check({ name: 'my_expressvpn_vietnam_udp.ovpn', content: EXPRESS_OVPN }).reasonKey).toBe('file.check.needsCredentials');
+    const checked = fileProvider.check({ name: 'my_expressvpn_vietnam_udp.ovpn', content: EXPRESS_OVPN, username: 'me', password: 'pw' });
+    expect(checked.ok).toBe(true);
+    const account: Account = { id: 'file-2', providerId: 'file', label: 'x', meta: checked.meta!, secretRef: 'file-2' };
+    const [target] = await fileProvider.targets(account);
+    const endpoint = fileProvider.bind(target, '203.0.113.9', account, checked.secret as AccountSecret);
+    expect(endpoint).toMatchObject({
+      type: 'openvpn-client',
+      server: '203.0.113.9',
+      server_port: 1195,
+      network: 'udp',
+      username: 'me',
+      password: 'pw',
+      tls: { server_name: 'Server', server_name_type: 'name-prefix', ns_certificate_type: 'server' },
+      data_ciphers: ['AES-256-GCM'],
+      auth: 'SHA512',
+      fragment: 1300,
+      mss_fix: 1200,
+      compression_lzo: 'no',
+      mtu: 1500,
+    });
+    expect((endpoint as { tls: { client_certificate: string[] } }).tls.client_certificate[0]).toBe('-----BEGIN CERTIFICATE-----');
+    expect((endpoint as { tls: { client_key: string[] } }).tls.client_key[0]).toBe('-----BEGIN RSA PRIVATE KEY-----');
+    expect(JSON.stringify(endpoint)).not.toMatch(/_path/);
   });
 });

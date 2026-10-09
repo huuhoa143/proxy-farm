@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IPC, type PortRow } from '../../shared/contracts';
-import { broadcastHostVpnChanged, broadcastPortsChanged, registerIpcHandlers, type ControllerFacade } from './index';
+import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastTargetsChanged, registerIpcHandlers, type ControllerFacade } from './index';
 
 function fakeController(): ControllerFacade {
   return {
@@ -128,5 +128,11 @@ describe('event broadcast (spec §3 push events)', () => {
     const w1 = { send: vi.fn() };
     broadcastHostVpnChanged([w1], true);
     expect(w1.send).toHaveBeenCalledWith(IPC.events.hostVpnChanged, true);
+  });
+
+  it('broadcastTargetsChanged sends a bare targets-changed event', () => {
+    const w1 = { send: vi.fn() };
+    broadcastTargetsChanged([w1]);
+    expect(w1.send).toHaveBeenCalledWith(IPC.events.targetsChanged);
   });
 });

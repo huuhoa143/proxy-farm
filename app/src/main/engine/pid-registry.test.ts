@@ -56,6 +56,16 @@ describe('recordPid / removePid', () => {
     await expect(removePid(registryPath, 'nope')).resolves.toBeUndefined();
   });
 
+  it('removePid with a pid removes only that process, not one that replaced it', async () => {
+    dir = await mkdtemp(path.join(tmpdir(), 'pf-pidreg-'));
+    registryPath = path.join(dir, 'pids.json');
+    await recordPid(registryPath, 'nordvpn:VN-HANOI#1', { pid: 5001, exe: '/path/to/sing-box', startedAt: 1 });
+    await removePid(registryPath, 'nordvpn:VN-HANOI#1', 4000); // an older child's late exit
+    expect(JSON.parse(await readFile(registryPath, 'utf8'))).toHaveProperty(['nordvpn:VN-HANOI#1', 'pid'], 5001);
+    await removePid(registryPath, 'nordvpn:VN-HANOI#1', 5001);
+    expect(JSON.parse(await readFile(registryPath, 'utf8'))).toEqual({});
+  });
+
   it('serializes concurrent recordPid calls so all of them persist (no lost updates)', async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'pf-pidreg-'));
     registryPath = path.join(dir, 'pids.json');

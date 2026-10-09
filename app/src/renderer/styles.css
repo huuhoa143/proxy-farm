@@ -43,6 +43,8 @@
   --pc-hma: #ffcc33;
   --pc-zoogvpn: #5aa8ff;
   --pc-surfshark: #2fd3c6;
+  --pc-nordvpn: #8f9bff;
+  --pc-expressvpn: #ff6b6b;
   --pc-file: #a6b2cc;
 }
 [data-theme='light'] {
@@ -76,6 +78,8 @@
   --pc-hma: #d9a100;
   --pc-zoogvpn: #2b74c9;
   --pc-surfshark: #12a497;
+  --pc-nordvpn: #4b57d1;
+  --pc-expressvpn: #d63c3c;
   --pc-file: #68738c;
 }
 
@@ -1064,6 +1068,14 @@ table.port-table {
 .pv-surfshark {
   --pc: var(--pc-surfshark);
 }
+.psw.nordvpn,
+.pv-nordvpn {
+  --pc: var(--pc-nordvpn);
+}
+.psw.expressvpn,
+.pv-expressvpn {
+  --pc: var(--pc-expressvpn);
+}
 .psw.file,
 .pv-file {
   --pc: var(--pc-file);
@@ -1143,6 +1155,38 @@ table.port-table {
   font-size: 11px;
   font-weight: 600;
   color: var(--mut);
+}
+/* Where IP geolocation puts the exit, when it disagrees with the location: a hint only. */
+.ip .geo-hint {
+  font-size: 10.5px;
+  color: var(--mut);
+  opacity: 0.85;
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+}
+.pill.virt {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  cursor: help;
+}
+.exit-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 10px;
+  font-size: 12px;
+}
+.exit-facts dt {
+  color: var(--mut);
+}
+.exit-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lat {
   font-family: var(--fm);
@@ -1297,6 +1341,14 @@ table.port-table {
 .pill.acc {
   color: var(--acc);
   background: var(--acc-soft);
+  border-color: transparent;
+}
+.pill.free {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  color: var(--ok);
+  background: var(--ok-soft);
   border-color: transparent;
 }
 
@@ -1824,6 +1876,47 @@ table.port-table {
   gap: 10px;
   margin-top: auto;
   flex-wrap: wrap;
+}
+/* add-account credential guide (CredentialGuide.tsx) */
+.cred-guide {
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.cred-guide > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dim);
+  cursor: pointer;
+  list-style: none;
+}
+.cred-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.cred-guide > summary span {
+  flex: 1;
+}
+.cred-guide > summary svg:last-child {
+  transition: transform 0.15s var(--ease);
+}
+.cred-guide[open] > summary svg:last-child {
+  transform: rotate(90deg);
+}
+.cred-guide-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 12px 12px;
+}
+.cred-guide .steps li {
+  align-items: flex-start;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .state-line {
   display: flex;
@@ -2365,7 +2458,8 @@ a.btn {
     padding-left: 10px;
     padding-right: 10px;
   }
-  .ip .cc {
+  .ip .cc,
+  .ip .geo-hint {
     display: none;
   }
 }
@@ -2801,6 +2895,13 @@ svg.i.spin {
 .cim-msg.bad {
   color: var(--bad);
 }
+.cim-msg.cim-note {
+  display: block;
+  max-width: 340px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
 
 /* picker: per-location quantity */
 .opt {
@@ -2862,6 +2963,18 @@ svg.i.spin {
   opacity: 0.45;
   cursor: default;
   background: transparent;
+}
+/* A location outside the plan: the stepper is there, but greyed out. */
+.stepper.is-disabled {
+  border-color: var(--line);
+  animation: none;
+  cursor: not-allowed;
+}
+.stepper.is-disabled input {
+  color: var(--mut);
+}
+.opt.not-in-plan .city .pool {
+  color: var(--bad);
 }
 .stepper input {
   width: 36px;

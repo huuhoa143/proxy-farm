@@ -30,6 +30,24 @@ export interface ServerHealthState {
   refused: Record<string, Record<string, number>>;
   /** accountId -> (server -> epoch ms the server was last confirmed online) */
   lastOk: Record<string, Record<string, number>>;
+  /** hostname -> the IP it last resolved to. Marks of a server whose IP is known are
+   * keyed by that IP, shared by every hostname on it. Absent in older files. */
+  ips?: Record<string, string>;
+}
+
+/**
+ * What a live credential check (spec §5.2, controller/credential-probe.ts) last showed
+ * about an account's login:
+ *   verified   — a server accepted it (the free-tier probe, or any port going online);
+ *   rejected   — a free-tier server refused it: the email/password are wrong;
+ *   unverified — no free-tier server could be reached to check it.
+ * `at` is when that was learned; `verifiedAt` is the last time it was verified (kept
+ * through a later `rejected`/`unverified`).
+ */
+export interface CredentialCheck {
+  state: 'verified' | 'rejected' | 'unverified';
+  at: number;
+  verifiedAt?: number;
 }
 
 export interface AppState {
@@ -47,6 +65,9 @@ export interface AppState {
    * accountId -> epoch ms of the lock. Persisted so an app restart does not start the
    * failed-handshake count over against the provider. */
   wgLockouts: Record<string, number>;
+  /** accountId -> the last credential check (spec §5.2). Dropped when the account's
+   * credentials change. */
+  credentials: Record<string, CredentialCheck>;
 }
 
 /** Secret-store ids `settings.proxyPass` / `settings.webhook.bearer` are kept under —
@@ -91,6 +112,7 @@ export function defaultState(randomPass?: () => string): AppState {
     serverHealth: { refused: {}, lastOk: {} },
     locationAliases: {},
     wgLockouts: {},
+    credentials: {},
   };
 }
 
@@ -188,7 +210,11 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
         : defaults.refusals,
     serverHealth:
       rawHealth && typeof rawHealth === 'object'
-        ? { refused: nestedRecord(rawHealth.refused), lastOk: nestedRecord(rawHealth.lastOk) }
+        ? {
+            refused: nestedRecord(rawHealth.refused),
+            lastOk: nestedRecord(rawHealth.lastOk),
+            ...(rawHealth.ips && typeof rawHealth.ips === 'object' && !Array.isArray(rawHealth.ips) ? { ips: rawHealth.ips } : {}),
+          }
         : defaults.serverHealth,
     locationAliases:
       raw?.locationAliases && typeof raw.locationAliases === 'object' && !Array.isArray(raw.locationAliases)
@@ -196,6 +222,8 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
         : defaults.locationAliases,
     wgLockouts:
       raw?.wgLockouts && typeof raw.wgLockouts === 'object' && !Array.isArray(raw.wgLockouts) ? raw.wgLockouts : defaults.wgLockouts,
+    credentials:
+      raw?.credentials && typeof raw.credentials === 'object' && !Array.isArray(raw.credentials) ? raw.credentials : defaults.credentials,
     settings: {
       ...defaults.settings,
       ...rawSettings,

@@ -42,4 +42,7 @@ app/node_modules/
 app/out/
 app/.vite/
 app/test-results/
-app/.release-state-win.json
+
+# Local release pipeline scratch (scripts/local-release.sh, release-with-x64.sh, local-release.ps1)
+.release-state*.json
+.release-keep/

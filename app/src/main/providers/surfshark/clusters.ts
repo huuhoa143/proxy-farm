@@ -21,6 +21,8 @@ export interface SurfsharkCluster {
   location: string;
   connectionName: string;
   pubKey: string;
+  /** Tagged `virtual`: the servers stand elsewhere and present as this country. */
+  virtual?: true;
 }
 
 export interface CacheFile {
@@ -45,6 +47,7 @@ export function parseClusters(payload: unknown): SurfsharkCluster[] {
       location: String(rec.location ?? ''),
       connectionName: rec.connectionName,
       pubKey: rec.pubKey,
+      ...(Array.isArray(rec.tags) && rec.tags.includes('virtual') ? { virtual: true as const } : {}),
     });
   }
   return out;

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PortRow, ProviderId, ProxyFarmApi, Target } from '../../shared/contracts';
+import { EXIT_IP_MODELS, type PortRow, type ProviderId, type ProxyFarmApi, type Target } from '../../shared/contracts';
 import { describePortState, isTerminalFailure } from '../portStateView';
 import { addPortBlock, groupPorts, portNumber, remainingByProvider, type PortGroup } from '../portGroups';
 import { StatusDot } from './StatusDot';
@@ -9,6 +9,8 @@ import { ChangeIpMenu } from './ChangeIpMenu';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
+import { exitCountry, type ExitCountryView } from '../ui/exitCountry';
+import { locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 
 export interface PortTableProps {
@@ -122,6 +124,7 @@ export function PortTable({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsed, toggleCollapsed] = useCollapsedGroups();
   const groups = useMemo(() => groupPorts(rows, targets, language), [rows, targets, language]);
+  const targetByKey = useMemo(() => new Map(targets.map((tg) => [tg.key, tg])), [targets]);
   const remaining = useMemo(() => remainingByProvider(rows, limits), [rows, limits]);
 
   // Spec §4.2 "live retry countdown": tick once a second, but only while at
@@ -161,7 +164,7 @@ export function PortTable({
   }
 
   function renderGroupHeader(group: PortGroup, isCollapsed: boolean) {
-    const location = group.city;
+    const location = group.name;
     const keys = group.rows.map((r) => r.key);
     const picked = keys.filter((k) => selectedKeys.has(k)).length;
     const allPicked = picked === keys.length;
@@ -169,11 +172,13 @@ export function PortTable({
     const block = target ? addPortBlock(target, remaining) : undefined;
     const provider = providerName(group.providerId, t);
     const blockReason =
-      block === 'limit-reached'
-        ? t('main.group.limitReached', { provider, limit: limits[group.providerId] })
-        : block === 'no-free-server'
-          ? t('main.group.noFreeServer', { location })
-          : undefined;
+      block === 'not-in-plan'
+        ? t('main.picker.notInPlanHint', { provider })
+        : block === 'limit-reached'
+          ? t('main.group.limitReached', { provider, limit: limits[group.providerId] })
+          : block === 'no-free-server'
+            ? t('main.group.noFreeServer', { location })
+            : undefined;
     return (
       <tr className="grp-row" data-testid={`group-${group.locationKey}`}>
         <td className="c-sel">
@@ -201,10 +206,19 @@ export function PortTable({
             >
               <Icon name="chevron" className="grp-chev" />
               <Flag country={group.country} />
-              <span className="grp-name" title={`${group.city} · ${countryName(group.country, language)} · ${provider}`}>
-                <b>{group.city}</b>
+              <span
+                className="grp-name"
+                title={group.countryWide ? `${group.name} · ${provider}` : `${group.name} · ${countryName(group.country, language)} · ${provider}`}
+              >
+                <b>{group.name}</b>
                 <span className="grp-sub">
-                  {countryName(group.country, language)}
+                  {/* A country-wide location is already named after the country. */}
+                  {!group.countryWide && countryName(group.country, language)}
+                  {target?.virtualLocation && (
+                    <span className="pill virt" title={t('main.virtualLocationHint', { provider }) as string} data-testid={`virtual-${group.locationKey}`}>
+                      {t('main.virtualLocation')}
+                    </span>
+                  )}
                   <span className={`psw ${group.providerId}`} aria-hidden="true" />
                   {provider}
                 </span>
@@ -218,7 +232,14 @@ export function PortTable({
               {target && (
                 <span className="grp-pool">
                   {t('main.group.servers', { count: target.servers.length })}
-                  {target.freeServers != null && (
+                  {target.notInPlan ? (
+                    <>
+                      {' · '}
+                      <span className="free none not-in-plan" title={t('main.picker.notInPlanHint', { provider }) as string} data-testid={`not-in-plan-${group.locationKey}`}>
+                        {t('main.picker.notInPlan')}
+                      </span>
+                    </>
+                  ) : target.freeServers != null && (
                     <>
                       {' · '}
                       <span className={target.freeServers ? 'free' : 'free none'}>
@@ -262,7 +283,12 @@ export function PortTable({
         const isOpen = expanded.has(row.key);
         const n = portNumber(row);
         const serverIp = row.serverIp ?? row.server;
-        const portLabel = n ? (t('main.port.label', { location: row.city, n }) as string) : row.label;
+        const rowLocation = locationName({ ...row, countryWide: targetByKey.get(row.locationKey)?.countryWide }, language);
+        // Tagged with the location's country; the probe's geolocation is only a hint.
+        const exit: ExitCountryView = state.kind === 'online' ? exitCountry(row.country, state.country) : {};
+        // NordVPN: the exit belongs to the connection, not the server (spec §5.5).
+        const sessionExit = EXIT_IP_MODELS[row.providerId] === 'session';
+        const portLabel = n ? (t('main.port.label', { location: rowLocation, n }) as string) : row.label;
         // Change IP picks another server: useful when online and when stuck
         // retrying / failed on a bad server; not while stopped or mid-connect.
         const canChangeIp = state.kind === 'online' || state.kind === 'retrying' || state.kind === 'failed';
@@ -338,7 +364,7 @@ export function PortTable({
                   {serverIp ? (
                     <span
                       className="srv-ip mono"
-                      title={t('main.port.serverTitle', { server: row.server ?? serverIp }) as string}
+                      title={t(sessionExit ? 'main.port.serverTitleSession' : 'main.port.serverTitle', { server: row.server ?? serverIp, provider: providerName(row.providerId, t) }) as string}
                     >
                       {serverIp}
                     </span>
@@ -364,10 +390,33 @@ export function PortTable({
               <td className="c-ip">
                 {state.kind === 'online' ? (
                   <span className="ip">
-                    <span className="mono">{state.exitIp}</span>
-                    <span className="cc" title={countryName(state.country, language)}>
-                      ({state.country})
+                    <span
+                      className="mono"
+                      data-testid={`exit-ip-${row.key}`}
+                      title={sessionExit ? (t('main.port.sessionExitTitle', { provider: providerName(row.providerId, t) }) as string) : undefined}
+                    >
+                      {state.exitIp}
                     </span>
+                    {exit.tag && (
+                      <span className="cc" title={countryName(exit.tag, language)} data-testid={`exit-cc-${row.key}`}>
+                        ({exit.tag})
+                      </span>
+                    )}
+                    {exit.tag && exit.geo && (
+                      <span
+                        className="geo-hint"
+                        data-testid={`geo-hint-${row.key}`}
+                        title={
+                          t('main.port.geoHintTitle', {
+                            ip: state.exitIp,
+                            geo: countryName(exit.geo, language),
+                            country: countryName(exit.tag, language),
+                          }) as string
+                        }
+                      >
+                        {t('main.port.geoHint', { country: exit.geo })}
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span className="none">—</span>
@@ -386,6 +435,10 @@ export function PortTable({
                     row={row}
                     api={api}
                     rows={rows}
+                    locationName={rowLocation}
+                    sameCountryAlternative={targets.some(
+                      (tg) => tg.providerId === row.providerId && tg.country === row.country && tg.key !== row.locationKey && !tg.notInPlan,
+                    )}
                     disabled={!canChangeIp}
                     busy={rotatingKeys?.has(row.key)}
                     onChange={onRotate}

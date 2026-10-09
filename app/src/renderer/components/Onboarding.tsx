@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderId, ProxyFarmApi } from '../../shared/contracts';
-import { FileCard, HmaCard, SurfsharkCard, ZoogVpnCard, type HmaDetected } from './OnboardingCards';
+import { ExpressVpnCard, FileCard, HmaCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, type HmaDetected } from './OnboardingCards';
 import { ProviderLimitField } from './ProviderLimitField';
 import { Icon } from '../ui/Icon';
 
@@ -10,10 +10,10 @@ export interface OnboardingProps {
   onDone: () => void;
 }
 
-const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
+const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'];
 type Counts = Record<ProviderId, number>;
 const HMA_WATCH_MS = 3000;
-const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, file: 0 };
+const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, nordvpn: 0, expressvpn: 0, file: 0 };
 
 export function Onboarding({ api, onDone }: OnboardingProps) {
   const { t } = useTranslation();
@@ -68,6 +68,8 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
         <HmaCard api={api} detected={hmaDetected} onAdded={markAdded} accountCount={counts.hma} />
         <ZoogVpnCard api={api} onAdded={markAdded} accountCount={counts.zoogvpn} />
         <SurfsharkCard api={api} onAdded={markAdded} accountCount={counts.surfshark} />
+        <NordVpnCard api={api} onAdded={markAdded} accountCount={counts.nordvpn} />
+        <ExpressVpnCard api={api} onAdded={markAdded} accountCount={counts.expressvpn} />
         <FileCard api={api} onAdded={markAdded} accountCount={counts.file} />
       </div>
       {/* Port limits only make sense once at least one provider is connected —

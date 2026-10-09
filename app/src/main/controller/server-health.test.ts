@@ -93,4 +93,81 @@ describe('server health (spec §6.8, per account and server)', () => {
     c.advance(REFUSED_TTL_MS);
     expect(h.serialize().refused).toEqual({});
   });
+
+  describe('marks follow the machine: keyed by resolved IP (spec §6.8)', () => {
+    const SHARED = '185.177.229.121'; // de7.webunlim.com and fr4.webunlim.com, 2026-10-08
+
+    it('a refusal under one hostname applies to every hostname on the same IP', () => {
+      const h = createServerHealth();
+      h.noteIp('de7.webunlim.com', SHARED);
+      h.markRefused('a', 'de7.webunlim.com');
+      expect(h.isRefused('a', 'fr4.webunlim.com')).toBe(false); // its IP is not known yet
+      h.noteIp('fr4.webunlim.com', SHARED);
+      expect(h.isRefused('a', 'fr4.webunlim.com')).toBe(true);
+      expect(h.isRefused('a', SHARED)).toBe(true);
+      expect(h.isRefused('b', 'fr4.webunlim.com')).toBe(false); // still per account
+    });
+
+    it('dead marks and lastOk are shared the same way; markOk under one name clears both', () => {
+      const h = createServerHealth();
+      h.noteIp('de7.webunlim.com', SHARED);
+      h.noteIp('fr4.webunlim.com', SHARED);
+      h.markDead('a', 'de7.webunlim.com');
+      expect(h.isDead('a', 'fr4.webunlim.com')).toBe(true);
+      h.markOk('a', 'fr4.webunlim.com');
+      expect(h.isUsable('a', 'de7.webunlim.com')).toBe(true);
+      expect(h.lastOk('a', 'de7.webunlim.com')).toBeTypeOf('number');
+      expect(h.workedRecently('a', 60_000, 'de7.webunlim.com')).toBe(false); // the same machine
+    });
+
+    it('a mark made while the hostname was unresolved moves onto its IP once it resolves', () => {
+      const h = createServerHealth();
+      h.markRefused('a', 'de7.webunlim.com');
+      expect(h.isRefused('a', 'de7.webunlim.com')).toBe(true);
+      expect(h.noteIp('de7.webunlim.com', SHARED)).toBe(true);
+      expect(h.noteIp('de7.webunlim.com', SHARED)).toBe(false); // unchanged
+      expect(h.serialize().refused).toEqual({ a: { [SHARED]: expect.any(Number) } });
+      h.noteIp('fr4.webunlim.com', SHARED);
+      expect(h.isRefused('a', 'fr4.webunlim.com')).toBe(true);
+    });
+
+    it('migrates the hostname-keyed marks persisted by 0.1.0, and persists the hostname → IP map', () => {
+      const c = clock();
+      const until = c.now() + 1000;
+      // 0.1.0 wrote marks keyed by hostname and no `ips`.
+      const old = createServerHealth({ now: c.now, initial: { refused: { a: { 'de7.webunlim.com': until } }, lastOk: { a: { 'nl1.webunlim.com': 5 } } } });
+      expect(old.isRefused('a', 'de7.webunlim.com')).toBe(true); // honoured before any lookup
+      old.noteIp('de7.webunlim.com', SHARED);
+      old.noteIp('nl1.webunlim.com', '185.107.80.1');
+      const snap = old.serialize();
+      expect(snap).toEqual({
+        refused: { a: { [SHARED]: until } },
+        lastOk: { a: { '185.107.80.1': 5 } },
+        ips: { 'de7.webunlim.com': SHARED, 'nl1.webunlim.com': '185.107.80.1' },
+      });
+      // After a restart the map is known before anything resolves.
+      const restored = createServerHealth({ now: c.now, initial: { ...snap, ips: { ...snap.ips, 'fr4.webunlim.com': SHARED } } });
+      expect(restored.isRefused('a', 'fr4.webunlim.com')).toBe(true);
+      // A file with both a hostname mark and its IP's keeps the later one, under the IP.
+      const both = createServerHealth({
+        now: c.now,
+        initial: { refused: { a: { 'de7.webunlim.com': until, [SHARED]: until + 5 } }, lastOk: {}, ips: { 'de7.webunlim.com': SHARED } },
+      });
+      expect(both.serialize().refused).toEqual({ a: { [SHARED]: until + 5 } });
+    });
+
+    it('forgetRefusalsSince drops only the refusals set at or after that time', () => {
+      const c = clock();
+      const h = createServerHealth({ now: c.now });
+      h.markRefused('a', 'old');
+      c.advance(10);
+      const since = c.now();
+      h.markRefused('a', 'new');
+      h.markRefused('b', 'new');
+      h.forgetRefusalsSince('a', since);
+      expect(h.isRefused('a', 'old')).toBe(true);
+      expect(h.isRefused('a', 'new')).toBe(false);
+      expect(h.isRefused('b', 'new')).toBe(true);
+    });
+  });
 });

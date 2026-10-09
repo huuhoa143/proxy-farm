@@ -1,12 +1,18 @@
 import type { PortRow, ProviderId, Target } from '../shared/contracts';
 import { splitPortKey } from '../shared/contracts';
 import { countryName } from './ui/countryName';
+import { isCountryWide, locationName } from './ui/locationName';
 
 /** All ports of one location, as one group on the main screen (spec §4.1). */
 export interface PortGroup {
   locationKey: string;
   country: string;
   city: string;
+  /** How the UI names the location: the city, or the localised country name for a
+   * location that covers the whole country. */
+  name: string;
+  /** The location covers the whole country (its name IS the country's). */
+  countryWide: boolean;
   providerId: ProviderId;
   /** The location as listed by `listTargets`, when it is still in the catalog. */
   target?: Target;
@@ -32,10 +38,13 @@ export function groupPorts(rows: readonly PortRow[], targets: readonly Target[],
     let group = groups.get(locationKey);
     if (!group) {
       const target = byKey.get(locationKey);
+      const loc = { country: target?.country ?? row.country, city: target?.city ?? row.city, countryWide: target?.countryWide };
       group = {
         locationKey,
-        country: target?.country ?? row.country,
-        city: target?.city ?? row.city,
+        country: loc.country,
+        city: loc.city,
+        name: locationName(loc, language),
+        countryWide: isCountryWide(loc, language),
         providerId: target?.providerId ?? row.providerId,
         target,
         rows: [],
@@ -51,7 +60,7 @@ export function groupPorts(rows: readonly PortRow[], targets: readonly Target[],
   list.sort(
     (a, b) =>
       names.get(a.country)!.localeCompare(names.get(b.country)!, language) ||
-      a.city.localeCompare(b.city, language) ||
+      a.name.localeCompare(b.name, language) ||
       a.providerId.localeCompare(b.providerId) ||
       a.locationKey.localeCompare(b.locationKey),
   );
@@ -78,8 +87,10 @@ export function remainingByProvider(
   return out;
 }
 
-/** How many more ports a location can take right now: free servers, capped by the provider limit. */
+/** How many more ports a location can take right now: free servers, capped by the
+ * provider limit; none for a location outside the plan. */
 export function addableCount(target: Target, remaining: Partial<Record<ProviderId, number>>): number {
+  if (target.notInPlan) return 0;
   const free = target.freeServers ?? target.servers.length;
   const cap = remaining[target.providerId];
   return cap === undefined ? free : Math.min(free, cap);
@@ -89,7 +100,8 @@ export function addableCount(target: Target, remaining: Partial<Record<ProviderI
 export function addPortBlock(
   target: Target,
   remaining: Partial<Record<ProviderId, number>>,
-): 'no-free-server' | 'limit-reached' | undefined {
+): 'not-in-plan' | 'no-free-server' | 'limit-reached' | undefined {
+  if (target.notInPlan) return 'not-in-plan';
   if (remaining[target.providerId] === 0) return 'limit-reached';
   if ((target.freeServers ?? target.servers.length) === 0) return 'no-free-server';
   return undefined;

@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ENDPOINT_TAG, type DelayResult, type LogSignal, type PortState, type RenderInput } from '../../shared/contracts';
 import { assertConfigInvariants } from '../engine/invariants';
 import { allocatePort, isPortFree } from '../engine/ports';
-import { reapOrphans, recordPid, removePid, type PidEntry, type ReapOrphansOptions } from '../engine/pid-registry';
+import { reapOrphans, recordPid, removePid, type ReapOrphansOptions } from '../engine/pid-registry';
 import { renderConfig } from '../engine/render-config';
 import { EngineProcess, type EngineProcessOptions, type ExitInfo } from '../engine/supervisor';
 import { singboxPath } from '../engine/singbox-path';
@@ -127,6 +127,8 @@ export interface CreateRealEngineOptions {
   /** Injectable proxy-port availability check. @default the real `isPortFree` (binds the
    * port to test it). Tests inject a fake so they never depend on a real free port. */
   isPortFreeFn?: typeof isPortFree;
+  /** Injectable clash_api port scan. @default the real `allocatePort` (binds to test). */
+  allocatePortFn?: typeof allocatePort;
   recordPidFn?: typeof recordPid;
   removePidFn?: typeof removePid;
   /** Injectable clock, used only for the pid registry's `startedAt`. */
@@ -190,6 +192,8 @@ interface PortEntry {
   /** True while the child is being stopped because the port entered a back-off: that
    * exit is ours too. */
   quiescing?: boolean;
+  /** The pid recorded in the registry for the current child, until that child exits. */
+  spawnedPid?: number;
   /** A `/delay` poll is outstanding: the next tick is skipped rather than stacked. */
   probeInFlight?: boolean;
   /** Polls in a row that clash_api left unanswered (hard timeout), for the hung-engine
@@ -214,6 +218,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   const doExitIpProbe = options.exitIpProbeFn ?? probeExitIp;
   const doClassifyLog = options.classifyLogFn ?? classifyLog;
   const doIsPortFree = options.isPortFreeFn ?? isPortFree;
+  const doAllocatePort = options.allocatePortFn ?? allocatePort;
   const doRecordPid = options.recordPidFn ?? recordPid;
   const doRemovePid = options.removePidFn ?? removePid;
   const now = options.now ?? Date.now;
@@ -248,6 +253,15 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   // instead of suddenly going blank.
   const lastKnownLogs = new Map<string, string[]>();
 
+  /** Records the entry's freshly spawned child in the pid registry (spec §6.3). Called
+   * on EVERY spawn (reviewer item 6), so a respawn's new pid replaces the old one. */
+  function recordSpawn(key: string, entry: PortEntry): Promise<void> {
+    const pid = entry.process.pid;
+    if (pid === undefined) return Promise.resolve();
+    entry.spawnedPid = pid;
+    return doRecordPid(options.registryPath, key, { pid, exe: binPath, startedAt: now() });
+  }
+
   async function teardown(key: string, entry: PortEntry): Promise<void> {
     entry.stopping = true;
     entry.cancelDelayPoll();
@@ -258,16 +272,37 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     await doRemovePid(options.registryPath, key);
   }
 
-  /** Every proxy/clash port currently claimed by ANY entry (reviewer item 5): the
-   * `taken` set a clash-port bind-error reallocation must scan around, same spirit as
-   * `port-manager.ts`'s `takenProxyPorts()` for the proxy side. */
-  function allClaimedPorts(): Set<number> {
+  /** Ports a `start` in flight has picked but not yet registered in `entries`: without
+   * them, two overlapping starts (a credential probe while ports start, two ports of a
+   * bulk start) both saw the same port free and handed it to two sing-box processes,
+   * and the second one died on its bind. One reservation per start call. */
+  const reserved = new Set<{ key: string; ports: Set<number> }>();
+
+  /** Every proxy/clash port currently claimed by ANY entry or start in flight (reviewer
+   * item 5): the `taken` set a clash-port allocation must scan around, same spirit as
+   * `port-manager.ts`'s `takenProxyPorts()` for the proxy side. `exceptKey`'s own
+   * claims are left out (a restart of a key reuses its proxy port). */
+  function allClaimedPorts(exceptKey?: string): Set<number> {
     const taken = new Set<number>();
-    for (const e of entries.values()) {
+    for (const [k, e] of entries) {
+      if (k === exceptKey) continue;
       taken.add(e.proxyPort);
       taken.add(e.clashPort);
     }
+    for (const r of reserved) if (r.key !== exceptKey) for (const port of r.ports) taken.add(port);
     return taken;
+  }
+
+  /** A clash_api port no entry or start in flight holds, reserved for `key` before any
+   * other start can pick it: re-picked if one took it while this one was scanning. */
+  async function reserveClashPort(reservation: { key: string; ports: Set<number> }): Promise<number> {
+    for (;;) {
+      const port = await doAllocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts(reservation.key) });
+      // Synchronous from here: no other start can run between this check and the add.
+      if (allClaimedPorts(reservation.key).has(port)) continue;
+      reservation.ports.add(port);
+      return port;
+    }
   }
 
   /**
@@ -303,7 +338,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     }
 
     try {
-      const newClashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
+      const newClashPort = await doAllocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
 
       // `allocatePort` above is async — the port could have been stopped, or even
       // restarted under the same key (a brand-new `entries.get(key)` entry), while we
@@ -325,9 +360,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       entry.lastConfig = newConfig;
 
       entry.process.start(newConfig);
-      if (entry.process.pid !== undefined) {
-        await doRecordPid(options.registryPath, key, { pid: entry.process.pid, exe: binPath, startedAt: now() });
-      }
+      await recordSpawn(key, entry);
     } catch {
       // The reallocation/re-render/respawn itself failed (e.g. no free port at all, or
       // a render-invariant violation) — this must become a retryable state via
@@ -372,6 +405,26 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
   }
 
   async function start(key: string, input: RenderInput, startOpts: EngineStartOptions = {}): Promise<void> {
+    // Another key's engine, running or starting, already listens there: two processes on
+    // one port can only end in a bind failure. Checked and reserved synchronously, so an
+    // overlapping start sees this one.
+    if (allClaimedPorts(key).has(input.listen.port)) throw new PortInUseError(input.listen.port);
+    const reservation = { key, ports: new Set([input.listen.port]) };
+    reserved.add(reservation);
+    try {
+      await startReserved(key, input, startOpts, reservation);
+    } finally {
+      // Registered in `entries` by now (or failed): the reservation has done its job.
+      reserved.delete(reservation);
+    }
+  }
+
+  async function startReserved(
+    key: string,
+    input: RenderInput,
+    startOpts: EngineStartOptions,
+    reservation: { key: string; ports: Set<number> },
+  ): Promise<void> {
     const existing = entries.get(key);
     if (existing) await teardown(key, existing);
 
@@ -383,7 +436,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
       throw new PortInUseError(input.listen.port);
     }
 
-    const clashPort = await allocatePort({ base: CLASH_AUX_BASE, taken: allClaimedPorts() });
+    const clashPort = await reserveClashPort(reservation);
     const clashSecret = randomBytes(16).toString('hex');
     const finalInput: RenderInput = { ...input, clash: { port: clashPort, secret: clashSecret } };
     const config = renderConfig(finalInput);
@@ -481,9 +534,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
             return;
           }
           // Re-record the pid on EVERY respawn (reviewer item 6).
-          if (engineProcess.pid !== undefined) {
-            await doRecordPid(options.registryPath, key, { pid: engineProcess.pid, exe: binPath, startedAt: now() }).catch(() => undefined);
-          }
+          await recordSpawn(key, entry).catch(() => undefined);
         })();
       }),
     );
@@ -498,6 +549,13 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
 
     entry.unsubscribe.push(
       engineProcess.onExit((info: ExitInfo) => {
+        // Whatever the cause, that process is gone: drop its pid now. Kept while the port
+        // waits out a back-off, a pid the OS may hand to another process would sit in
+        // the registry for the next launch's orphan reaper. Only that pid: a respawn
+        // records its own, and a late exit report must not drop it.
+        const exitedPid = entry.spawnedPid;
+        entry.spawnedPid = undefined;
+        if (exitedPid !== undefined) void doRemovePid(options.registryPath, key, exitedPid).catch(() => undefined);
         if (entry.stopping || entry.respawning || entry.quiescing) return; // our own stop(), not a crash
         const collidedPort = detectBindErrorPort(entry.lastLogLine);
         if (collidedPort !== undefined) {
@@ -559,10 +617,7 @@ export function createRealEngine(options: CreateRealEngineOptions): Engine {
     health.start();
     engineProcess.start(config);
 
-    if (engineProcess.pid !== undefined) {
-      const entryInfo: PidEntry = { pid: engineProcess.pid, exe: binPath, startedAt: now() };
-      await doRecordPid(options.registryPath, key, entryInfo);
-    }
+    await recordSpawn(key, entry);
   }
 
   async function stop(key: string): Promise<void> {

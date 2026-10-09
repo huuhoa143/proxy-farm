@@ -30,7 +30,12 @@ export function buildOvpnEndpoint(
     password: creds?.password,
     tls: {
       certificate: parsed.caLines,
+      ...(parsed.serverName ? { server_name: parsed.serverName, server_name_type: parsed.serverNameType } : {}),
+      ...(parsed.clientCertLines && parsed.clientKeyLines
+        ? { client_certificate: parsed.clientCertLines, client_key: parsed.clientKeyLines }
+        : {}),
       remote_certificate_tls: 'server',
+      ...(parsed.nsCertType ? { ns_certificate_type: parsed.nsCertType } : {}),
       ...(parsed.tlsAuthLines
         ? { control_wrap: { type: 'tls_auth' as const, key: parsed.tlsAuthLines, direction: parsed.controlWrapDirection } }
         : parsed.tlsCryptLines
@@ -39,6 +44,11 @@ export function buildOvpnEndpoint(
     },
     data_ciphers: parsed.cipher ? [parsed.cipher] : ['AES-256-GCM'],
     auth: parsed.auth,
+    ...(parsed.fragment !== undefined ? { fragment: parsed.fragment } : {}),
+    ...(parsed.mssFix !== undefined ? { mss_fix: parsed.mssFix } : {}),
+    ...(parsed.mssFixMode ? { mss_fix_mode: parsed.mssFixMode } : {}),
+    ...(parsed.mssFixDisabled ? { mss_fix_disabled: parsed.mssFixDisabled } : {}),
+    ...(parsed.compressionLzo ? { compression_lzo: parsed.compressionLzo } : {}),
     route_no_pull: true,
     mtu: resolveOvpnMtu(parsed.tunMtu),
   };

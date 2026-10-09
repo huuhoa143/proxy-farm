@@ -66,6 +66,15 @@ describe('probeExitIp', () => {
     expect(result).toEqual({ ip: '5.62.19.134', country: 'unknown' });
   });
 
+  it('still reports the exit IP when both geo services answer HTTP 403 (some ExpressVPN exits)', async () => {
+    const transport = fakeTransport({
+      'api.ipify.org': { body: JSON.stringify({ ip: '104.164.168.62' }) },
+      'ifconfig.co': { error: 'HTTP 403 from https://ifconfig.co/json' },
+      'ipinfo.io': { error: 'HTTP 403 from https://ipinfo.io/json' },
+    });
+    expect(await probeExitIp(1234, { fetchViaProxy: transport, geoCache: new Map() })).toEqual({ ip: '104.164.168.62', country: 'unknown' });
+  });
+
   it('caches a newly-learned country for that ip for subsequent calls', async () => {
     const geoCache = new Map<string, string>();
     const firstCall = fakeTransport({

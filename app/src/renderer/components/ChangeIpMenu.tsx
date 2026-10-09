@@ -2,8 +2,9 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi, ServerHealth, ServerInfo } from '../../shared/contracts';
-import { splitPortKey } from '../../shared/contracts';
+import { EXIT_IP_MODELS, splitPortKey } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
+import { providerName } from '../ui/providerName';
 import type { StatusTone } from '../portStateView';
 
 export interface ChangeIpMenuProps {
@@ -16,6 +17,11 @@ export interface ChangeIpMenuProps {
   busy?: boolean;
   /** `toServer` undefined = let the controller pick the next free server. */
   onChange: (row: PortRow, toServer?: string) => void;
+  /** How the UI names the port's location (localised for a country-wide one). @default row.city */
+  locationName?: string;
+  /** Another location of the same provider exists in the same country, so with no free
+   * server here "Next free server" moves the port there (spec §6.5 step 2). */
+  sameCountryAlternative?: boolean;
 }
 
 const HEALTH_TONE: Record<ServerHealth, StatusTone> = {
@@ -37,7 +43,7 @@ type Placement = { top?: number; bottom?: number; right: number };
  * focusable but are aria-disabled with the reason as the item's description.
  * Keyboard: ↑/↓/Home/End move, Enter/Space pick, Esc/Tab close.
  */
-export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: ChangeIpMenuProps) {
+export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange, locationName, sameCountryAlternative = false }: ChangeIpMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<ServerInfo[] | null>(null);
@@ -225,13 +231,19 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
               </span>
               <span className="cim-tx">
                 <b>{t('main.changeIp.next')}</b>
-                <small>{freeCount === 0 ? t('main.changeIp.noneFreeHint') : t('main.changeIp.nextHint')}</small>
+                <small>
+                  {freeCount !== 0
+                    ? t('main.changeIp.nextHint')
+                    : sameCountryAlternative
+                      ? t('main.changeIp.noneFreeHint')
+                      : t('main.changeIp.noneFreeNoAltHint')}
+                </small>
               </span>
             </button>
             <div className="cim-sep" role="separator" />
             <div role="group" aria-labelledby={`${menuId}-h`}>
               <div className="cim-h" id={`${menuId}-h`}>
-                <span>{t('main.changeIp.heading', { city: row.city })}</span>
+                <span>{t('main.changeIp.heading', { city: locationName ?? row.city })}</span>
                 {freeCount != null && <span className="cim-free">{t('main.group.free', { count: freeCount })}</span>}
               </div>
               {failed ? (
@@ -274,6 +286,11 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
                           <span className="mono">{ip}</span>
                           {s.ip && s.ip !== s.server && <small className="mono">{s.server}</small>}
                         </span>
+                        {s.freeTier && (
+                          <span className="pill free" title={t('main.changeIp.freeTierHint') as string}>
+                            {t('main.changeIp.freeTier')}
+                          </span>
+                        )}
                         <span className="cim-st">
                           {current && <Icon name="check" />}
                           {status}
@@ -289,6 +306,12 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange }: Chang
                 </div>
               )}
             </div>
+            {EXIT_IP_MODELS[row.providerId] === 'session' && (
+              // The servers above are what a port pins; the exit IP is not tied to them.
+              <p className="cim-msg cim-note" data-testid="session-exit-note">
+                {t('main.changeIp.sessionExitNote', { provider: providerName(row.providerId, t) })}
+              </p>
+            )}
           </div>,
           document.body,
         )}

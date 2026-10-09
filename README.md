@@ -63,7 +63,9 @@ so each port has its own stable exit IP.
 | **HMA** | OpenVPN | Nothing: the app reads the device credentials of the HMA app installed on the same computer | On Windows, click **Enable HMA support** once (one administrator prompt); see below. |
 | **ZoogVPN** | OpenVPN | Account email and password | Your plan decides which servers accept you; refused servers are skipped. |
 | **Surfshark** | WireGuard | Your WireGuard private key (Surfshark manual setup page) | The server list comes from Surfshark's public API. |
-| **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server. |
+| **NordVPN** | WireGuard (NordLynx) | An access token from Nord Account (NordVPN → Advanced settings → Get access token), or your NordLynx private key | The token is used once to fetch the key and is not kept. The server list comes from NordVPN's public API. |
+| **ExpressVPN** | OpenVPN | The username and password from your ExpressVPN account's Manual configuration → OpenVPN page (not your email/password or activation code) | Checked with one test connection when added. The server list is bundled (ExpressVPN has no public one). Default limit 8 ports: a plan allows 10 devices. |
+| **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server, including ExpressVPN's own `.ovpn` downloads. |
 
 Port limits per provider can be set in the app. Many simultaneous tunnels on one account
 can trigger a provider's abuse detection; see the [Disclaimer](DISCLAIMER.md).
@@ -82,8 +84,9 @@ Download the latest build from
 
 ## Quick start
 
-1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark or
-   Config file). For HMA, install the HMA app, sign in and connect once; Proxy Farm
+1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark,
+   NordVPN, ExpressVPN or Config file). Each card has a "How to get …" guide for its
+   credential. For HMA, install the HMA app, sign in and connect once; Proxy Farm
    picks up its credentials.
    On Windows, HMA keeps those credentials in a file only administrators can read, so the
    HMA card first shows **Enable HMA support**. It asks for administrator approval once and
@@ -180,8 +183,8 @@ share them with others. You are responsible for following your provider's terms 
 service and the laws where you live. Aggressive reconnect attempts, many simultaneous
 tunnels, or sharing can get your VPN account suspended by the provider.
 
-This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN or any other VPN
-provider.
+This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord
+Security, ExpressVPN or any other VPN provider.
 
 ## Disclaimer
 

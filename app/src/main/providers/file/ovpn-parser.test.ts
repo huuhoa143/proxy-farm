@@ -8,6 +8,7 @@ import { UnsupportedDirectiveError } from './errors';
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const GOOD = readFileSync(path.join(FIXTURES, 'good.ovpn'), 'utf8');
 const BAD = readFileSync(path.join(FIXTURES, 'bad-unsupported-directive.ovpn'), 'utf8');
+const EXPRESS = readFileSync(path.join(FIXTURES, 'expressvpn-style.ovpn'), 'utf8');
 
 describe('parseOvpn', () => {
   it('parses remote, proto, cipher, auth, inline ca, inline tls-auth, and auth-user-pass', () => {
@@ -45,9 +46,17 @@ describe('parseOvpn', () => {
     expect(parsed.remotePort).toBe(443);
   });
 
-  it('rejects an inline <cert> block (client-certificate auth is unsupported)', () => {
-    const withCert = GOOD + '\n<cert>\n-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----\n</cert>\n';
-    expect(() => parseOvpn(withCert)).toThrow(UnsupportedDirectiveError);
+  it('rejects an inline <cert> block without its <key>, and a <key> without its <cert>', () => {
+    const cert = '\n<cert>\n-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----\n</cert>\n';
+    const key = '\n<key>\n-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----\n</key>\n';
+    expect(() => parseOvpn(GOOD + cert)).toThrow(UnsupportedDirectiveError);
+    expect(() => parseOvpn(GOOD + key)).toThrow(UnsupportedDirectiveError);
+  });
+
+  it('still rejects <pkcs12> and <extra-certs> blocks', () => {
+    const block = (tag: string) => `\n<${tag}>\n-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----\n</${tag}>\n`;
+    expect(() => parseOvpn(GOOD + block('pkcs12'))).toThrow(UnsupportedDirectiveError);
+    expect(() => parseOvpn(GOOD + block('extra-certs'))).toThrow(UnsupportedDirectiveError);
   });
 
   it('rejects a bare (non-inline) ca file reference', () => {
@@ -119,5 +128,112 @@ describe('parseOvpn', () => {
   it('ignores a non-numeric tun-mtu value rather than throwing', () => {
     const withBogusMtu = GOOD.replace('fast-io', 'tun-mtu not-a-number\nfast-io');
     expect(parseOvpn(withBogusMtu).tunMtu).toBeUndefined();
+  });
+});
+
+describe('parseOvpn: an ExpressVPN-style profile (client certificate, fragment, verify-x509-name)', () => {
+  it('parses the whole file', () => {
+    const parsed = parseOvpn(EXPRESS);
+    expect(parsed.servers).toEqual(['vpn-ca-version-2.example.net']);
+    expect(parsed.remotePort).toBe(1195);
+    expect(parsed.proto).toBe('udp');
+    expect(parsed.needsAuthUserPass).toBe(true);
+    expect(parsed.cipher).toBe('AES-256-GCM');
+    expect(parsed.auth).toBe('SHA512');
+    expect(parsed.tunMtu).toBe(1500);
+  });
+
+  it('keeps the inline client certificate and key', () => {
+    const parsed = parseOvpn(EXPRESS);
+    expect(parsed.clientCertLines).toEqual([
+      '-----BEGIN CERTIFICATE-----',
+      'RkFLRS1DTElFTlQtQ0VSVC1mb3ItdGVzdGluZy1vbmx5',
+      '-----END CERTIFICATE-----',
+    ]);
+    expect(parsed.clientKeyLines?.[0]).toBe('-----BEGIN RSA PRIVATE KEY-----');
+    expect(parsed.clientKeyLines?.at(-1)).toBe('-----END RSA PRIVATE KEY-----');
+  });
+
+  it('maps fragment, mssfix, comp-lzo no, verify-x509-name and ns-cert-type', () => {
+    const parsed = parseOvpn(EXPRESS);
+    expect(parsed.fragment).toBe(1300);
+    expect(parsed.mssFix).toBe(1200);
+    expect(parsed.compressionLzo).toBe('no');
+    expect(parsed.serverName).toBe('Server');
+    expect(parsed.serverNameType).toBe('name-prefix');
+    expect(parsed.nsCertType).toBe('server');
+  });
+
+  it('leaves every new field unset for a profile without those directives', () => {
+    const parsed = parseOvpn(GOOD);
+    for (const field of ['clientCertLines', 'clientKeyLines', 'fragment', 'mssFix', 'mssFixMode', 'mssFixDisabled', 'compressionLzo', 'serverName', 'serverNameType', 'nsCertType'] as const) {
+      expect(parsed[field]).toBeUndefined();
+    }
+  });
+
+  it('reads verify-x509-name with each type, a quoted name, and no type (subject)', () => {
+    const withName = (line: string) => parseOvpn(EXPRESS.replace('verify-x509-name Server name-prefix', line));
+    expect(withName('verify-x509-name vpn.example.net name')).toMatchObject({ serverName: 'vpn.example.net', serverNameType: 'name' });
+    expect(withName("verify-x509-name 'C=VG, CN=Server' subject")).toMatchObject({ serverName: 'C=VG, CN=Server', serverNameType: 'subject' });
+    expect(withName('verify-x509-name "Server"')).toMatchObject({ serverName: 'Server', serverNameType: 'subject' });
+    expect(() => withName('verify-x509-name Server bogus')).toThrow(UnsupportedDirectiveError);
+    expect(() => withName('verify-x509-name')).toThrow(UnsupportedDirectiveError);
+  });
+
+  it('rejects ns-cert-type other than server, and a non-numeric fragment or mssfix', () => {
+    expect(() => parseOvpn(EXPRESS.replace('ns-cert-type server', 'ns-cert-type client'))).toThrow(UnsupportedDirectiveError);
+    expect(() => parseOvpn(EXPRESS.replace('fragment 1300', 'fragment lots'))).toThrow(UnsupportedDirectiveError);
+    expect(() => parseOvpn(EXPRESS.replace('mssfix 1200', 'mssfix big'))).toThrow(UnsupportedDirectiveError);
+  });
+
+  describe('mssfix, as OpenVPN 2.6 reads it', () => {
+    const withMssfix = (line: string) => parseOvpn(EXPRESS.replace('mssfix 1200', line));
+
+    // Leaving mss_fix unset would make sing-box clamp to its 1492 default — the
+    // opposite of what `mssfix 0` asks for.
+    it('turns clamping off for mssfix 0, whatever the mode', () => {
+      for (const line of ['mssfix 0', 'mssfix 0 mtu', 'mssfix 0 fixed']) {
+        const parsed = withMssfix(line);
+        expect(parsed.mssFixDisabled).toBe(true);
+        expect(parsed.mssFix).toBeUndefined();
+        expect(parsed.mssFixMode).toBeUndefined();
+      }
+    });
+
+    it('keeps the mtu or fixed mode', () => {
+      expect(withMssfix('mssfix 1450 mtu')).toMatchObject({ mssFix: 1450, mssFixMode: 'mtu' });
+      expect(withMssfix('mssfix 1400 fixed')).toMatchObject({ mssFix: 1400, mssFixMode: 'fixed' });
+      expect(withMssfix('mssfix 1200').mssFixMode).toBeUndefined();
+    });
+
+    it('rejects an unknown mode, an extra argument, and a fixed size below the IPv4+TCP headers', () => {
+      expect(() => withMssfix('mssfix 1450 bogus')).toThrow(UnsupportedDirectiveError);
+      expect(() => withMssfix('mssfix 1450 mtu extra')).toThrow(UnsupportedDirectiveError);
+      expect(() => withMssfix('mssfix 40 fixed')).toThrow(UnsupportedDirectiveError);
+      expect(withMssfix('mssfix 41 fixed')).toMatchObject({ mssFix: 41, mssFixMode: 'fixed' });
+    });
+  });
+
+  describe('fragment, as OpenVPN 2.6 reads it', () => {
+    const withFragment = (line: string) => parseOvpn(EXPRESS.replace('fragment 1300', line));
+
+    it('reads fragment 0 as no fragmentation', () => {
+      expect(withFragment('fragment 0').fragment).toBeUndefined();
+    });
+
+    it('rejects a size sing-box refuses at start (below 68) instead of failing the tunnel later', () => {
+      expect(() => withFragment('fragment 67')).toThrow(UnsupportedDirectiveError);
+      expect(withFragment('fragment 68').fragment).toBe(68);
+    });
+
+    it('rejects the mtu mode, which sing-box has no field for', () => {
+      expect(() => withFragment('fragment 1300 mtu')).toThrow(UnsupportedDirectiveError);
+    });
+  });
+
+  it('keeps ignoring a bare mssfix and comp-lzo values other than no, as before', () => {
+    expect(parseOvpn(EXPRESS.replace('mssfix 1200', 'mssfix')).mssFix).toBeUndefined();
+    expect(parseOvpn(EXPRESS.replace('comp-lzo no', 'comp-lzo')).compressionLzo).toBeUndefined();
+    expect(parseOvpn(EXPRESS.replace('comp-lzo no', 'comp-lzo adaptive')).compressionLzo).toBeUndefined();
   });
 });

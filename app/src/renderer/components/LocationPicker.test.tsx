@@ -54,6 +54,23 @@ describe('LocationPicker', () => {
     expect(within(row('hma:JP-OSAKA')).getByRole('checkbox')).toBeDisabled();
   });
 
+  it('a location outside the plan says so: not pickable, a disabled stepper, the reason as a tooltip', () => {
+    const notInPlan: Target = { ...target('zoogvpn:JP', 'Japan', 10, 0, 'zoogvpn'), notInPlan: true };
+    const { row, onSubmit } = renderPicker({ targets: [TOKYO, notInPlan] });
+    const r = row('zoogvpn:JP');
+    expect(r).toHaveTextContent('Not in your plan');
+    expect(r).not.toHaveTextContent('No free server');
+    expect(r).toHaveAttribute('title', expect.stringContaining("Your ZoogVPN plan doesn't include this location"));
+    expect(within(r).getByRole('checkbox')).toBeDisabled();
+    const stepper = within(r).getByRole('group');
+    expect(stepper).toHaveAttribute('aria-disabled', 'true');
+    for (const b of within(stepper).getAllByRole('button')) expect(b).toBeDisabled();
+    expect(within(stepper).getByRole('spinbutton')).toBeDisabled();
+    fireEvent.click(within(r).getByRole('checkbox'));
+    expect(screen.getByTestId('picker-submit')).toBeDisabled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('a picked location gets a stepper: default 1, max = free servers', () => {
     const { row } = renderPicker();
     fireEvent.click(within(row('hma:JP-TOKYO')).getByRole('checkbox'));
@@ -144,6 +161,53 @@ describe('LocationPicker', () => {
       const headers = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
       // CLDR's Vietnamese keeps "Italy"; the header says Ý, and sorts as Ý.
       expect(headers).toEqual(['Áo', 'Đức', 'Nhật Bản', 'Ý']);
+    } finally {
+      await act(() => changeLanguage('en'));
+    }
+  });
+
+  it('marks a virtual location, with what that means as a tooltip', () => {
+    const hanoi: Target = { ...target('nordvpn:VN-HANOI', 'Hanoi', 2, 2, 'nordvpn'), country: 'VN', virtualLocation: true };
+    const { row } = renderPicker({ targets: [hanoi, TOKYO] });
+    const pill = within(row('nordvpn:VN-HANOI')).getByTestId('virtual-nordvpn:VN-HANOI');
+    expect(pill).toHaveTextContent('virtual location');
+    expect(pill.getAttribute('title')).toMatch(/^NordVPN lists this as a virtual location/);
+    expect(within(row('hma:JP-TOKYO')).queryByText('virtual location')).toBeNull();
+  });
+
+  it('names, sorts and finds cities by their Vietnamese name where there is one', async () => {
+    const vn = (key: string, city: string): Target => ({ ...target(key, city, 2, 2, 'nordvpn'), country: 'VN' });
+    const targets = [vn('nordvpn:VN-HO-CHI-MINH-CITY', 'Ho Chi Minh City'), vn('nordvpn:VN-NHA-TRANG', 'Nha Trang'), vn('nordvpn:VN-HANOI', 'Hanoi')];
+    await act(() => changeLanguage('vi'));
+    try {
+      const { row } = renderPicker({ targets });
+      expect(row('nordvpn:VN-HANOI')).toHaveTextContent('Hà Nội');
+      const order = screen.getAllByTestId(/^pick-nordvpn:/).map((r) => r.getAttribute('data-testid'));
+      // "TP. Hồ Chí Minh" sorts under T, after "Nha Trang".
+      expect(order).toEqual(['pick-nordvpn:VN-HANOI', 'pick-nordvpn:VN-NHA-TRANG', 'pick-nordvpn:VN-HO-CHI-MINH-CITY']);
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'hà nội' } });
+      expect(screen.getAllByTestId(/^pick-nordvpn:/).map((r) => r.getAttribute('data-testid'))).toEqual(['pick-nordvpn:VN-HANOI']);
+    } finally {
+      await act(() => changeLanguage('en'));
+    }
+  });
+
+  it('a country-wide location (ZoogVPN "Germany") is named after the country in the UI language, picked chip too', async () => {
+    const wide = (key: string, country: string, city: string): Target => ({ ...target(key, city, 2, 2, 'zoogvpn'), country, countryWide: true });
+    const germany = wide('zoogvpn:DE', 'DE', 'Germany');
+    const usEast: Target = { ...target('zoogvpn:US-EAST', 'East', 2, 2, 'zoogvpn'), country: 'US' };
+    const us = wide('zoogvpn:US', 'US', 'United States');
+    await act(() => changeLanguage('vi'));
+    try {
+      const { row } = renderPicker({ targets: [germany, usEast, us] });
+      expect(row('zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(row('zoogvpn:DE')).not.toHaveTextContent('Germany');
+      expect(row('zoogvpn:US-EAST')).toHaveTextContent('East');
+      expect(row('zoogvpn:US')).toHaveTextContent('Hoa Kỳ');
+      expect(row('zoogvpn:US')).not.toHaveTextContent('United States');
+      fireEvent.click(within(row('zoogvpn:DE')).getByRole('checkbox'));
+      expect(screen.getByTestId('picked-zoogvpn:DE')).toHaveTextContent('Đức');
+      expect(within(row('zoogvpn:DE')).getByRole('group')).toHaveAccessibleName('Số cổng ở Đức');
     } finally {
       await act(() => changeLanguage('en'));
     }

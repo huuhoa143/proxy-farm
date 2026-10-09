@@ -16,7 +16,7 @@ export interface ProviderLimitFieldProps {
  * limits"). Starts at the current limit reported by `listProviders()`.
  */
 export function ProviderLimitField({ api, providerId, initialLimit }: ProviderLimitFieldProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [value, setValue] = useState(initialLimit ?? 0);
   const [touched, setTouched] = useState(false);
 
@@ -64,7 +64,11 @@ export function ProviderLimitField({ api, providerId, initialLimit }: ProviderLi
           setSaved(false);
         }}
       />
-      <span className="limit-hint">
+      <span
+        className="limit-hint"
+        // Why the provider's default is what it is (`DEFAULT_PORT_LIMITS`), where known.
+        title={i18n.exists(`onboarding.portLimit.why.${providerId}`) ? (t(`onboarding.portLimit.why.${providerId}`) as string) : undefined}
+      >
         {value === 0 ? t('onboarding.portLimit.unlimited') : t('onboarding.portLimit.ports', { count: value })}
       </span>
       <button className="btn sm" onClick={() => void save()}>

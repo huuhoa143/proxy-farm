@@ -137,7 +137,7 @@ function occupyPort(): Promise<{ port: number; close: () => Promise<void> }> {
 
 describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () => {
   const recordedPids: Array<{ registryPath: string; key: string; entry: any }> = [];
-  const removedPids: Array<{ registryPath: string; key: string }> = [];
+  const removedPids: Array<{ registryPath: string; key: string; pid?: number }> = [];
 
   afterEach(() => {
     recordedPids.length = 0;
@@ -199,8 +199,8 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       recordPidFn: async (registryPath, key, entry) => {
         recordedPids.push({ registryPath, key, entry });
       },
-      removePidFn: async (registryPath, key) => {
-        removedPids.push({ registryPath, key });
+      removePidFn: async (registryPath, key, pid) => {
+        removedPids.push({ registryPath, key, ...(pid !== undefined ? { pid } : {}) });
       },
       ...opts.engineOpts,
     });
@@ -216,6 +216,48 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     const config = JSON.parse(processes[0].startedConfigs[0]);
     expect(config.route.final).toBe('block'); // sanity: a real, invariant-passing config
     expect(healths[0].started).toBe(1);
+  });
+
+  describe('overlapping starts never share a port (a credential probe while ports start)', () => {
+    const clashPortOf = (config: string): number => Number(JSON.parse(config).experimental.clash_api.external_controller.split(':')[1]);
+
+    it('two starts in flight at once get different clash_api ports', async () => {
+      // Every start waits on the proxy-port check, so both scan for a clash port together.
+      // The scan takes a while and sees only what `taken` says (like the real one between
+      // its bind test and sing-box's bind): overlapping scans pick the same lowest port.
+      const allocatePortFn = async (o: { base?: number; taken?: Set<number> } = {}) => {
+        await new Promise((r) => setTimeout(r, 5));
+        let port = o.base ?? 40000;
+        while (o.taken?.has(port)) port += 1;
+        return port;
+      };
+      const { engine, processes } = setup({ isPortFree: async () => true, engineOpts: { allocatePortFn } });
+      await Promise.all([engine.start('probe:z1:1', sampleInput(45401)), engine.start('zoogvpn:DE#1', sampleInput(45402)), engine.start('zoogvpn:DE#2', sampleInput(45403))]);
+      const clash = processes.map((p) => clashPortOf(p.startedConfigs[0]));
+      expect(new Set(clash).size).toBe(3);
+      // None of them is another start's proxy port either.
+      for (const port of clash) expect([45401, 45402, 45403]).not.toContain(port);
+    });
+
+    it("a start on a proxy port another key's start already holds is refused as port-in-use, before any spawn", async () => {
+      const { engine, processes } = setup({ isPortFree: () => new Promise((r) => setTimeout(() => r(true), 5)) });
+      const first = engine.start('zoogvpn:DE#1', sampleInput(45410));
+      await expect(engine.start('probe:z1:1', sampleInput(45410))).rejects.toBeInstanceOf(PortInUseError);
+      await first;
+      expect(processes).toHaveLength(1);
+      // Once registered, the port stays claimed for other keys.
+      await expect(engine.start('probe:z1:2', sampleInput(45410))).rejects.toBeInstanceOf(PortInUseError);
+    });
+
+    it('a restart of the same key keeps its own proxy port, and a stopped key frees it', async () => {
+      const { engine, processes } = setup({ isPortFree: async () => true });
+      await engine.start('zoogvpn:DE#1', sampleInput(45420));
+      await engine.start('zoogvpn:DE#1', sampleInput(45420));
+      expect(processes).toHaveLength(2);
+      await engine.stop('zoogvpn:DE#1');
+      await engine.start('probe:z1:1', sampleInput(45420));
+      expect(processes).toHaveLength(3);
+    });
   });
 
   it('records the pid after starting', async () => {
@@ -362,6 +404,33 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
     expect(recordedPids[1].key).toBe('k1');
   });
 
+  describe('the pid registry forgets an engine once it has exited', () => {
+    it('a crash drops that pid at once, while the port is still retrying', async () => {
+      const { engine, processes, healths } = setup();
+      await engine.start('k1', sampleInput(45250));
+      processes[0].emitExit({ code: 1, signal: null });
+      expect(healths[0].fedExit).toEqual([1]); // still a crash for PortHealth to back off on
+      expect(removedPids).toEqual([{ registryPath: '/tmp/pf-fake-registry.json', key: 'k1', pid: 111 }]);
+    });
+
+    it('a back-off quiesce drops the pid too', async () => {
+      const { engine, processes, healths } = setup();
+      await engine.start('k1', sampleInput(45251));
+      const p = processes[0];
+      p.stop.mockImplementation(async () => p.emitExit({ code: 0, signal: null }));
+      healths[0].setState({ kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' });
+      await vi.waitFor(() => expect(removedPids).toEqual([{ registryPath: '/tmp/pf-fake-registry.json', key: 'k1', pid: 111 }]));
+    });
+
+    it('drops each exit once: a second exit report for the same child removes nothing more', async () => {
+      const { engine, processes } = setup();
+      await engine.start('k1', sampleInput(45252));
+      processes[0].emitExit({ code: 1, signal: null });
+      processes[0].emitExit({ code: 1, signal: null });
+      expect(removedPids).toHaveLength(1);
+    });
+  });
+
   describe('reviewer item 5: bind-error reallocation/termination', () => {
     it('a PROXY port bind collision is terminal: reports failed(port-in-use) and quiesces PortHealth rather than retrying', async () => {
       const { engine, processes, healths } = setup();
@@ -379,7 +448,13 @@ describe('engine adapter (reviewer item 6: real Engine/PortHealth wiring)', () =
       // connectivity backoff/retry to a bind collision that it has no vocabulary for.
       expect(healths[0].stopped).toBe(1);
       expect(healths[0].fedExit).toEqual([]);
-      await vi.waitFor(() => expect(removedPids).toEqual([{ registryPath: '/tmp/pf-fake-registry.json', key: 'k1' }]));
+      // The exit drops the exited pid; the teardown then clears the key.
+      await vi.waitFor(() =>
+        expect(removedPids).toEqual([
+          { registryPath: '/tmp/pf-fake-registry.json', key: 'k1', pid: 111 },
+          { registryPath: '/tmp/pf-fake-registry.json', key: 'k1' },
+        ]),
+      );
 
       // reviewer M-1: the torn-down entry is removed from the map, so it no longer
       // reports as a running engine (nor keeps counting its ports in allClaimedPorts).

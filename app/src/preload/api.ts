@@ -21,8 +21,10 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     removeAccount: (accountId) => ipcRenderer.invoke('removeAccount', accountId) as ReturnType<ProxyFarmApi['removeAccount']>,
     connectHma: () => ipcRenderer.invoke('connectHma') as ReturnType<ProxyFarmApi['connectHma']>,
     enableHmaSupport: () => ipcRenderer.invoke('enableHmaSupport') as ReturnType<ProxyFarmApi['enableHmaSupport']>,
-    importConfigFile: (name, content, country) =>
-      ipcRenderer.invoke('importConfigFile', name, content, country) as ReturnType<ProxyFarmApi['importConfigFile']>,
+    importConfigFile: (name, content, country, credentials) =>
+      ipcRenderer.invoke('importConfigFile', name, content, country, ...(credentials === undefined ? [] : [credentials])) as ReturnType<
+        ProxyFarmApi['importConfigFile']
+      >,
     listTargets: (providerId) => ipcRenderer.invoke('listTargets', providerId) as ReturnType<ProxyFarmApi['listTargets']>,
 
     listServers: (locationKey, portKey) =>
@@ -61,6 +63,11 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
       const listener = (_event: unknown, active: unknown) => cb(active as Parameters<typeof cb>[0]);
       ipcRenderer.on(IPC.events.hostVpnChanged, listener);
       return () => ipcRenderer.removeListener(IPC.events.hostVpnChanged, listener);
+    },
+    onTargetsChanged: (cb) => {
+      const listener = () => cb();
+      ipcRenderer.on(IPC.events.targetsChanged, listener);
+      return () => ipcRenderer.removeListener(IPC.events.targetsChanged, listener);
     },
     onUpdateStatus: (cb) => {
       const listener = (_event: unknown, status: unknown) => cb(status as Parameters<typeof cb>[0]);
