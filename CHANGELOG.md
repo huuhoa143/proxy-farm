@@ -7,6 +7,17 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- NordVPN provider (WireGuard / NordLynx). Add an account with an access token from Nord
+  Account (NordVPN → Advanced settings → Get access token) or with your NordLynx private
+  key. A token is used once to fetch the key from api.nordvpn.com and is not kept; only
+  the key is stored, encrypted. Locations are NordVPN's cities (about 225 in 150
+  countries), from its public server list, refreshed at most every 12 hours. Each port
+  pins one server; the exit IP shown is the one observed through the tunnel, which for
+  NordVPN is not the server's own address. The default port limit is 6. NordVPN ports
+  get the same protection against repeated silent WireGuard handshakes as Surfshark.
+
 ## [0.1.1] — 2026-10-09
 
 ### Changed

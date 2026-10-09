@@ -43,7 +43,7 @@ Success criteria:
 │  Renderer (UI, vi/en)  ◄── contextBridge IPC only (no HTTP) ──►  Main process      │
 │                                                                                    │
 │  Main: Controller (TypeScript)                                                     │
-│   ├─ Providers      hma · zoogvpn · surfshark · file  (setup/check/targets/bind)   │
+│   ├─ Providers      hma · zoogvpn · surfshark · nordvpn · file (check/targets/bind)│
 │   ├─ Catalogs       hma (bundled + feed) · surfshark API · zoogvpn (bundled)       │
 │   ├─ ServerPools    per location: servers, health, which port holds which (§6.8)  │
 │   ├─ Accounts       multi-account pools per provider (pick / rebalance / pin)      │
@@ -236,6 +236,22 @@ Each unit is independently testable:
 - Unsupported directives are rejected with a clear message rather than ignored.
 - Imported files are kept in the encrypted secrets store, not as plain files.
 
+### 5.5 NordVPN — WireGuard (NordLynx) ✅ 2026-10-09
+
+- **Credential**: the account's NordLynx private key (WireGuard, 44-character base64). The user enters either:
+  - an **access token** (64 hex) from Nord Account → NordVPN → Advanced settings → Get access token. `GET https://api.nordvpn.com/v1/users/services/credentials` with HTTP Basic `token:<token>` answers `{id, created_at, updated_at, username, password, nordlynx_private_key}`. The app calls it **once**, while the account is being added, and stores only `nordlynx_private_key` (a `wgkey` secret). The token is never stored; the service username/password (OpenVPN) are not kept either (no OpenVPN mode yet; a token can fetch them again). 401/403 → "token rejected"; no answer or any other status → "couldn't reach Nord"; a 200 without a key → "no NordLynx key". Or:
+  - the **NordLynx private key** itself: no network call.
+  - The exchange runs in the optional `Provider.resolveInput()`, which the facade awaits before the synchronous, offline `check()` (the ZoogVPN credential probe's place in `addAccount`).
+  - ❌ Email/password sign-in (`POST /v1/users/tokens`) is behind a Cloudflare challenge (403) and is not offered.
+- **Server list**: the public, unauthenticated `GET https://api.nordvpn.com/v1/servers?limit=16384&filters[servers_technologies][identifier]=wireguard_udp&fields[...]`, from the user's own IP, cached 12 h beside Surfshark's (`cache/nordvpn-servers.json`), a stale cache kept when a refresh fails. `fields[...]` trims each server to `hostname`, `station`, `load`, `locations.country.{code,name,city.name}` and `technologies.{identifier,metadata}`.
+  - Cost of a full refresh ✅: **one request**, ~198 kB transferred (gzip; 5.3 MB decompressed, ~27 MB without the field projection), < 1 s; 6950 WireGuard servers in 150 countries, 225 cities. The cache file is ~0.9 MB. Paging would only add requests; per-country filters would need one request per country.
+  - Each server's `wireguard_udp` technology carries `metadata[{name:'public_key'}]`: the server's WireGuard public key, shared per cluster (all Hanoi servers have one; one city, San Francisco, has two). The cache keeps it **per server**, so `bind()` reads it synchronously and deterministically, without a prior `targets()`.
+- **Locations**: one per (country, city), key `nordvpn:<CC>-<CITY-SLUG>` (city upper-cased, accents folded, non-alphanumerics → `-`: `nordvpn:VN-HO-CHI-MINH-CITY`). Servers = the station IPs, least loaded first (then by IP). E.g. VN: Hanoi `vn52`, `vn53`; Ho Chi Minh City `vn56`, `vn57`, `vn60`, `vn61`. Big cities have hundreds (London 647).
+- **Endpoint**: `wireguard`, `address: ['10.5.0.2/32']` (the same for every key), the account's private key, `mtu: 1280`, peer = the pinned server's IP, port 51820, **that server's** public key, `allowed_ips: ['0.0.0.0/0']`, keepalive 25.
+- **Exit IP ≠ server IP** ✅: `vn52` at `187.40.60.1` exited from `.22` in one session and `.15` in a later one; `vn53` → `.40`, `vn56` → `.66`; Ho Chi Minh City `187.40.224.111` → `.130`. Within a session a reconnect kept the exit; it is different per server. So ports pin servers as usual, the UI shows the **observed** exit IP, and the duplicate-exit check (§6.8) compares observed exits. Nothing assumes exit = server IP (or + 1) for NordVPN. ⚠️ How long a server's exit stays the same is unmeasured.
+- **Concurrency**: 3 tunnels with one key to three different servers stayed up together ✅. Default port limit **6** until a live ramp says more.
+- **Provider safety**: NordLynx is WireGuard, so a wrong or revoked key is silent like Surfshark's. NordVPN accounts get the per-account attempt cap and the unproven-key lockout (§6.4), with NordVPN-specific guidance (subscription active, re-add with a fresh token).
+
 ## 6. Engine
 
 ### 6.1 Config invariants (ConfigRenderer; a unit test runs on every provider's output)
@@ -317,7 +333,7 @@ Each unit is independently testable:
 **Provider safety** (2026-10-08 incident). The app hammered Surfshark with WireGuard handshakes that never completed: the back-off restarted at 30 s on every engine restart, and dead-server failover walked the pool. Surfshark suspended the account's VPN access; afterwards the official app failed on every protocol with "The VPN credentials are invalid". Same failure mode as gluetun issue #2595. WireGuard is silent: a rejected key looks exactly like an unreachable server, so the app must assume the worst. Rules:
 
 - **Per-account attempt cap.** Every engine start of a port (start, due retry, failover, Change IP) takes a token from a per-account bucket: at most 6, refilling one every 10 s (≤ 6 handshake attempts per minute per account, across all its ports). With no token the port shows `retrying(rate-limited)` until the next one is due; the back-off does not grow. Applies to every provider.
-- **Unproven WireGuard key.** For a WireGuard account (Surfshark, or an imported WireGuard `.conf`) that has **never** been confirmed online (no persisted `lastOk` for the account): 3 attempts in a row that end without a handshake (`/delay` 504 or the connecting deadline, before the first 200) stop the account. Every port of it goes to `failed(key-rejected)`: its engine is stopped, nothing retries automatically, and the UI shows it as action-needed (no countdown) with the provider's guidance (Surfshark: check the key is under Manual setup → WireGuard, the address matches the key's config, the subscription is active; retrying too often can get an account suspended). The lock is persisted (`AppState.wgLockouts`) so an app restart does not start over. A user Start or Change IP re-arms it for **one** attempt (a further failure locks it again at once); app start, resume, due retries, auto-rotate and the webhook never re-arm. A handshake or new credentials (a re-added key, a changed address) clear it. Failures during a host-wide incident are not counted.
+- **Unproven WireGuard key.** For a WireGuard account (Surfshark, NordVPN, or an imported WireGuard `.conf`) that has **never** been confirmed online (no persisted `lastOk` for the account): 3 attempts in a row that end without a handshake (`/delay` 504 or the connecting deadline, before the first 200) stop the account. Every port of it goes to `failed(key-rejected)`: its engine is stopped, nothing retries automatically, and the UI shows it as action-needed (no countdown) with the provider's guidance (Surfshark: check the key is under Manual setup → WireGuard, the address matches the key's config, the subscription is active; NordVPN: the subscription is active, or re-add with a fresh token; retrying too often can get an account suspended). The lock is persisted (`AppState.wgLockouts`) so an app restart does not start over. A user Start or Change IP re-arms it for **one** attempt (a further failure locks it again at once); app start, resume, due retries, auto-rotate and the webhook never re-arm. A handshake or new credentials (a re-added key, a changed address) clear it. Failures during a host-wide incident are not counted.
 - **Proven WireGuard key** (has worked before): never locked, but its ports do not jump to the next server the moment one times out. The server is marked dead and the next attempt waits for the back-off (with jitter), which then moves the port. Attempts never come faster than the back-off.
 - OpenVPN auth failures (HMA, ZoogVPN) keep their refusal/failover rules (§6.8) and are bounded by the persistent back-off and the per-account cap.
 
@@ -365,13 +381,14 @@ Each unit is independently testable:
 |---|---|---|---|
 | HMA | catalog `ips` of the location | maintainer scan (§5.1), shipped in the seed + feed | = server IP |
 | Surfshark | IPs behind the cluster hostname | the app, DNS sampling (§5.3) | = server IP + 1 |
+| NordVPN | station IPs of the city's WireGuard servers | the app, public server list (§5.5) | another address of the server's subnet, observed (§5.5) |
 | ZoogVPN | numbered hosts of the location | maintainer enumeration (§5.2), bundled | = server IP |
 | File | the file's `remote` lines | parser (§5.4) | = server IP |
 
 **Allocation invariant.** Two enabled ports of the same provider never hold the same server, because the same server means the same exit IP. "Same" is compared on the **resolved IP**, not the token: different hostnames can point at one machine (✅ `de7.webunlim.com` and `fr4.webunlim.com` both resolve to `185.177.229.121`). The exit-IP probe is the final check: a port whose exit IP equals another port's is moved to another server.
 
 - **Add k ports** to a location: take the k best free usable servers (usable = not refused for that account, not dead; best = most recent `lastOk`, then pool order). If fewer are free, add that many and say how many were added.
-- The provider's port limit (§4.2) caps the provider's enabled ports. Defaults: HMA 12 (✅ 20 processes verified), Surfshark 20 (⚠️ 10 separate processes ✅, 50 endpoints in one process ✅; 20 processes and the 24 h soak wait on a live test key), ZoogVPN 5 (✅ 8 concurrent tunnels on one account, no kicks; plan refusals are per server, not a connection count), file 1 per file.
+- The provider's port limit (§4.2) caps the provider's enabled ports. Defaults: HMA 12 (✅ 20 processes verified), Surfshark 20 (⚠️ 10 separate processes ✅, 50 endpoints in one process ✅; 20 processes and the 24 h soak wait on a live test key), ZoogVPN 5 (✅ 8 concurrent tunnels on one account, no kicks; plan refusals are per server, not a connection count), NordVPN 6 (✅ 3 concurrent tunnels on one key; live ramp pending), file 1 per file. In code only NordVPN's default is wired so far (`DEFAULT_PORT_LIMITS`); the others still default to unlimited until the user sets a limit.
 - Ports are spread across the provider's accounts by the existing account pool. A server refused for one account may still be used by another.
 
 **Failover.** It runs on every (re)start and every due retry; the start path re-selects instead of reusing a stale choice.
@@ -543,6 +560,14 @@ proxy-farm/
 | HMA concurrent tunnels, one device, ramp 12→14→16→20 | ✅ 20/20 established, one handshake each, no auth failures; sampled exits = server IP, distinct |
 | HMA full scan (`scan:hma-servers --write --max 4`) | ✅ 115/115 locations verified; 192 servers; 68 with 1, 27 with 2, 7 with 3, 13 with 4 |
 | ZoogVPN unlisted hosts with the test account | `sg2` ✅ exit = server IP; `jp4`, `vn2`, `de5` `AUTH_FAILED` (plan); `jp1`, `jp2` timed out |
+| **2026-10-09 (NordVPN, §5.5)** | |
+| Nord `GET /v1/users/services/credentials`, Basic `token:<token>` | ✅ 200 `{username (24), password (24), nordlynx_private_key (44)}` |
+| Nord `POST /v1/users/tokens` (email/password) | ❌ Cloudflare 403 |
+| Nord server list, WireGuard filter + `fields[...]`, one request | ✅ 6950 servers, 150 countries, 225 cities; ~198 kB gzip (5.3 MB raw; ~27 MB without `fields`); < 1 s |
+| NordLynx endpoint (`10.5.0.2/32`, server's own pubKey, mtu 1280) | ✅ connects, `/delay` 130–290 ms |
+| NordLynx exit IP vs server IP | ✅ different: vn52 `.1` → `.22` (later session `.15`), vn53 → `.40`, vn56 → `.66`, HCMC `187.40.224.111` → `.130`; same exit on reconnect within a session; distinct per server |
+| NordLynx, 3 concurrent tunnels, one key, different servers | ✅ all stayed up |
+| App provider end to end (worktree `targets()` → `bind()` → `renderConfig` + invariants → sing-box stdin), 2 VN tunnels | ✅ Hanoi `187.40.60.1` 265 ms exit `187.40.60.15`; Ho Chi Minh City `187.40.224.111` 271 ms exit `187.40.224.130` |
 
 ## 12. Risks & open items
 
@@ -553,6 +578,8 @@ proxy-farm/
 | Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
 | **Failed WireGuard handshakes get an account suspended** ✅ happened 2026-10-08: a Surfshark account's VPN access was suspended after mass failed WireGuard handshakes; the official app then failed on all protocols with "The VPN credentials are invalid" (cf. gluetun #2595) | §6.4 "Provider safety": per-port back-off persists across restarts, engines are stopped during back-off, ≤ 6 attempts/min per account, an unproven WireGuard key is stopped after 3 silent attempts until the user acts. Live experiments are rate-limited (CONTRIBUTING) |
 | Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
+| NordVPN exit IP is not the server IP and changed between sessions on one server ⚠️ (§5.5) | The UI and the duplicate-exit check use the observed exit; a soak should measure how often a pinned server's exit changes |
+| NordVPN concurrency per key ⚠️ | Default limit 6 (3 verified); live ramp before raising |
 | ZoogVPN plan limits per server ⚠️ | Per-(account, server) refusal memory. Connection count: ✅ ≥ 8 on one account, default 5 |
 | HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
 | ZoogVPN plan vs password ambiguity ✅ | Free-host credential probe (§5.2), 2026-10-09; the count heuristic is only a labelled last resort |

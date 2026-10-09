@@ -83,5 +83,6 @@ They contain no secrets of any user.
 
 ## Trademarks
 
-HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard, OpenVPN, Electron and other names are
-trademarks of their owners. Proxy Farm is not affiliated with or endorsed by them.
+HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, NordLynx, Nord Security, WireGuard,
+OpenVPN, Electron and other names are trademarks of their owners. Proxy Farm is not
+affiliated with or endorsed by them.
