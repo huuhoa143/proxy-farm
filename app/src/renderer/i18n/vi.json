@@ -203,13 +203,13 @@
     "rotateDisabledHint": "Hãy bật cổng (hoặc chờ kết nối xong) rồi mới đổi IP.",
     "stop": "Tắt",
     "stopDisabledHint": "Cổng này đã dừng.",
-    "remove": "Xoá",
+    "remove": "Xóa",
     "details": "Chi tiết",
     "selectAll": "Chọn tất cả",
     "confirmRemove": {
-      "title": "Xoá cổng?",
-      "message_one": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách.",
-      "message_other": "Xoá {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách."
+      "title": "Xóa cổng?",
+      "message_one": "Xóa {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách.",
+      "message_other": "Xóa {{count}} cổng? Thao tác này sẽ tắt và gỡ khỏi danh sách."
     },
     "logs": {
       "title": "Nhật ký",
@@ -241,7 +241,7 @@
       "start": "Bật",
       "stop": "Tắt",
       "rotate": "Đổi IP",
-      "remove": "Xoá",
+      "remove": "Xóa",
       "export": "Xuất",
       "clear": "Bỏ chọn",
       "autoRotate": "Tự xoay…",
@@ -702,7 +702,7 @@
     "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Cổng ExpressVPN phân giải tên máy chủ ExpressVPN (expressnetw.com) qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn; ngoài chính kết nối VPN, không có yêu cầu nào khác tới ExpressVPN. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
     "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
     "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
-    "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
+    "delete": "Để xóa toàn bộ dữ liệu: xóa tài khoản và cổng, thoát Proxy Farm, rồi xóa thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
     "fullPolicy": "Chính sách quyền riêng tư đầy đủ"
   },
   "disclaimer": {
