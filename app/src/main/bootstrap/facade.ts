@@ -147,7 +147,14 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   }
 
   async function detectHma(): Promise<{ found: boolean; hintKey?: string }> {
-    const r = await deps.hma.read();
+    let r = await deps.hma.read();
+    // Windows: a copy whose task has not reported lately reads as helper-missing. After a
+    // sleep the task may simply not have caught up yet: ask it for a run (returns at once
+    // when HMA support was never enabled) before offering to enable it again.
+    if (r.status === 'helper-missing' && deps.hmaWindows) {
+      await deps.hmaWindows.refresh().catch(() => undefined);
+      r = await deps.hma.read();
+    }
     if (r.status === 'found') return { found: true };
     if (r.status === 'helper-missing') return { found: false, hintKey: 'hma.helperMissing' };
     if (r.status === 'invalid') return { found: false, hintKey: 'hma.notSignedIn' };

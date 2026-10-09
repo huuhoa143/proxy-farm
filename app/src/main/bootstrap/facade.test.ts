@@ -232,6 +232,25 @@ describe('controller facade', () => {
     expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.helperMissing' });
   });
 
+  it('listProviders asks the Windows task for a run before offering to enable HMA support again', async () => {
+    let refreshes = 0;
+    // The task had not caught up after a sleep: its run brings the copy back.
+    const hmaWindows = {
+      enable: async () => ({ ok: true }) as const,
+      refresh: async () => {
+        refreshes++;
+        hmaRead = { status: 'found', creds: { udid: 'U1.x', password: 'p'.repeat(64) } };
+      },
+    };
+    const { facade } = setup({ platform: 'win32', hmaWindows });
+    hmaRead = { status: 'helper-missing' };
+    expect((await facade.listProviders())[0].detected).toEqual({ found: true });
+    expect(refreshes).toBe(1);
+    // A found copy needs no run.
+    await facade.listProviders();
+    expect(refreshes).toBe(1);
+  });
+
   it('connectHma stores the device creds as a userpass secret, and a second connect updates the same account', async () => {
     const { facade, state, secrets } = setup();
     const first = await facade.connectHma();

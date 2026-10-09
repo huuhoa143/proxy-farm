@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHostVpnMonitor, hasVpnNamedAdapter, isDefaultRouteViaTunnel, isWindowsRouteViaVpn, type WindowsRouteSnapshot } from './host-vpn';
+import { createHostVpnMonitor, hasVpnNamedAdapter, isDefaultRouteViaTunnel, isWindowsRouteViaVpn, labelAdapters, type WindowsRouteSnapshot } from './host-vpn';
 
 const ROUTE_VIA_IPSEC0 = `   route to: default
 destination: default
@@ -129,6 +129,22 @@ describe('isWindowsRouteViaVpn (spec §4.3 Windows detection)', () => {
     expect(hasVpnNamedAdapter(LAN)).toBe(false);
     expect(hasVpnNamedAdapter(WITH_WINTUN)).toBe(true);
   });
+
+  it('PPPoE broadband is not a VPN; Windows built-in VPN miniports are', () => {
+    expect(hasVpnNamedAdapter({ '100.64.1.2': 'Viettel PPPoE WAN Miniport (PPPoE)', '10.0.0.2': 'PPP adapter' })).toBe(false);
+    expect(hasVpnNamedAdapter({ '10.0.0.3': 'Work WAN Miniport (IKEv2)' })).toBe(true);
+    expect(hasVpnNamedAdapter({ '10.0.0.4': 'Teredo Tunneling Pseudo-Interface' })).toBe(false);
+  });
+
+  it('recognises a VPN adapter by its description when its name is arbitrary (WireGuard tunnel, TAP)', () => {
+    const up = { ...LAN, '10.8.0.2': 'office', '10.9.0.2': 'Ethernet 3' };
+    const labelled = labelAdapters(up, { office: 'WireGuard Tunnel', 'Ethernet 3': 'TAP-Windows Adapter V9', 'Ethernet 2': 'Intel(R) Ethernet Controller (3) I225-V' });
+    expect(labelled['10.8.0.2']).toBe('office WireGuard Tunnel');
+    expect(hasVpnNamedAdapter(labelled)).toBe(true);
+    expect(isWindowsRouteViaVpn(win(ROUTE_PRINT_SPLIT, labelled))).toBe(true);
+    // The names alone say nothing.
+    expect(isWindowsRouteViaVpn(win(ROUTE_PRINT_SPLIT, up))).toBe(false);
+  });
 });
 
 describe('createHostVpnMonitor', () => {
@@ -143,6 +159,7 @@ describe('createHostVpnMonitor', () => {
       runDefaultRouteCheck: async () => ROUTE_VIA_IPSEC0,
       readWindowsRoutes: async () => ROUTE_PRINT_SPLIT,
       readWindowsAdapters: () => WITH_WINTUN,
+      describeWindowsAdapters: async () => ({}),
     });
     expect(await monitor.isHostVpnActive()).toBe(true);
   });
@@ -153,9 +170,60 @@ describe('createHostVpnMonitor', () => {
       platform: 'win32',
       readWindowsRoutes: async () => (reads++, ROUTE_PRINT_SPLIT),
       readWindowsAdapters: () => LAN,
+      describeWindowsAdapters: async () => ({}),
     });
     expect(await monitor.isHostVpnActive()).toBe(false);
     expect(reads).toBe(0);
+  });
+
+  it('isHostVpnActive on win32 reads descriptions once per set of adapters that are up', async () => {
+    let up: Record<string, string> = LAN;
+    let described = 0;
+    const monitor = createHostVpnMonitor({
+      platform: 'win32',
+      readWindowsRoutes: async () => ROUTE_PRINT_SPLIT,
+      readWindowsAdapters: () => up,
+      describeWindowsAdapters: async () => (described++, { office: 'WireGuard Tunnel' }),
+    });
+    expect(await monitor.isHostVpnActive()).toBe(false);
+    expect(await monitor.isHostVpnActive()).toBe(false);
+    expect(described).toBe(1);
+    up = { ...LAN, '10.8.0.2': 'office' };
+    expect(await monitor.isHostVpnActive()).toBe(true);
+    expect(await monitor.isHostVpnActive()).toBe(true);
+    expect(described).toBe(2);
+  });
+
+  it('a failed description lookup is not retried until the adapters that are up change', async () => {
+    let up: Record<string, string> = LAN;
+    let attempts = 0;
+    const monitor = createHostVpnMonitor({
+      platform: 'win32',
+      readWindowsRoutes: async () => ROUTE_PRINT_SPLIT,
+      readWindowsAdapters: () => up,
+      describeWindowsAdapters: async () => {
+        attempts++;
+        throw new Error('powershell missing');
+      },
+    });
+    await monitor.isHostVpnActive();
+    await monitor.isHostVpnActive();
+    expect(attempts).toBe(1);
+    up = WITH_WINTUN;
+    await monitor.isHostVpnActive();
+    expect(attempts).toBe(2);
+  });
+
+  it('isHostVpnActive on win32 still uses names when descriptions cannot be read', async () => {
+    const monitor = createHostVpnMonitor({
+      platform: 'win32',
+      readWindowsRoutes: async () => ROUTE_PRINT_SPLIT,
+      readWindowsAdapters: () => WITH_WINTUN,
+      describeWindowsAdapters: async () => {
+        throw new Error('powershell missing');
+      },
+    });
+    expect(await monitor.isHostVpnActive()).toBe(true);
   });
 
   it('isHostVpnActive on win32 is false when reading the route table fails', async () => {
@@ -165,6 +233,7 @@ describe('createHostVpnMonitor', () => {
         throw new Error('route missing');
       },
       readWindowsAdapters: () => WITH_WINTUN,
+      describeWindowsAdapters: async () => ({}),
     });
     expect(await monitor.isHostVpnActive()).toBe(false);
   });

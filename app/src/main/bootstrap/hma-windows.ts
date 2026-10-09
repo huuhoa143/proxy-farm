@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -77,6 +77,7 @@ export const UNINSTALL_GRACE_MS = 24 * 60 * 60_000;
 
 /** The setup exits with these; 1223 comes from the elevation (ERROR_CANCELLED). */
 const EXIT_NO_CREDENTIALS = 2;
+const EXIT_UNSUPPORTED_LOCATION = 4;
 const UAC_CANCELLED = 1223;
 
 /**
@@ -223,7 +224,8 @@ export function encodePowerShell(script: string): string {
  * - registers the task with the sync script embedded in its action and a security descriptor
  *   that lets those users start it; the script is never written to disk;
  * - runs the task and waits for that run's `last-run`: exits 0 with a copy, 2 when HMA has
- *   no credentials, 3 when HMA's folder is untrusted or the run did not finish.
+ *   no credentials, 3 when HMA's folder is untrusted or the run ended without reporting;
+ * - before changing anything, exits 4 when the executable is not on a fixed local drive.
  */
 export function buildSetupScript(opts: { userSid: string; appExe: string }): string {
   if (!SID_RE.test(opts.userSid)) throw new Error(`hma-windows: not a SID: ${opts.userSid}`);
@@ -240,6 +242,9 @@ $dir = Join-Path $root 'hma'
 ${PS_COMMON}
 $users = New-Object System.Collections.Generic.List[string]
 $users.Add($sid)
+# The task (as SYSTEM) checks this path for as long as HMA support is on, so it must be on a
+# fixed local volume every session sees: not removable, not a network drive.
+if ([IO.DriveInfo]::new($app.Substring(0, 1)).DriveType -ne 'Fixed') { exit ${EXIT_UNSUPPORTED_LOCATION} }
 
 function Remove-IfNotOurs([string]$path) {
   # Returns $true if, afterwards, $path does NOT exist (so the caller creates it fresh).
@@ -323,15 +328,25 @@ $task = $folder.RegisterTaskDefinition(${psQuote(HMA_TASK_NAME)}, $def, 6, 'SYST
 
 # Run it once and wait for that run (up to its 2-minute limit) to report.
 $requested = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+# LastRunTime has a resolution of one second: compare with the request's whole second.
+$now = Get-Date
+$requestedAt = $now.AddTicks(-($now.Ticks % [TimeSpan]::TicksPerSecond))
 $null = $task.Run($null)
 $lastRun = Join-Path $dir 'last-run'
 $deadline = [DateTime]::UtcNow.AddSeconds(125)
 $result = ''
+$ended = $false
 while (-not $result -and [DateTime]::UtcNow -lt $deadline) {
   Start-Sleep -Milliseconds 250
   try { $parts = [IO.File]::ReadAllText($lastRun).Trim() -split ' ' } catch { $parts = @() }
   [long]$at = 0
   if ($parts.Count -eq 2 -and [long]::TryParse($parts[0], [ref]$at) -and $at -ge $requested) { $result = $parts[1] }
+  if (-not $result) {
+    # Read once more after the run ended, then stop: it ended without reporting.
+    if ($ended) { break }
+    $t = $folder.GetTask(${psQuote(HMA_TASK_NAME)})
+    $ended = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - $requested -gt 2000 -and $t.State -eq 3 -and $t.LastRunTime -ge $requestedAt
+  }
 }
 if ($result -eq 'ok') { exit 0 }
 if ($result -eq 'none') { exit ${EXIT_NO_CREDENTIALS} }
@@ -390,7 +405,20 @@ export function buildElevationCommand(setupScript: string): string {
   );
 }
 
-export type EnableResult = { ok: true } | { ok: false; reason: 'cancelled' | 'no-credentials' | 'failed' };
+/** The task runs at least every 5 minutes; a `last-run` older than three runs means it no
+ * longer reports (removed, disabled, or its folder no longer passes `Test-OurDir`). */
+export const LAST_RUN_STALE_MS = 15 * 60_000;
+
+/** Whether `last-run` shows the task keeping the copy up to date. */
+export function isLastRunFresh(text: string, now = Date.now()): boolean {
+  const last = parseLastRun(text);
+  // Either way: a clock set back must not keep a task that stopped looking fresh.
+  return last !== undefined && Math.abs(now - last.started) <= LAST_RUN_STALE_MS;
+}
+
+export type EnableResult =
+  | { ok: true }
+  | { ok: false; reason: 'cancelled' | 'no-credentials' | 'unsupported-location' | 'failed' };
 
 export interface HmaWindowsSupport {
   /** Runs the elevated setup (one UAC prompt). */
@@ -403,48 +431,67 @@ export interface HmaWindowsSupport {
 export interface HmaWindowsSupportOptions {
   /** The executable the task checks to tell whether Proxy Farm is still installed. */
   appExe?: string;
+  /** Resolves `subst` drives to their target and mapped network drives to UNC (tests). */
+  realpath?: (p: string) => string;
   runFile?: RunFile;
   /** The copy's folder and its `last-run` stamp (tests). */
   mirrorDir?: string;
   lastRunPath?: string;
-  /** How long refresh() waits for the run it requested (a cold SYSTEM PowerShell is ~1 s). */
+  /** How long refresh() waits for the run it requested (a cold SYSTEM PowerShell is ~1 s),
+   * and how long when the task has stopped reporting (`LAST_RUN_STALE_MS`). */
   refreshTimeoutMs?: number;
+  staleRefreshTimeoutMs?: number;
   refreshPollMs?: number;
 }
 
 export function createHmaWindowsSupport(opts: HmaWindowsSupportOptions = {}): HmaWindowsSupport {
   const runFile = opts.runFile ?? defaultRunFile;
   const appExe = opts.appExe ?? process.execPath;
+  const realpath = opts.realpath ?? ((p: string) => realpathSync.native(p));
   const mirrorDir = opts.mirrorDir ?? hmaMirrorDir();
   const lastRunPath = opts.lastRunPath ?? hmaLastRunPath();
   const refreshTimeoutMs = opts.refreshTimeoutMs ?? 20_000;
+  const staleRefreshTimeoutMs = opts.staleRefreshTimeoutMs ?? 5_000;
   const refreshPollMs = opts.refreshPollMs ?? 100;
 
   return {
     async enable() {
+      // The path SYSTEM will see: a `subst` drive resolves to its target, a mapped network
+      // drive to its UNC path (both exist only in this user's logon session).
+      let exe: string;
+      try {
+        exe = realpath(appExe);
+      } catch {
+        return { ok: false, reason: 'failed' };
+      }
       // The task probes this path as SYSTEM; a non-local path (e.g. UNC) is refused so it
       // can never make SYSTEM authenticate to a remote host.
-      if (!isLocalPath(appExe)) return { ok: false, reason: 'failed' };
+      if (!isLocalPath(exe)) return { ok: false, reason: 'unsupported-location' };
       const who = await runFile(system32('whoami.exe'), ['/user', '/fo', 'csv', '/nh']);
       const userSid = parseWhoamiSid(who.stdout);
       if (!userSid) return { ok: false, reason: 'failed' };
-      const outer = buildElevationCommand(buildSetupScript({ userSid, appExe }));
+      const outer = buildElevationCommand(buildSetupScript({ userSid, appExe: exe }));
       const { code } = await runFile(POWERSHELL(), ['-NoProfile', '-NonInteractive', '-Command', outer]);
       if (code === 0) return { ok: true };
       if (code === UAC_CANCELLED) return { ok: false, reason: 'cancelled' };
       if (code === EXIT_NO_CREDENTIALS) return { ok: false, reason: 'no-credentials' };
+      if (code === EXIT_UNSUPPORTED_LOCATION) return { ok: false, reason: 'unsupported-location' };
       return { ok: false, reason: 'failed' };
     },
 
     async refresh() {
       // No copy folder: HMA support was never enabled for this machine, so there is no task.
       if (!existsSync(mirrorDir)) return;
+      // A task that stopped reporting (see LAST_RUN_STALE_MS) is not waited for long: the
+      // read that follows then asks the user to enable HMA support again.
+      const before = await readFile(lastRunPath, 'utf8').catch(() => '');
+      const timeoutMs = isLastRunFresh(before) ? refreshTimeoutMs : Math.min(refreshTimeoutMs, staleRefreshTimeoutMs);
       // `schtasks /run` returns once the run is started, not finished: wait for a last-run
       // stamped at or after the request (the task queues a run asked for during another).
       const requested = Date.now();
       const run = await runFile(system32('schtasks.exe'), ['/run', '/tn', `${HMA_TASK_FOLDER}${HMA_TASK_NAME}`]).catch(() => undefined);
       if (run?.code !== 0) return;
-      while (Date.now() - requested < refreshTimeoutMs) {
+      while (Date.now() - requested < timeoutMs) {
         // The run removed HMA support (Proxy Farm uninstalled long enough): nothing will report.
         if (!existsSync(mirrorDir)) return;
         const last = parseLastRun(await readFile(lastRunPath, 'utf8').catch(() => ''));

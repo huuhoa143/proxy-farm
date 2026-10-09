@@ -124,8 +124,14 @@ describe('HMA local source (spec §5.1)', () => {
         winMirrorPath: join(o.mirrorDir ?? join(dir, 'no-mirror'), 'auth'),
       });
 
+    // A copy folder whose task reported a moment ago (hma\last-run), as a working task leaves it.
+    const reportingMirror = (name: string, startedAgoMs = 1000) => {
+      mkdirSync(join(dir, name), { recursive: true });
+      writeFileSync(join(dir, name, 'last-run'), `${Date.now() - startedAgoMs} ok`);
+    };
+
     it('reads the HMA support copy of the auth file', async () => {
-      mkdirSync(join(dir, 'mirror'));
+      reportingMirror('mirror');
       writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
       expect(await win({ hma: dir, mirrorDir: join(dir, 'mirror') }).read()).toEqual({ status: 'found', creds: { udid: USER, password: PASS } });
     });
@@ -138,7 +144,7 @@ describe('HMA local source (spec §5.1)', () => {
     it("prefers HMA's own file over the copy whenever it is readable (it may be newer)", async () => {
       mkdirSync(join(dir, 'hma'));
       writeFileSync(join(dir, 'hma', 'auth'), `${USER}\r\n${'C'.repeat(64)}\r\n`);
-      mkdirSync(join(dir, 'mirror'));
+      reportingMirror('mirror');
       writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
       expect(await win({ hma: dir, auth: join(dir, 'hma', 'auth'), mirrorDir: join(dir, 'mirror') }).read()).toEqual({
         status: 'found',
@@ -148,7 +154,7 @@ describe('HMA local source (spec §5.1)', () => {
 
     it("reports signed out when HMA's folder is readable but empty, ignoring a stale copy", async () => {
       mkdirSync(join(dir, 'hma'));
-      mkdirSync(join(dir, 'mirror'));
+      reportingMirror('mirror');
       writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
       expect((await win({ hma: dir, auth: join(dir, 'hma', 'auth'), mirrorDir: join(dir, 'mirror') }).read()).status).toBe('invalid');
     });
@@ -180,19 +186,33 @@ describe('HMA local source (spec §5.1)', () => {
       expect(await changes('now', () => mkdirSync(join(dir, 'now')))).toBeGreaterThan(0);
     });
 
+    it('distrusts a copy whose task stopped reporting, and asks to enable HMA support again', async () => {
+      reportingMirror('stale', 20 * 60_000);
+      writeFileSync(join(dir, 'stale', 'auth'), `${USER}
+${PASS}
+`);
+      expect(await win({ hma: dir, mirrorDir: join(dir, 'stale') }).read()).toEqual({ status: 'helper-missing' });
+      // A task from before last-run existed (or one that never reported) counts as stopped.
+      mkdirSync(join(dir, 'unstamped'));
+      writeFileSync(join(dir, 'unstamped', 'auth'), `${USER}
+${PASS}
+`);
+      expect(await win({ hma: dir, mirrorDir: join(dir, 'unstamped') }).read()).toEqual({ status: 'helper-missing' });
+    });
+
     it('reports helper-missing when HMA is installed but HMA support is not enabled', async () => {
       expect(await win({ hma: dir }).read()).toEqual({ status: 'helper-missing' });
     });
 
     it('reports a signed-out HMA (support on, no copy) as invalid, and an absent HMA as missing', async () => {
-      mkdirSync(join(dir, 'empty-mirror'));
+      reportingMirror('empty-mirror');
       // Support enabled but HMA has no credentials: point the user at HMA, not "not installed".
       expect((await win({ hma: dir, mirrorDir: join(dir, 'empty-mirror') }).read()).status).toBe('invalid');
       expect(await win({}).read()).toEqual({ status: 'missing' });
     });
 
     it('reports an unreadable copy as invalid', async () => {
-      mkdirSync(join(dir, 'bad-mirror'));
+      reportingMirror('bad-mirror');
       writeFileSync(join(dir, 'bad-mirror', 'auth'), '');
       expect((await win({ hma: dir, mirrorDir: join(dir, 'bad-mirror') }).read()).status).toBe('invalid');
     });

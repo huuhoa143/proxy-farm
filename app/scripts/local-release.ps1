@@ -222,7 +222,7 @@ try {
     foreach ($tag in 'with_gvisor', 'with_wireguard', 'with_openvpn') {
       if ($versionOut -notmatch $tag) { throw "packaged sing-box lacks $tag" }
     }
-    foreach ($res in 'ca\sectigo-r46.pem', 'catalogs\hma-ovpn-seed.json', 'app-update.yml') {
+    foreach ($res in 'ca\sectigo-r46.pem', 'ca\zoogvpn-ca.pem', 'ca\zoogvpn-tls-auth.key', 'ca\expressvpn-ca.pem', 'ca\expressvpn-client.crt', 'ca\expressvpn-client.key', 'ca\expressvpn-tls-auth.key', 'catalogs\hma-ovpn-seed.json', 'catalogs\zoogvpn-servers.json', 'catalogs\expressvpn-servers.json', 'app-update.yml') {
       if (-not (Test-Path -LiteralPath (Join-Path $PackagedDir "resources\$res"))) { throw "packaged resource missing: $res" }
     }
     Green "  sing-box $($pins.version) with gvisor/wireguard/openvpn; resources present"

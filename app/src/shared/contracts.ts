@@ -457,7 +457,7 @@ export interface ProxyFarmApi {
   connectHma(): Promise<CheckResult & { account?: Account }>;
   /** Windows only: runs the elevated HMA support setup (spec §7, one UAC). Shown when `detected.hintKey`
    * says the helper is missing. Elsewhere there is nothing to enable: `{ok:true}`. Failures carry
-   * `hma.enable.{cancelled|no-credentials|failed}`. */
+   * `hma.enable.{cancelled|no-credentials|unsupported-location|failed}`. */
   enableHmaSupport(): Promise<CheckResult>;
   /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
    * Without them such a file answers `file.check.needsCredentials`. */

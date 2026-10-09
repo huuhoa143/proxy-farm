@@ -13,7 +13,9 @@ import {
   hmaAuthPath,
   hmaLastRunPath,
   hmaMirrorPath,
+  isLastRunFresh,
   isLocalPath,
+  LAST_RUN_STALE_MS,
   MAX_COMMAND_LINE,
   parseLastRun,
   parseWhoamiSid,
@@ -206,7 +208,7 @@ $out | ConvertTo-Json -Compress`;
         if (/whoami\.exe$/i.test(file)) return { code: 0, stdout: `"pc\\me","${SID}"` };
         return { code: outerCode, stdout: '' };
       };
-      return { calls, hma: createHmaWindowsSupport({ appExe: 'C:\\pf.exe', runFile }) };
+      return { calls, hma: createHmaWindowsSupport({ appExe: 'C:\\pf.exe', realpath: (p) => p, runFile }) };
     }
 
     it('runs whoami and the elevated setup by absolute System32 paths', async () => {
@@ -223,6 +225,7 @@ $out | ConvertTo-Json -Compress`;
     it.each([
       [1223, 'cancelled'],
       [2, 'no-credentials'],
+      [4, 'unsupported-location'],
       [3, 'failed'],
       [1, 'failed'],
     ])('maps exit code %i to %s', async (code, reason) => {
@@ -231,17 +234,70 @@ $out | ConvertTo-Json -Compress`;
 
     it('fails without prompting when the SID cannot be read', async () => {
       const calls: string[] = [];
-      const hma = createHmaWindowsSupport({ appExe: 'C:\\pf.exe', runFile: async (file) => (calls.push(file), { code: 1, stdout: '' }) });
+      const hma = createHmaWindowsSupport({ appExe: 'C:\\pf.exe', realpath: (p) => p, runFile: async (file) => (calls.push(file), { code: 1, stdout: '' }) });
       expect(await hma.enable()).toEqual({ ok: false, reason: 'failed' });
       expect(calls).toHaveLength(1);
     });
 
     it('refuses a non-local app path without running anything', async () => {
       const calls: string[] = [];
-      const hma = createHmaWindowsSupport({ appExe: '\\\\srv\\share\\Proxy Farm.exe', runFile: async (f) => (calls.push(f), { code: 0, stdout: '' }) });
-      expect(await hma.enable()).toEqual({ ok: false, reason: 'failed' });
+      const hma = createHmaWindowsSupport({
+        appExe: '\\\\srv\\share\\Proxy Farm.exe',
+        realpath: (p) => p,
+        runFile: async (f) => (calls.push(f), { code: 0, stdout: '' }),
+      });
+      expect(await hma.enable()).toEqual({ ok: false, reason: 'unsupported-location' });
       expect(calls).toHaveLength(0);
     });
+
+    it('records the real path: a subst drive resolves to its target, a mapped drive to UNC (refused)', async () => {
+      const calls: Array<[string, string[]]> = [];
+      const runFile: RunFile = async (file, args) => {
+        calls.push([file, args]);
+        return /whoami\.exe$/i.test(file) ? { code: 0, stdout: `"pc\\me","${SID}"` } : { code: 0, stdout: '' };
+      };
+      const real: Record<string, string> = { 'Q:\\pf.exe': 'C:\\Real\\pf.exe', 'Z:\\pf.exe': '\\\\nas\\apps\\pf.exe' };
+      const subst = createHmaWindowsSupport({ appExe: 'Q:\\pf.exe', realpath: (p) => real[p], runFile });
+      expect(await subst.enable()).toEqual({ ok: true });
+      const b64 = calls[1][1][3].match(/FromBase64String\(''([^']+)''\)/)?.[1] ?? '';
+      expect(Buffer.from(b64, 'base64').toString('utf8')).toContain("$app = 'C:\\Real\\pf.exe'");
+      calls.length = 0;
+      const mapped = createHmaWindowsSupport({ appExe: 'Z:\\pf.exe', realpath: (p) => real[p], runFile });
+      expect(await mapped.enable()).toEqual({ ok: false, reason: 'unsupported-location' });
+      expect(calls).toHaveLength(0);
+      const gone = createHmaWindowsSupport({
+        appExe: 'C:\\gone.exe',
+        realpath: () => {
+          throw new Error('ENOENT');
+        },
+        runFile,
+      });
+      expect(await gone.enable()).toEqual({ ok: false, reason: 'failed' });
+    });
+  });
+
+  it('the setup accepts only a fixed local drive, before it changes anything', () => {
+    const setup = buildSetupScript({ userSid: SID, appExe: 'C:\\pf.exe' });
+    const check = "if ([IO.DriveInfo]::new($app.Substring(0, 1)).DriveType -ne 'Fixed') { exit 4 }";
+    expect(setup).toContain(check);
+    expect(setup.indexOf(check)).toBeLessThan(setup.indexOf('New-OurDir $root'));
+  });
+
+  it('the setup stops waiting once its run ended without reporting', () => {
+    const setup = buildSetupScript({ userSid: SID, appExe: 'C:\\pf.exe' });
+    expect(setup).toContain('$t.State -eq 3 -and $t.LastRunTime -ge $requestedAt');
+    expect(setup).toContain('$requestedAt = $now.AddTicks(-($now.Ticks % [TimeSpan]::TicksPerSecond))');
+    expect(setup).toContain('if ($ended) { break }');
+  });
+
+  it('a last-run counts as fresh for three task intervals', () => {
+    const now = 1_800_000_000_000;
+    expect(LAST_RUN_STALE_MS).toBe(15 * 60_000);
+    expect(isLastRunFresh(`${now - 60_000} ok`, now)).toBe(true);
+    expect(isLastRunFresh(`${now - LAST_RUN_STALE_MS - 1} ok`, now)).toBe(false);
+    expect(isLastRunFresh('', now)).toBe(false);
+    // A clock set back does not keep a task that stopped looking fresh.
+    expect(isLastRunFresh(`${now + LAST_RUN_STALE_MS + 1} ok`, now)).toBe(false);
   });
 
   describe('refresh()', () => {
@@ -255,8 +311,8 @@ $out | ConvertTo-Json -Compress`;
     const lastRunPath = () => join(tmp, 'hma', 'last-run');
     const enableFolder = () => mkdirSync(mirrorDir());
     const stamp = (started: number, result = 'ok') => writeFileSync(lastRunPath(), `${started} ${result}`);
-    const make = (runFile: RunFile, refreshTimeoutMs = 2000) =>
-      createHmaWindowsSupport({ mirrorDir: mirrorDir(), lastRunPath: lastRunPath(), runFile, refreshTimeoutMs, refreshPollMs: 5 });
+    const make = (runFile: RunFile, refreshTimeoutMs = 2000, staleRefreshTimeoutMs = refreshTimeoutMs) =>
+      createHmaWindowsSupport({ mirrorDir: mirrorDir(), lastRunPath: lastRunPath(), runFile, refreshTimeoutMs, staleRefreshTimeoutMs, refreshPollMs: 5 });
 
     it('does nothing when HMA support was never enabled (no copy folder)', async () => {
       const calls: string[] = [];
@@ -298,9 +354,18 @@ $out | ConvertTo-Json -Compress`;
 
     it('gives up after the timeout when no run reports', async () => {
       enableFolder();
+      stamp(Date.now() - 60_000);
       const t0 = Date.now();
       await make(async () => ({ code: 0, stdout: '' }), 100).refresh();
       expect(Date.now() - t0).toBeGreaterThanOrEqual(100);
+    });
+
+    it('waits only briefly for a task that already stopped reporting', async () => {
+      enableFolder();
+      stamp(Date.now() - LAST_RUN_STALE_MS - 60_000);
+      const t0 = Date.now();
+      await make(async () => ({ code: 0, stdout: '' }), 5000, 100).refresh();
+      expect(Date.now() - t0).toBeLessThan(2000);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFile, unwatchFile, watchFile } from 'node:fs';
 import path from 'node:path';
 import { parseAuthFile, parseDeviceCreds, type DeviceCreds } from '../providers/hma/token';
-import { hmaAuthPath, hmaMirrorDir, hmaMirrorPath } from './hma-windows';
+import { hmaAuthPath, hmaLastRunPath, hmaMirrorDir, hmaMirrorPath, isLastRunFresh } from './hma-windows';
 
 /** spec §5.1: world-readable on macOS, no admin needed. */
 export const MAC_HMA_TOKEN_PATH = '/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json';
@@ -30,6 +30,8 @@ export interface HmaLocalSourceOptions {
   /** Windows: the copy HMA support keeps readable for this user, and its folder. */
   winMirrorPath?: string;
   winMirrorDir?: string;
+  /** Windows: the task's `last-run` stamp (default: in `winMirrorDir`). */
+  winLastRunPath?: string;
   /** stat-poll interval: HMA rewrites the file via rename, which fs.watch misses. */
   pollMs?: number;
 }
@@ -64,6 +66,7 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
   const winAuthPath = opts.winAuthPath ?? hmaAuthPath();
   const winMirrorPath = opts.winMirrorPath ?? hmaMirrorPath();
   const winMirrorDir = opts.winMirrorDir ?? hmaMirrorDir();
+  const winLastRunPath = opts.winLastRunPath ?? (opts.winMirrorDir ? path.join(opts.winMirrorDir, 'last-run') : hmaLastRunPath());
   const pollMs = opts.pollMs ?? 3000;
 
   /** HMA's own folder is admin-only: listing it succeeds only when the app runs elevated. */
@@ -83,15 +86,22 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
     if ('text' in direct) return parsed(direct.text, parseAuthFile);
     // Its folder is readable but holds no credentials: HMA is signed out, whatever the copy says.
     if (direct.error.code === 'ENOENT' && hmaFolderReadable()) return { status: 'invalid', message: 'hma: not signed in' };
+    const notEnabled: HmaRead = existsSync(winHmaDir) ? { status: 'helper-missing' } : { status: 'missing' };
+    if (!existsSync(winMirrorDir)) return notEnabled;
+    // The copy counts only while the task keeps it up to date. One that stopped reporting
+    // (removed, disabled, or its folder no longer as the setup left it) may hold a rotated
+    // pair: ask the user to enable HMA support again, which repairs all of these.
+    const lastRun = await readText(winLastRunPath);
+    if (!('text' in lastRun) || !isLastRunFresh(lastRun.text)) return notEnabled;
     const mirror = await readText(winMirrorPath);
     if ('text' in mirror) return parsed(mirror.text, parseAuthFile);
-    // HMA support is on (its folder is readable) but there is no copy: HMA is installed and
-    // signed out (the task removes the copy when HMA has none), so point the user at HMA
-    // rather than telling them it isn't installed.
-    if (mirror.error.code === 'ENOENT' && existsSync(winMirrorDir)) {
+    // HMA support is on but there is no copy: HMA is installed and signed out (the task
+    // removes the copy when HMA has none), so point the user at HMA rather than telling them
+    // it isn't installed.
+    if (mirror.error.code === 'ENOENT') {
       return { status: 'invalid', message: 'hma: no credentials copy yet (sign in to HMA and connect once)' };
     }
-    return existsSync(winHmaDir) ? { status: 'helper-missing' } : { status: 'missing' };
+    return notEnabled;
   }
 
   async function read(): Promise<HmaRead> {
@@ -105,8 +115,14 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
   function watch(cb: () => void): () => void {
     // Windows: the copy, plus HMA's own file only when this process can see it (elevated);
     // otherwise stat-polling it could never succeed.
+    // `last-run` too: the task writes it after the copy, so a read between the two (the first
+    // run after a long sleep) could still see a stale stamp; its update triggers another read.
     const watched =
-      platform === 'win32' ? (hmaFolderReadable() ? [winMirrorPath, winAuthPath] : [winMirrorPath]) : platform === 'darwin' ? [tokenPath] : [];
+      platform === 'win32'
+        ? [winMirrorPath, winLastRunPath, ...(hmaFolderReadable() ? [winAuthPath] : [])]
+        : platform === 'darwin'
+          ? [tokenPath]
+          : [];
     const listener = (curr: { mtimeMs: number; size: number }, prev: { mtimeMs: number; size: number }) => {
       if (curr.mtimeMs !== prev.mtimeMs || curr.size !== prev.size) cb();
     };

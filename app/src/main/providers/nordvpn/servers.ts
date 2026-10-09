@@ -15,8 +15,8 @@
  * read it synchronously and deterministically, without a prior `targets()`.
  */
 import { readFileSync } from 'node:fs';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../../store/atomic-write';
 
 export const SERVERS_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -167,10 +167,7 @@ async function readCache(cachePath: string): Promise<ServersCacheFile | undefine
 }
 
 async function writeCache(cachePath: string, cache: ServersCacheFile): Promise<void> {
-  await mkdir(path.dirname(cachePath), { recursive: true });
-  const tmp = `${cachePath}.tmp`;
-  await writeFile(tmp, JSON.stringify(cache), 'utf8');
-  await rename(tmp, cachePath);
+  await writeFileAtomic(cachePath, JSON.stringify(cache));
 }
 
 /**

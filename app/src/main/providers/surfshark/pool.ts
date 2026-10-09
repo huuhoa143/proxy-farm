@@ -38,8 +38,8 @@
  * Network access is injectable (`PoolNet`) so tests stay hermetic.
  */
 import { promises as dns } from 'node:dns';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../../store/atomic-write';
 
 export const POOL_REFRESH_MS = 12 * 60 * 60 * 1000;
 export const POOL_FORGET_MS = 7 * 24 * 60 * 60 * 1000;
@@ -172,10 +172,7 @@ export function createSurfsharkPools(opts: SurfsharkPoolsOptions): SurfsharkPool
     // never interleave and a crash never leaves half a file.
     writing = writing.then(async () => {
       try {
-        await mkdir(path.dirname(opts.poolPath), { recursive: true });
-        const tmp = `${opts.poolPath}.tmp`;
-        await writeFile(tmp, JSON.stringify(file), 'utf8');
-        await rename(tmp, opts.poolPath);
+        await writeFileAtomic(opts.poolPath, JSON.stringify(file));
       } catch {
         // Losing a write only costs re-sampling later.
       }
