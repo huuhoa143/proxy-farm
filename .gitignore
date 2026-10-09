@@ -24,6 +24,7 @@ p12pass
 
 # Runtime data (lives in $FARM, outside the repo, but just in case)
 data/
+!site/src/data/
 status/
 configs/
 inbox/
