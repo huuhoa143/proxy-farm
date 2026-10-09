@@ -1,0 +1,583 @@
+---
+import { copy, type Lang } from '../i18n/copy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang].board;
+
+// Illustration only: addresses come from the documentation ranges (RFC 5737).
+const servers = [
+  { city: 'Tokyo', cc: 'JP', provider: 'hma', label: 'HMA', ip: '203.0.113.10' },
+  { city: 'Tokyo', cc: 'JP', provider: 'hma', label: 'HMA', ip: '203.0.113.24' },
+  { city: 'Tokyo', cc: 'JP', provider: 'hma', label: 'HMA', ip: '203.0.113.37' },
+  { city: 'Singapore', cc: 'SG', provider: 'surfshark', label: 'Surfshark', ip: '198.51.100.30' },
+  { city: 'Amsterdam', cc: 'NL', provider: 'zoogvpn', label: 'ZoogVPN', ip: '198.51.100.71' },
+  { city: 'Amsterdam', cc: 'NL', provider: 'zoogvpn', label: 'ZoogVPN', ip: '198.51.100.84' },
+  { city: 'Amsterdam', cc: 'NL', provider: 'zoogvpn', label: 'ZoogVPN', ip: '198.51.100.92' },
+  { city: 'Frankfurt', cc: 'DE', provider: 'surfshark', label: 'Surfshark', ip: '192.0.2.45' },
+];
+const wiring = [0, 1, 3, 4, 5, 7];
+const legend = [...new Map(servers.map((s) => [s.provider, s])).values()];
+const latency = [42, 47, 38, 61, 58, 66];
+const ports = wiring.map((s, i) => ({ port: 29001 + i, server: s, ms: latency[i] }));
+const used = new Set(wiring);
+const hasFree = (s: number) => servers.some((x, j) => x.city === servers[s].city && !used.has(j));
+
+const PORT_H = 100;
+const SERVER_H = (PORT_H * ports.length) / servers.length;
+const H = PORT_H * ports.length;
+const py = (i: number) => (i + 0.5) * PORT_H;
+const sy = (j: number) => (j + 0.5) * SERVER_H;
+const cord = (y1: number, y2: number) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`;
+---
+
+<figure class="board on-plate" aria-label={t.label} data-board>
+  <div class="board-head" aria-hidden="true">
+    <span>{t.ports}</span>
+    <span>{t.servers}</span>
+  </div>
+
+  <div class="board-body" style={`--ports:${ports.length};--servers:${servers.length}`}>
+    <ol class="ports" role="list">
+      {
+        ports.map((p, i) => {
+          const s = servers[p.server];
+          const free = hasFree(p.server);
+          return (
+            <li class="port" data-port={p.port} data-index={i} data-server={p.server}>
+              <button
+                type="button"
+                class="rotate"
+                aria-label={t.changeIpFor(String(p.port))}
+                aria-disabled={free ? undefined : 'true'}
+                title={free ? t.changeIp : t.noFree}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+                  <path d="M20 4v7h-7" />
+                </svg>
+              </button>
+              <span class="port-text">
+                <span class="port-addr mono">
+                  <span class="dim">127.0.0.1:</span>
+                  {p.port}
+                </span>
+                <span class="port-exit mono">
+                  <span class="sr-only">{t.exit}: </span>
+                  <i class="dot" style={`background: var(--pc-${s.provider})`} aria-hidden="true" />
+                  <span data-exit>{s.ip}</span>
+                  <span class="ms">· {p.ms} ms</span>
+                </span>
+              </span>
+              <span class="jack" aria-hidden="true" />
+            </li>
+          );
+        })
+      }
+    </ol>
+
+    <svg class="cords" viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-hidden="true">
+      {
+        ports.map((p, i) => (
+          <path
+            class="cord"
+            data-cord={i}
+            d={cord(py(i), sy(p.server))}
+            style={`--c: var(--pc-${servers[p.server].provider})`}
+            vector-effect="non-scaling-stroke"
+          />
+        ))
+      }
+    </svg>
+
+    <ol class="servers" role="list">
+      {
+        servers.map((s, j) => {
+          const first = j === 0 || servers[j - 1].city !== s.city;
+          return (
+            <li class:list={['server', { 'group-start': first, free: !used.has(j) }]} data-server-row={j} data-city={s.city}>
+              <span class="jack" aria-hidden="true" />
+              <span class="server-ip mono">{s.ip}</span>
+              {first ? (
+                <span class="server-loc">
+                  <i class="dot" style={`background: var(--pc-${s.provider})`} />
+                  {s.city}
+                </span>
+              ) : (
+                <span class="server-free">{t.free}</span>
+              )}
+            </li>
+          );
+        })
+      }
+    </ol>
+  </div>
+
+  <figcaption class="board-foot">
+    <span class="legend" aria-hidden="true">
+      {legend.map((l) => (
+        <span>
+          <i class="dot" style={`background: var(--pc-${l.provider})`} />
+          {l.label}
+        </span>
+      ))}
+    </span>
+    <span>{t.caption}</span>
+    <span class="sr-only" aria-live="polite" data-status></span>
+  </figcaption>
+</figure>
+
+<script define:vars={{ servers, wiring, PORT_H, SERVER_H, lang, noFree: t.noFree }}>
+  // define:vars cannot pass functions, so rebuild the one message we need here.
+  const moved = (port, ip) =>
+    lang === 'vi' ? `Cổng ${port} đã chuyển sang máy chủ khác. IP thoát mới: ${ip}` : `Port ${port} moved to another server. New exit IP: ${ip}`;
+
+  const board = document.querySelector('[data-board]');
+  if (board) {
+    const map = [...wiring];
+    const status = board.querySelector('[data-status]');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const py = (i) => (i + 0.5) * PORT_H;
+    const sy = (j) => (j + 0.5) * SERVER_H;
+    const d = (y1, y2) => `M0 ${y1} C55 ${y1} 45 ${y2} 100 ${y2}`;
+    const freeFor = (j) => servers.findIndex((s, k) => s.city === servers[j].city && !map.includes(k));
+
+    const refreshFree = () => {
+      board.querySelectorAll('[data-server-row]').forEach((row) => {
+        row.classList.toggle('free', !map.includes(Number(row.dataset.serverRow)));
+      });
+      board.querySelectorAll('.port').forEach((li) => {
+        const btn = li.querySelector('.rotate');
+        const ok = freeFor(map[Number(li.dataset.index)]) !== -1;
+        if (ok) btn.removeAttribute('aria-disabled');
+        else btn.setAttribute('aria-disabled', 'true');
+      });
+    };
+
+    let busy = false;
+    const rotate = (i) => {
+      const from = map[i];
+      const to = freeFor(from);
+      const li = board.querySelector(`.port[data-index="${i}"]`);
+      if (to === -1) {
+        status.textContent = noFree;
+        li.classList.remove('nope');
+        void li.offsetWidth;
+        li.classList.add('nope');
+        return;
+      }
+      if (busy) return;
+      busy = true;
+      map[i] = to;
+      const path = board.querySelector(`[data-cord="${i}"]`);
+      const exit = li.querySelector('[data-exit]');
+      const y1 = py(i);
+      const a = sy(from);
+      const b = sy(to);
+      const finish = () => {
+        path.setAttribute('d', d(y1, b));
+        path.classList.remove('patching');
+        path.classList.add('lit');
+        exit.textContent = servers[to].ip;
+        li.classList.add('changed');
+        setTimeout(() => {
+          path.classList.remove('lit');
+          li.classList.remove('changed');
+        }, 1400);
+        refreshFree();
+        status.textContent = moved(li.dataset.port, servers[to].ip);
+        busy = false;
+      };
+      if (reduce) return finish();
+      path.classList.add('patching');
+      exit.textContent = '···';
+      const start = performance.now();
+      const dur = 620;
+      const step = (now) => {
+        const k = Math.min(1, (now - start) / dur);
+        const e = 1 - Math.pow(1 - k, 4);
+        path.setAttribute('d', d(y1, a + (b - a) * e));
+        if (k < 1) requestAnimationFrame(step);
+        else finish();
+      };
+      requestAnimationFrame(step);
+    };
+
+    board.querySelectorAll('.rotate').forEach((btn) => {
+      btn.addEventListener('click', () => rotate(Number(btn.closest('.port').dataset.index)));
+    });
+
+    // One unprompted demonstration when the board is first seen; never repeats.
+    if (!reduce && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            io.disconnect();
+            setTimeout(() => rotate(1), 1600);
+          }
+        },
+        { threshold: 0.6 },
+      );
+      io.observe(board);
+    }
+  }
+</script>
+
+<style>
+  .board {
+    margin: 0;
+    border-radius: 20px;
+    background: linear-gradient(180deg, var(--plate-2), var(--plate) 70%);
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.04) inset,
+      0 1px 0 rgb(255 255 255 / 0.08) inset,
+      0 24px 32px -24px rgb(10 15 27 / 0.6),
+      0 8px 16px -10px rgb(10 15 27 / 0.4);
+    padding: clamp(1rem, 2.4vw, 1.75rem);
+    color: var(--plate-tx);
+    --row: 64px;
+  }
+
+  .board-head {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 0.9rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--plate-rule);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--plate-mut);
+  }
+
+  .board-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(56px, 0.5fr) minmax(0, 1.1fr);
+    grid-template-rows: minmax(0, 1fr);
+    height: calc(var(--row) * var(--ports));
+  }
+
+  .ports,
+  .servers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+  }
+
+  .ports {
+    grid-template-rows: repeat(var(--ports), 1fr);
+  }
+
+  .servers {
+    grid-template-rows: repeat(var(--servers), 1fr);
+  }
+
+  .port {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-right: 0.9rem;
+    border-bottom: 1px solid rgb(35 48 73 / 0.6);
+  }
+
+  .port:last-child {
+    border-bottom: 0;
+  }
+
+  .port-text {
+    display: grid;
+    min-width: 0;
+    line-height: 1.3;
+  }
+
+  .port-addr {
+    font-size: 0.9375rem;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .port-addr .dim {
+    color: var(--plate-mut);
+  }
+
+  .port-exit {
+    font-size: 0.8125rem;
+    color: var(--green);
+    white-space: nowrap;
+    transition: color 200ms var(--ease-out);
+  }
+
+  .port-exit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .port-exit .cc,
+  .port-exit .ms {
+    color: var(--plate-mut);
+  }
+
+  .port-exit .dot {
+    width: 0.45rem;
+    height: 0.45rem;
+  }
+
+  .port.changed .port-exit {
+    color: #fff;
+  }
+
+  .rotate {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--plate-rule);
+    background: var(--plate-2);
+    color: var(--plate-tx);
+    cursor: pointer;
+    transition:
+      background-color 160ms var(--ease-out),
+      border-color 160ms var(--ease-out),
+      color 160ms var(--ease-out);
+  }
+
+  .rotate svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 500ms var(--ease-out);
+  }
+
+  .rotate:hover {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .rotate:hover svg {
+    transform: rotate(-120deg);
+  }
+
+  .rotate[aria-disabled='true'] {
+    color: #56627d;
+    cursor: not-allowed;
+  }
+
+  .rotate[aria-disabled='true']:hover {
+    border-color: var(--plate-rule);
+    color: #56627d;
+  }
+
+  .rotate[aria-disabled='true']:hover svg {
+    transform: none;
+  }
+
+  .port.nope .rotate {
+    animation: nope 360ms var(--ease-out);
+  }
+
+  @keyframes nope {
+    20%,
+    60% {
+      transform: translateX(-3px);
+    }
+    40%,
+    80% {
+      transform: translateX(3px);
+    }
+  }
+
+  .jack {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #05080f 0 3px, #5b6884 3.5px 5px, #2a3550 5.5px);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+    top: 50%;
+    translate: 0 -50%;
+    z-index: 1;
+  }
+
+  .port .jack {
+    right: -7px;
+  }
+
+  .cords {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .cord {
+    fill: none;
+    stroke: var(--c);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    opacity: 0.88;
+    transition:
+      opacity 400ms var(--ease-out),
+      stroke-width 400ms var(--ease-out);
+  }
+
+  .cord.patching {
+    opacity: 0.35;
+  }
+
+  .cord.lit {
+    opacity: 1;
+    stroke-width: 4;
+  }
+
+  .server {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-left: 1rem;
+    min-width: 0;
+  }
+
+  .server.group-start {
+    border-top: 1px solid rgb(35 48 73 / 0.9);
+  }
+
+  .server:first-child {
+    border-top: 0;
+  }
+
+  .server .jack {
+    left: -7px;
+  }
+
+  .server-ip {
+    font-size: 0.8125rem;
+    color: var(--plate-tx);
+    white-space: nowrap;
+  }
+
+  .server.free .server-ip {
+    color: var(--plate-mut);
+  }
+
+  .server-loc {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--plate-mut);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .server-free {
+    font-size: 0.75rem;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 300ms var(--ease-out);
+  }
+
+  .server.free .server-free {
+    opacity: 1;
+  }
+
+  .board-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.4rem 1.5rem;
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--plate-rule);
+    font-size: 0.8125rem;
+    color: var(--plate-mut);
+  }
+
+  .legend {
+    display: inline-flex;
+    gap: 1rem;
+    color: var(--plate-tx);
+  }
+
+  .legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .server.free .jack {
+    box-shadow: 0 0 0 1.5px rgb(0 221 138 / 0.55);
+  }
+
+  @media (max-width: 1100px) {
+    .server-loc {
+      display: none;
+    }
+    .server.group-start .server-free {
+      display: none;
+    }
+  }
+
+  @media (max-width: 1100px) {
+    .server.group-start::after {
+      content: attr(data-city);
+      position: absolute;
+      right: 0;
+      font-size: 0.6875rem;
+      color: var(--plate-mut);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .board {
+      --row: 58px;
+      border-radius: 16px;
+    }
+    .board-body {
+      grid-template-columns: minmax(0, 1.25fr) minmax(36px, 0.45fr) minmax(0, 1fr);
+    }
+    .port {
+      gap: 0.5rem;
+      padding-right: 0.6rem;
+    }
+    .port-addr {
+      font-size: 0.8125rem;
+    }
+    .port-addr .dim {
+      display: none;
+    }
+    .port-exit {
+      font-size: 0.75rem;
+    }
+    .port-exit .ms,
+    .port-exit .dot {
+      display: none;
+    }
+    .port-exit {
+      font-size: 0.6875rem;
+    }
+    .server {
+      padding-left: 0.7rem;
+    }
+    .server-ip {
+      font-size: 0.75rem;
+    }
+    .server.group-start::after,
+    .server-free {
+      display: none;
+    }
+  }
+</style>

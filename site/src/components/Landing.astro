@@ -1,0 +1,1319 @@
+---
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { Picture, Image } from 'astro:assets';
+import Switchboard from './Switchboard.astro';
+import Arrow from './Arrow.astro';
+import { copy, pathFor, type Lang } from '../i18n/copy';
+import { links, downloads, anyDownloadLive, media } from '../data/site';
+import icon from '../assets/icon-512.png';
+import mainLightVi from '../assets/shots/main-light-vi.png';
+import mainDarkVi from '../assets/shots/main-dark-vi.png';
+import mainLightEn from '../assets/shots/main-light-en.png';
+import mainDarkEn from '../assets/shots/main-dark-en.png';
+import poolsVi from '../assets/shots/main-server-pools-vi.png';
+import poolsEn from '../assets/shots/main-server-pools-en.png';
+import pickerVi from '../assets/shots/picker-light-vi.png';
+import pickerEn from '../assets/shots/picker-dark-en.png';
+import onboardVi from '../assets/shots/onboarding-connected-light-vi.png';
+import onboardEn from '../assets/shots/onboarding-dark-en.png';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const other: Lang = lang === 'vi' ? 'en' : 'vi';
+
+const shots = {
+  vi: { light: mainLightVi, dark: mainDarkVi, pools: poolsVi, steps: [onboardVi, pickerVi, mainLightVi] },
+  en: { light: mainLightEn, dark: mainDarkEn, pools: poolsEn, steps: [onboardEn, pickerEn, mainDarkEn] },
+}[lang];
+
+// The demo section switches from placeholder to player as soon as the mp4 lands in public/media/.
+const publicDir = new URL('../../public/', import.meta.url);
+const hasFile = (p: string) => existsSync(fileURLToPath(new URL(p.slice(1), publicDir)));
+const hasVideo = hasFile(media.video);
+const hasPoster = hasFile(media.poster);
+const hasTracks = { vi: hasFile(media.tracks.vi), en: hasFile(media.tracks.en) };
+
+const widths = [640, 960, 1280, 1600];
+// Zoom each step thumbnail onto the panel its text names (provider cards, picker, port rows).
+const stepFocus = ['--fx: 22%; --fy: 18%', '--fx: 92%; --fy: 22%', '--fx: 38%; --fy: 42%'];
+const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
+---
+
+<a class="skip" href="#main">{t.skip}</a>
+
+<header class="top wrap">
+  <a class="brand" href={pathFor(lang)}>
+    <Image src={icon} alt="" width={36} height={36} densities={[1, 2]} loading="eager" />
+    <span class="brand-name">Proxy Farm</span>
+    <span class="brand-by">by LingoReUp</span>
+  </a>
+  <nav class="top-nav" aria-label={t.nav.menu}>
+    <a href="#how">{t.nav.how}</a>
+    <a href="#features">{t.nav.features}</a>
+    <a href="#screens">{t.nav.screens}</a>
+    <a href="#faq">{t.nav.faq}</a>
+  </nav>
+  <div class="top-actions">
+    <a class="lang" href={pathFor(other)} hreflang={other} lang={other} data-lang={other}>
+      <span class="sr-only">{t.langSwitch.label}: </span>
+      <span aria-hidden="true" class="lang-cur">{lang.toUpperCase()}</span>
+      <span aria-hidden="true" class="lang-sep">/</span>
+      <span>{t.langSwitch.otherShort}</span>
+    </a>
+    <a class="gh" href={links.repo} rel="noopener" aria-label="GitHub">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+      <span>GitHub</span>
+    </a>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">{t.hero.title} <span>{t.hero.titleSub}</span></h1>
+      <p class="lede">{t.hero.lede}</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>
+          {t.hero.download}
+          {!anyDownloadLive && <span class="pill">{t.hero.soon}</span>}
+        </a>
+        <a class="btn btn-ghost" href="#demo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+          {t.hero.watch}
+        </a>
+        <a class="gh-link" href={links.repo} rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+          {t.hero.github}
+        </a>
+      </div>
+      <p class="platforms">{t.hero.platforms}</p>
+      <ul class="facts" role="list">
+        {t.hero.facts.map((f) => <li>{f}</li>)}
+      </ul>
+    </div>
+    <div class="hero-board">
+      <Switchboard lang={lang} />
+    </div>
+  </section>
+
+  <section id="demo" class="demo on-plate" aria-labelledby="demo-title">
+    <div class="wrap demo-inner">
+      <div class="demo-head">
+        <h2 id="demo-title">{t.demo.title}</h2>
+        <p class="lede">{t.demo.body}</p>
+      </div>
+      <div class="screen">
+        {
+          hasVideo ? (
+            <video
+              controls
+              preload="none"
+              playsinline
+              width="1920"
+              height="1080"
+              poster={hasPoster ? media.poster : undefined}
+              aria-describedby="demo-note"
+            >
+              <source src={media.video} type="video/mp4" />
+              {hasTracks.vi && <track kind="captions" src={media.tracks.vi} srclang="vi" label="Tiếng Việt" default={lang === 'vi'} />}
+              {hasTracks.en && <track kind="captions" src={media.tracks.en} srclang="en" label="English" default={lang === 'en'} />}
+            </video>
+          ) : (
+            <div class="screen-pending">
+              <Picture
+                class="screen-poster"
+                src={shots.dark}
+                formats={['avif']}
+                fallbackFormat="webp"
+                widths={[640, 1280]}
+                sizes={pctPickers}
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 5.5v13l10-6.5z" />
+              </svg>
+              <p class="screen-pending-title">{t.demo.pending}</p>
+              <p>{t.demo.pendingNote}</p>
+            </div>
+          )
+        }
+      </div>
+      {hasVideo && <p class="demo-note" id="demo-note">{t.demo.transcript}</p>}
+    </div>
+  </section>
+
+  <section id="how" class="section how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="how-title">{t.how.title}</h2>
+        <p class="lede">{t.how.lede}</p>
+      </div>
+      <ol class="steps" role="list">
+        {
+          t.how.steps.map((s, i) => (
+            <li class="step">
+              <span class="step-n" aria-hidden="true">{i + 1}</span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+              <div class="step-shot" style={stepFocus[i]}>
+                <Picture
+                  src={shots.steps[i]}
+                  formats={["avif"]} fallbackFormat="webp"
+                  widths={[480, 720, 960]}
+                  sizes="(min-width: 1000px) 380px, calc(100vw - 2.5rem)"
+                  alt={s.alt}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section id="features" class="section features" aria-labelledby="features-title">
+    <div class="wrap features-grid">
+      <div class="section-head features-head">
+        <h2 id="features-title">{t.features.title}</h2>
+        <p class="lede">{t.features.lede}</p>
+      </div>
+      <div class="spec">
+        {
+          t.features.groups.map((g) => (
+            <section class="spec-group" aria-label={g.title}>
+              <h3 class="spec-title">{g.title}</h3>
+              <dl>
+                {g.rows.map((r) => (
+                  <div class="spec-row">
+                    <dt>
+                      {r.title} {r.next && <span class="tag-next">{t.features.nextTag}</span>}
+                    </dt>
+                    <dd>{r.body}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section id="providers" class="section providers" aria-labelledby="providers-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="providers-title">{t.providers.title}</h2>
+        <p class="lede">{t.providers.lede}</p>
+      </div>
+      <div class="table-wrap">
+        <table class="ptable">
+          <thead>
+            <tr>
+              <th scope="col">{t.providers.cols.provider}</th>
+              <th scope="col">{t.providers.cols.signIn}</th>
+              <th scope="col">{t.providers.cols.protocol}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              t.providers.list.map((p) => (
+                <tr>
+                  <th scope="row">
+                    <span class="pname">
+                      <i class="dot" style={`background: var(--pc-${p.key})`} aria-hidden="true" />
+                      {p.name}
+                    </span>
+                    {p.next && <span class="tag-next">{t.features.nextTag}</span>}
+                  </th>
+                  <td>
+                    {p.signIn}
+                    {p.note && <span class="pnote">{p.note}</span>}
+                  </td>
+                  <td class="proto">{p.protocol}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="footnote">{t.providers.footnote}</p>
+    </div>
+  </section>
+
+  <section id="screens" class="section screens" aria-labelledby="screens-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="screens-title">{t.screens.title}</h2>
+        <p class="lede">{t.screens.lede}</p>
+      </div>
+      <div class="theme-switch" role="radiogroup" aria-label={`${t.screens.light} / ${t.screens.dark}`}>
+        <input type="radio" name="theme" id="th-light" value="light" checked />
+        <label for="th-light">{t.screens.light}</label>
+        <input type="radio" name="theme" id="th-dark" value="dark" />
+        <label for="th-dark">{t.screens.dark}</label>
+      </div>
+      <figure class="shot shot-main">
+        <div class="shot-frame">
+          <Picture
+            class="shot-light"
+            src={shots.light}
+            formats={["avif"]} fallbackFormat="webp"
+            widths={widths}
+            sizes={pctPickers}
+            alt={t.screens.altMain}
+            loading="lazy"
+            decoding="async"
+          />
+          <Picture
+            class="shot-dark"
+            src={shots.dark}
+            formats={["avif"]} fallbackFormat="webp"
+            widths={widths}
+            sizes={pctPickers}
+            alt={t.screens.altMain}
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </figure>
+      <figure class="shot shot-pools">
+        <div class="shot-frame">
+          <Picture
+            src={shots.pools}
+            formats={["avif"]} fallbackFormat="webp"
+            widths={widths}
+            sizes={pctPickers}
+            alt={t.screens.altPools}
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <figcaption>{t.screens.poolsCaption}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="use-cases" class="section uses" aria-labelledby="uses-title">
+    <div class="wrap">
+      <h2 id="uses-title">{t.useCases.title}</h2>
+      <ul class="uses-list" role="list">
+        {
+          t.useCases.list.map((u) => (
+            <li>
+              <h3>{u.who}</h3>
+              <p>{u.body}</p>
+              <p class="uses-ex">
+                {u.example[0]} <span aria-hidden="true">→</span> <code>{u.example[1]}</code>
+              </p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section id="faq" class="section faq" aria-labelledby="faq-title">
+    <div class="wrap faq-grid">
+      <h2 id="faq-title">{t.faq.title}</h2>
+      <div class="faq-list">
+        {
+          t.faq.list.map((f, i) => (
+            <details open={i < 2}>
+              <summary>
+                <span>{f.q}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              </summary>
+              <p>{f.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="close on-plate" aria-labelledby="download-title">
+    <div class="wrap">
+      <div class="close-grid">
+        <div class="close-head">
+          <h2 id="download-title">{t.download.title}</h2>
+          <p class="lede">{t.download.lede}</p>
+        </div>
+        <ul class="dl-list" role="list">
+          {
+            downloads.map((d) => {
+              const target = t.download.targets[d.id];
+              return (
+                <li class="dl">
+                  <span class="dl-os">
+                    <span class="dl-name">{target.name}</span>
+                    <span class="dl-detail">{target.detail}</span>
+                  </span>
+                  {d.url ? (
+                    <a class="btn btn-primary" href={d.url}>
+                      {t.download.get}
+                    </a>
+                  ) : (
+                    <span class="dl-soon">{t.download.soon}</span>
+                  )}
+                </li>
+              );
+            })
+          }
+        </ul>
+        <div class="dl-more">
+          <a href={links.releases} rel="noopener">{t.download.releases}</a>
+          <a href={`${links.repo}#building-from-source`} rel="noopener">{t.download.build}</a>
+        </div>
+      </div>
+
+      <div id="support" class="support" aria-labelledby="support-title">
+        <div class="support-head">
+          <h2 id="support-title">{t.support.title}</h2>
+          <p class="lede">{t.support.lede}</p>
+        </div>
+        <ul class="support-list" role="list">
+          <li>
+            <a href={links.discussions} rel="noopener">{t.support.discussions}<Arrow /></a>
+            <p>{t.support.discussionsBody}</p>
+          </li>
+          <li>
+            <a href={links.issues} rel="noopener">{t.support.issues}<Arrow /></a>
+            <p>{t.support.issuesBody}</p>
+          </li>
+          <li>
+            <a href={links.security} rel="noopener">{t.support.security}<Arrow /></a>
+            <p>{t.support.securityBody}</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot on-plate">
+  <div class="wrap foot-inner">
+    <div class="foot-brand">
+      <Image src={icon} alt="" width={28} height={28} densities={[1, 2]} />
+      <span>{t.footer.by}</span>
+    </div>
+    <nav class="foot-links" aria-label="Legal">
+      <a href={links.privacy} rel="noopener">{t.footer.privacy}</a>
+      <a href={links.disclaimer} rel="noopener">{t.footer.disclaimer}</a>
+      <a href={links.license} rel="noopener">{t.footer.license}</a>
+      <a href={links.changelog} rel="noopener">{t.footer.changelog}</a>
+      <a href={pathFor(other)} hreflang={other} lang={other} data-lang={other}>{t.langSwitch.other}</a>
+    </nav>
+    <p class="foot-note">{t.footer.notice}</p>
+    <p class="foot-note">{t.footer.trademarks}</p>
+  </div>
+</footer>
+
+<script>
+  // Remember an explicit language choice; the Vietnamese page honours it on the next visit.
+  document.querySelectorAll<HTMLAnchorElement>('a[data-lang]').forEach((a) => {
+    a.addEventListener('click', () => {
+      try {
+        localStorage.setItem('pf-lang', a.dataset.lang ?? 'vi');
+      } catch {}
+    });
+  });
+</script>
+
+<style>
+  /* Header */
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding-block: 1.25rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    text-decoration: none;
+    margin-right: auto;
+  }
+
+  .brand img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-name {
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-by {
+    font-size: 0.8125rem;
+    color: var(--mut);
+    padding-left: 0.65rem;
+    border-left: 1px solid var(--rule);
+  }
+
+  .top-nav {
+    display: flex;
+    gap: 1.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .top-nav a {
+    color: var(--ink-2);
+    text-decoration: none;
+    padding-block: 0.5rem;
+  }
+
+  .top-nav a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+
+  .top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .lang,
+  .gh {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 40px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 10px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .lang:hover,
+  .gh:hover {
+    border-color: #aab4c8;
+  }
+
+  .lang-cur {
+    color: var(--ink);
+  }
+
+  .lang-sep,
+  .lang span:last-child {
+    color: var(--mut);
+  }
+
+  .gh svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+
+  /* Hero */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 5.4fr) minmax(0, 6.6fr);
+    gap: clamp(2rem, 4.5vw, 4rem);
+    align-items: center;
+    padding-block: clamp(2.5rem, 6vw, 5.5rem) clamp(4rem, 8vw, 7rem);
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 4vw, 3.875rem);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  h1 span {
+    display: block;
+    color: var(--green-deep);
+  }
+
+  .hero-copy {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .hero-ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .platforms {
+    font-size: 0.9375rem;
+    color: var(--mut);
+    margin-top: -0.5rem;
+  }
+
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding-inline: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+  }
+
+  .gh-link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .gh-link svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+    color: var(--mut);
+  }
+
+  .facts li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .facts li::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green-deep);
+  }
+
+  /* Demo */
+  .demo {
+    padding-block: clamp(4rem, 9vw, 7.5rem);
+  }
+
+  .demo-inner {
+    display: grid;
+    gap: clamp(2rem, 4vw, 3rem);
+  }
+
+  .demo-head {
+    display: grid;
+    gap: 1rem;
+    max-width: 44rem;
+  }
+
+  .screen {
+    aspect-ratio: 16 / 9;
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--plate-2);
+    border: 1px solid var(--plate-rule);
+    box-shadow: 0 24px 32px -24px rgb(0 0 0 / 0.7);
+  }
+
+  .screen video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+  }
+
+  .screen-pending {
+    position: relative;
+    isolation: isolate;
+    height: 100%;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.6rem;
+    padding: 2rem;
+    text-align: center;
+    color: var(--plate-mut);
+    background: radial-gradient(closest-side, rgb(10 15 27 / 0.92), rgb(10 15 27 / 0.55)), var(--plate-2);
+  }
+
+  .screen-pending :global(img.screen-poster) {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: left top;
+    opacity: 0.16;
+    filter: saturate(0.5) blur(1px);
+  }
+
+  .screen-pending > svg {
+    width: 56px;
+    height: 56px;
+    padding: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--plate-rule);
+    background: var(--plate);
+    color: var(--green);
+    margin-bottom: 0.5rem;
+  }
+
+  .screen-pending-title {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  .demo-note {
+    font-size: 0.875rem;
+    color: var(--plate-mut);
+  }
+
+  /* How */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: none;
+  }
+
+  .step {
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 2px solid var(--ink);
+  }
+
+  .step-n {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--green-deep);
+  }
+
+  .step p {
+    color: var(--ink-2);
+    font-size: 1rem;
+  }
+
+  .step-shot {
+    margin-top: 0.75rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    box-shadow: 0 14px 24px -18px rgb(13 20 36 / 0.35);
+    aspect-ratio: 4 / 3;
+  }
+
+  .step-shot :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--fx) var(--fy);
+    transform: scale(1.75);
+    transform-origin: var(--fx) var(--fy);
+  }
+
+  /* Features */
+  .features {
+    padding-top: 0;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: clamp(2rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  .features-head {
+    position: sticky;
+    top: 2rem;
+  }
+
+  .spec {
+    display: grid;
+    gap: clamp(2.5rem, 5vw, 3.5rem);
+  }
+
+  .spec-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--green-deep);
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .spec dl {
+    margin: 0;
+  }
+
+  .spec-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 0.5rem 2rem;
+    padding-block: 1.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .spec-row dt {
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .spec-row dd {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 1rem;
+  }
+
+  /* Providers */
+  .providers {
+    background: var(--paper);
+    border-block: 1px solid var(--rule);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .ptable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1rem;
+  }
+
+  .ptable thead th {
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--mut);
+    padding: 0 1.25rem 0.85rem 0;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .ptable tbody th,
+  .ptable td {
+    text-align: left;
+    vertical-align: top;
+    padding: 1.1rem 1.25rem 1.1rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .ptable tbody th {
+    font-weight: 700;
+    white-space: nowrap;
+    width: 1%;
+  }
+
+  .ptable tbody th .tag-next {
+    margin-left: 0.5rem;
+  }
+
+  .pname {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .ptable td {
+    color: var(--ink-2);
+  }
+
+  .pnote {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--mut);
+    margin-top: 0.2rem;
+  }
+
+  .ptable .proto {
+    white-space: nowrap;
+    color: var(--ink);
+  }
+
+  .footnote {
+    margin-top: 1.25rem;
+    font-size: 0.875rem;
+    color: var(--mut);
+  }
+
+  /* Screens */
+  .theme-switch {
+    display: inline-flex;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    margin-bottom: 1.5rem;
+  }
+
+  .theme-switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .theme-switch label {
+    min-width: 5.5rem;
+    min-height: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0 1rem;
+    border-radius: 9px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--mut);
+    cursor: pointer;
+    transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out);
+  }
+
+  .theme-switch input:checked + label {
+    background: var(--ink);
+    color: #fff;
+  }
+
+  .theme-switch input:focus-visible + label {
+    outline: 2px solid var(--green-deep);
+    outline-offset: 2px;
+  }
+
+  .shot {
+    margin: 0;
+  }
+
+  .shot-frame {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    box-shadow:
+      0 28px 32px -28px rgb(13 20 36 / 0.45),
+      0 10px 20px -14px rgb(13 20 36 / 0.25);
+  }
+
+  .shot-frame :global(img) {
+    width: 100%;
+  }
+
+  .shot-main .shot-frame {
+    display: grid;
+  }
+
+  .shot-main .shot-frame > :global(picture) {
+    grid-area: 1 / 1;
+    transition: opacity 360ms var(--ease-out);
+  }
+
+  .shot-main :global(.shot-dark) {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .screens:has(#th-dark:checked) :global(.shot-dark) {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .screens:has(#th-dark:checked) :global(.shot-light) {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .shot-pools {
+    margin-top: clamp(3rem, 6vw, 5rem);
+    display: grid;
+    grid-template-columns: minmax(0, 8fr) minmax(0, 3fr);
+    gap: 2rem;
+    align-items: end;
+  }
+
+  .shot-pools figcaption {
+    color: var(--ink-2);
+    font-size: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  /* Use cases: the one drenched band */
+  .uses {
+    background: var(--paper);
+    border-block: 1px solid var(--rule);
+  }
+
+  .uses h2 {
+    max-width: 20ch;
+  }
+
+  .uses-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 clamp(2rem, 5vw, 4.5rem);
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .uses-list li {
+    display: grid;
+    gap: 0.6rem;
+    align-content: start;
+    padding-block: 1.6rem 2rem;
+    border-top: 2px solid var(--ink);
+  }
+
+  .uses-list p {
+    color: var(--ink-2);
+  }
+
+  .uses-ex {
+    margin-top: 0.4rem;
+    font-size: 0.875rem;
+    background: var(--plate);
+    color: var(--plate-mut) !important;
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    justify-self: start;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .uses-ex code {
+    color: var(--green);
+  }
+
+  /* FAQ */
+  .faq-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: clamp(2rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  .faq-list {
+    border-top: 2px solid var(--ink);
+  }
+
+  details {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    padding-block: 1.2rem;
+    min-height: 48px;
+    font-weight: 700;
+    font-size: 1.0625rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--mut);
+    transition: transform 300ms var(--ease-out);
+  }
+
+  details[open] summary svg {
+    transform: rotate(45deg);
+  }
+
+  summary:hover span {
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+  }
+
+  details p {
+    padding-bottom: 1.4rem;
+    color: var(--ink-2);
+    max-width: 66ch;
+  }
+
+  /* Close: download + support */
+  .close {
+    padding-block: var(--sec);
+  }
+
+  .close-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 2rem clamp(2rem, 6vw, 6rem);
+    align-items: start;
+  }
+
+  .close-head {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .dl-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--plate-rule);
+  }
+
+  .dl {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.1rem;
+    border-bottom: 1px solid var(--plate-rule);
+  }
+
+  .dl-os {
+    display: grid;
+  }
+
+  .dl-name {
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .dl-detail {
+    font-size: 0.875rem;
+    color: var(--plate-mut);
+  }
+
+  .dl-soon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 40px;
+    padding: 0.4rem 0.9rem;
+    border-radius: 10px;
+    border: 1px dashed #3a4867;
+    font-size: 0.875rem;
+    color: var(--plate-mut);
+    white-space: nowrap;
+  }
+
+  .dl-soon::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+
+  .dl-more {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .dl-more a {
+    color: var(--green);
+  }
+
+  .support {
+    margin-top: clamp(4rem, 8vw, 6.5rem);
+    padding-top: clamp(2.5rem, 5vw, 3.5rem);
+    border-top: 1px solid var(--plate-rule);
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 2rem clamp(2rem, 6vw, 6rem);
+  }
+
+  .support-head {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+  }
+
+  .support h2 {
+    font-size: clamp(1.625rem, 3vw, 2.25rem);
+  }
+
+  .support-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .support-list a {
+    font-weight: 700;
+    color: #fff;
+    font-size: 1.0625rem;
+  }
+
+  .support-list a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .support-list a :global(svg) {
+    width: 18px;
+    height: 18px;
+    color: var(--green);
+    transition: translate 200ms var(--ease-out);
+  }
+
+  .support-list a:hover :global(svg) {
+    translate: 3px 0;
+  }
+
+  .support-list p {
+    color: var(--plate-mut);
+    font-size: 0.9375rem;
+  }
+
+  /* Footer */
+  .foot {
+    border-top: 1px solid var(--plate-rule);
+    padding-block: 2.5rem 3rem;
+  }
+
+  .foot-inner {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .foot-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .foot-links a {
+    color: var(--plate-tx);
+    padding-block: 0.4rem;
+  }
+
+  .foot-note {
+    font-size: 0.8125rem;
+    color: var(--plate-mut);
+    max-width: 90ch;
+  }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .top-nav {
+      display: none;
+    }
+  }
+
+  @media (max-width: 1000px) {
+    .hero,
+    .features-grid,
+    .faq-grid,
+    .close-grid,
+    .support {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .features-head {
+      position: static;
+    }
+    .dl-more {
+      grid-column: auto;
+    }
+    .steps {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 3rem;
+    }
+    .step {
+      grid-template-rows: auto;
+    }
+    .shot-pools {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.25rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .brand-by {
+      display: none;
+    }
+    .gh span {
+      display: none;
+    }
+    .hero-ctas .btn {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+    .hero-ctas .btn-primary {
+      flex-basis: 100%;
+    }
+    .spec-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .uses-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ptable thead {
+      display: none;
+    }
+    .ptable,
+    .ptable tbody,
+    .ptable tr,
+    .ptable th,
+    .ptable td {
+      display: block;
+      width: auto;
+    }
+    .ptable tr {
+      padding-block: 1rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    .ptable tbody th,
+    .ptable td {
+      border: 0;
+      padding: 0.15rem 0;
+      white-space: normal;
+    }
+    .ptable .proto {
+      font-size: 0.875rem;
+      color: var(--mut);
+    }
+    .dl {
+      flex-wrap: wrap;
+    }
+  }
+</style>

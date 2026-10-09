@@ -1,0 +1,111 @@
+---
+import '@fontsource/be-vietnam-pro/400.css';
+import '@fontsource/be-vietnam-pro/500.css';
+import '@fontsource/be-vietnam-pro/700.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
+import '../styles/global.css';
+import fontLatin700 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-700-normal.woff2?url';
+import fontViet700 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-700-normal.woff2?url';
+import fontLatin400 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-400-normal.woff2?url';
+import { copy, pathFor, type Lang } from '../i18n/copy';
+import { SITE_URL, links } from '../data/site';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const canonical = new URL(pathFor(lang), SITE_URL).href;
+const altVi = new URL('/', SITE_URL).href;
+const altEn = new URL('/en/', SITE_URL).href;
+const ogImage = new URL(`/og/og-${lang}.png`, SITE_URL).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${SITE_URL}/#app`,
+      name: 'Proxy Farm',
+      description: t.meta.description,
+      url: canonical,
+      inLanguage: t.htmlLang,
+      applicationCategory: 'NetworkingApplication',
+      operatingSystem: 'macOS 12 or later, Windows',
+      license: 'https://opensource.org/licenses/MIT',
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      image: new URL('/icon-512.png', SITE_URL).href,
+      screenshot: ogImage,
+      softwareHelp: links.discussions,
+      codeRepository: links.repo,
+      author: { '@type': 'Organization', name: 'LingoReUp' },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#site`,
+      url: `${SITE_URL}/`,
+      name: 'Proxy Farm',
+      inLanguage: ['vi', 'en'],
+      publisher: { '@type': 'Organization', name: 'LingoReUp' },
+    },
+  ],
+};
+---
+
+<!doctype html>
+<html lang={t.htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.meta.title}</title>
+    <meta name="description" content={t.meta.description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="vi" href={altVi} />
+    <link rel="alternate" hreflang="en" href={altEn} />
+    <link rel="alternate" hreflang="x-default" href={altVi} />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#eef1f7" />
+
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <link rel="preload" href={fontLatin700} as="font" type="font/woff2" crossorigin />
+    {lang === 'vi' && <link rel="preload" href={fontViet700} as="font" type="font/woff2" crossorigin />}
+    <link rel="preload" href={fontLatin400} as="font" type="font/woff2" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Proxy Farm" />
+    <meta property="og:title" content={t.meta.title} />
+    <meta property="og:description" content={t.meta.description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={t.ogLocale} />
+    <meta property="og:locale:alternate" content={lang === 'vi' ? 'en_US' : 'vi_VN'} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.meta.ogAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={t.meta.title} />
+    <meta name="twitter:description" content={t.meta.description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={t.meta.ogAlt} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    {
+      lang === 'vi' && (
+        <script is:inline>
+          try {
+            if (localStorage.getItem('pf-lang') === 'en' && !location.hash) location.replace('/en/');
+          } catch (e) {}
+        </script>
+      )
+    }
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

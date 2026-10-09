@@ -1,0 +1,28 @@
+---
+import '@fontsource/be-vietnam-pro/400.css';
+import '@fontsource/be-vietnam-pro/700.css';
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>404 · Proxy Farm</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <main class="wrap nf">
+      <h1>Không có trang này. <span lang="en">This page does not exist.</span></h1>
+      <p><a href="/">Về trang chủ</a> · <a href="/en/" lang="en">Go to the home page</a></p>
+    </main>
+    <style>
+      .nf { min-height: 80vh; display: grid; align-content: center; gap: 1.5rem; }
+      h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.03em; max-width: 22ch; }
+      h1 span { display: block; color: var(--mut); }
+      a { color: var(--green-deep); font-weight: 500; }
+    </style>
+  </body>
+</html>
