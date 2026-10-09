@@ -25,7 +25,15 @@ export interface OpenVpnEndpoint {
   tls: {
     certificate: string[]; // inline PEM lines (never a path — §6.1.1)
     server_name?: string;
+    /** How `server_name` is matched against the server certificate (OpenVPN
+     * `verify-x509-name <name> <type>`); sing-box's default is the full subject. */
+    server_name_type?: 'subject' | 'name' | 'name-prefix';
+    /** Client-certificate auth (OpenVPN `<cert>` / `<key>`): inline PEM lines, both or neither. */
+    client_certificate?: string[];
+    client_key?: string[];
     remote_certificate_tls?: 'server';
+    /** OpenVPN `ns-cert-type server`: the legacy Netscape check on the server certificate. */
+    ns_certificate_type?: 'server';
     control_wrap?: {
       type: 'tls_auth' | 'tls_crypt';
       key: string[]; // inline key lines
@@ -35,6 +43,13 @@ export interface OpenVpnEndpoint {
   data_ciphers: string[];
   data_ciphers_fallback?: string;
   auth?: string; // e.g. 'SHA256'
+  /** OpenVPN `fragment N`: split data packets above N bytes. A server configured with it
+   * needs the client to match, or the tunnel comes up and carries nothing (ExpressVPN). */
+  fragment?: number;
+  /** OpenVPN `mssfix N`. */
+  mss_fix?: number;
+  /** OpenVPN `comp-lzo no`: compression framing on, compression off. */
+  compression_lzo?: 'no';
   route_no_pull: true;
   explicit_exit_notify?: number;
   mtu: number;
@@ -429,7 +444,14 @@ export interface ProxyFarmApi {
   /** Windows only: runs the elevated helper installer (spec §7, one UAC). Shown when `detected.hintKey`
    * says the helper is missing. Stubbed until the Windows track: returns `{ok:false, reasonKey:'hma.windowsLater'}`. */
   enableHmaSupport(): Promise<CheckResult>;
-  importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }>;
+  /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
+   * Without them such a file answers `file.check.needsCredentials`. */
+  importConfigFile(
+    name: string,
+    content: string,
+    country?: string,
+    credentials?: { username: string; password: string },
+  ): Promise<CheckResult & { account?: Account }>;
   /** Locations with `freeServers` filled in (spec §6.8). */
   listTargets(providerId?: ProviderId): Promise<Target[]>;
 
