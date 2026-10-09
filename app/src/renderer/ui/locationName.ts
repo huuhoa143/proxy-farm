@@ -1,4 +1,4 @@
-import { countryName } from './countryName';
+import { cityName, countryName } from './countryName';
 
 /** Anything that names a location: a `Target`, a `PortRow`, a port group. */
 export interface LocationLike {
@@ -35,5 +35,5 @@ export function isCountryWide(loc: LocationLike, language: string): boolean {
  * name in the UI language ("Đức", not "Germany", in Vietnamese).
  */
 export function locationName(loc: LocationLike, language: string): string {
-  return isCountryWide(loc, language) ? countryName(loc.country, language) : loc.city;
+  return isCountryWide(loc, language) ? countryName(loc.country, language) : cityName(loc.city, language);
 }

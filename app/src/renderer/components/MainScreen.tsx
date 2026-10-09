@@ -13,6 +13,7 @@ import { Icon } from '../ui/Icon';
 import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 import { providerName } from '../ui/providerName';
 import { locationName as nameOf } from '../ui/locationName';
+import { cityName } from '../ui/countryName';
 import { remainingByProvider } from '../portGroups';
 
 export interface MainScreenProps {
@@ -220,7 +221,7 @@ export function MainScreen({ api }: MainScreenProps) {
 
   function describeRotateResult(result: RotateResult): string | undefined {
     // A move to another city is always said, whether or not the new IP was confirmed.
-    if (result.movedTo) return t('main.rotateResult.movedToCityNote', { city: result.movedTo });
+    if (result.movedTo) return t('main.rotateResult.movedToCityNote', { city: cityName(result.movedTo, language) });
     if (result.noteKey === SAME_CITY_NOTE) return t(SAME_CITY_NOTE);
     // The picked server refused the account: say so, and where the port is now.
     if (result.refusedServer && result.noteKey) {
