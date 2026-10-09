@@ -1,7 +1,7 @@
 {
   "name": "proxy-farm",
   "productName": "Proxy Farm",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Proxy Farm desktop app — one VPN subscription, many local proxy ports",
   "main": ".vite/build/index.js",
   "private": true,
