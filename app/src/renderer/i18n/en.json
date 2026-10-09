@@ -279,7 +279,7 @@
       "addPortLabel": "Add a port in {{location}}",
       "addPortHint": "Adds one port on a free server — a new exit IP in {{location}}.",
       "noFreeServer": "Every server in {{location}} is already in use or unavailable.",
-      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it in Settings."
+      "limitReached": "{{provider}} is at its limit of {{limit}} ports — raise it on the Providers screen."
     },
     "port": {
       "label": "{{location}} · port #{{n}}",

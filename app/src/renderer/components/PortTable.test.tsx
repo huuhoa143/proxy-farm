@@ -462,7 +462,7 @@ describe('PortTable', () => {
       renderGrouped({ limits: { hma: 2 } });
       const blocked = screen.getByTestId('add-port-hma:JP-TOKYO');
       expect(blocked).toHaveAttribute('aria-disabled', 'true');
-      expect(blocked).toHaveAttribute('title', 'HMA is at its limit of 2 ports — raise it in Settings.');
+      expect(blocked).toHaveAttribute('title', 'HMA is at its limit of 2 ports — raise it on the Providers screen.');
     });
 
     it('collapsing a group hides its ports and is remembered', () => {

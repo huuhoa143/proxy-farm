@@ -279,7 +279,7 @@
       "addPortLabel": "Thêm một cổng ở {{location}}",
       "addPortHint": "Thêm một cổng trên một máy chủ trống — thêm một IP thoát ở {{location}}.",
       "noFreeServer": "Mọi máy chủ ở {{location}} đều đang được dùng hoặc không khả dụng.",
-      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng trong Cài đặt."
+      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng ở màn hình VPN."
     },
     "port": {
       "label": "{{location}} · cổng #{{n}}",
