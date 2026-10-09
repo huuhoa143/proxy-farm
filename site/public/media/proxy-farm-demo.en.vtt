@@ -1,0 +1,54 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.400
+Proxy Farm — turn your VPN plan into dozens of proxies, one IP per port
+
+2
+00:00:03.400 --> 00:00:10.085
+1. Add ExpressVPN — open the step-by-step credential guide
+
+3
+00:00:10.085 --> 00:00:17.439
+1. Enter the username/password (masked), then press “Check”
+
+4
+00:00:17.589 --> 00:00:25.557
+2. Pick a location — every port gets its own server and its own IP
+
+5
+00:00:25.557 --> 00:00:36.644
+2. Vietnam, Japan, Singapore, USA: five ports come online one by one
+
+6
+00:00:36.794 --> 00:00:43.524
+3. Each port is a SOCKS5/HTTP proxy — curl returns its exit IP
+
+7
+00:00:43.524 --> 00:00:50.562
+4. Change IP: same port, another server, a new exit IP
+
+8
+00:00:50.562 --> 00:00:53.262
+5. Import a test WireGuard file (unreachable server) to get a dead port
+
+9
+00:00:53.262 --> 00:00:58.312
+5. Check all: a summary of alive and dead ports
+
+10
+00:00:58.312 --> 00:01:04.245
+5. Filter by status: “Dead”, then “Alive”
+
+11
+00:01:04.245 --> 00:01:08.278
+5. Search by location, IP or port: “viet”
+
+12
+00:01:08.378 --> 00:01:20.612
+6. Export → CSV → Alive only → Save to file
+
+13
+00:01:20.612 --> 00:01:24.412
+Proxy Farm by LingoReUp · proxyfarm.lingoreup.com · Open source, MIT
+
