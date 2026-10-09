@@ -296,3 +296,7 @@ code,
 .on-plate .lede {
   color: var(--plate-mut);
 }
+
+[hidden] {
+  display: none !important;
+}

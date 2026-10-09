@@ -5,7 +5,10 @@ import { Picture, Image } from 'astro:assets';
 import Switchboard from './Switchboard.astro';
 import Arrow from './Arrow.astro';
 import { copy, pathFor, type Lang } from '../i18n/copy';
-import { links, downloads, anyDownloadLive, media } from '../data/site';
+import { links, media, release } from '../data/site';
+import { getDownloads, formatSize } from '../data/release-sizes';
+import lingoreupIcon from '../assets/lingoreup/lingoreup-icon.svg';
+import lingoreupWordmark from '../assets/lingoreup/lingoreup-wordmark-dark-bg.svg';
 import icon from '../assets/icon-512.png';
 import mainLightVi from '../assets/shots/main-light-vi.png';
 import mainDarkVi from '../assets/shots/main-dark-vi.png';
@@ -27,6 +30,10 @@ interface Props {
 
 const { lang } = Astro.props;
 const t = copy[lang];
+const LINGOREUP = 'https://lingoreup.com';
+const downloads = await getDownloads();
+const dl = Object.fromEntries(downloads.map((d) => [d.id, d])) as Record<(typeof downloads)[number]['id'], (typeof downloads)[number]>;
+const ext = (file: string) => file.slice(file.lastIndexOf('.'));
 const other: Lang = lang === 'vi' ? 'en' : 'vi';
 
 const shots = {
@@ -51,11 +58,17 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
 <a class="skip" href="#main">{t.skip}</a>
 
 <header class="top wrap">
+  <div class="brand-wrap">
   <a class="brand" href={pathFor(lang)}>
     <Image src={icon} alt="" width={36} height={36} densities={[1, 2]} loading="eager" />
     <span class="brand-name">Proxy Farm</span>
-    <span class="brand-by">by LingoReUp</span>
   </a>
+  <a class="brand-by" href={LINGOREUP} rel="noopener">
+    <span class="by-text">by</span>
+    <img src={lingoreupIcon.src} alt="" width="24" height="24" />
+    <span class="by-text">LingoReUp</span>
+  </a>
+  </div>
   <nav class="top-nav" aria-label={t.nav.menu}>
     <a href="#how">{t.nav.how}</a>
     <a href="#features">{t.nav.features}</a>
@@ -82,10 +95,23 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
       <h1 id="hero-title">{t.hero.title} <span>{t.hero.titleSub}</span></h1>
       <p class="lede">{t.hero.lede}</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="#download">
+        <a
+          class="btn btn-primary"
+          href="#download"
+          data-dl-primary
+          data-mac-href={dl['mac-arm64'].url}
+          data-mac-label={t.hero.downloadMac}
+          data-mac-size={`${t.hero.appleSilicon} · ${formatSize(dl['mac-arm64'].bytes, lang)}`}
+          data-win-href={dl['win-x64'].url}
+          data-win-label={t.hero.downloadWin}
+          data-win-size={formatSize(dl['win-x64'].bytes, lang)}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>
-          {t.hero.download}
-          {!anyDownloadLive && <span class="pill">{t.hero.soon}</span>}
+          <span data-dl-label>{t.hero.download}</span>
+          <span class="pill" data-dl-size hidden></span>
+        </a>
+        <a class="alt-dl" href={dl['mac-x64'].url} data-dl-alt hidden aria-label={`${t.hero.intelLabel}, ${formatSize(dl['mac-x64'].bytes, lang)}`}>
+          {t.hero.intel} <span class="alt-size">· {formatSize(dl['mac-x64'].bytes, lang)}</span>
         </a>
         <a class="btn btn-ghost" href="#demo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
@@ -96,7 +122,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
           {t.hero.github}
         </a>
       </div>
-      <p class="platforms">{t.hero.platforms}</p>
+      <p class="platforms">{t.hero.version(release.version)}</p>
       <ul class="facts" role="list">
         {t.hero.facts.map((f) => <li>{f}</li>)}
       </ul>
@@ -360,26 +386,28 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
           {
             downloads.map((d) => {
               const target = t.download.targets[d.id];
+              const note = d.id === 'win-x64' ? t.download.winNote : null;
               return (
                 <li class="dl">
                   <span class="dl-os">
                     <span class="dl-name">{target.name}</span>
                     <span class="dl-detail">{target.detail}</span>
+                    <span class="dl-meta">
+                      {t.download.version(release.version)} · {ext(d.file)} · {formatSize(d.bytes, lang)}
+                    </span>
+                    {note && <span class="dl-note">{note}</span>}
                   </span>
-                  {d.url ? (
-                    <a class="btn btn-primary" href={d.url}>
-                      {t.download.get}
-                    </a>
-                  ) : (
-                    <span class="dl-soon">{t.download.soon}</span>
-                  )}
+                  <a class="btn btn-primary" href={d.url} aria-label={t.download.getFor(target.name)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>
+                    {t.download.get}
+                  </a>
                 </li>
               );
             })
           }
         </ul>
         <div class="dl-more">
-          <a href={links.releases} rel="noopener">{t.download.releases}</a>
+          <a href={links.releases} rel="noopener">{t.download.all}</a>
           <a href={`${links.repo}#building-from-source`} rel="noopener">{t.download.build}</a>
         </div>
       </div>
@@ -410,9 +438,15 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
 
 <footer class="foot on-plate">
   <div class="wrap foot-inner">
-    <div class="foot-brand">
-      <Image src={icon} alt="" width={28} height={28} densities={[1, 2]} />
-      <span>{t.footer.by}</span>
+    <div class="foot-top">
+      <div class="foot-brand">
+        <Image src={icon} alt="" width={28} height={28} densities={[1, 2]} />
+        <span>Proxy Farm</span>
+      </div>
+      <a class="foot-credit" href={LINGOREUP} rel="noopener">
+        <span>{t.footer.credit}</span>
+        <img src={lingoreupWordmark.src} alt="LingoReUp" width="135" height="28" loading="lazy" />
+      </a>
     </div>
     <nav class="foot-links" aria-label="Legal">
       <a href={links.privacy} rel="noopener">{t.footer.privacy}</a>
@@ -427,6 +461,25 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
 </footer>
 
 <script>
+  // Point the hero download at this visitor's OS. Without JS it stays a link to #download.
+  // Macs get Apple silicon with the Intel build beside it: the UA can't tell the CPU apart.
+  const primary = document.querySelector<HTMLAnchorElement>('[data-dl-primary]');
+  if (primary) {
+    const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+    const platform = (nav.userAgentData?.platform || navigator.platform || '').toLowerCase();
+    const touch = navigator.maxTouchPoints > 1; // iPadOS reports a Mac platform
+    const os = /mac/.test(platform) && !touch ? 'mac' : /win/.test(platform) ? 'win' : null;
+    if (os) {
+      const d = primary.dataset;
+      primary.href = (os === 'mac' ? d.macHref : d.winHref) ?? primary.href;
+      primary.querySelector('[data-dl-label]')!.textContent = (os === 'mac' ? d.macLabel : d.winLabel) ?? '';
+      const size = primary.querySelector<HTMLElement>('[data-dl-size]')!;
+      size.textContent = ' ' + ((os === 'mac' ? d.macSize : d.winSize) ?? '');
+      size.hidden = false;
+      if (os === 'mac') document.querySelector<HTMLElement>('[data-dl-alt]')!.hidden = false;
+    }
+  }
+
   // Remember an explicit language choice; the Vietnamese page honours it on the next visit.
   document.querySelectorAll<HTMLAnchorElement>('a[data-lang]').forEach((a) => {
     a.addEventListener('click', () => {
@@ -446,12 +499,22 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     padding-block: 1.25rem;
   }
 
+  .brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-right: auto;
+  }
+
+  .brand-name {
+    white-space: nowrap;
+  }
+
   .brand {
     display: inline-flex;
     align-items: center;
     gap: 0.65rem;
     text-decoration: none;
-    margin-right: auto;
   }
 
   .brand img {
@@ -465,11 +528,29 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     letter-spacing: -0.01em;
   }
 
+  /* LingoReUp credit: present, in the muted voice, never in its purple beyond the 24px mark. */
   .brand-by {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--rule);
     font-size: 0.8125rem;
     color: var(--mut);
-    padding-left: 0.65rem;
-    border-left: 1px solid var(--rule);
+    text-decoration: none;
+  }
+
+  .brand-by img {
+    width: 24px;
+    height: 24px;
+    margin-inline: 0.15rem;
+  }
+
+  .brand-by:hover .by-text:last-child {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
   }
 
   .top-nav {
@@ -558,8 +639,41 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   .hero-ctas {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.6rem;
     margin-top: 0.5rem;
+  }
+
+  .hero-ctas .btn {
+    gap: 0.5rem;
+    padding-inline: 1.1rem;
+  }
+
+  .alt-dl {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding-inline: 0.8rem;
+    border-radius: 12px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .alt-dl[hidden] {
+    display: none;
+  }
+
+  .alt-dl:hover {
+    border-color: #aab4c8;
+  }
+
+  .alt-size {
+    margin-left: 0.25rem;
+    color: var(--mut);
+    font-weight: 400;
   }
 
   .platforms {
@@ -1118,25 +1232,21 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     color: var(--plate-mut);
   }
 
-  .dl-soon {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 40px;
-    padding: 0.4rem 0.9rem;
-    border-radius: 10px;
-    border: 1px dashed #3a4867;
-    font-size: 0.875rem;
+  .dl-meta {
+    margin-top: 0.15rem;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
     color: var(--plate-mut);
-    white-space: nowrap;
   }
 
-  .dl-soon::before {
-    content: '';
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--amber);
+  .dl-note {
+    margin-top: 0.35rem;
+    font-size: 0.8125rem;
+    color: var(--amber);
+  }
+
+  .dl .btn {
+    flex: none;
   }
 
   .dl-more {
@@ -1217,6 +1327,36 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     gap: 1rem;
   }
 
+  .foot-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--plate-rule);
+  }
+
+  .foot-credit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+    font-size: 0.875rem;
+    color: var(--plate-mut);
+    text-decoration: none;
+  }
+
+  .foot-credit img {
+    width: 135px;
+    height: auto;
+    margin: 7px;
+  }
+
+  .foot-credit:hover span {
+    color: var(--plate-tx);
+    text-decoration: underline;
+  }
+
   .foot-brand {
     display: inline-flex;
     align-items: center;
@@ -1274,8 +1414,21 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   }
 
   @media (max-width: 640px) {
-    .brand-by {
-      display: none;
+    .foot-credit {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+    .foot-credit img {
+      margin-left: 0;
+    }
+    .brand-by .by-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
     }
     .gh span {
       display: none;
