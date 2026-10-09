@@ -1,4 +1,4 @@
-import { existsSync, readFile, unwatchFile, watchFile } from 'node:fs';
+import { existsSync, readdirSync, readFile, unwatchFile, watchFile } from 'node:fs';
 import path from 'node:path';
 import { parseAuthFile, parseDeviceCreds, type DeviceCreds } from '../providers/hma/token';
 import { hmaAuthPath, hmaMirrorDir, hmaMirrorPath } from './hma-windows';
@@ -51,8 +51,8 @@ function parsed(text: string, parse: (text: string) => DeviceCreds): HmaRead {
 /**
  * Reads HMA's local device credentials (spec §5.1).
  * - macOS: parses `tokenCoreSE.json` with the providers module's `parseDeviceCreds`.
- * - Windows: parses the `auth` file with `parseAuthFile`. HMA's own copy is admin-only, so
- *   it is read only when the app happens to run elevated; normally the copy kept by HMA
+ * - Windows: parses the `auth` file with `parseAuthFile`. HMA's own file is admin-only; it
+ *   is preferred whenever the app happens to run elevated, and otherwise the copy kept by HMA
  *   support (`hma-windows.ts`) is read. Once HMA support is enabled, a missing copy means
  *   HMA has no credentials (not signed in); before that, an HMA install reports
  *   `helper-missing` so the UI offers "Enable HMA support".
@@ -65,13 +65,26 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
   const winMirrorPath = opts.winMirrorPath ?? hmaMirrorPath();
   const winMirrorDir = opts.winMirrorDir ?? hmaMirrorDir();
   const pollMs = opts.pollMs ?? 3000;
-  const watched = platform === 'win32' ? [winMirrorPath, winAuthPath] : platform === 'darwin' ? [tokenPath] : [];
+
+  /** HMA's own folder is admin-only: listing it succeeds only when the app runs elevated. */
+  function hmaFolderReadable(): boolean {
+    try {
+      readdirSync(path.win32.dirname(winAuthPath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function readWindows(): Promise<HmaRead> {
-    const mirror = await readText(winMirrorPath);
-    if ('text' in mirror) return parsed(mirror.text, parseAuthFile);
+    // HMA's own file first: when it is readable (the app runs elevated) it is the current
+    // pair, while the copy may lag a rotation by up to the task's 5 minutes.
     const direct = await readText(winAuthPath);
     if ('text' in direct) return parsed(direct.text, parseAuthFile);
+    // Its folder is readable but holds no credentials: HMA is signed out, whatever the copy says.
+    if (direct.error.code === 'ENOENT' && hmaFolderReadable()) return { status: 'invalid', message: 'hma: not signed in' };
+    const mirror = await readText(winMirrorPath);
+    if ('text' in mirror) return parsed(mirror.text, parseAuthFile);
     // HMA support is on (its folder is readable) but there is no copy: HMA is installed and
     // signed out (the task removes the copy when HMA has none), so point the user at HMA
     // rather than telling them it isn't installed.
@@ -90,6 +103,10 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
   }
 
   function watch(cb: () => void): () => void {
+    // Windows: the copy, plus HMA's own file only when this process can see it (elevated);
+    // otherwise stat-polling it could never succeed.
+    const watched =
+      platform === 'win32' ? (hmaFolderReadable() ? [winMirrorPath, winAuthPath] : [winMirrorPath]) : platform === 'darwin' ? [tokenPath] : [];
     const listener = (curr: { mtimeMs: number; size: number }, prev: { mtimeMs: number; size: number }) => {
       if (curr.mtimeMs !== prev.mtimeMs || curr.size !== prev.size) cb();
     };

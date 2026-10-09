@@ -135,6 +135,51 @@ describe('HMA local source (spec §5.1)', () => {
       expect(await win({ hma: dir, auth: join(dir, 'auth') }).read()).toEqual({ status: 'found', creds: { udid: USER, password: PASS } });
     });
 
+    it("prefers HMA's own file over the copy whenever it is readable (it may be newer)", async () => {
+      mkdirSync(join(dir, 'hma'));
+      writeFileSync(join(dir, 'hma', 'auth'), `${USER}\r\n${'C'.repeat(64)}\r\n`);
+      mkdirSync(join(dir, 'mirror'));
+      writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
+      expect(await win({ hma: dir, auth: join(dir, 'hma', 'auth'), mirrorDir: join(dir, 'mirror') }).read()).toEqual({
+        status: 'found',
+        creds: { udid: USER, password: 'C'.repeat(64) },
+      });
+    });
+
+    it("reports signed out when HMA's folder is readable but empty, ignoring a stale copy", async () => {
+      mkdirSync(join(dir, 'hma'));
+      mkdirSync(join(dir, 'mirror'));
+      writeFileSync(join(dir, 'mirror', 'auth'), `${USER}\r\n${PASS}\r\n`);
+      expect((await win({ hma: dir, auth: join(dir, 'hma', 'auth'), mirrorDir: join(dir, 'mirror') }).read()).status).toBe('invalid');
+    });
+
+    it("watches HMA's own file only when its folder was readable at watch time", async () => {
+      const source = (sub: string) =>
+        createHmaLocalSource({
+          platform: 'win32',
+          winHmaDir: dir,
+          winAuthPath: join(dir, sub, 'auth'),
+          winMirrorDir: join(dir, 'mirror'),
+          winMirrorPath: join(dir, 'mirror', 'auth'),
+          pollMs: 10,
+        });
+      const changes = async (sub: string, before: () => void) => {
+        let n = 0;
+        before();
+        const stop = source(sub).watch(() => n++);
+        await new Promise((r) => setTimeout(r, 50));
+        mkdirSync(join(dir, sub), { recursive: true });
+        writeFileSync(join(dir, sub, 'auth'), `${USER}\r\n${PASS}\r\n`);
+        await new Promise((r) => setTimeout(r, 200));
+        stop();
+        return n;
+      };
+      // Unreadable (here: absent) when watching started: never polled.
+      expect(await changes('later', () => undefined)).toBe(0);
+      // Readable (the app runs elevated): a change to HMA's own file is seen.
+      expect(await changes('now', () => mkdirSync(join(dir, 'now')))).toBeGreaterThan(0);
+    });
+
     it('reports helper-missing when HMA is installed but HMA support is not enabled', async () => {
       expect(await win({ hma: dir }).read()).toEqual({ status: 'helper-missing' });
     });

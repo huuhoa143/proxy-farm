@@ -88,7 +88,8 @@ Download the latest build from
    On Windows, HMA keeps those credentials in a file only administrators can read, so the
    HMA card first shows **Enable HMA support**. It asks for administrator approval once and
    sets up a small Windows task that keeps a copy only you and administrators can read;
-   updates need no approval. The task removes itself when Proxy Farm is uninstalled.
+   updates need no approval. The task removes itself a day after Proxy Farm is uninstalled
+   (for every Windows user who enabled it).
 2. Click **Add locations**, choose locations and how many ports each.
 3. When a port shows **Online**, use it:
 
