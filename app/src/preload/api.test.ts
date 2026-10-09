@@ -52,6 +52,14 @@ describe('preload API surface (spec §3)', () => {
     expect(ipc.invoke).toHaveBeenCalledWith('listServers', 'hma:jp-tok', 'hma:jp-tok#2');
     await api.listServers('hma:jp-tok');
     expect(ipc.invoke).toHaveBeenLastCalledWith('listServers', 'hma:jp-tok');
+
+    await api.exportPorts(['a#1'], 'csv', { 'a#1': { ok: true, latencyMs: 9 } });
+    expect(ipc.invoke).toHaveBeenLastCalledWith('exportPorts', ['a#1'], 'csv', { 'a#1': { ok: true, latencyMs: 9 } });
+    await api.exportPorts(['a#1'], 'hostPort');
+    expect(ipc.invoke).toHaveBeenLastCalledWith('exportPorts', ['a#1'], 'hostPort');
+
+    await api.saveExportFile('text', 'csv');
+    expect(ipc.invoke).toHaveBeenLastCalledWith('saveExportFile', 'text', 'csv');
   });
 
   it('onPortsChanged subscribes on the right channel and unwraps the event arg', () => {

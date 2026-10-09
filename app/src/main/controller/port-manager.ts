@@ -9,6 +9,7 @@ import {
   type Account,
   type AccountSecret,
   type ExportFormat,
+  type PortCheck,
   type FailDetail,
   type FailReason,
   type PortRow,
@@ -26,7 +27,7 @@ import { nextBackoffMs } from '../health/backoff';
 import type { SecretStore } from '../store/secrets';
 import type { CredentialCheck, StateStore } from '../store/state';
 import { createCredentialProbe, freeHosts, isProbeKey, type CredentialProbe } from './credential-probe';
-import { exportLines, type ExportCreds } from './export-format';
+import { exportCsv, exportLines, sanitizeChecks, type ExportCreds } from './export-format';
 import { PortInUseError, type Engine, type ExitIpProber, type PortAllocator, type ProviderRegistry } from './ports';
 import { createServerHealth, type ServerHealth } from './server-health';
 import { createAttemptLimiter, createWgKeyGuard, type AttemptLimiter, type WgKeyGuard } from './provider-safety';
@@ -167,7 +168,8 @@ export interface PortManager {
    * the location is outside the user's plan(s). False with no account to judge by. */
   locationNotInPlan(target: Target): boolean;
   setAutoRotate(key: string, minutes: number): Promise<void>;
-  exportPorts(keys: string[], format: ExportFormat): Promise<string>;
+  /** `checks`: the renderer's current Check results, used by the CSV format only. */
+  exportPorts(keys: string[], format: ExportFormat, checks?: Record<string, PortCheck>): Promise<string>;
   testPort(key: string, speed: boolean): Promise<{ ok: boolean; exitIp?: string; latencyMs?: number; mbps?: number }>;
   /** Reconciles auto-rotate timers against the CURRENT `ports` (reviewer item 8). Called
    * internally after start/stop/remove/setAutoRotate/rotate already — exported mainly so
@@ -1737,11 +1739,12 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     autoRotate.sync(deps.state.getState().ports);
   }
 
-  async function exportPorts(keys: string[], format: ExportFormat): Promise<string> {
+  async function exportPorts(keys: string[], format: ExportFormat, checks?: Record<string, PortCheck>): Promise<string> {
     const s = deps.state.getState();
     const host = s.settings.lanSharing ? getLanIPv4() : '127.0.0.1';
     const creds: ExportCreds = { host, user: s.settings.proxyUser, pass: s.settings.proxyPass };
     const ports = keys.map((k) => s.ports.find((p) => p.key === k)).filter((p): p is PortRow => Boolean(p));
+    if (format === 'csv') return exportCsv(ports, creds, sanitizeChecks(checks));
     return exportLines(format, ports.map((p) => p.proxyPort), creds);
   }
 
