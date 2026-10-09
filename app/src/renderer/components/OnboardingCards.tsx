@@ -436,6 +436,11 @@ interface PendingFile {
   content: string;
 }
 
+/** An `.ovpn` that signs in with a username and password (a bare `auth-user-pass` line). */
+function needsSignIn(file: PendingFile): boolean {
+  return /\.ovpn$/i.test(file.name) && /^\s*auth-user-pass\s*$/m.test(file.content);
+}
+
 export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
   const { t, i18n } = useTranslation();
   const [dragOver, setDragOver] = useState(false);
@@ -443,15 +448,30 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [country, setCountry] = useState('');
   const [busy, setBusy] = useState(false);
+  // The VPN username/password an `.ovpn` with `auth-user-pass` signs in with (spec §5.4).
+  const [askSignIn, setAskSignIn] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  function reset() {
+    setPending(null);
+    setCountry('');
+    setAskSignIn(false);
+    setUsername('');
+    setPassword('');
+  }
 
   async function stageFile(file: File) {
     const content = await file.text();
-    setPending({ name: file.name, content });
+    const staged = { name: file.name, content };
+    setPending(staged);
     setCountry(guessCountryFromFilename(file.name));
+    setAskSignIn(needsSignIn(staged));
     setMessage(null);
   }
 
   const validCountry = /^[A-Z]{2}$/.test(country);
+  const signInReady = !askSignIn || (username.trim() !== '' && password !== '');
 
   async function confirmImport() {
     if (!pending) return;
@@ -464,12 +484,15 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await api.importConfigFile(pending.name, pending.content, country);
+      const result = askSignIn
+        ? await api.importConfigFile(pending.name, pending.content, country, { username: username.trim(), password })
+        : await api.importConfigFile(pending.name, pending.content, country);
       setMessage(resultMessage(t, result));
       if (result.ok) {
-        setPending(null);
-        setCountry('');
+        reset();
         onAdded();
+      } else if (result.reasonKey === 'file.check.needsCredentials') {
+        setAskSignIn(true);
       }
     } catch (err) {
       setMessage(errorMessage(t, err));
@@ -518,13 +541,7 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
             <span className="nm" title={pending.name}>
               {pending.name}
             </span>
-            <button
-              className="btn ghost sm"
-              onClick={() => {
-                setPending(null);
-                setCountry('');
-              }}
-            >
+            <button className="btn ghost sm" onClick={reset}>
               {t('onboarding.providers.file.chooseAnother')}
             </button>
           </div>
@@ -551,10 +568,36 @@ export function FileCard({ api, onAdded, accountCount }: FileCardProps) {
               </p>
             )}
           </div>
+          {askSignIn && (
+            <div className="pc-body" data-testid="file-credentials">
+              <div className="field">
+                <label htmlFor="file-username">{t('onboarding.providers.file.username')}</label>
+                <input
+                  id="file-username"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="file-password">{t('onboarding.providers.file.password')}</label>
+                <input
+                  id="file-password"
+                  type="password"
+                  autoComplete="off"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <p className="hint">{t('onboarding.providers.file.signInNote')}</p>
+              </div>
+            </div>
+          )}
           <div className="pc-actions">
             <button
               className="btn primary"
-              disabled={busy || !validCountry}
+              disabled={busy || !validCountry || !signInReady}
               onClick={() => void confirmImport()}
             >
               <Icon name="check" />

@@ -396,9 +396,12 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return { ok: true, label: 'HMA helper installed' };
     },
 
-    async importConfigFile(name, content, country) {
+    async importConfigFile(name, content, country, credentials) {
       if (!content.includes('PrivateKey') && !content.includes('remote ')) {
         return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
+      }
+      if (/^\s*auth-user-pass\s*$/m.test(content) && !(credentials?.username && credentials.password)) {
+        return { ok: false, reasonKey: 'file.check.needsCredentials' };
       }
       const account: Account = {
         id: `file-${accounts.length + 1}`,
@@ -407,7 +410,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         meta: country ? { name, country } : { name },
         secretRef: `file-${accounts.length + 1}`,
       };
-      accounts.push({ account, secret: { kind: 'file', content } });
+      accounts.push({ account, secret: { kind: 'file', content, ...credentials } });
       return { ok: true, account, label: name };
     },
 

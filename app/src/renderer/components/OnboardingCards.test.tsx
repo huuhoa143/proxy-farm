@@ -70,6 +70,49 @@ describe('FileCard', () => {
   });
 });
 
+describe('FileCard: an .ovpn that signs in with a username and password', () => {
+  it('asks for them when the file has auth-user-pass, and imports with them', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'importConfigFile');
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('vn_expressvpn_udp.ovpn', 'remote vietnam-ca-version-2.expressnetw.com 1195\nauth-user-pass\n');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId('file-credentials')).toBeInTheDocument());
+    expect(screen.getByLabelText('Country')).toHaveValue('VN');
+    expect(screen.getByText('Import').closest('button')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('VPN username'), { target: { value: 'me' } });
+    fireEvent.change(screen.getByLabelText('VPN password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByText('Import'));
+
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('vn_expressvpn_udp.ovpn', expect.any(String), 'VN', { username: 'me', password: 'pw' }));
+  });
+
+  it('shows the fields when main says the file needs them, though the UI did not spot it', async () => {
+    const api = createFakeProxyFarmApi();
+    vi.spyOn(api, 'importConfigFile').mockResolvedValueOnce({ ok: false, reasonKey: 'file.check.needsCredentials' });
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('us-nyc.ovpn', 'remote vpn.example.com 1194');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByTestId('file-pending')).toBeInTheDocument());
+    expect(screen.queryByTestId('file-credentials')).toBeNull();
+    fireEvent.click(screen.getByText('Import'));
+    await waitFor(() => expect(screen.getByTestId('file-credentials')).toBeInTheDocument());
+  });
+
+  it('asks for nothing for a file without auth-user-pass', async () => {
+    const api = createFakeProxyFarmApi();
+    render(<FileCard api={api} onAdded={() => {}} />);
+    const file = makeFile('mullvad-se-got.conf', '[Interface]\nPrivateKey = abc');
+    const input = screen.getByTestId('file-dropzone').querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByTestId('file-pending')).toBeInTheDocument());
+    expect(screen.queryByTestId('file-credentials')).toBeNull();
+  });
+});
+
 describe('ZoogVpnCard', () => {
   it('surfaces a rejected addAccount as an inline message instead of failing silently', async () => {
     const api = createFakeProxyFarmApi();

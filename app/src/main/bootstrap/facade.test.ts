@@ -428,6 +428,15 @@ describe('controller facade', () => {
     });
   });
 
+  it('importConfigFile hands a username/password to the file check (an .ovpn with auth-user-pass)', async () => {
+    const check = vi.fn((_input: Record<string, string>) => ({ ok: false, reasonKey: 'file.check.needsCredentials' }) as ReturnType<Provider['check']>);
+    const { facade } = setup({ providers: { get: (id) => (id === 'file' ? { ...fakeProvider('file', () => []), check } : undefined) } });
+    await facade.importConfigFile('vn.ovpn', 'auth-user-pass', 'VN', { username: 'me', password: 'pw' });
+    expect(check).toHaveBeenLastCalledWith({ name: 'vn.ovpn', content: 'auth-user-pass', username: 'me', password: 'pw' });
+    await facade.importConfigFile('vn.ovpn', 'auth-user-pass', 'VN');
+    expect(check).toHaveBeenLastCalledWith({ name: 'vn.ovpn', content: 'auth-user-pass' });
+  });
+
   it('importConfigFile honours the country override, else guesses it from the file name', async () => {
     const { facade } = setup();
     const a = await facade.importConfigFile('home.conf', '[Interface]', 'se');

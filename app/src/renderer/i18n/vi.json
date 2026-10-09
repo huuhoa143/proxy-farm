@@ -101,7 +101,10 @@
         "countryInvalid": "Nhập mã quốc gia 2 chữ cái (ví dụ US, DE).",
         "import": "Nhập",
         "initials": "T",
-        "chooseAnother": "Chọn tệp khác"
+        "chooseAnother": "Chọn tệp khác",
+        "username": "Tên đăng nhập VPN",
+        "password": "Mật khẩu VPN",
+        "signInNote": "Tệp này đăng nhập bằng tên đăng nhập và mật khẩu. Dùng bộ mà nhà cung cấp cho để cài OpenVPN thủ công; chúng được lưu mã hóa cùng tệp."
       }
     },
     "portLimit": {
@@ -568,7 +571,7 @@
   "file": {
     "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
     "check": {
-      "needsCredentials": "File .ovpn này cần tên đăng nhập và mật khẩu, hiện chưa được hỗ trợ.",
+      "needsCredentials": "Tệp .ovpn này đăng nhập bằng tên đăng nhập và mật khẩu. Nhập chúng rồi bấm Nhập lại.",
       "unknownExtension": "Chỉ hỗ trợ file .ovpn và .conf.",
       "parseError": "Không đọc được file này."
     }

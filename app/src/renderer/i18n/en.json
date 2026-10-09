@@ -101,7 +101,10 @@
         "countryInvalid": "Enter a 2-letter country code (e.g. US, DE).",
         "import": "Import",
         "initials": "F",
-        "chooseAnother": "Choose another"
+        "chooseAnother": "Choose another",
+        "username": "VPN username",
+        "password": "VPN password",
+        "signInNote": "This file signs in with a username and password. Use the ones your provider gives for manual OpenVPN setup; they are stored encrypted with the file."
       }
     },
     "portLimit": {
@@ -568,7 +571,7 @@
   "file": {
     "unsupportedDirective": "This file uses a setting Proxy Farm doesn't support: {{label}}",
     "check": {
-      "needsCredentials": "This .ovpn file needs a username and password, which isn't supported yet.",
+      "needsCredentials": "This .ovpn file signs in with a username and password. Enter them, then import again.",
       "unknownExtension": "Only .ovpn and .conf files are supported.",
       "parseError": "This file couldn't be read."
     }

@@ -265,10 +265,18 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     return { ok: true, label: account.label, account };
   }
 
-  async function importConfigFile(name: string, content: string, country?: string): Promise<CheckResult & { account?: Account }> {
+  async function importConfigFile(
+    name: string,
+    content: string,
+    country?: string,
+    credentials?: { username: string; password: string },
+  ): Promise<CheckResult & { account?: Account }> {
     const provider = deps.providers.get('file');
     if (!provider) return { ok: false, reasonKey: 'file.check.parseError' };
-    const check = provider.check({ name, content });
+    // From the renderer: only two strings get through, nothing else the check might read.
+    const { username, password } = credentials ?? {};
+    const creds: Record<string, string> = typeof username === 'string' && typeof password === 'string' ? { username, password } : {};
+    const check = provider.check({ name, content, ...creds });
     if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
     const cc = (country?.trim() || guessCountry(name) || '??').toUpperCase().slice(0, 2);
     const city = path.basename(name).replace(/\.[^.]+$/, '');
