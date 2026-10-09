@@ -53,4 +53,35 @@ describe('check store', () => {
     store.prune([row('a#1', online(2))]);
     expect(store.getState().checks).toEqual({});
   });
+
+  it('re-reads each port when its turn comes: gone offline or removed counts as skipped', async () => {
+    const store = createCheckStore();
+    const rows = [row('a#1', online(1)), row('b#1', online(1)), row('c#1', online(1))];
+    store.prune(rows);
+    const probed: string[] = [];
+    // Before the run starts, b goes offline and c is removed.
+    store.prune([row('a#1', online(1)), row('b#1', { kind: 'stopped' })]);
+    await store.run({ testPort: async (key) => (probed.push(key), { ok: false }) }, rows);
+    expect(probed).toEqual(['a#1']);
+    expect(store.getState().summary).toEqual({ alive: 0, dead: 1, skipped: 2, deadKeys: ['a#1'] });
+  });
+
+  it('drops a result whose port reconnected during the probe, and does not count it', async () => {
+    const store = createCheckStore();
+    const rows = [row('a#1', online(1)), row('b#1', online(1))];
+    store.prune(rows);
+    const run = store.run(
+      {
+        testPort: async (key) => {
+          if (key === 'a#1') store.prune([row('a#1', online(2)), row('b#1', online(1))]);
+          return { ok: false };
+        },
+      },
+      rows,
+    );
+    await run;
+    expect(Object.keys(store.getState().checks)).toEqual(['b#1']);
+    expect(store.getState().summary).toEqual({ alive: 0, dead: 1, skipped: 1, deadKeys: ['b#1'] });
+    expect(store.getState().progress).toBeNull();
+  });
 });

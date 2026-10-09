@@ -184,7 +184,7 @@ export function ExportModal({ api, targetKeys, rows, checks = NO_CHECKS, onClose
             <Icon name="file" />
             {t('main.export.saveFile')}
           </button>
-          <button className="btn primary" onClick={() => void copyAll()}>
+          <button className="btn primary" onClick={() => void copyAll()} disabled={!ready} data-testid="export-copy">
             <Icon name={copied ? 'check' : 'copy'} />
             {copied ? t('common.copied') : t('main.export.copyAll')}
           </button>

@@ -70,6 +70,21 @@ describe('ExportModal', () => {
     expect(exportSpy).toHaveBeenLastCalledWith([TOKYO_1], 'csv', { [TOKYO_1]: { ok: true, latencyMs: 61 } });
   });
 
+  it('Copy all waits, like Save, until the text matches the current settings', async () => {
+    const { api, rows } = await renderExport();
+    expect(screen.getByTestId('export-copy')).toBeEnabled();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const real = api.exportPorts.bind(api);
+    api.exportPorts = async (...args: Parameters<typeof api.exportPorts>) => (await gate, real(...args));
+    fireEvent.click(screen.getByTestId('export-alive-only'));
+    expect(screen.getByTestId('export-copy')).toBeDisabled();
+    expect(screen.getByTestId('export-save')).toBeDisabled();
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByTestId('export-copy')).toBeEnabled());
+    expect((screen.getByTestId('export-text') as HTMLTextAreaElement).value.split('\n')).toHaveLength(rows.length);
+  });
+
   it('Save to file writes the shown text and reports where', async () => {
     const { api } = await renderExport();
     const save = vi.spyOn(api, 'saveExportFile');
