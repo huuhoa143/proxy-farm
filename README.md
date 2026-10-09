@@ -49,8 +49,10 @@ so each port has its own stable exit IP.
 - Per-port test and optional speed test; per-port logs in the Details drawer, with
   secrets redacted.
 - Multiple accounts per provider; ports are spread across them.
-- Bulk actions, and export in 4 formats: `host:port:user:pass`,
-  `socks5://user:pass@host:port`, `host:port`, `curl`.
+- Filter ports by status (alive, dead, connecting, stopped), provider, or a search over
+  location, IP and port number; "Check all" checks the ports shown.
+- Bulk actions, and export in 5 formats: `host:port:user:pass`,
+  `socks5://user:pass@host:port`, `host:port`, `curl`, CSV; copy or save to a file.
 - Optional rotate webhook (off by default): `POST /rotate/<port-key>` with a Bearer key.
 - Tray icon, launch at login (opt-in), keep-awake while ports are on, stop on sleep and
   restart on wake.
