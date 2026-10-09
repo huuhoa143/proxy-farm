@@ -19,6 +19,7 @@ export interface SaveExportDeps {
 export const MAX_EXPORT_BYTES = 5 * 1024 * 1024;
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const UTF8_BOM = '﻿';
 
 /** `proxy-farm-<yyyy-mm-dd-hhmm>.<txt|csv>`, in local time. */
 export function exportFileName(format: ExportFormat, date: Date): string {
@@ -42,7 +43,10 @@ export function createSaveExport(deps: SaveExportDeps): (text: unknown, format: 
     try {
       const { canceled, filePath } = await deps.showSaveDialog({ defaultPath, filters });
       if (canceled || !filePath) return { saved: false };
-      await deps.writeFile(filePath, text);
+      // A CSV file starts with a UTF-8 BOM: without one, Excel (Windows and macOS) reads it
+      // in the legacy code page and garbles accented location names ("Hà Nội"). Only the
+      // file gets it; the text shown and copied stays as is.
+      await deps.writeFile(filePath, csv && !text.startsWith(UTF8_BOM) ? UTF8_BOM + text : text);
       return { saved: true, path: filePath };
     } catch (err) {
       return { saved: false, error: err instanceof Error ? err.message : String(err) };

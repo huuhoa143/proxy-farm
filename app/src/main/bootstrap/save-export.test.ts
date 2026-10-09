@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createSaveExport, exportFileName, MAX_EXPORT_BYTES } from './save-export';
 
@@ -20,13 +21,23 @@ describe('save export to file', () => {
     const { save, showSaveDialog, writeFile } = setup();
     expect(await save('a,b', 'csv')).toEqual({ saved: true, path: '/tmp/out.csv' });
     expect(showSaveDialog).toHaveBeenCalledWith({
-      defaultPath: '/Users/me/Downloads/proxy-farm-2026-10-09-0705.csv',
+      // The platform's own separator (backslashes on Windows).
+      defaultPath: path.join('/Users/me/Downloads/', 'proxy-farm-2026-10-09-0705.csv'),
       filters: [{ name: 'CSV', extensions: ['csv'] }],
     });
-    expect(writeFile).toHaveBeenCalledWith('/tmp/out.csv', 'a,b');
+    expect(writeFile).toHaveBeenCalledWith('/tmp/out.csv', '﻿a,b');
 
     await save('x', 'hostPort');
     expect(showSaveDialog).toHaveBeenLastCalledWith(expect.objectContaining({ filters: [{ name: 'Text', extensions: ['txt'] }] }));
+    expect(writeFile).toHaveBeenLastCalledWith('/tmp/out.csv', 'x');
+  });
+
+  it('starts a CSV file with one UTF-8 BOM so Excel reads accented names (Hà Nội)', async () => {
+    const { save, writeFile } = setup();
+    await save('location\r\nHà Nội', 'csv');
+    expect(writeFile).toHaveBeenLastCalledWith('/tmp/out.csv', '﻿location\r\nHà Nội');
+    await save('﻿already', 'csv');
+    expect(writeFile).toHaveBeenLastCalledWith('/tmp/out.csv', '﻿already');
   });
 
   it('writes nothing when the dialog is cancelled', async () => {
