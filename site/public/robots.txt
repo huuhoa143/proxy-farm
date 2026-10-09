@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://proxyfarm.lingoreup.com/sitemap-index.xml
