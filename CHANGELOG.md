@@ -17,6 +17,33 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pins one server; the exit IP shown is the one observed through the tunnel, which for
   NordVPN is not the server's own address. The default port limit is 6. NordVPN ports
   get the same protection against repeated silent WireGuard handshakes as Surfshark.
+  NordVPN picks the exit IP per connection: it stays the same while a port is
+  connected and may change when the port reconnects, even to the same server. The
+  port's tooltips and the Change IP menu say so, and such a change is never treated
+  as an error.
+- Locations that NordVPN or Surfshark list as virtual (servers standing in another
+  country) are marked "virtual location" in the picker and on their group header.
+- The port details show the exit IP's geolocation next to the location's country.
+
+### Changed
+
+- An exit IP is tagged with the country of its location, not with what an IP database
+  says. When the geolocation differs ("(VN) IP geolocates to HK"), it is shown as a
+  hint with a tooltip: IP databases often disagree, and virtual locations are common.
+- Vietnamese UI: cities with an established Vietnamese name use it (Hà Nội,
+  TP. Hồ Chí Minh, Đà Nẵng, Bắc Kinh, Thượng Hải, …), for every provider, in names
+  and sort order; the picker's search finds both spellings. "khóa" is spelled one way
+  throughout.
+- Surfshark and NordVPN accounts are labelled with the end of their public key
+  ("Public key …qqbTmo"), not their private key. Existing labels are converted on
+  launch.
+- The port-limit tooltip points to the Providers screen, where the limit is set, not
+  to Settings.
+
+### Fixed
+
+- An engine that exited while its port waited to retry stayed in the pid registry until
+  the port stopped; it is now removed as soon as it exits.
 
 ## [0.1.1] — 2026-10-09
 

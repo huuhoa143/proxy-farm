@@ -225,7 +225,7 @@ Each unit is independently testable:
   - Discovery runs **in the app** (DNS only, no probing): resolve the hostname repeatedly (`dns.resolve4` against the system's DNS server, not the cached `dns.lookup`, plus DoH to `dns.google` through the host) when the location is first used and at most every 12 h, and accumulate into a persisted pool with `lastSeen`. An IP not seen for 7 days and not OK in that time is dropped.
   - A pinned server that dies (`/delay` 504, no handshake) is marked dead for 2 h and the port moves to another free pool server (§6.8). This replaces rev 2's "re-resolve the host on probe failure" (✅ pool IPs went stale within minutes in spike 1).
   - ⚠️ How long a pinned Surfshark server stays usable is unmeasured; the 24 h soak (§10) checks it.
-- Exit country = the geo-IP result, not the label (virtual locations).
+- Exit country = the **location's** country (what Surfshark sells), not the geo-IP result: clusters tagged `virtual` stand elsewhere, and IP databases disagree (§6.4). The cluster's `virtual` tag becomes `Target.virtualLocation`.
 - A wrong key produces no log line at all. It shows up only as `/delay` 504 (§6.4), exactly like an unreachable server. Retrying it is what got an account suspended (§6.4 "Provider safety").
 
 ### 5.4 Config file
@@ -243,12 +243,18 @@ Each unit is independently testable:
   - the **NordLynx private key** itself: no network call.
   - The exchange runs in the optional `Provider.resolveInput()`, which the facade awaits before the synchronous, offline `check()` (the ZoogVPN credential probe's place in `addAccount`).
   - ❌ Email/password sign-in (`POST /v1/users/tokens`) is behind a Cloudflare challenge (403) and is not offered.
-- **Server list**: the public, unauthenticated `GET https://api.nordvpn.com/v1/servers?limit=16384&filters[servers_technologies][identifier]=wireguard_udp&fields[...]`, from the user's own IP, cached 12 h beside Surfshark's (`cache/nordvpn-servers.json`), a stale cache kept when a refresh fails. `fields[...]` trims each server to `hostname`, `station`, `load`, `locations.country.{code,name,city.name}` and `technologies.{identifier,metadata}`.
+- **Server list**: the public, unauthenticated `GET https://api.nordvpn.com/v1/servers?limit=16384&filters[servers_technologies][identifier]=wireguard_udp&fields[...]`, from the user's own IP, cached 12 h beside Surfshark's (`cache/nordvpn-servers.json`), a stale cache kept when a refresh fails. `fields[...]` trims each server to `hostname`, `station`, `load`, `locations.country.{code,name,city.name}`, `technologies.{identifier,metadata}` and `specifications.{identifier,values}`.
+  - **Virtual locations** ✅ 2026-10-09: a server's `specifications` carry `{identifier:'virtual_location', title:'Virtual Location', values:[{value:'true'}]}` when Nord sells it as a country it does not stand in (`vn52`, `vn53`, `vn56`: all three VN servers in one `filters[country_id]=234` sample). A location whose servers all carry it gets `Target.virtualLocation`; the picker and the group header say "virtual location". Their exits geolocate elsewhere (ifconfig.co/MaxMind said BR for `187.40.60.7` and `187.40.224.118`, ipinfo HK). ⚠️ The `fields[servers.specifications.*]` projection was not checked live (one fetch, unprojected); a list without the flag only loses the label. Caches written before the flag carry none until their next refresh.
   - Cost of a full refresh ✅: **one request**, ~198 kB transferred (gzip; 5.3 MB decompressed, ~27 MB without the field projection), < 1 s; 6950 WireGuard servers in 150 countries, 225 cities. The cache file is ~0.9 MB. Paging would only add requests; per-country filters would need one request per country.
   - Each server's `wireguard_udp` technology carries `metadata[{name:'public_key'}]`: the server's WireGuard public key, shared per cluster (all Hanoi servers have one; one city, San Francisco, has two). The cache keeps it **per server**, so `bind()` reads it synchronously and deterministically, without a prior `targets()`.
 - **Locations**: one per (country, city), key `nordvpn:<CC>-<CITY-SLUG>` (city upper-cased, accents folded, non-alphanumerics → `-`: `nordvpn:VN-HO-CHI-MINH-CITY`). Servers = the station IPs, least loaded first (then by IP). E.g. VN: Hanoi `vn52`, `vn53`; Ho Chi Minh City `vn56`, `vn57`, `vn60`, `vn61`. Big cities have hundreds (London 647).
 - **Endpoint**: `wireguard`, `address: ['10.5.0.2/32']` (the same for every key), the account's private key, `mtu: 1280`, peer = the pinned server's IP, port 51820, **that server's** public key, `allowed_ips: ['0.0.0.0/0']`, keepalive 25.
-- **Exit IP ≠ server IP** ✅: `vn52` at `187.40.60.1` exited from `.22` in one session and `.15` in a later one; `vn53` → `.40`, `vn56` → `.66`; Ho Chi Minh City `187.40.224.111` → `.130`. Within a session a reconnect kept the exit; it is different per server. So ports pin servers as usual, the UI shows the **observed** exit IP, and the duplicate-exit check (§6.8) compares observed exits. Nothing assumes exit = server IP (or + 1) for NordVPN. ⚠️ How long a server's exit stays the same is unmeasured.
+- **Exit IP ≠ server IP, and it belongs to the session** ✅ (soak, 2026-10-09): `vn53` at `187.40.60.3` → `.40`, `vn56` → `.66`; Ho Chi Minh City `187.40.224.111` → `.130`.
+  - **Constant while connected**: a persistent `vn53` tunnel kept `187.40.60.28` for 35+ min.
+  - **A fresh connection to the same server may get another exit**: `vn52` (`187.40.60.1`) gave `.22` around 09:25, `.15` at 09:55–09:57 (three reconnects within a minute, all `.15`), then `.7` at 10:07. So "same exit on reconnect" holds only over short spans.
+  - Hence `EXIT_IP_MODELS.nordvpn = 'session'` (`shared/contracts.ts`; HMA/ZoogVPN `'server'`, Surfshark `'server+1'`, an imported file `'session'`, its provider unknown). Ports still pin servers; the UI shows the **observed** exit; the duplicate-exit check (§6.8) compares the **live** exits of online ports. A session exit is never remembered as the server's identity (a stale one would make another server look taken), and a different exit after a reconnect is not an error. The row's exit-IP and server tooltips and the Change IP menu say the exit is fixed while connected but may change when the port reconnects.
+  - Exit country: tagged with the location's country (§6.4), not the geo-IP result.
+- **Handshakes per server** (2026-10-09): some servers never complete a WireGuard handshake while others in the same city work with the same key: `sg639` `152.233.9.183` (load 3) and `jp720` `154.47.23.210` (load 0) failed; HK, DE, US and VN servers worked. The dead-server failover (§6.8: marked dead for 2 h, the port moves to the next free server) handles it. No `load == 0` filter: one load-0 failure is not evidence that load 0 means unusable.
 - **Concurrency**: 3 tunnels with one key to three different servers stayed up together ✅. Default port limit **6** until a live ramp says more.
 - **Provider safety**: NordLynx is WireGuard, so a wrong or revoked key is silent like Surfshark's. NordVPN accounts get the per-account attempt cap and the unproven-key lockout (§6.4), with NordVPN-specific guidance (subscription active, re-add with a fresh token).
 
@@ -321,9 +327,10 @@ Each unit is independently testable:
 - **Exit IP + country** after each (re)start and every 30 min.
   - Use https IP-echo services with fallback: `api.ipify.org` → `ifconfig.co/json` → `ipinfo.io/json`.
   - Cache geo per IP.
+  - The geo result is a **hint**, not the exit's country ✅ 2026-10-09: IP databases disagree (NordVPN Vietnam `187.40.60.7`: ifconfig.co BR, ipinfo HK; HMA Vienna `95.177.87.72`: ifconfig.co GB, ipinfo AT) and providers sell virtual locations. The row tags the exit with the **location's** country (what the provider sells); when the geo result differs it adds a muted "IP geolocates to HK" with a tooltip explaining both causes. The Details drawer keeps the raw geo result beside the exit IP and the location's country. A file import without a country falls back to the geo result.
 
 **Back-off**: 30 s, 1, 2, 4 … capped at 30 min, plus random jitter.
-- A port's exit IP is sticky: a drop of an online port retries the **same** server on the back-off and marks nothing.
+- A port's server is sticky: a drop of an online port retries the **same** server on the back-off and marks nothing. For `'server'`/`'server+1'` providers that keeps its exit IP; a `'session'` provider (NordVPN, §5.5) may hand the reconnected tunnel another exit.
 - A server is judged dead (remembered for 2 h, fail over to another server of the same location) only when it fails a **fresh reconnect**: at once for a server the port never got online on, after 2 failed reconnects in a row for the server it was online on.
 - Correlated drops are not dead servers: when another port of the same provider failed within the last 15 s, that provider has an incident; when ports of two providers did, the host has one. During an incident (2 min, extended by every further failure) nothing is marked and no port moves; every port retries its own server. (2026-10-08: every few minutes all HMA tunnels stalled together for 30–60 s while direct traffic was fine.)
 - Starts are queued at ≤ 3 concurrent, 2–5 s apart (also on resume and app start).
@@ -565,9 +572,14 @@ proxy-farm/
 | Nord `POST /v1/users/tokens` (email/password) | ❌ Cloudflare 403 |
 | Nord server list, WireGuard filter + `fields[...]`, one request | ✅ 6950 servers, 150 countries, 225 cities; ~198 kB gzip (5.3 MB raw; ~27 MB without `fields`); < 1 s |
 | NordLynx endpoint (`10.5.0.2/32`, server's own pubKey, mtu 1280) | ✅ connects, `/delay` 130–290 ms |
-| NordLynx exit IP vs server IP | ✅ different: vn52 `.1` → `.22` (later session `.15`), vn53 → `.40`, vn56 → `.66`, HCMC `187.40.224.111` → `.130`; same exit on reconnect within a session; distinct per server |
+| NordLynx exit IP vs server IP | ✅ different: vn52 `.1` → `.22` (later session `.15`), vn53 → `.40`, vn56 → `.66`, HCMC `187.40.224.111` → `.130`; distinct per server |
 | NordLynx, 3 concurrent tunnels, one key, different servers | ✅ all stayed up |
 | App provider end to end (worktree `targets()` → `bind()` → `renderConfig` + invariants → sing-box stdin), 2 VN tunnels | ✅ Hanoi `187.40.60.1` 265 ms exit `187.40.60.15`; Ho Chi Minh City `187.40.224.111` 271 ms exit `187.40.224.130` |
+| NordLynx exit soak: one tunnel kept up | ✅ vn53 kept `187.40.60.28` for 35+ min |
+| NordLynx exit soak: fresh connections to one server | ⚠️ vn52 → `.22` (~09:25), `.15` (09:55–09:57, 3 reconnects within a minute), `.7` (10:07): the exit is per session (§5.5) |
+| Nord `virtual_location` flag (`GET /v1/servers?limit=3&filters[country_id]=234`, one request) | ✅ `specifications[{identifier:'virtual_location', values:[{value:'true'}]}]` on vn52, vn53, vn56 |
+| Exit geolocation by service | ⚠️ disagree: NordVPN VN `187.40.60.7`, `187.40.224.118` → ifconfig.co BR, ipinfo HK; HMA Vienna `95.177.87.72` → ifconfig.co GB, ipinfo AT |
+| NordLynx handshake per server, same key | ⚠️ sg639 `152.233.9.183` (load 3) and jp720 `154.47.23.210` (load 0) never completed one; HK, DE, US, VN servers did |
 
 ## 12. Risks & open items
 
@@ -578,7 +590,9 @@ proxy-farm/
 | Many concurrent tunnels per account may trip provider abuse detection | Conservative default limits (§6.8), user-adjustable; soak (§10) before raising them |
 | **Failed WireGuard handshakes get an account suspended** ✅ happened 2026-10-08: a Surfshark account's VPN access was suspended after mass failed WireGuard handshakes; the official app then failed on all protocols with "The VPN credentials are invalid" (cf. gluetun #2595) | §6.4 "Provider safety": per-port back-off persists across restarts, engines are stopped during back-off, ≤ 6 attempts/min per account, an unproven WireGuard key is stopped after 3 silent attempts until the user acts. Live experiments are rate-limited (CONTRIBUTING) |
 | Pinned Surfshark servers may rotate out of the pool ⚠️ | Dead-server failover to another pool IP; pool refreshed by DNS sampling; soak measures lifetime |
-| NordVPN exit IP is not the server IP and changed between sessions on one server ⚠️ (§5.5) | The UI and the duplicate-exit check use the observed exit; a soak should measure how often a pinned server's exit changes |
+| NordVPN exit IP is per session ✅ (§5.5): fixed while a tunnel is up, may change on any reconnect, even to the same server | `EXIT_IP_MODELS.nordvpn = 'session'`: the UI says so, the duplicate-exit check compares live exits only, a change after a reconnect is never an error. Users who need one IP for hours must keep the port connected; the soak is still running and may refine how often it changes |
+| Some NordVPN servers never complete a WireGuard handshake while their city's others do ⚠️ (§5.5: sg639, jp720) | Dead-server failover (§6.8) moves the port on. Not filtered by load: one load-0 failure is no evidence. Each silent attempt still counts toward the unproven-key lockout (3 in a row, §6.4): a new key that met three such servers in a row before its first handshake would be stopped until the user starts it again. Not seen yet; one bad server is followed by a good one |
+| Exit-IP geolocation disagrees between services and with virtual locations ✅ | Rows are tagged with the location's country; the geo result is a hint (§6.4) |
 | NordVPN concurrency per key ⚠️ | Default limit 6 (3 verified); live ramp before raising |
 | ZoogVPN plan limits per server ⚠️ | Per-(account, server) refusal memory. Connection count: ✅ ≥ 8 on one account, default 5 |
 | HMA WireGuard servers exist (CT) | Not used: registering a device key is unexplored. Out of scope for rev 3 |
