@@ -245,7 +245,11 @@
       "export": "Xuất",
       "clear": "Bỏ chọn",
       "autoRotate": "Tự xoay…",
-      "rotateSummary": "{{changed}} đã đổi IP, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ trống"
+      "rotateSummary": "{{changed}} đã đổi IP, {{moved}} chuyển sang thành phố khác, {{unavailable}} không còn máy chủ trống",
+      "check": "Kiểm tra",
+      "hiddenCount_one": "({{count}} đang ẩn)",
+      "hiddenCount_other": "({{count}} đang ẩn)",
+      "hiddenHint": "Một số cổng đã chọn đang bị bộ lọc ẩn; thao tác hàng loạt vẫn áp dụng cho chúng"
     },
     "export": {
       "title": "Xuất danh sách cổng",
@@ -253,13 +257,20 @@
         "hostPortUserPass": "host:port:user:pass",
         "socks5Url": "socks5://…",
         "hostPort": "host:port",
-        "curl": "lệnh curl"
+        "curl": "lệnh curl",
+        "csv": "CSV"
       },
       "copyAll": "Sao chép tất cả",
       "copyFailed": "Không sao chép được vào bộ nhớ tạm — hãy bôi đen đoạn trên và tự sao chép.",
       "close": "Đóng",
       "count_one": "{{count}} cổng",
-      "count_other": "{{count}} cổng"
+      "count_other": "{{count}} cổng",
+      "aliveOnly": "Chỉ cổng sống",
+      "leftOut_one": "Đã bỏ {{count}} cổng không sống",
+      "leftOut_other": "Đã bỏ {{count}} cổng không sống",
+      "saveFile": "Lưu ra file…",
+      "saved": "Đã lưu vào {{path}}",
+      "saveFailed": "Không lưu được file: {{error}}"
     },
     "rotateResult": {
       "changedNote": "IP thoát đã đổi: {{from}} → {{to}}",
@@ -271,7 +282,6 @@
     },
     "emptyTitle": "Chưa có cổng nào",
     "addLocations": "Thêm vị trí",
-    "exportAll": "Xuất tất cả",
     "credentials": "Đăng nhập proxy",
     "stats": {
       "label": "Tóm tắt cổng",
@@ -379,6 +389,37 @@
       "limit-reached_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — {{provider}} đã đạt giới hạn cổng.",
       "generic_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}}.",
       "generic_other": "Đã thêm {{added}}/{{count}} cổng ở {{location}}."
+    },
+    "exportButton": "Xuất",
+    "exportButtonHint": "Xuất các cổng đã chọn, hoặc mọi cổng đang hiện theo bộ lọc",
+    "filter": {
+      "label": "Bộ lọc cổng",
+      "statusLabel": "Trạng thái",
+      "status": {
+        "all": "Tất cả",
+        "alive": "Sống",
+        "dead": "Chết",
+        "connecting": "Đang kết nối",
+        "stopped": "Đã dừng"
+      },
+      "provider": "Nhà cung cấp",
+      "allProviders": "Mọi nhà cung cấp",
+      "searchPlaceholder": "Tìm vị trí, IP hoặc cổng",
+      "emptyTitle": "Không có cổng nào khớp bộ lọc",
+      "emptyHint": "Thử trạng thái, nhà cung cấp hoặc từ khóa khác.",
+      "clear": "Xóa bộ lọc"
+    },
+    "check": {
+      "all": "Kiểm tra tất cả",
+      "allHint": "Kiểm tra mọi cổng đang chạy đang hiện theo bộ lọc",
+      "progress": "Đang kiểm tra {{done}}/{{total}}",
+      "stop": "Dừng",
+      "summary": "{{alive}} sống · {{dead}} chết · {{skipped}} bỏ qua",
+      "selectDead": "Chọn các cổng chết",
+      "dismiss": "Đóng",
+      "passed": "Kiểm tra đạt",
+      "failed": "Kiểm tra lỗi",
+      "at": "Kiểm tra lúc {{time}}"
     }
   },
   "vpnNote": {

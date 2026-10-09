@@ -245,7 +245,11 @@
       "export": "Export",
       "clear": "Clear selection",
       "autoRotate": "Auto-rotate…",
-      "rotateSummary": "{{changed}} changed IP, {{moved}} moved to another city, {{unavailable}} had no free server"
+      "rotateSummary": "{{changed}} changed IP, {{moved}} moved to another city, {{unavailable}} had no free server",
+      "check": "Check",
+      "hiddenCount_one": "({{count}} hidden)",
+      "hiddenCount_other": "({{count}} hidden)",
+      "hiddenHint": "Some selected ports are hidden by the filter; bulk actions still apply to them"
     },
     "export": {
       "title": "Export ports",
@@ -253,13 +257,20 @@
         "hostPortUserPass": "host:port:user:pass",
         "socks5Url": "socks5://…",
         "hostPort": "host:port",
-        "curl": "curl command"
+        "curl": "curl command",
+        "csv": "CSV"
       },
       "copyAll": "Copy all",
       "copyFailed": "Couldn't copy to the clipboard — select the text above and copy it manually.",
       "close": "Close",
       "count_one": "{{count}} port",
-      "count_other": "{{count}} ports"
+      "count_other": "{{count}} ports",
+      "aliveOnly": "Alive ports only",
+      "leftOut_one": "{{count}} port that is not alive left out",
+      "leftOut_other": "{{count}} ports that are not alive left out",
+      "saveFile": "Save to file…",
+      "saved": "Saved to {{path}}",
+      "saveFailed": "Could not save the file: {{error}}"
     },
     "rotateResult": {
       "changedNote": "Exit IP changed: {{from}} → {{to}}",
@@ -271,7 +282,6 @@
     },
     "emptyTitle": "No ports yet",
     "addLocations": "Add locations",
-    "exportAll": "Export all",
     "credentials": "Proxy login",
     "stats": {
       "label": "Port summary",
@@ -379,6 +389,37 @@
       "limit-reached_other": "Added {{added}} of {{count}} ports in {{location}} — {{provider}} reached its port limit.",
       "generic_one": "Added {{added}} of {{count}} port in {{location}}.",
       "generic_other": "Added {{added}} of {{count}} ports in {{location}}."
+    },
+    "exportButton": "Export",
+    "exportButtonHint": "Export the selected ports, or every port the filter shows",
+    "filter": {
+      "label": "Port filters",
+      "statusLabel": "Status",
+      "status": {
+        "all": "All",
+        "alive": "Alive",
+        "dead": "Dead",
+        "connecting": "Connecting",
+        "stopped": "Stopped"
+      },
+      "provider": "Provider",
+      "allProviders": "All providers",
+      "searchPlaceholder": "Search location, IP or port",
+      "emptyTitle": "No ports match the filter",
+      "emptyHint": "Try another status, provider or search.",
+      "clear": "Clear filters"
+    },
+    "check": {
+      "all": "Check all",
+      "allHint": "Check every online port the filter shows",
+      "progress": "Checking {{done}}/{{total}}",
+      "stop": "Stop",
+      "summary": "{{alive}} alive · {{dead}} dead · {{skipped}} skipped",
+      "selectDead": "Select dead ports",
+      "dismiss": "Dismiss",
+      "passed": "Check passed",
+      "failed": "Check failed",
+      "at": "Checked at {{time}}"
     }
   },
   "vpnNote": {

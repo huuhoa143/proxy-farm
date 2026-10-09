@@ -15,6 +15,19 @@ import { providerName } from '../ui/providerName';
 import { locationName as nameOf } from '../ui/locationName';
 import { cityName } from '../ui/countryName';
 import { remainingByProvider } from '../portGroups';
+import { FilterBar } from './FilterBar';
+import {
+  bucketCounts,
+  filterByProviderAndQuery,
+  filterPorts,
+  loadFilter,
+  NO_FILTER,
+  saveFilter,
+  stateSince,
+  type CheckRecord,
+  type PortFilter,
+} from '../portFilter';
+import { runQueue, type QueueRun } from '../runQueue';
 
 export interface MainScreenProps {
   api: ProxyFarmApi;
@@ -25,6 +38,16 @@ const SAME_CITY_NOTE = 'main.rotateResult.sameCityNote';
 const COPIED_MS = 1500;
 /** Coalesces the target re-reads a burst of port changes triggers into one. */
 const TARGETS_REFRESH_MS = 250;
+/** Check all: probes in flight at once. Each is one request through the port's own
+ * tunnel, so a few in parallel keep a long list quick without a burst on the engines. */
+const CHECK_CONCURRENCY = 4;
+
+interface CheckSummary {
+  alive: number;
+  dead: number;
+  skipped: number;
+  deadKeys: string[];
+}
 
 function removeKey(record: Record<string, string>, key: string): Record<string, string> {
   const { [key]: _removed, ...rest } = record;
@@ -49,7 +72,18 @@ export function MainScreen({ api }: MainScreenProps) {
   const [limits, setLimits] = useState<Partial<Record<ProviderId, number>>>({});
   const [rotating, setRotating] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
+  const [filter, setFilterState] = useState<PortFilter>(loadFilter);
+  // Check results live here only (never persisted); see `currentCheck` for when one expires.
+  const [checks, setChecks] = useState<Record<string, CheckRecord>>({});
+  const [checkProgress, setCheckProgress] = useState<{ done: number; total: number } | null>(null);
+  const [checkSummary, setCheckSummary] = useState<CheckSummary | null>(null);
+  const checkRun = useRef<QueueRun | null>(null);
   const schedule = useKeyedTimeouts();
+
+  const setFilter = useCallback((next: PortFilter) => {
+    setFilterState(next);
+    saveFilter(next);
+  }, []);
 
   // Only the newest `listTargets` answer is applied: one read while a change is still
   // in flight must not land after (and overwrite) the read that follows it.
@@ -110,6 +144,28 @@ export function MainScreen({ api }: MainScreenProps) {
   }, [ports]);
   const remaining = useMemo(() => remainingByProvider(ports, limits), [ports, limits]);
 
+  const visible = useMemo(() => filterPorts(ports, filter, checks), [ports, filter, checks]);
+  const counts = useMemo(() => bucketCounts(filterByProviderAndQuery(ports, filter), checks), [ports, filter, checks]);
+  const providersWithPorts = useMemo(() => Array.from(new Set(ports.map((p) => p.providerId))), [ports]);
+  const visibleKeys = useMemo(() => new Set(visible.map((r) => r.key)), [visible]);
+  const hiddenSelected = ports.filter((p) => selected.has(p.key) && !visibleKeys.has(p.key)).length;
+
+  // A check result only describes the connection it was taken on: drop it once the
+  // port reconnects, changes IP or stops (its `since` changes or goes away).
+  useEffect(() => {
+    setChecks((prev) => {
+      const byKey = new Map(ports.map((p) => [p.key, p]));
+      const kept = Object.entries(prev).filter(([key, check]) => {
+        const row = byKey.get(key);
+        return row !== undefined && stateSince(row.state) === check.since;
+      });
+      return kept.length === Object.keys(prev).length ? prev : Object.fromEntries(kept);
+    });
+  }, [ports]);
+
+  // Leaving the screen mid-run: queued checks are dropped, in-flight ones are ignored.
+  useEffect(() => () => checkRun.current?.cancel(), []);
+
   function showNotice(text: string) {
     setNotice(text);
     schedule('notice', () => setNotice(null), NOTE_MS);
@@ -135,8 +191,65 @@ export function MainScreen({ api }: MainScreenProps) {
     });
   }
 
+  /** The header checkbox: selects or clears the VISIBLE ports only; selections the
+   * filter hides are kept (the bulk bar says how many). */
   function toggleSelectAll() {
-    setSelected((prev) => (prev.size === ports.length ? new Set() : new Set(ports.map((p) => p.key))));
+    const keys = visible.map((p) => p.key);
+    setSelected((prev) => {
+      const all = keys.every((k) => prev.has(k));
+      const next = new Set(prev);
+      for (const key of keys) {
+        if (all) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Check (spec §4.1 "Check all"): one exit probe per online port, CHECK_CONCURRENCY at
+   * a time, no speed test. Other ports are counted as skipped, as are the ones Stop
+   * dropped before they ran. One run at a time.
+   */
+  async function runChecks(rows: readonly PortRow[]) {
+    if (checkRun.current) return;
+    const online = rows.filter((r) => r.state.kind === 'online');
+    const outcome = new Map<string, boolean>();
+    setCheckSummary(null);
+    setCheckProgress({ done: 0, total: online.length });
+    const run = runQueue(online, CHECK_CONCURRENCY, async (row) => {
+      const since = stateSince(row.state)!;
+      let result: { ok: boolean; latencyMs?: number };
+      try {
+        result = await api.testPort(row.key, false);
+      } catch {
+        result = { ok: false };
+      }
+      outcome.set(row.key, result.ok);
+      const check: CheckRecord = { ok: result.ok, at: Date.now(), since };
+      if (result.ok && result.latencyMs !== undefined) check.latencyMs = result.latencyMs;
+      setChecks((prev) => ({ ...prev, [row.key]: check }));
+      setCheckProgress((p) => p && { ...p, done: p.done + 1 });
+    });
+    checkRun.current = run;
+    await run.done;
+    if (checkRun.current !== run) return;
+    checkRun.current = null;
+    setCheckProgress(null);
+    const deadKeys = online.filter((r) => outcome.get(r.key) === false).map((r) => r.key);
+    setCheckSummary({ alive: outcome.size - deadKeys.length, dead: deadKeys.length, skipped: rows.length - outcome.size, deadKeys });
+  }
+
+  function stopChecks() {
+    checkRun.current?.cancel();
+  }
+
+  /** "Select dead ports" on the summary: show the Dead bucket and select what the run found dead. */
+  function selectDead(keys: string[]) {
+    setFilter({ ...filter, status: 'dead' });
+    const live = new Set(ports.map((p) => p.key));
+    setSelected(new Set(keys.filter((k) => live.has(k))));
+    setCheckSummary(null);
   }
 
   async function handleStart(keys: string[]) {
@@ -309,6 +422,7 @@ export function MainScreen({ api }: MainScreenProps) {
   const closePicker = useCallback(() => setPicking(false), []);
   const closeExport = useCallback(() => setExporting(null), []);
   const selectedKeys = Array.from(selected);
+  const checking = checkProgress !== null;
 
   return (
     <div className="screen" data-testid="main-screen">
@@ -318,10 +432,28 @@ export function MainScreen({ api }: MainScreenProps) {
         <CredentialsChip api={api} />
         <span className="sp" />
         {ports.length > 0 && (
-          <button className="btn ghost" onClick={() => setExporting(ports.map((p) => p.key))}>
-            <Icon name="export" />
-            {t('main.exportAll')}
-          </button>
+          <>
+            <button
+              className="btn ghost"
+              onClick={() => void runChecks(visible)}
+              disabled={checking || visible.length === 0}
+              title={t('main.check.allHint') as string}
+              data-testid="check-all"
+            >
+              <Icon name="activity" />
+              {t('main.check.all')}
+            </button>
+            <button
+              className="btn ghost"
+              onClick={() => setExporting(selected.size ? selectedKeys : visible.map((p) => p.key))}
+              disabled={selected.size === 0 && visible.length === 0}
+              title={t('main.exportButtonHint') as string}
+              data-testid="export-button"
+            >
+              <Icon name="export" />
+              {t('main.exportButton')}
+            </button>
+          </>
         )}
         <button className="btn primary" onClick={() => setPicking(true)}>
           <Icon name="plus" />
@@ -330,6 +462,9 @@ export function MainScreen({ api }: MainScreenProps) {
       </div>
       <BulkActionBar
         count={selected.size}
+        hiddenCount={hiddenSelected}
+        checking={checking}
+        onCheck={() => void runChecks(ports.filter((p) => selected.has(p.key)))}
         onStart={() => void handleStart(selectedKeys).then(() => setSelected(new Set()))}
         onStop={() => void handleStop(selectedKeys)}
         onRotate={() => void handleBulkRotate(selectedKeys)}
@@ -342,6 +477,40 @@ export function MainScreen({ api }: MainScreenProps) {
           <Icon name="rotate" />
           {bulkRotateSummary}
         </div>
+      )}
+      {checkProgress && (
+        <div className="banner check-progress" data-testid="check-progress" role="status">
+          <Icon name="activity" />
+          <span>{t('main.check.progress', { done: checkProgress.done, total: checkProgress.total })}</span>
+          <progress max={Math.max(1, checkProgress.total)} value={checkProgress.done} aria-hidden="true" />
+          <span className="sp" />
+          <button className="btn ghost sm" onClick={stopChecks} data-testid="check-stop">
+            <Icon name="x" />
+            {t('main.check.stop')}
+          </button>
+        </div>
+      )}
+      {checkSummary && (
+        <div className="banner check-summary" data-testid="check-summary" role="status">
+          <Icon name="check" />
+          <span>{t('main.check.summary', { alive: checkSummary.alive, dead: checkSummary.dead, skipped: checkSummary.skipped })}</span>
+          <span className="sp" />
+          {checkSummary.dead > 0 && (
+            <button className="btn ghost sm" onClick={() => selectDead(checkSummary.deadKeys)} data-testid="check-select-dead">
+              {t('main.check.selectDead')}
+            </button>
+          )}
+          <button
+            className="iconbtn"
+            onClick={() => setCheckSummary(null)}
+            aria-label={t('main.check.dismiss') as string}
+          >
+            <Icon name="x" />
+          </button>
+        </div>
+      )}
+      {ports.length > 0 && (
+        <FilterBar filter={filter} onChange={setFilter} counts={counts} providers={providersWithPorts} />
       )}
       {ports.length === 0 ? (
         loaded && (
@@ -357,9 +526,22 @@ export function MainScreen({ api }: MainScreenProps) {
             </button>
           </div>
         )
+      ) : visible.length === 0 ? (
+        <div className="empty filter-empty" data-testid="filter-empty">
+          <div className="glyph">
+            <Icon name="search" />
+          </div>
+          <h2>{t('main.filter.emptyTitle')}</h2>
+          <p>{t('main.filter.emptyHint')}</p>
+          <button className="btn primary" onClick={() => setFilter(NO_FILTER)} data-testid="filter-clear">
+            {t('main.filter.clear')}
+          </button>
+        </div>
       ) : (
         <PortTable
-          rows={ports}
+          rows={visible}
+          allRows={ports}
+          checks={checks}
           targets={targets}
           limits={limits}
           selectedKeys={selected}
@@ -422,7 +604,7 @@ export function MainScreen({ api }: MainScreenProps) {
           }}
         />
       )}
-      {exporting && <ExportModal api={api} targetKeys={exporting} onClose={closeExport} />}
+      {exporting && <ExportModal api={api} targetKeys={exporting} rows={ports} checks={checks} onClose={closeExport} />}
     </div>
   );
 }
