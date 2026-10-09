@@ -344,6 +344,75 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
   );
 }
 
+export interface NordVpnCardProps {
+  api: ProxyFarmApi;
+  onAdded: () => void;
+  accountCount?: number;
+}
+
+/** spec §5.5: one field takes a Nord Account access token (exchanged once in main, never
+ * stored) or the NordLynx private key itself. Masked: both are secrets. */
+export function NordVpnCard({ api, onAdded, accountCount }: NordVpnCardProps) {
+  const { t } = useTranslation();
+  const [credential, setCredential] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function add() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await api.addAccount('nordvpn', { credential: credential.trim() });
+      setMessage(resultMessage(t, result));
+      if (result.ok) {
+        setCredential('');
+        onAdded();
+      }
+    } catch (err) {
+      setMessage(errorMessage(t, err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <CardShell providerId="nordvpn" accountCount={accountCount}>
+      <form
+        className="pc-body"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!busy && credential.trim()) void add();
+        }}
+      >
+        <div className="field">
+          <label htmlFor="nordvpn-credential">{t('onboarding.providers.nordvpn.credentialLabel')}</label>
+          <input
+            id="nordvpn-credential"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t('onboarding.providers.nordvpn.credentialPlaceholder') as string}
+            value={credential}
+            onChange={(e) => setCredential(e.target.value)}
+          />
+          <p className="hint">
+            {t('onboarding.providers.nordvpn.hintLead')}{' '}
+            <span className="path">{t('onboarding.providers.nordvpn.hintPath')}</span>
+          </p>
+          <p className="hint">{t('onboarding.providers.nordvpn.hintStored')}</p>
+        </div>
+        <div className="pc-actions">
+          <button className="btn primary" type="submit" disabled={busy || !credential.trim()}>
+            <Icon name="key" />
+            {busy ? t('onboarding.providers.nordvpn.adding') : t('onboarding.providers.nordvpn.add')}
+          </button>
+        </div>
+      </form>
+      <ResultLine message={message} testId="nordvpn-message" />
+    </CardShell>
+  );
+}
+
 export interface FileCardProps {
   api: ProxyFarmApi;
   onAdded: () => void;

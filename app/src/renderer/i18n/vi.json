@@ -79,6 +79,18 @@
         "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
         "importConf": "Nhập tệp .conf…"
       },
+      "nordvpn": {
+        "name": "NordVPN",
+        "description": "Dán mã truy cập (access token) từ Nord Account của bạn, hoặc khóa riêng NordLynx.",
+        "credentialLabel": "Mã truy cập hoặc khóa riêng NordLynx",
+        "credentialPlaceholder": "Mã 64 ký tự, hoặc khóa 44 ký tự",
+        "hintLead": "Lấy mã tại",
+        "hintPath": "Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token",
+        "hintStored": "Mã truy cập chỉ được dùng một lần để lấy khóa NordLynx và không được giữ lại; chỉ khóa được lưu.",
+        "add": "Thêm",
+        "adding": "Đang thêm…",
+        "initials": "N"
+      },
       "file": {
         "name": "Tệp cấu hình",
         "description": "Nhập tệp .ovpn hoặc .conf (WireGuard).",
@@ -348,6 +360,7 @@
         "label": "Khóa không được phản hồi",
         "guidance": {
           "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark, địa chỉ khớp với tệp cấu hình của chính khóa đó, và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
+          "nordvpn": "NordVPN không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra tài khoản cấp khóa này vẫn còn gói NordVPN đang hoạt động, hoặc thêm lại tài khoản bằng mã truy cập mới. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
           "generic": "Máy chủ không phản hồi khóa WireGuard này sau 3 lần thử. Hãy kiểm tra khóa và địa chỉ trong tệp vẫn còn hợp lệ với nhà cung cấp. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần."
         }
       },
@@ -530,6 +543,14 @@
       "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
     }
   },
+  "nordvpn": {
+    "check": {
+      "tokenRejected": "Nord từ chối mã truy cập này. Có thể mã bị gõ sai, đã hết hạn hoặc bị thu hồi — hãy tạo mã mới trong Nord Account rồi thử lại.",
+      "networkError": "Không kết nối được tới Nord để kiểm tra mã truy cập. Hãy kiểm tra kết nối mạng rồi thử lại.",
+      "noKey": "Nord chấp nhận mã nhưng không trả về khóa NordLynx. Hãy kiểm tra Nord Account này còn gói NordVPN đang hoạt động.",
+      "invalidInput": "Đây không phải mã truy cập NordVPN (64 ký tự, gồm 0–9 và a–f) hay khóa riêng NordLynx (44 ký tự, kết thúc bằng =)."
+    }
+  },
   "file": {
     "unsupportedDirective": "File này dùng thiết lập Proxy Farm chưa hỗ trợ: {{label}}",
     "check": {
@@ -569,7 +590,7 @@
     "title": "Quyền riêng tư",
     "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
     "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khoá và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
-    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
     "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
     "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
     "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
@@ -582,7 +603,7 @@
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
     "suspension": "Nhà cung cấp có thể tạm khoá hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
     "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
     "full": "Bản miễn trừ trách nhiệm đầy đủ"
   },
   "firstRun": {
@@ -591,7 +612,7 @@
     "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
     "suspension": "Nhà cung cấp có thể khoá tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
     "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
-    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark, ZoogVPN hay NordVPN / Nord Security.",
     "acknowledge": "Tôi đã hiểu",
     "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
   },

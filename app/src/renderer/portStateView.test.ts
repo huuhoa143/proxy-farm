@@ -102,6 +102,7 @@ describe('describePortState', () => {
     expect(ss).toMatchObject({ tone: 'bad', label: 'Key not answered', terminal: true, countdownSeconds: undefined });
     expect(ss.guidance).toMatch(/^Surfshark didn't answer this key on 3 servers\..*Manual setup → WireGuard.*suspended/);
     expect(describePortState(state, 'file', t).guidance).toMatch(/WireGuard key/);
+    expect(describePortState(state, 'nordvpn', t).guidance).toMatch(/^NordVPN didn't answer this key on 3 servers\..*access token.*suspended/);
   });
 
   it('a rate-limited retry explains the wait', () => {
