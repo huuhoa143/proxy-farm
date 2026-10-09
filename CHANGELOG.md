@@ -41,14 +41,29 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   engine, health checks, Change IP and the packaged e2e suite.
 - HMA on Windows: **Enable HMA support** (one administrator prompt) sets up a SYSTEM
   scheduled task that keeps a copy of HMA's device credentials only the enabling user and
-  administrators can read. No service stays running; the task removes itself once Proxy
-  Farm is uninstalled.
+  administrators can read. No service stays running; the task removes itself a day after
+  Proxy Farm is uninstalled.
 - "Other VPN on this computer" detection on Windows.
 - `Proxy Farm --quit` stops the engines of a running instance and exits it (Windows has
   no SIGTERM for GUI apps).
+- Main screen filters: status chips with counts (All · Alive · Dead · Connecting ·
+  Stopped), a provider filter and a search over location names (Vietnamese or English,
+  accents optional), exit IP, server IP and local port. Filters combine and are
+  remembered. Group headers count only the ports shown.
+- "Check all" checks every online port the filter shows (four at a time, no speed
+  test), with progress and a Stop button; the bulk bar has "Check" for the selected
+  ports. Each row shows its latest result (✓ latency / ✗, and when) until the port
+  reconnects; the summary ("35 alive · 5 dead · 3 skipped") can select the dead ports.
+- Export: CSV format (`host,port,username,password,location,provider,exit_ip,country,
+  status,latency_ms`), an "Alive ports only" toggle (on by default) and "Save to
+  file…" through the system save dialog.
 
 ### Changed
 
+- Select-all (and a group's checkbox) selects only the ports the filter shows; ports
+  selected and then hidden stay selected, and the bulk bar says how many are hidden.
+- The toolbar "Export" button exports the selected ports, or else the ports the filter
+  shows (was "Export all").
 - An exit IP is tagged with the country of its location, not with what an IP database
   says. When the geolocation differs ("(VN) IP geolocates to HK"), it is shown as a
   hint with a tooltip: IP databases often disagree, and virtual locations are common.

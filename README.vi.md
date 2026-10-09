@@ -50,8 +50,10 @@ nên mỗi cổng có một IP lối ra riêng và ổn định.
 - Kiểm tra từng cổng và đo tốc độ (tuỳ chọn); log từng cổng trong ngăn Chi tiết, đã che
   thông tin bí mật.
 - Nhiều tài khoản cho mỗi nhà cung cấp; các cổng được chia đều giữa chúng.
-- Thao tác hàng loạt, xuất danh sách 4 định dạng: `host:port:user:pass`,
-  `socks5://user:pass@host:port`, `host:port`, `curl`.
+- Lọc cổng theo trạng thái (sống, chết, đang kết nối, đã dừng), nhà cung cấp, hoặc tìm
+  theo vị trí, IP, số cổng; "Kiểm tra tất cả" các cổng đang hiện.
+- Thao tác hàng loạt, xuất danh sách 5 định dạng: `host:port:user:pass`,
+  `socks5://user:pass@host:port`, `host:port`, `curl`, CSV; sao chép hoặc lưu ra file.
 - Webhook xoay IP (tuỳ chọn, mặc định tắt): `POST /rotate/<port-key>` kèm khoá Bearer.
 - Biểu tượng khay hệ thống, tự mở khi đăng nhập (tuỳ chọn), giữ máy thức khi có cổng đang
   bật, tắt cổng khi máy ngủ và bật lại khi máy thức.

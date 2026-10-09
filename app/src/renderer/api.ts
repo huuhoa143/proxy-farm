@@ -21,6 +21,7 @@ import type {
   UpdateStatus,
 } from '../shared/contracts';
 import { DEFAULT_PORT_LIMITS, makePortKey, splitPortKey } from '../shared/contracts';
+import { portBucket } from '../shared/portBucket';
 
 export function getProxyFarmApi(): ProxyFarmApi {
   const injected = typeof window !== 'undefined' ? window.proxyFarm : undefined;
@@ -600,8 +601,21 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return [`[fake] log line ${n} for ${targetKey}`, `[fake] no real sing-box process backs this port in the dev fallback`];
     },
 
-    async exportPorts(targetKeys, format: ExportFormat) {
+    async exportPorts(targetKeys, format: ExportFormat, checks = {}) {
       const rows = targetKeys.map((k) => ports.get(k)).filter((r): r is PortRow => Boolean(r));
+      if (format === 'csv') {
+        // Same columns as main's exportCsv; the fake's values never need quoting.
+        const header = 'host,port,username,password,location,provider,exit_ip,country,status,latency_ms';
+        const csvRows = rows.map((row) => {
+          const check = checks[row.key];
+          const polled = row.state.kind === 'online' ? row.state.latencyMs : undefined;
+          const latency = check ? (check.ok ? (check.latencyMs ?? polled) : undefined) : polled;
+          const exitIp = row.state.kind === 'online' ? row.state.exitIp : '';
+          const fields = ['127.0.0.1', row.proxyPort, settings.proxyUser, settings.proxyPass, row.city, row.providerId, exitIp, row.country, portBucket(row.state, check), latency ?? ''];
+          return fields.join(',');
+        });
+        return [header, ...csvRows].join('\r\n');
+      }
       const lines = rows.map((row) => {
         const host = '127.0.0.1';
         switch (format) {
@@ -618,6 +632,11 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         }
       });
       return lines.join('\n');
+    },
+
+    async saveExportFile(_text, format) {
+      // No file system in the fake: pretend the dialog saved it.
+      return { saved: true, path: `/fake/proxy-farm.${format === 'csv' ? 'csv' : 'txt'}` };
     },
 
     async getSettings() {

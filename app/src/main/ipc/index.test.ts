@@ -23,6 +23,7 @@ function fakeController(): ControllerFacade {
     testPort: vi.fn(async () => ({ ok: true })),
     getLogs: vi.fn(async () => []),
     exportPorts: vi.fn(async () => ''),
+    saveExportFile: vi.fn(async () => ({ saved: false })),
     getSettings: vi.fn(async () => ({}) as any),
     setSettings: vi.fn(async () => ({}) as any),
     getHostVpnActive: vi.fn(async () => false),

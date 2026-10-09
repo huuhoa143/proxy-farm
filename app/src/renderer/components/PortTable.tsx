@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { EXIT_IP_MODELS, type PortRow, type ProviderId, type ProxyFarmApi, type Target } from '../../shared/contracts';
 import { describePortState, isTerminalFailure } from '../portStateView';
 import { addPortBlock, groupPorts, portNumber, remainingByProvider, type PortGroup } from '../portGroups';
+import { currentCheck, type CheckRecord } from '../portFilter';
 import { StatusDot } from './StatusDot';
 import { PortDetailsDrawer } from './PortDetailsDrawer';
 import { ChangeIpMenu } from './ChangeIpMenu';
@@ -12,9 +13,16 @@ import { countryName } from '../ui/countryName';
 import { exitCountry, type ExitCountryView } from '../ui/exitCountry';
 import { locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
+import { relativeTime } from '../ui/relativeTime';
 
 export interface PortTableProps {
+  /** The rows to show (the main screen passes the filtered ones). */
   rows: PortRow[];
+  /** Every port, filtered or not: provider limits, Change-IP menus and the "this
+   * account works elsewhere" hint look at all of them. Defaults to `rows`. */
+  allRows?: PortRow[];
+  /** Check results (Check all / bulk Check), shown under the latency. */
+  checks?: Readonly<Record<string, CheckRecord>>;
   selectedKeys: ReadonlySet<string>;
   onToggleSelect: (key: string) => void;
   onToggleSelectAll: () => void;
@@ -93,9 +101,13 @@ function latencyClass(ms: number): string {
 }
 
 const COLUMNS = 7;
+/** How often "checked 3 minutes ago" is refreshed. */
+const CHECK_AGE_TICK_MS = 30_000;
 
 export function PortTable({
   rows,
+  allRows = rows,
+  checks,
   selectedKeys,
   onToggleSelect,
   onToggleSelectAll,
@@ -120,12 +132,12 @@ export function PortTable({
   // Accounts with at least one online port: their credentials demonstrably work,
   // so an auth rejection on another of their ports is location-specific (used by
   // describePortState to show a "try another location" message, not "check login").
-  const onlineAccountIds = new Set(rows.filter((r) => r.state.kind === 'online').map((r) => r.accountId));
+  const onlineAccountIds = new Set(allRows.filter((r) => r.state.kind === 'online').map((r) => r.accountId));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsed, toggleCollapsed] = useCollapsedGroups();
   const groups = useMemo(() => groupPorts(rows, targets, language), [rows, targets, language]);
   const targetByKey = useMemo(() => new Map(targets.map((tg) => [tg.key, tg])), [targets]);
-  const remaining = useMemo(() => remainingByProvider(rows, limits), [rows, limits]);
+  const remaining = useMemo(() => remainingByProvider(allRows, limits), [allRows, limits]);
 
   // Spec §4.2 "live retry countdown": tick once a second, but only while at
   // least one row actually has a countdown, and as a single interval shared
@@ -139,6 +151,14 @@ export function PortTable({
     const id = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, [rows]);
+
+  // Keeps "checked 3 minutes ago" roughly current while any check result is shown.
+  const hasChecks = Boolean(checks && Object.keys(checks).length);
+  useEffect(() => {
+    if (!hasChecks) return undefined;
+    const id = setInterval(() => setTick((n) => n + 1), CHECK_AGE_TICK_MS);
+    return () => clearInterval(id);
+  }, [hasChecks]);
 
   // When each countdown started, so the ring can show how much of the wait
   // has elapsed (PortState only carries the deadline).
@@ -279,6 +299,7 @@ export function PortTable({
         });
         const state = row.state;
         const note = notes?.[row.key];
+        const check = checks ? currentCheck(row, checks) : undefined;
         const selected = selectedKeys.has(row.key);
         const isOpen = expanded.has(row.key);
         const n = portNumber(row);
@@ -428,13 +449,25 @@ export function PortTable({
                 ) : (
                   <span className="none">—</span>
                 )}
+                {check && (
+                  <div
+                    className={`chk ${check.ok ? 'ok' : 'bad'}`}
+                    data-testid={`check-${row.key}`}
+                    title={t('main.check.at', { time: new Date(check.at).toLocaleString(language) }) as string}
+                  >
+                    <Icon name={check.ok ? 'check' : 'x'} />
+                    <span className="sr-only">{t(check.ok ? 'main.check.passed' : 'main.check.failed')}</span>
+                    {check.ok && check.latencyMs != null && <span>{check.latencyMs} ms</span>}
+                    <span className="when">{relativeTime(check.at, Date.now(), language)}</span>
+                  </div>
+                )}
               </td>
               <td className="num">
                 <div className="rowact">
                   <ChangeIpMenu
                     row={row}
                     api={api}
-                    rows={rows}
+                    rows={allRows}
                     locationName={rowLocation}
                     sameCountryAlternative={targets.some(
                       (tg) => tg.providerId === row.providerId && tg.country === row.country && tg.key !== row.locationKey && !tg.notInPlan,

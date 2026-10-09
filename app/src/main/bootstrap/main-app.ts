@@ -9,6 +9,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, powerSaveBlocker, safeStorage, session, shell, Tray } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
 import { isTerminalState, portLimitOf, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
@@ -34,6 +35,7 @@ import { resolveRotateKey, startWebhook, type Webhook } from '../webhook/index';
 import { aboutPanelOptions, buildAppMenuTemplate, menuLabels } from './app-menu';
 import { openExternalIfAllowed } from './external-links';
 import { createControllerFacade, rotateNoteKey } from './facade';
+import { createSaveExport } from './save-export';
 import { createHmaLocalSource } from './hma-local';
 import { createHmaCredsSync } from './hma-sync';
 import { createHmaWindowsSupport } from './hma-windows';
@@ -373,6 +375,11 @@ export function runApp(): void {
       hmaWindows,
       platform: process.platform,
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
+      saveExport: createSaveExport({
+        showSaveDialog: (options) => (mainWindow ? dialog.showSaveDialog(mainWindow, options) : dialog.showSaveDialog(options)),
+        writeFile: (filePath, text) => writeFile(filePath, text, 'utf8'),
+        defaultDir: app.getPath('downloads'),
+      }),
       appStatus,
       updater,
       diagnosticsEnv: () => ({
