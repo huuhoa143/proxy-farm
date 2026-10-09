@@ -34,14 +34,28 @@ export const LINKS = {
 
 export type LinkId = keyof typeof LINKS;
 
+/**
+ * The provider pages the add-account credential guides open (renderer `CredentialGuide`):
+ * where the user signs in to fetch the credential Proxy Farm asks for. Only these exact
+ * URLs are allowed, not their sites.
+ */
+export const PROVIDER_LINKS = {
+  expressvpn: 'https://www.expressvpn.com/setup',
+  nordvpn: 'https://my.nordaccount.com/',
+  surfshark: 'https://my.surfshark.com/',
+} as const;
+
+const PROVIDER_HREFS = new Set<string>(Object.values(PROVIDER_LINKS));
+
 const REPO_PATH = `/${REPO_OWNER}/${REPO_NAME}`;
 
 /**
  * The only URLs the app ever hands to the OS browser: https pages of this project's
- * GitHub repository (`https://github.com/huuhoa143/proxy-farm` and anything under it).
- * The URL is parsed first, so dot-segments (`/huuhoa143/proxy-farm/../x`), userinfo
- * (`https://github.com@evil.example/…`), other hosts, other ports, and look-alike
- * prefixes (`/huuhoa143/proxy-farm-evil`) are all rejected.
+ * GitHub repository (`https://github.com/huuhoa143/proxy-farm` and anything under it),
+ * and the exact `PROVIDER_LINKS` pages. The URL is parsed first, so dot-segments
+ * (`/huuhoa143/proxy-farm/../x`), userinfo (`https://github.com@evil.example/…`), other
+ * hosts, other ports, and look-alike prefixes (`/huuhoa143/proxy-farm-evil`) are all
+ * rejected.
  */
 export function isAllowedExternalUrl(raw: string): boolean {
   let url: URL;
@@ -51,6 +65,7 @@ export function isAllowedExternalUrl(raw: string): boolean {
     return false;
   }
   if (url.protocol !== 'https:') return false;
+  if (PROVIDER_HREFS.has(url.href)) return true;
   if (url.hostname !== 'github.com' || url.port !== '') return false;
   if (url.username !== '' || url.password !== '') return false;
   return url.pathname === REPO_PATH || url.pathname.startsWith(`${REPO_PATH}/`);
