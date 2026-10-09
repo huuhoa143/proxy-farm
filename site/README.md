@@ -22,23 +22,38 @@ npx wrangler deploy    # uploads dist/ to the proxy-farm-site Worker (workers.de
 | What | File |
 |---|---|
 | All page copy, vi and en | `src/i18n/copy.ts` |
-| GitHub links, download targets, demo video paths | `src/data/site.ts` |
+| GitHub links, the current release (version and assets), demo video paths | `src/data/site.ts` |
 | Page sections | `src/components/Landing.astro` |
 | Hero switchboard illustration | `src/components/Switchboard.astro` |
 | `<head>`: SEO, hreflang, Open Graph, JSON-LD | `src/layouts/Base.astro` |
 | Open Graph images | `public/og/og-{vi,en}.png`, rendered by `scripts/og/render.sh` from `scripts/og/og.html` |
 | Security and cache headers | `public/_headers` |
 
-## Publishing downloads
+## Publishing a release
 
-The download buttons show "Sắp ra mắt / Coming soon" while their `url` is `null`.
-To publish a build, set the url in `src/data/site.ts` to the GitHub release asset:
+The release lives in one place, `release` in `src/data/site.ts`. For a new release,
+change one line:
 
 ```ts
-{ id: 'mac-arm64', url: 'https://github.com/huuhoa143/proxy-farm/releases/download/v0.2.0/<asset>.dmg' },
+version: '0.2.1',
 ```
 
-When any url is set, the hero button drops its "coming soon" pill.
+The asset names, download URLs, JSON-LD `softwareVersion`/`downloadUrl` and every
+"Phiên bản / Version" label derive from it. The asset names must still follow the
+release workflow's pattern (`ProxyFarm-darwin-{arm64,x64}-<v>.dmg`,
+`Proxy.Farm.Setup.<v>.exe`). If the pattern changes, edit the `file` functions in the
+same block.
+
+File sizes are read from the GitHub release when the site builds
+(`src/data/release-sizes.ts`). If GitHub can't be reached, or an asset is missing from
+the release, the build prints a `[downloads]` warning and shows the fallback `bytes`
+from `site.ts`. Update those when convenient.
+
+The hero button picks the visitor's OS in the browser. Macs get Apple silicon with the
+Intel build next to it, because the browser can't tell the CPU apart. Windows gets the
+`.exe`. Other devices, and browsers without JavaScript, link to the download section.
+To show a note under the Windows row (for example about SmartScreen), set
+`download.winNote` for each language in `src/i18n/copy.ts`.
 
 ## Demo video
 

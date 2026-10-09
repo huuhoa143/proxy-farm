@@ -18,8 +18,12 @@ export interface Copy {
     titleSub: string;
     lede: string;
     download: string;
-    soon: string;
-    platforms: string;
+    downloadMac: string;
+    downloadWin: string;
+    appleSilicon: string;
+    intel: string;
+    intelLabel: string;
+    version: (v: string) => string;
     watch: string;
     github: string;
     facts: string[];
@@ -57,15 +61,18 @@ export interface Copy {
     title: string;
     lede: string;
     targets: Record<'mac-arm64' | 'mac-x64' | 'win-x64', { name: string; detail: string }>;
-    soon: string;
     get: string;
-    releases: string;
+    getFor: (name: string) => string;
+    version: (v: string) => string;
+    all: string;
     build: string;
+    /** Shown under the Windows row when set (e.g. a SmartScreen note); null hides it. */
+    winNote: string | null;
   };
   faq: { title: string; list: Faq[] };
   support: { title: string; lede: string; discussions: string; discussionsBody: string; issues: string; issuesBody: string; security: string; securityBody: string };
   footer: {
-    by: string;
+    credit: string;
     privacy: string;
     disclaimer: string;
     license: string;
@@ -93,8 +100,12 @@ const vi: Copy = {
     lede:
       'Proxy Farm chạy trên máy bạn và mở các cổng SOCKS5/HTTP cục bộ. Mỗi cổng là một đường hầm riêng tới đúng một máy chủ VPN. Không cần Docker, terminal hay quyền admin.',
     download: 'Tải về',
-    soon: 'Sắp ra mắt',
-    platforms: 'Dành cho macOS 12 trở lên, Apple silicon và Intel. Bản Windows x64 đang hoàn thiện.',
+    downloadMac: 'Tải cho Mac',
+    downloadWin: 'Tải cho Windows',
+    appleSilicon: 'Apple silicon',
+    intel: 'Intel',
+    intelLabel: 'Tải cho Mac chip Intel',
+    version: (v) => `Phiên bản ${v} · macOS 12 trở lên (Apple silicon, Intel) · Windows x64`,
     watch: 'Xem video',
     github: 'Mã nguồn trên GitHub',
     facts: ['Miễn phí, giấy phép MIT', 'Dùng gói VPN của bạn', 'Không telemetry'],
@@ -141,7 +152,7 @@ const vi: Copy = {
   },
   features: {
     title: 'Làm ít việc, nhưng làm đúng',
-    lede: 'Những gì ứng dụng thật sự làm, theo đúng tài liệu của dự án. Mục đánh dấu “Bản tới” đã có trong mã nguồn nhưng chưa nằm trong bản phát hành hiện tại (v0.1.1).',
+    lede: 'Những gì ứng dụng thật sự làm, theo đúng tài liệu của dự án.',
     nextTag: 'Bản tới',
     groups: [
       {
@@ -163,9 +174,9 @@ const vi: Copy = {
         title: 'Biết cổng nào đang sống',
         rows: [
           { title: 'Trạng thái từng cổng', body: 'Đang kết nối, đang hoạt động, thử lại kèm đếm ngược và lý do, hoặc lỗi kèm hướng xử lý. Có IP thoát, quốc gia và độ trễ.' },
-          { title: 'Lọc cổng sống/chết và Kiểm tra tất cả', body: 'Lọc nhanh các cổng đang lỗi và kiểm tra lại toàn bộ trong một lần bấm.', next: true },
+          { title: 'Lọc cổng sống/chết và Kiểm tra tất cả', body: 'Lọc nhanh các cổng đang lỗi và kiểm tra lại toàn bộ trong một lần bấm.' },
           { title: 'Xuất proxy', body: 'Xuất theo dạng host:port:user:pass, socks5://, host:port hoặc curl.' },
-          { title: 'Xuất CSV và lưu ra tệp', body: 'Lưu danh sách proxy thành tệp CSV hoặc tệp văn bản.', next: true },
+          { title: 'Xuất CSV và lưu ra tệp', body: 'Lưu danh sách proxy thành tệp CSV hoặc tệp văn bản.' },
         ],
       },
       {
@@ -183,11 +194,11 @@ const vi: Copy = {
     lede: 'Proxy Farm không bán IP hay quyền truy cập VPN. Bạn mang tài khoản của mình, ứng dụng biến nó thành các cổng proxy.',
     cols: { provider: 'Nhà cung cấp', signIn: 'Bạn nhập', protocol: 'Giao thức' },
     list: [
-      { name: 'HMA', key: 'hma', signIn: 'Không cần nhập gì: ứng dụng đọc thông tin thiết bị của app HMA cài trên cùng máy', protocol: 'OpenVPN', note: 'Hiện chỉ trên macOS' },
+      { name: 'HMA', key: 'hma', signIn: 'Không cần nhập gì: ứng dụng đọc thông tin thiết bị của app HMA cài trên cùng máy', protocol: 'OpenVPN', note: 'Trên Windows: bấm “Bật hỗ trợ HMA” một lần (cần xác nhận quản trị viên một lần)' },
       { name: 'ZoogVPN', key: 'zoogvpn', signIn: 'Email và mật khẩu tài khoản', protocol: 'OpenVPN' },
       { name: 'Surfshark', key: 'surfshark', signIn: 'Khoá riêng WireGuard từ trang cài đặt thủ công', protocol: 'WireGuard' },
-      { name: 'NordVPN', key: 'nordvpn', signIn: 'Access token từ Nord Account, hoặc khoá NordLynx', protocol: 'WireGuard (NordLynx)', next: true },
-      { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Tên đăng nhập và mật khẩu ở trang Manual configuration → OpenVPN', protocol: 'OpenVPN', next: true },
+      { name: 'NordVPN', key: 'nordvpn', signIn: 'Access token từ Nord Account, hoặc khoá NordLynx', protocol: 'WireGuard (NordLynx)' },
+      { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Tên đăng nhập và mật khẩu ở trang Manual configuration → OpenVPN', protocol: 'OpenVPN' },
       { name: 'Tệp cấu hình', key: 'file', signIn: 'Tệp .ovpn hoặc .conf của WireGuard, từ nhà cung cấp khác hay máy chủ của bạn', protocol: 'OpenVPN / WireGuard' },
     ],
     footnote: 'Proxy Farm không liên kết với bất kỳ nhà cung cấp VPN nào. Tên nhà cung cấp là nhãn hiệu của chủ sở hữu.',
@@ -213,23 +224,26 @@ const vi: Copy = {
   },
   download: {
     title: 'Tải Proxy Farm',
-    lede: 'Bản cài đặt sẽ có tại đây và trên GitHub Releases. Ứng dụng tự cập nhật từ GitHub.',
+    lede: 'Miễn phí, tải trực tiếp từ GitHub Releases. Sau khi cài, ứng dụng tự cập nhật từ GitHub.',
     targets: {
-      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 trở lên, chip M' },
-      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 trở lên' },
-      'win-x64': { name: 'Windows · x64', detail: 'Bản 64-bit' },
+      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 trở lên, chip M · đã ký và được Apple notarize' },
+      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 trở lên · đã ký và được Apple notarize' },
+      'win-x64': { name: 'Windows · x64', detail: 'Cài cho tài khoản của bạn, không cần quyền admin' },
     },
-    soon: 'Sắp ra mắt',
     get: 'Tải về',
-    releases: 'Theo dõi bản phát hành trên GitHub',
+    getFor: (name) => `Tải về ${name}`,
+    version: (v) => `Phiên bản ${v}`,
+    all: 'Tất cả phiên bản',
     build: 'Hoặc tự build từ mã nguồn',
+    winNote: 'Bản Windows chưa ký số: nếu Windows SmartScreen cảnh báo, bấm “Thêm thông tin” (More info) → “Vẫn chạy” (Run anyway).',
   },
   faq: {
     title: 'Câu hỏi thường gặp',
     list: [
       { q: 'Proxy Farm có bán IP hay VPN không?', a: 'Không. Bạn cần một gói VPN của riêng mình (hoặc tệp .ovpn/.conf). Proxy Farm chỉ biến gói đó thành các cổng proxy trên máy bạn.' },
       { q: 'Dùng như vậy có vi phạm điều khoản của nhà cung cấp VPN không?', a: 'Có thể. Nhiều nhà cung cấp cấm chia sẻ hoặc bán lại kết nối, và việc mở nhiều đường hầm cùng lúc có thể kích hoạt cơ chế chống lạm dụng, dẫn tới khoá tài khoản. Hãy dùng cho chính bạn, đừng mở proxy ra internet hay chia cho người khác, và tự đọc điều khoản của nhà cung cấp.' },
-      { q: 'Chạy trên hệ điều hành nào?', a: 'macOS 12 trở lên, cả Apple silicon lẫn Intel. Bản Windows x64 đã hoàn thiện mã nhưng chưa phát hành. HMA hiện chỉ dùng được trên macOS.' },
+      { q: 'Chạy trên hệ điều hành nào?', a: 'macOS 12 trở lên (Apple silicon và Intel) và Windows x64. Bản Windows cài cho riêng tài khoản của bạn, không cần quyền admin; riêng HMA trên Windows cần xác nhận quản trị viên một lần khi bật hỗ trợ HMA.' },
+      { q: 'Windows SmartScreen cảnh báo khi cài, phải làm sao?', a: 'Bản Windows chưa ký số nên SmartScreen có thể cảnh báo. Bấm “Thêm thông tin” (More info) → “Vẫn chạy” (Run anyway). Bản macOS đã được ký và Apple notarize.' },
       { q: 'Có mất phí không?', a: 'Không. Proxy Farm miễn phí, mã nguồn mở theo giấy phép MIT. Ứng dụng đi kèm sing-box (GPL-3.0) dưới dạng chương trình riêng, không chỉnh sửa.' },
       { q: 'Một gói VPN cho được bao nhiêu cổng?', a: 'Tuỳ số máy chủ của vị trí và giới hạn thiết bị của gói. Mỗi cổng cần một máy chủ trống. Ứng dụng đặt sẵn giới hạn an toàn cho một số nhà cung cấp, ví dụ 8 cổng cho ExpressVPN để chừa thiết bị cho bạn, và bạn tự chỉnh được.' },
       { q: 'Ứng dụng có thu thập dữ liệu của tôi không?', a: 'Không. Không telemetry, không phân tích, không tài khoản với chúng tôi. Ứng dụng chỉ kết nối tới máy chủ VPN của bạn và vài dịch vụ được liệt kê kèm lý do trong PRIVACY.md.' },
@@ -248,7 +262,7 @@ const vi: Copy = {
     securityBody: 'Báo riêng tư theo SECURITY.md, đừng đăng công khai.',
   },
   footer: {
-    by: 'Proxy Farm by LingoReUp',
+    credit: 'Được phát triển bởi đội ngũ LingoReup',
     privacy: 'Quyền riêng tư',
     disclaimer: 'Miễn trừ trách nhiệm',
     license: 'Giấy phép MIT',
@@ -276,8 +290,12 @@ const en: Copy = {
     lede:
       'Proxy Farm runs on your computer and opens local SOCKS5/HTTP ports. Each port is its own tunnel to exactly one VPN server. No Docker, no terminal, no admin rights.',
     download: 'Download',
-    soon: 'Coming soon',
-    platforms: 'For macOS 12 or later, Apple silicon and Intel. The Windows x64 build is being finished.',
+    downloadMac: 'Download for Mac',
+    downloadWin: 'Download for Windows',
+    appleSilicon: 'Apple silicon',
+    intel: 'Intel',
+    intelLabel: 'Download for Intel Mac',
+    version: (v) => `Version ${v} · macOS 12 or later (Apple silicon, Intel) · Windows x64`,
     watch: 'Watch the demo',
     github: 'Source on GitHub',
     facts: ['Free, MIT licensed', 'Uses your own VPN plan', 'No telemetry'],
@@ -324,7 +342,7 @@ const en: Copy = {
   },
   features: {
     title: 'Does a few things, and does them right',
-    lede: 'What the app actually does, as documented by the project. Items marked “Next release” are in the source code but not in the current release (v0.1.1).',
+    lede: 'What the app actually does, as documented by the project.',
     nextTag: 'Next release',
     groups: [
       {
@@ -346,9 +364,9 @@ const en: Copy = {
         title: 'Know which ports are alive',
         rows: [
           { title: 'Live status per port', body: 'Connecting, online, retrying with a countdown and the reason, or failed with guidance. Exit IP, country and latency.' },
-          { title: 'Alive/dead filters and Check all', body: 'Filter the failing ports and re-check every port in one click.', next: true },
+          { title: 'Alive/dead filters and Check all', body: 'Filter the failing ports and re-check every port in one click.' },
           { title: 'Export proxies', body: 'Export as host:port:user:pass, socks5://, host:port or curl.' },
-          { title: 'CSV export and save to file', body: 'Save the proxy list as a CSV or text file.', next: true },
+          { title: 'CSV export and save to file', body: 'Save the proxy list as a CSV or text file.' },
         ],
       },
       {
@@ -366,11 +384,11 @@ const en: Copy = {
     lede: 'Proxy Farm does not sell IPs or VPN access. You bring your own account; the app turns it into proxy ports.',
     cols: { provider: 'Provider', signIn: 'You enter', protocol: 'Protocol' },
     list: [
-      { name: 'HMA', key: 'hma', signIn: 'Nothing: the app reads the device credentials of the HMA app on the same computer', protocol: 'OpenVPN', note: 'macOS only for now' },
+      { name: 'HMA', key: 'hma', signIn: 'Nothing: the app reads the device credentials of the HMA app on the same computer', protocol: 'OpenVPN', note: 'On Windows: click “Enable HMA support” once (one administrator prompt)' },
       { name: 'ZoogVPN', key: 'zoogvpn', signIn: 'Account email and password', protocol: 'OpenVPN' },
       { name: 'Surfshark', key: 'surfshark', signIn: 'WireGuard private key from the manual setup page', protocol: 'WireGuard' },
-      { name: 'NordVPN', key: 'nordvpn', signIn: 'An access token from Nord Account, or your NordLynx key', protocol: 'WireGuard (NordLynx)', next: true },
-      { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Username and password from Manual configuration → OpenVPN', protocol: 'OpenVPN', next: true },
+      { name: 'NordVPN', key: 'nordvpn', signIn: 'An access token from Nord Account, or your NordLynx key', protocol: 'WireGuard (NordLynx)' },
+      { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Username and password from Manual configuration → OpenVPN', protocol: 'OpenVPN' },
       { name: 'Config file', key: 'file', signIn: 'An .ovpn or WireGuard .conf file, from another provider or your own server', protocol: 'OpenVPN / WireGuard' },
     ],
     footnote: 'Proxy Farm is not affiliated with any VPN provider. Provider names are trademarks of their owners.',
@@ -396,23 +414,26 @@ const en: Copy = {
   },
   download: {
     title: 'Download Proxy Farm',
-    lede: 'Installers will be here and on GitHub Releases. The app updates itself from GitHub.',
+    lede: 'Free, straight from GitHub Releases. Once installed, the app updates itself from GitHub.',
     targets: {
-      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 or later, M-series' },
-      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 or later' },
-      'win-x64': { name: 'Windows · x64', detail: '64-bit build' },
+      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 or later, M-series · signed and notarized by Apple' },
+      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 or later · signed and notarized by Apple' },
+      'win-x64': { name: 'Windows · x64', detail: 'Installs for your user, no admin rights' },
     },
-    soon: 'Coming soon',
     get: 'Download',
-    releases: 'Watch releases on GitHub',
+    getFor: (name) => `Download ${name}`,
+    version: (v) => `Version ${v}`,
+    all: 'All releases',
     build: 'Or build it from source',
+    winNote: 'The Windows build isn’t code-signed yet; if SmartScreen warns, choose More info → Run anyway.',
   },
   faq: {
     title: 'Questions',
     list: [
       { q: 'Does Proxy Farm sell IPs or VPN access?', a: 'No. You need your own VPN subscription (or an .ovpn/.conf file). Proxy Farm only turns it into proxy ports on your computer.' },
       { q: 'Is this against my VPN provider’s terms?', a: 'It can be. Many providers forbid sharing or reselling connections, and many simultaneous tunnels can trigger abuse detection and get the account suspended. Use it for yourself, do not expose the proxies to the internet or share them, and read your provider’s terms.' },
-      { q: 'Which operating systems does it run on?', a: 'macOS 12 or later, on Apple silicon and Intel. The Windows x64 build is code-complete but not released yet. HMA currently works on macOS only.' },
+      { q: 'Which operating systems does it run on?', a: 'macOS 12 or later (Apple silicon and Intel) and Windows x64. The Windows installer installs for your user only and needs no admin rights; HMA on Windows needs one administrator prompt when you enable HMA support.' },
+      { q: 'Windows SmartScreen warns when I install it. What do I do?', a: 'The Windows build isn’t code-signed yet, so SmartScreen may warn. Choose More info → Run anyway. The macOS builds are signed and notarized by Apple.' },
       { q: 'Does it cost anything?', a: 'No. Proxy Farm is free and open source under the MIT license. It bundles sing-box (GPL-3.0) as a separate, unmodified program.' },
       { q: 'How many ports can one VPN plan give me?', a: 'It depends on the location’s servers and your plan’s device limit. Each port needs a free server. The app sets safe defaults for some providers, such as 8 ports for ExpressVPN to leave devices for you, and you can change them.' },
       { q: 'Does the app collect my data?', a: 'No. No telemetry, no analytics, no account with us. The app talks only to your VPN servers and a few services listed with their reasons in PRIVACY.md.' },
@@ -431,7 +452,7 @@ const en: Copy = {
     securityBody: 'Privately, as described in SECURITY.md. Never in a public issue.',
   },
   footer: {
-    by: 'Proxy Farm by LingoReUp',
+    credit: 'Built by the LingoReup team',
     privacy: 'Privacy',
     disclaimer: 'Disclaimer',
     license: 'MIT License',

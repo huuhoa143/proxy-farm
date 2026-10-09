@@ -259,7 +259,7 @@ There are no content cards. The containers are:
 - **FAQ disclosure:** native details/summary rows, 700 at 1.0625rem, a 48px minimum row, and a plus icon that rotates 45° over 300ms. The list is headed by a 2px ink rule.
 
 ### Navigation
-Header: app icon (36px), "Proxy Farm" in 700, and "by LingoReUp" in muted text after a 1px rule. Anchor nav is 0.9375rem `ink-2` and underlines on hover; it is hidden under 1100px. On the right are the language chip and the GitHub chip. Footer: on the plate, brand row, legal links in `plate-text`, notices in `plate-muted` at 0.8125rem.
+Header: app icon (36px), "Proxy Farm" in 700, and "by LingoReup" in muted text after a 1px rule. Anchor nav is 0.9375rem `ink-2` and underlines on hover; it is hidden under 1100px. On the right are the language chip and the GitHub chip. Footer: on the plate, brand row, legal links in `plate-text`, notices in `plate-muted` at 0.8125rem.
 
 ### Switchboard (signature)
 A `figure` on the plate. It is labelled as an illustration and uses only RFC 5737 documentation addresses. Each **port row** has a 40px rotate control (10px radius, `plate-2`, `plate-rule` border; on hover the border and icon turn green and the arrow turns -120°), the mono `127.0.0.1:` prefix in `plate-muted` with the port in white, and below it the exit IP in Live-Line Green with a provider dot and latency in muted text. A jack sits on the row's right edge. **Server rows** have a jack on the left, the mono IP, and the city with a dot on the first row of each city group, which is set off by a stronger rule. A free server shows a green ring on its jack and a green "free" label. **Cords** are SVG curves in the provider colour at 88% opacity.

@@ -18,21 +18,32 @@ export const links = {
 };
 
 /**
- * Download targets. While `url` is null the button renders as "Coming soon".
- * To publish a build, set its url to the GitHub release asset, e.g.
- *   url: 'https://github.com/huuhoa143/proxy-farm/releases/download/v0.2.0/Proxy-Farm-0.2.0-arm64.dmg',
+ * The current release. For the next release, change `version`: asset names and URLs
+ * derive from it. Sizes are read from the GitHub release at build time; `bytes` is the
+ * fallback used when GitHub can't be reached, so refresh it when convenient.
  */
-export const downloads: { id: 'mac-arm64' | 'mac-x64' | 'win-x64'; url: string | null }[] = [
-  { id: 'mac-arm64', url: null },
-  { id: 'mac-x64', url: null },
-  { id: 'win-x64', url: null },
-];
+export const release = {
+  version: '0.2.0',
+  assets: {
+    'mac-arm64': { file: (v: string) => `ProxyFarm-darwin-arm64-${v}.dmg`, bytes: 145_413_281 },
+    'mac-x64': { file: (v: string) => `ProxyFarm-darwin-x64-${v}.dmg`, bytes: 155_535_377 },
+    'win-x64': { file: (v: string) => `Proxy.Farm.Setup.${v}.exe`, bytes: 120_702_529 },
+  },
+};
 
-export const anyDownloadLive = downloads.some((d) => d.url);
+export type TargetId = keyof typeof release.assets;
+
+export const releaseUrl = `${REPO}/releases/tag/v${release.version}`;
+
+/** Download targets in display order, with the URL each button points at. */
+export const downloads = (Object.keys(release.assets) as TargetId[]).map((id) => {
+  const file = release.assets[id].file(release.version);
+  return { id, file, url: `${REPO}/releases/download/v${release.version}/${file}`, bytes: release.assets[id].bytes };
+});
 
 /**
  * Demo media. The poster and captions are static files in public/media/. The mp4 and
- * webm are hosted on TeleCloud (LingoReUp's file host, which serves byte ranges, so
+ * webm are hosted on TeleCloud (LingoReup's file host, which serves byte ranges, so
  * Safari and iOS can play and seek them); see site/README.md to replace them.
  */
 export const media = {

@@ -8,7 +8,7 @@ import fontLatin700 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-
 import fontViet700 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-700-normal.woff2?url';
 import fontLatin400 from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-400-normal.woff2?url';
 import { copy, pathFor, type Lang } from '../i18n/copy';
-import { SITE_URL, links } from '../data/site';
+import { SITE_URL, links, release, releaseUrl, downloads } from '../data/site';
 
 interface Props {
   lang: Lang;
@@ -32,7 +32,10 @@ const jsonLd = {
       url: canonical,
       inLanguage: t.htmlLang,
       applicationCategory: 'NetworkingApplication',
-      operatingSystem: 'macOS 12 or later, Windows',
+      operatingSystem: 'macOS 12 or later, Windows (x64)',
+      softwareVersion: release.version,
+      downloadUrl: downloads.map((d) => d.url),
+      releaseNotes: releaseUrl,
       license: 'https://opensource.org/licenses/MIT',
       isAccessibleForFree: true,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -40,7 +43,8 @@ const jsonLd = {
       screenshot: ogImage,
       softwareHelp: links.discussions,
       codeRepository: links.repo,
-      author: { '@type': 'Organization', name: 'LingoReUp' },
+      author: { '@id': `${SITE_URL}/#lingoreup` },
+      publisher: { '@id': `${SITE_URL}/#lingoreup` },
     },
     {
       '@type': 'WebSite',
@@ -48,7 +52,13 @@ const jsonLd = {
       url: `${SITE_URL}/`,
       name: 'Proxy Farm',
       inLanguage: ['vi', 'en'],
-      publisher: { '@type': 'Organization', name: 'LingoReUp' },
+      publisher: { '@id': `${SITE_URL}/#lingoreup` },
+    },
+    {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#lingoreup`,
+      name: 'LingoReup',
+      url: 'https://lingoreup.com',
     },
   ],
 };
