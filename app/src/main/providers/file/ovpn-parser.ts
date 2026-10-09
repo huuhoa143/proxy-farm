@@ -48,10 +48,13 @@ export interface ParsedOvpn {
   /** Inline `<cert>` / `<key>`: client-certificate auth. Always both or neither. */
   clientCertLines?: string[];
   clientKeyLines?: string[];
-  /** `fragment <n>`. */
+  /** `fragment <n>`; `fragment 0` (no fragmentation, OpenVPN's default) leaves it unset. */
   fragment?: number;
-  /** `mssfix <n>`; a bare `mssfix` (OpenVPN's default) leaves it unset. */
+  /** `mssfix <n> [mtu|fixed]`; a bare `mssfix` (OpenVPN's default) leaves all three unset. */
   mssFix?: number;
+  mssFixMode?: 'mtu' | 'fixed';
+  /** `mssfix 0`: no clamping. Distinct from unset, where sing-box clamps by default. */
+  mssFixDisabled?: true;
   /** `comp-lzo no`. Other `comp-lzo` values stay ignored, as they always were. */
   compressionLzo?: 'no';
   /** `verify-x509-name <name> [subject|name|name-prefix]`; OpenVPN's default type is subject. */
@@ -98,11 +101,39 @@ const SUPPORTED_BLOCKS = new Set(['ca', 'tls-auth', 'tls-crypt', 'cert', 'key'])
 
 const X509_NAME_TYPES = new Set(['subject', 'name', 'name-prefix']);
 
-/** A positive whole number of bytes, or an `UnsupportedDirectiveError` naming `directive`. */
+// sing-box refuses a smaller `fragment` when the tunnel starts.
+const MIN_FRAGMENT = 68;
+// `mssfix <n> fixed` subtracts the IPv4 and TCP headers from n; sing-box doesn't check it.
+const MIN_FIXED_MSSFIX = 41;
+
+/** A whole number of bytes (0 allowed: OpenVPN's "off"), or an `UnsupportedDirectiveError` naming `directive`. */
 function byteCount(directive: string, arg: string): number {
   const n = Number(arg);
-  if (!/^\d+$/.test(arg) || n < 1 || n > 65535) throw new UnsupportedDirectiveError(directive, `"${arg}" is not a size in bytes`);
+  if (!/^\d+$/.test(arg) || n > 65535) throw new UnsupportedDirectiveError(directive, `"${arg}" is not a size in bytes`);
   return n;
+}
+
+/** `fragment <n> [mtu]`; undefined for `fragment 0`. sing-box has no field for the `mtu` mode. */
+function parseFragment(args: string[]): number | undefined {
+  if (args.length !== 1) throw new UnsupportedDirectiveError('fragment', `"${args.join(' ')}" (only a size is supported)`);
+  const n = byteCount('fragment', args[0]);
+  if (n === 0) return undefined;
+  if (n < MIN_FRAGMENT) throw new UnsupportedDirectiveError('fragment', `${n} is below ${MIN_FRAGMENT} bytes`);
+  return n;
+}
+
+/** `mssfix <n> [mtu|fixed]` (not bare `mssfix`), read as OpenVPN 2.6 does: 0 turns clamping off. */
+function parseMssfix(args: string[]): Pick<ParsedOvpn, 'mssFix' | 'mssFixMode' | 'mssFixDisabled'> {
+  const [size, mode, ...extra] = args;
+  if (extra.length > 0 || (mode !== undefined && mode !== 'mtu' && mode !== 'fixed')) {
+    throw new UnsupportedDirectiveError('mssfix', `"${args.join(' ')}"`);
+  }
+  const n = byteCount('mssfix', size);
+  if (n === 0) return { mssFixDisabled: true };
+  if (mode === 'fixed' && n < MIN_FIXED_MSSFIX) {
+    throw new UnsupportedDirectiveError('mssfix', `${n} fixed leaves no room for the IPv4 and TCP headers`);
+  }
+  return { mssFix: n, ...(mode ? { mssFixMode: mode } : {}) };
 }
 
 /** `verify-x509-name` arguments: a name, possibly quoted (subjects contain spaces), then an optional type. */
@@ -138,7 +169,7 @@ export function parseOvpn(content: string): ParsedOvpn {
   let clientCertLines: string[] | undefined;
   let clientKeyLines: string[] | undefined;
   let fragment: number | undefined;
-  let mssFix: number | undefined;
+  let mss: Pick<ParsedOvpn, 'mssFix' | 'mssFixMode' | 'mssFixDisabled'> = {};
   let compressionLzo: 'no' | undefined;
   let x509Name: { name: string; type: 'subject' | 'name' | 'name-prefix' } | undefined;
   let nsCertType: 'server' | undefined;
@@ -219,11 +250,11 @@ export function parseOvpn(content: string): ParsedOvpn {
         break;
       }
       case 'fragment':
-        fragment = byteCount(directive, arg);
+        fragment = parseFragment(rest);
         break;
       case 'mssfix':
         // A bare `mssfix` means OpenVPN's default, which sing-box applies on its own.
-        if (arg.length > 0) mssFix = byteCount(directive, rest[0]);
+        mss = rest.length > 0 ? parseMssfix(rest) : {};
         break;
       case 'comp-lzo':
         // Only `no` is mapped (compression framing, no compression); every other value
@@ -290,7 +321,7 @@ export function parseOvpn(content: string): ParsedOvpn {
     tunMtu,
     ...(clientCertLines && clientKeyLines ? { clientCertLines, clientKeyLines } : {}),
     ...(fragment !== undefined ? { fragment } : {}),
-    ...(mssFix !== undefined ? { mssFix } : {}),
+    ...mss,
     ...(compressionLzo ? { compressionLzo } : {}),
     ...(x509Name ? { serverName: x509Name.name, serverNameType: x509Name.type } : {}),
     ...(nsCertType ? { nsCertType } : {}),

@@ -166,7 +166,7 @@ describe('parseOvpn: an ExpressVPN-style profile (client certificate, fragment, 
 
   it('leaves every new field unset for a profile without those directives', () => {
     const parsed = parseOvpn(GOOD);
-    for (const field of ['clientCertLines', 'clientKeyLines', 'fragment', 'mssFix', 'compressionLzo', 'serverName', 'serverNameType', 'nsCertType'] as const) {
+    for (const field of ['clientCertLines', 'clientKeyLines', 'fragment', 'mssFix', 'mssFixMode', 'mssFixDisabled', 'compressionLzo', 'serverName', 'serverNameType', 'nsCertType'] as const) {
       expect(parsed[field]).toBeUndefined();
     }
   });
@@ -184,6 +184,51 @@ describe('parseOvpn: an ExpressVPN-style profile (client certificate, fragment, 
     expect(() => parseOvpn(EXPRESS.replace('ns-cert-type server', 'ns-cert-type client'))).toThrow(UnsupportedDirectiveError);
     expect(() => parseOvpn(EXPRESS.replace('fragment 1300', 'fragment lots'))).toThrow(UnsupportedDirectiveError);
     expect(() => parseOvpn(EXPRESS.replace('mssfix 1200', 'mssfix big'))).toThrow(UnsupportedDirectiveError);
+  });
+
+  describe('mssfix, as OpenVPN 2.6 reads it', () => {
+    const withMssfix = (line: string) => parseOvpn(EXPRESS.replace('mssfix 1200', line));
+
+    // Leaving mss_fix unset would make sing-box clamp to its 1492 default — the
+    // opposite of what `mssfix 0` asks for.
+    it('turns clamping off for mssfix 0, whatever the mode', () => {
+      for (const line of ['mssfix 0', 'mssfix 0 mtu', 'mssfix 0 fixed']) {
+        const parsed = withMssfix(line);
+        expect(parsed.mssFixDisabled).toBe(true);
+        expect(parsed.mssFix).toBeUndefined();
+        expect(parsed.mssFixMode).toBeUndefined();
+      }
+    });
+
+    it('keeps the mtu or fixed mode', () => {
+      expect(withMssfix('mssfix 1450 mtu')).toMatchObject({ mssFix: 1450, mssFixMode: 'mtu' });
+      expect(withMssfix('mssfix 1400 fixed')).toMatchObject({ mssFix: 1400, mssFixMode: 'fixed' });
+      expect(withMssfix('mssfix 1200').mssFixMode).toBeUndefined();
+    });
+
+    it('rejects an unknown mode, an extra argument, and a fixed size below the IPv4+TCP headers', () => {
+      expect(() => withMssfix('mssfix 1450 bogus')).toThrow(UnsupportedDirectiveError);
+      expect(() => withMssfix('mssfix 1450 mtu extra')).toThrow(UnsupportedDirectiveError);
+      expect(() => withMssfix('mssfix 40 fixed')).toThrow(UnsupportedDirectiveError);
+      expect(withMssfix('mssfix 41 fixed')).toMatchObject({ mssFix: 41, mssFixMode: 'fixed' });
+    });
+  });
+
+  describe('fragment, as OpenVPN 2.6 reads it', () => {
+    const withFragment = (line: string) => parseOvpn(EXPRESS.replace('fragment 1300', line));
+
+    it('reads fragment 0 as no fragmentation', () => {
+      expect(withFragment('fragment 0').fragment).toBeUndefined();
+    });
+
+    it('rejects a size sing-box refuses at start (below 68) instead of failing the tunnel later', () => {
+      expect(() => withFragment('fragment 67')).toThrow(UnsupportedDirectiveError);
+      expect(withFragment('fragment 68').fragment).toBe(68);
+    });
+
+    it('rejects the mtu mode, which sing-box has no field for', () => {
+      expect(() => withFragment('fragment 1300 mtu')).toThrow(UnsupportedDirectiveError);
+    });
   });
 
   it('keeps ignoring a bare mssfix and comp-lzo values other than no, as before', () => {

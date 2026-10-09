@@ -46,6 +46,8 @@ export function buildOvpnEndpoint(
     auth: parsed.auth,
     ...(parsed.fragment !== undefined ? { fragment: parsed.fragment } : {}),
     ...(parsed.mssFix !== undefined ? { mss_fix: parsed.mssFix } : {}),
+    ...(parsed.mssFixMode ? { mss_fix_mode: parsed.mssFixMode } : {}),
+    ...(parsed.mssFixDisabled ? { mss_fix_disabled: parsed.mssFixDisabled } : {}),
     ...(parsed.compressionLzo ? { compression_lzo: parsed.compressionLzo } : {}),
     route_no_pull: true,
     mtu: resolveOvpnMtu(parsed.tunMtu),

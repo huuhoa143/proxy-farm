@@ -46,8 +46,11 @@ export interface OpenVpnEndpoint {
   /** OpenVPN `fragment N`: split data packets above N bytes. A server configured with it
    * needs the client to match, or the tunnel comes up and carries nothing (ExpressVPN). */
   fragment?: number;
-  /** OpenVPN `mssfix N`. */
+  /** OpenVPN `mssfix N [mtu|fixed]`. Unset, sing-box clamps by default (from `fragment`, else 1492). */
   mss_fix?: number;
+  mss_fix_mode?: 'mtu' | 'fixed';
+  /** OpenVPN `mssfix 0`: no clamping. Excludes `mss_fix` and `mss_fix_mode`. */
+  mss_fix_disabled?: true;
   /** OpenVPN `comp-lzo no`: compression framing on, compression off. */
   compression_lzo?: 'no';
   route_no_pull: true;

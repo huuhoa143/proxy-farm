@@ -90,4 +90,15 @@ describe('buildOvpnEndpoint: client certificate and ExpressVPN-style options', (
     });
     expect(ep).toMatchObject({ fragment: 1300, mss_fix: 1200, compression_lzo: 'no', auth: 'SHA512', username: 'u', password: 'p' });
   });
+
+  it('maps the mssfix mode, and mssfix 0 to mss_fix_disabled', () => {
+    expect(buildOvpnEndpoint(baseParsed({ mssFix: 1450, mssFixMode: 'mtu' }), '203.0.113.1')).toMatchObject({
+      mss_fix: 1450,
+      mss_fix_mode: 'mtu',
+    });
+    const disabled = buildOvpnEndpoint(baseParsed({ mssFixDisabled: true }), '203.0.113.1');
+    expect(disabled.mss_fix_disabled).toBe(true);
+    expect(disabled).not.toHaveProperty('mss_fix');
+    expect(disabled).not.toHaveProperty('mss_fix_mode');
+  });
 });
