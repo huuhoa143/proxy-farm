@@ -5,7 +5,7 @@
  * agreement: every exported name here is relied on by at least two modules.
  *   engine/     renderConfig, invariants, ports, supervisor, pid registry   (spec §6.1–6.3)
  *   health/     log signals, /delay, exit-IP, state machine, backoff        (spec §6.4)
- *   providers/  hma, zoogvpn, surfshark, file + catalogs                    (spec §5)
+ *   providers/  hma, zoogvpn, surfshark, nordvpn, file + catalogs           (spec §5)
  *   controller/ store, accounts, port manager, power, webhook, IPC          (spec §3, §4, §6.5–6.7)
  *   renderer/   React UI + i18n, talks only to `window.proxyFarm`           (spec §4)
  */
@@ -65,7 +65,18 @@ export interface RenderInput {
 
 // ───────────────────────── providers & catalogs (spec §5) ─────────────────────────
 
-export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'file';
+export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'file';
+
+/**
+ * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
+ * unlimited. An explicit user value, 0 included, always wins.
+ */
+export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6 };
+
+/** The port limit in force for a provider: the user's, else the default, else 0. */
+export function portLimitOf(limits: Partial<Record<ProviderId, number>>, providerId: ProviderId): number {
+  return limits[providerId] ?? DEFAULT_PORT_LIMITS[providerId] ?? 0;
+}
 
 /** One selectable exit location. `key` is stable across catalog refreshes. */
 export interface Target {
@@ -167,6 +178,13 @@ export interface CheckResult {
 
 export interface Provider {
   id: ProviderId;
+  /**
+   * Optional network step that runs once, before `check`, when an account is added
+   * (spec §5.5: NordVPN exchanges an access token for the account's NordLynx key).
+   * Resolves to the input `check` should validate instead, or to a refusal (an i18n
+   * key). Never rejects. Providers without it get their input checked as typed.
+   */
+  resolveInput?(input: Record<string, string>): Promise<{ input: Record<string, string> } | { reasonKey: string }>;
   /** Validate user input (format only, no network) and normalise it. */
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */

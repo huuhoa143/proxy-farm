@@ -11,7 +11,7 @@ import { autoUpdater } from 'electron-updater';
 import { mkdirSync } from 'node:fs';
 import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
-import { isTerminalState, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
+import { isTerminalState, portLimitOf, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
@@ -197,7 +197,10 @@ export function runApp(): void {
     const refusals = createRefusalTracker({ initial: rawState.getState().refusals });
 
     // 7. providers.
-    registerAllProviders({ surfsharkCachePath: path.join(userData, 'cache', 'surfshark-clusters.json') });
+    registerAllProviders({
+      surfsharkCachePath: path.join(userData, 'cache', 'surfshark-clusters.json'),
+      nordvpnCachePath: path.join(userData, 'cache', 'nordvpn-servers.json'),
+    });
     const providers = { get: getProvider };
 
     // 8. engine: one sing-box per port; `giveUpAfter` read live from settings.
@@ -242,7 +245,7 @@ export function runApp(): void {
       listPorts: () => state.getState().ports,
       setPortAccount: (key, accountId) =>
         state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === key ? { ...p, accountId } : p)) })),
-      getLimit: (providerId) => state.getState().limits[providerId] ?? 0,
+      getLimit: (providerId) => portLimitOf(state.getState().limits, providerId),
       isUsable: () => true,
       refusals,
     });

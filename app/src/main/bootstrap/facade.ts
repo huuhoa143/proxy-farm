@@ -2,6 +2,7 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import {
   isTerminalState,
+  portLimitOf,
   splitPortKey,
   type Account,
   type AccountSecret,
@@ -27,7 +28,7 @@ import type { UpdateStatus } from '../../shared/contracts';
 import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
 import type { HmaLocalSource } from './hma-local';
 
-export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
+export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'];
 
 /** The slice of the `UpdaterService` the facade drives from IPC (spec §9). */
 export interface FacadeUpdater {
@@ -282,7 +283,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
         id,
         accounts: accounts().filter((a) => a.providerId === id),
         detected: id === 'hma' ? hmaDetected : undefined,
-        limit: limits[id] ?? 0,
+        limit: portLimitOf(limits, id),
       }));
     },
 
@@ -292,7 +293,14 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       const provider = deps.providers.get(providerId);
       if (!provider) return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
       // The ZoogVPN card labels its login field "email"; the provider calls it username.
-      const normalized = providerId === 'zoogvpn' && !input.username ? { ...input, username: input.email ?? '' } : input;
+      let normalized = providerId === 'zoogvpn' && !input.username ? { ...input, username: input.email ?? '' } : input;
+      // spec §5.5: some input must be exchanged over the network first (a NordVPN access
+      // token for its NordLynx key), once; what is exchanged is never stored.
+      if (provider.resolveInput) {
+        const resolved = await provider.resolveInput(normalized);
+        if ('reasonKey' in resolved) return { ok: false, reasonKey: resolved.reasonKey };
+        normalized = resolved.input;
+      }
       const check = provider.check(normalized);
       if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
       const secret = check.secret;

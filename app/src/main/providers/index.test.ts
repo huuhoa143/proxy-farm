@@ -7,10 +7,10 @@ describe('registerAllProviders', () => {
     resetRegistryForTest();
   });
 
-  it('registers all four built-in providers', () => {
+  it('registers all five built-in providers', () => {
     registerAllProviders({ surfsharkCachePath: '/tmp/pf-v2-test-unused/surfshark-clusters.json' });
-    expect(allProviders()).toHaveLength(4);
-    for (const id of ['hma', 'zoogvpn', 'surfshark', 'file'] as const) {
+    expect(allProviders()).toHaveLength(5);
+    for (const id of ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as const) {
       expect(getProvider(id)).toBeDefined();
       expect(getProvider(id)!.id).toBe(id);
     }

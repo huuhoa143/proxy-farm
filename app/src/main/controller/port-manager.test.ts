@@ -2548,4 +2548,60 @@ describe('port manager', () => {
       expect(engine.started).toHaveLength(2); // the immediate failover still happens for OpenVPN
     });
   });
+
+  describe('NordVPN (NordLynx) gets the same provider safety (spec §5.5, §6.4)', () => {
+    const NKEY = 'nordvpn:VN-HANOI#1';
+    const nTargets: Target[] = [
+      { key: 'nordvpn:VN-HANOI', providerId: 'nordvpn', country: 'VN', city: 'Hanoi', label: 'Vietnam — Hanoi', servers: ['10.2.0.1', '10.2.0.2', '10.2.0.3', '10.2.0.4'] },
+    ];
+    const nAccount: Account = { id: 'n1', providerId: 'nordvpn', label: 'key …abc', meta: {}, secretRef: 'n1-secret' };
+    const timeout: PortState = { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' };
+
+    function nSetup(depsOverrides: Partial<PortManagerDeps> = {}) {
+      const ctx = setup({
+        targets: nTargets,
+        port: { key: NKEY, locationKey: 'nordvpn:VN-HANOI', providerId: 'nordvpn', accountId: 'n1', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { attemptLimiter: { take: () => 0 }, ...depsOverrides },
+      });
+      ctx.secrets.saveSecret('n1-secret', JSON.stringify({ kind: 'wgkey', privateKey: 'k' }));
+      ctx.state.setState((st) => ({ ...st, accounts: [account, nAccount] }));
+      return ctx;
+    }
+    const stateOf = (ctx: ReturnType<typeof nSetup>) => ctx.state.getState().ports.find((p) => p.key === NKEY)!.state;
+
+    it('an unproven key that gets no handshake 3 times in a row is locked: failed(key-rejected)', async () => {
+      const ctx = nSetup();
+      await ctx.manager.startPort(NKEY);
+      ctx.engine.fireState(NKEY, timeout);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(ctx.engine.started).toHaveLength(1); // no immediate hop, as for Surfshark
+      for (const n of [1, 2]) {
+        ctx.engine.fireRetryDue(NKEY);
+        await vi.waitFor(() => expect(ctx.engine.started).toHaveLength(n + 1));
+        ctx.engine.fireState(NKEY, timeout);
+      }
+      await vi.waitFor(() => expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' }));
+      expect(Object.keys(ctx.state.getState().wgLockouts)).toEqual(['n1']);
+      await ctx.manager.startPort(NKEY);
+      expect(ctx.engine.started).toHaveLength(3);
+    });
+
+    it('its engine starts take from the per-account attempt budget', async () => {
+      const timers: number[] = [];
+      const ctx = nSetup({
+        attemptLimiter: createAttemptLimiter({ now: () => 0, perMinute: 1 }),
+        scheduleRetry: (ms) => {
+          timers.push(ms);
+          return () => undefined;
+        },
+      });
+      await ctx.manager.startPort(NKEY);
+      await ctx.manager.startPort(NKEY);
+      expect(ctx.engine.started).toHaveLength(1);
+      expect(stateOf(ctx)).toMatchObject({ kind: 'retrying', reasonKey: 'rate-limited' });
+      expect(timers).toEqual([60_000]);
+    });
+  });
 });

@@ -13,7 +13,7 @@ export interface OnboardingProps {
 const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'file'];
 type Counts = Record<ProviderId, number>;
 const HMA_WATCH_MS = 3000;
-const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, file: 0 };
+const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, nordvpn: 0, file: 0 };
 
 export function Onboarding({ api, onDone }: OnboardingProps) {
   const { t } = useTranslation();
