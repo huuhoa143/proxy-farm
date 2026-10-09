@@ -65,7 +65,8 @@ nên mỗi cổng có một IP lối ra riêng và ổn định.
 | **ZoogVPN** | OpenVPN | Email và mật khẩu tài khoản | Gói của bạn quyết định máy chủ nào cho vào; máy chủ từ chối sẽ được bỏ qua. |
 | **Surfshark** | WireGuard | Private key WireGuard (trang thiết lập thủ công của Surfshark) | Danh sách máy chủ lấy từ API công khai của Surfshark. |
 | **NordVPN** | WireGuard (NordLynx) | Mã truy cập (access token) từ Nord Account (NordVPN → Advanced settings → Get access token), hoặc private key NordLynx | Mã chỉ được dùng một lần để lấy khóa và không được giữ lại. Danh sách máy chủ lấy từ API công khai của NordVPN. |
-| **File cấu hình** | OpenVPN hoặc WireGuard | File `.ovpn` hoặc `.conf` WireGuard | Dùng được với nhà cung cấp khác hoặc máy chủ của riêng bạn. |
+| **ExpressVPN** | OpenVPN | Username và password ở trang Manual configuration → OpenVPN trong tài khoản ExpressVPN (không phải email/mật khẩu đăng nhập hay mã kích hoạt) | Được kiểm tra bằng một kết nối thử khi thêm. Danh sách máy chủ đóng gói sẵn (ExpressVPN không có danh sách công khai). Giới hạn mặc định 8 cổng: một gói cho 10 thiết bị. |
+| **File cấu hình** | OpenVPN hoặc WireGuard | File `.ovpn` hoặc `.conf` WireGuard | Dùng được với nhà cung cấp khác hoặc máy chủ của riêng bạn, kể cả file `.ovpn` tải từ ExpressVPN. |
 
 Có thể đặt giới hạn số cổng cho từng nhà cung cấp trong app. Chạy quá nhiều tunnel trên
 một tài khoản có thể kích hoạt cơ chế chống lạm dụng của nhà cung cấp; xem
@@ -86,7 +87,8 @@ Tải bản mới nhất ở
 ## Bắt đầu nhanh
 
 1. Mở Proxy Farm và chọn nhà cung cấp ở màn hình đầu tiên (HMA, ZoogVPN, Surfshark,
-   NordVPN hoặc File cấu hình). Với HMA: cài app HMA, đăng nhập và kết nối một lần; Proxy Farm sẽ tự
+   NordVPN, ExpressVPN hoặc File cấu hình). Mỗi thẻ có mục "Cách lấy …" hướng dẫn từng
+   bước. Với HMA: cài app HMA, đăng nhập và kết nối một lần; Proxy Farm sẽ tự
    lấy thông tin thiết bị.
 2. Bấm **Thêm vị trí**, chọn các vị trí và số cổng cho mỗi vị trí.
 3. Khi cổng hiện **Online**, dùng nó:
@@ -178,8 +180,8 @@ người khác. Bạn tự chịu trách nhiệm tuân thủ điều khoản d�
 pháp nơi bạn sống. Kết nối lại dồn dập, chạy quá nhiều tunnel cùng lúc, hay chia sẻ kết nối
 có thể khiến nhà cung cấp khoá tài khoản VPN của bạn.
 
-Dự án không liên quan tới HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security hay
-bất kỳ nhà cung cấp VPN nào.
+Dự án không liên quan tới HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security,
+ExpressVPN hay bất kỳ nhà cung cấp VPN nào.
 
 ## Miễn trừ trách nhiệm
 

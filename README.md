@@ -64,7 +64,8 @@ so each port has its own stable exit IP.
 | **ZoogVPN** | OpenVPN | Account email and password | Your plan decides which servers accept you; refused servers are skipped. |
 | **Surfshark** | WireGuard | Your WireGuard private key (Surfshark manual setup page) | The server list comes from Surfshark's public API. |
 | **NordVPN** | WireGuard (NordLynx) | An access token from Nord Account (NordVPN → Advanced settings → Get access token), or your NordLynx private key | The token is used once to fetch the key and is not kept. The server list comes from NordVPN's public API. |
-| **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server. |
+| **ExpressVPN** | OpenVPN | The username and password from your ExpressVPN account's Manual configuration → OpenVPN page (not your email/password or activation code) | Checked with one test connection when added. The server list is bundled (ExpressVPN has no public one). Default limit 8 ports: a plan allows 10 devices. |
+| **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server, including ExpressVPN's own `.ovpn` downloads. |
 
 Port limits per provider can be set in the app. Many simultaneous tunnels on one account
 can trigger a provider's abuse detection; see the [Disclaimer](DISCLAIMER.md).
@@ -84,7 +85,8 @@ Download the latest build from
 ## Quick start
 
 1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark,
-   NordVPN or Config file). For HMA, install the HMA app, sign in and connect once; Proxy Farm
+   NordVPN, ExpressVPN or Config file). Each card has a "How to get …" guide for its
+   credential. For HMA, install the HMA app, sign in and connect once; Proxy Farm
    picks up its credentials.
 2. Click **Add locations**, choose locations and how many ports each.
 3. When a port shows **Online**, use it:
@@ -177,7 +179,7 @@ service and the laws where you live. Aggressive reconnect attempts, many simulta
 tunnels, or sharing can get your VPN account suspended by the provider.
 
 This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord
-Security or any other VPN provider.
+Security, ExpressVPN or any other VPN provider.
 
 ## Disclaimer
 
