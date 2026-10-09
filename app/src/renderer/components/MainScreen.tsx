@@ -14,7 +14,7 @@ import { useKeyedTimeouts } from '../ui/useKeyedTimeouts';
 import { providerName } from '../ui/providerName';
 import { locationName as nameOf } from '../ui/locationName';
 import { cityName } from '../ui/countryName';
-import { remainingByProvider } from '../portGroups';
+import { groupPorts, remainingByProvider } from '../portGroups';
 import { FilterBar } from './FilterBar';
 import {
   bucketCounts,
@@ -23,11 +23,9 @@ import {
   loadFilter,
   NO_FILTER,
   saveFilter,
-  stateSince,
-  type CheckRecord,
   type PortFilter,
 } from '../portFilter';
-import { runQueue, type QueueRun } from '../runQueue';
+import { useCheckStore } from '../checkStore';
 
 export interface MainScreenProps {
   api: ProxyFarmApi;
@@ -38,16 +36,6 @@ const SAME_CITY_NOTE = 'main.rotateResult.sameCityNote';
 const COPIED_MS = 1500;
 /** Coalesces the target re-reads a burst of port changes triggers into one. */
 const TARGETS_REFRESH_MS = 250;
-/** Check all: probes in flight at once. Each is one request through the port's own
- * tunnel, so a few in parallel keep a long list quick without a burst on the engines. */
-const CHECK_CONCURRENCY = 4;
-
-interface CheckSummary {
-  alive: number;
-  dead: number;
-  skipped: number;
-  deadKeys: string[];
-}
 
 function removeKey(record: Record<string, string>, key: string): Record<string, string> {
   const { [key]: _removed, ...rest } = record;
@@ -73,11 +61,9 @@ export function MainScreen({ api }: MainScreenProps) {
   const [rotating, setRotating] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilterState] = useState<PortFilter>(loadFilter);
-  // Check results live here only (never persisted); see `currentCheck` for when one expires.
-  const [checks, setChecks] = useState<Record<string, CheckRecord>>({});
-  const [checkProgress, setCheckProgress] = useState<{ done: number; total: number } | null>(null);
-  const [checkSummary, setCheckSummary] = useState<CheckSummary | null>(null);
-  const checkRun = useRef<QueueRun | null>(null);
+  // Check results and a running Check all belong to the app session, not this screen:
+  // they survive a tab switch (memory only; see `currentCheck` for when one expires).
+  const [checkStore, { checks, progress: checkProgress, summary: checkSummary }] = useCheckStore();
   const schedule = useKeyedTimeouts();
 
   const setFilter = useCallback((next: PortFilter) => {
@@ -153,18 +139,8 @@ export function MainScreen({ api }: MainScreenProps) {
   // A check result only describes the connection it was taken on: drop it once the
   // port reconnects, changes IP or stops (its `since` changes or goes away).
   useEffect(() => {
-    setChecks((prev) => {
-      const byKey = new Map(ports.map((p) => [p.key, p]));
-      const kept = Object.entries(prev).filter(([key, check]) => {
-        const row = byKey.get(key);
-        return row !== undefined && stateSince(row.state) === check.since;
-      });
-      return kept.length === Object.keys(prev).length ? prev : Object.fromEntries(kept);
-    });
-  }, [ports]);
-
-  // Leaving the screen mid-run: queued checks are dropped, in-flight ones are ignored.
-  useEffect(() => () => checkRun.current?.cancel(), []);
+    if (loaded) checkStore.prune(ports);
+  }, [checkStore, ports, loaded]);
 
   function showNotice(text: string) {
     setNotice(text);
@@ -206,42 +182,19 @@ export function MainScreen({ api }: MainScreenProps) {
     });
   }
 
-  /**
-   * Check (spec §4.1 "Check all"): one exit probe per online port, CHECK_CONCURRENCY at
-   * a time, no speed test. Other ports are counted as skipped, as are the ones Stop
-   * dropped before they ran. One run at a time.
-   */
-  async function runChecks(rows: readonly PortRow[]) {
-    if (checkRun.current) return;
-    const online = rows.filter((r) => r.state.kind === 'online');
-    const outcome = new Map<string, boolean>();
-    setCheckSummary(null);
-    setCheckProgress({ done: 0, total: online.length });
-    const run = runQueue(online, CHECK_CONCURRENCY, async (row) => {
-      const since = stateSince(row.state)!;
-      let result: { ok: boolean; latencyMs?: number };
-      try {
-        result = await api.testPort(row.key, false);
-      } catch {
-        result = { ok: false };
-      }
-      outcome.set(row.key, result.ok);
-      const check: CheckRecord = { ok: result.ok, at: Date.now(), since };
-      if (result.ok && result.latencyMs !== undefined) check.latencyMs = result.latencyMs;
-      setChecks((prev) => ({ ...prev, [row.key]: check }));
-      setCheckProgress((p) => p && { ...p, done: p.done + 1 });
-    });
-    checkRun.current = run;
-    await run.done;
-    if (checkRun.current !== run) return;
-    checkRun.current = null;
-    setCheckProgress(null);
-    const deadKeys = online.filter((r) => outcome.get(r.key) === false).map((r) => r.key);
-    setCheckSummary({ alive: outcome.size - deadKeys.length, dead: deadKeys.length, skipped: rows.length - outcome.size, deadKeys });
+  /** Ports in the order the table shows them (groups, then port number), so a
+   * check run walks the screen top to bottom and Stop skips what is shown last. */
+  function displayOrder(rows: readonly PortRow[]): PortRow[] {
+    return groupPorts(rows, targets, language).flatMap((g) => g.rows);
+  }
+
+  /** Check (spec §4.1 "Check all"): see `CheckStore.run`. One run at a time. */
+  function runChecks(rows: readonly PortRow[]) {
+    void checkStore.run(api, displayOrder(rows));
   }
 
   function stopChecks() {
-    checkRun.current?.cancel();
+    checkStore.stop();
   }
 
   /** "Select dead ports" on the summary: show the Dead bucket and select what the run found dead. */
@@ -249,7 +202,7 @@ export function MainScreen({ api }: MainScreenProps) {
     setFilter({ ...filter, status: 'dead' });
     const live = new Set(ports.map((p) => p.key));
     setSelected(new Set(keys.filter((k) => live.has(k))));
-    setCheckSummary(null);
+    checkStore.dismissSummary();
   }
 
   async function handleStart(keys: string[]) {
@@ -435,7 +388,7 @@ export function MainScreen({ api }: MainScreenProps) {
           <>
             <button
               className="btn ghost"
-              onClick={() => void runChecks(visible)}
+              onClick={() => runChecks(visible)}
               disabled={checking || visible.length === 0}
               title={t('main.check.allHint') as string}
               data-testid="check-all"
@@ -464,7 +417,7 @@ export function MainScreen({ api }: MainScreenProps) {
         count={selected.size}
         hiddenCount={hiddenSelected}
         checking={checking}
-        onCheck={() => void runChecks(ports.filter((p) => selected.has(p.key)))}
+        onCheck={() => runChecks(ports.filter((p) => selected.has(p.key)))}
         onStart={() => void handleStart(selectedKeys).then(() => setSelected(new Set()))}
         onStop={() => void handleStop(selectedKeys)}
         onRotate={() => void handleBulkRotate(selectedKeys)}
@@ -502,7 +455,7 @@ export function MainScreen({ api }: MainScreenProps) {
           )}
           <button
             className="iconbtn"
-            onClick={() => setCheckSummary(null)}
+            onClick={() => checkStore.dismissSummary()}
             aria-label={t('main.check.dismiss') as string}
           >
             <Icon name="x" />

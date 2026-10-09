@@ -30,6 +30,8 @@ describe('ExportModal', () => {
   it('exports only alive ports by default and says how many were left out', async () => {
     await renderExport();
     expect(screen.getByTestId('export-alive-only')).toBeChecked();
+    // A long CSV row scrolls sideways instead of wrapping onto two lines.
+    expect(screen.getByTestId('export-text')).toHaveAttribute('wrap', 'off');
     expect(screen.getByTestId('export-count')).toHaveTextContent('2 ports');
     expect(screen.getByTestId('export-left-out')).toHaveTextContent('3 ports that are not alive left out');
     expect(screen.getByTestId('export-text')).toHaveValue(

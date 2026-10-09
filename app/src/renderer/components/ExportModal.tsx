@@ -151,6 +151,8 @@ export function ExportModal({ api, targetKeys, rows, checks = NO_CHECKS, onClose
             rows={Math.min(10, Math.max(3, included.length + (format === 'csv' ? 1 : 0)))}
             data-testid="export-text"
             spellCheck={false}
+            // One proxy (or CSV row) per line: scroll sideways rather than wrap a row in two.
+            wrap="off"
           />
           {copyError && (
             <p className="result bad" data-testid="export-copy-error" role="alert">

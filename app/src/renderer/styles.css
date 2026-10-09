@@ -1866,6 +1866,9 @@ table.port-table {
 }
 .modal-box textarea {
   width: 100%;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
   font-family: var(--fm);
   font-size: 12px;
   line-height: 1.6;

@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
 import type { PortRow } from '../../shared/contracts';
 import { MainScreen } from './MainScreen';
+import { CheckStoreProvider, createCheckStore } from '../checkStore';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
 
@@ -236,6 +237,65 @@ describe('MainScreen Check all', () => {
     });
     await waitFor(() => expect(screen.getByTestId('check-summary')).toHaveTextContent('1 alive · 0 dead · 1 skipped'));
     expect(test.mock.calls.map((c) => c[0])).toEqual([TOKYO_1]);
+  });
+});
+
+describe('MainScreen Check all across a tab switch', () => {
+  it('keeps the results, and a running check, when the user leaves the Ports screen and comes back', async () => {
+    const api = createFakeProxyFarmApi();
+    const store = createCheckStore();
+    const pending = new Map<string, ReturnType<typeof deferred<{ ok: boolean; latencyMs?: number }>>>();
+    vi.spyOn(api, 'testPort').mockImplementation((key) => {
+      const d = deferred<{ ok: boolean; latencyMs?: number }>();
+      pending.set(key, d);
+      return d.promise;
+    });
+    const screenWithStore = () => (
+      <CheckStoreProvider value={store}>
+        <MainScreen api={api} />
+      </CheckStoreProvider>
+    );
+    const first = render(screenWithStore());
+    await waitFor(() => expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('check-all'));
+    });
+    await act(async () => {
+      pending.get(TOKYO_1)!.resolve({ ok: true, latencyMs: 44 });
+    });
+    expect(screen.getByTestId('check-progress')).toHaveTextContent('Checking 1/2');
+
+    first.unmount(); // another tab
+    await act(async () => {
+      pending.get(TOKYO_2)!.resolve({ ok: false });
+    });
+
+    render(screenWithStore());
+    await waitFor(() => expect(screen.getByTestId(`check-${TOKYO_1}`)).toHaveTextContent('44 ms'));
+    expect(screen.getByTestId(`check-${TOKYO_2}`)).toHaveTextContent('Check failed');
+    expect(screen.getByTestId('check-summary')).toHaveTextContent('1 alive · 1 dead · 3 skipped');
+  });
+});
+
+describe('MainScreen Check all order', () => {
+  it('checks ports in on-screen order, not the order main lists them in', async () => {
+    const api = createFakeProxyFarmApi();
+    const listed = await api.listPorts();
+    // New York (United States) first in main's list, but its group sorts after Japan.
+    const nyc = listed.find((r) => r.key === NYC)!;
+    const rows: PortRow[] = [
+      { ...nyc, state: { kind: 'online', since: 1, exitIp: '203.0.113.20', country: 'US' } },
+      ...listed.filter((r) => r.key === TOKYO_2),
+      ...listed.filter((r) => r.key !== NYC && r.key !== TOKYO_2),
+    ];
+    vi.spyOn(api, 'listPorts').mockResolvedValue(rows);
+    const test = vi.spyOn(api, 'testPort').mockResolvedValue({ ok: true, latencyMs: 5 });
+    await renderMain(api);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('check-all'));
+    });
+    await waitFor(() => expect(screen.getByTestId('check-summary')).toBeInTheDocument());
+    expect(test.mock.calls.map((c) => c[0])).toEqual([TOKYO_1, TOKYO_2, NYC]);
   });
 });
 

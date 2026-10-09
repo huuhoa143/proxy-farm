@@ -168,8 +168,10 @@ Each unit is independently testable:
 - **Check all / bulk Check.** `testPort(key, false)` on each online port (others count
   as skipped), 4 at a time, queued in the renderer (`runQueue`): main's `testPort` is
   already one probe per call and Stop is a renderer concern. Stop drops queued checks;
-  in-flight ones finish. One run at a time. Results live in renderer memory only, keyed
-  by port and tied to the state's `since`: a reconnect or Change IP drops them. The
+  in-flight ones finish. One run at a time, walking the ports in on-screen order (groups,
+  then port number). Results and a running check live in an app-level store
+  (`checkStore.ts`, memory only) so they survive switching tabs; keyed by port and tied
+  to the state's `since`: a reconnect or Change IP drops them. The
   summary banner offers "Select dead ports" (Dead filter + those ports selected).
 - **Export.** The toolbar button exports the selection, else the visible ports. The modal
   has "Alive ports only" (default on, same buckets) and says how many were left out.
