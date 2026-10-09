@@ -5,11 +5,9 @@
   --ink-2: #2f3a52;
   --mut: #545f78;
   --rule: #d3d9e6;
-  --rule-soft: #e2e7f0;
 
   --plate: #0a0f1b;
   --plate-2: #111a2b;
-  --plate-3: #18233a;
   --plate-rule: #233049;
   --plate-tx: #e9eef9;
   --plate-mut: #9aa6c2;
@@ -17,7 +15,6 @@
   --green: #00dd8a;
   --green-ink: #03150e;
   --green-deep: #007a48;
-  --green-wash: #d9f7ea;
   --amber: #f6b53d;
   --amber-deep: #8a5a06;
 
@@ -34,7 +31,6 @@
   --wrap: 1200px;
   --gutter: clamp(1.25rem, 4vw, 2.5rem);
   --sec: clamp(4.5rem, 10vw, 8.5rem);
-  --radius: 14px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   color-scheme: light;

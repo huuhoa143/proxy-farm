@@ -960,7 +960,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     border-bottom: 2px solid var(--ink);
   }
 
-  /* Use cases: the one drenched band */
+  /* Use cases */
   .uses {
     background: var(--paper);
     border-block: 1px solid var(--rule);
@@ -987,7 +987,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     border-top: 2px solid var(--ink);
   }
 
-  .uses-list p {
+  .uses-list p:not(.uses-ex) {
     color: var(--ink-2);
   }
 
@@ -995,7 +995,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     margin-top: 0.4rem;
     font-size: 0.875rem;
     background: var(--plate);
-    color: var(--plate-mut) !important;
+    color: var(--plate-mut);
     border-radius: 8px;
     padding: 0.5rem 0.8rem;
     justify-self: start;
