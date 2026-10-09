@@ -160,6 +160,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     }
     if (r.status === 'found') return { found: true };
     if (r.status === 'helper-missing') return { found: false, hintKey: 'hma.helperMissing' };
+    if (r.status === 'untrusted') return { found: false, hintKey: 'hma.untrusted' };
     if (r.status === 'invalid') return { found: false, hintKey: 'hma.notSignedIn' };
     return { found: false };
   }
@@ -264,6 +265,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     await deps.hmaWindows?.refresh().catch(() => undefined);
     const r = await deps.hma.read();
     if (r.status === 'helper-missing') return { ok: false, reasonKey: 'hma.helperMissing' };
+    if (r.status === 'untrusted') return { ok: false, reasonKey: 'hma.untrusted' };
     if (r.status === 'missing') return { ok: false, reasonKey: 'hma.notFound' };
     if (r.status !== 'found') return { ok: false, reasonKey: 'hma.notSignedIn' };
     const provider = deps.providers.get('hma');

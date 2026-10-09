@@ -111,6 +111,8 @@ export interface HmaCardProps {
 }
 
 const HMA_HELPER_MISSING_HINT = 'hma.helperMissing';
+/** Windows: HMA's folder failed the task's ownership check; installing HMA again fixes it. */
+const HMA_UNTRUSTED_HINT = 'hma.untrusted';
 
 export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) {
   const { t } = useTranslation();
@@ -195,6 +197,12 @@ export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) 
             </span>
             <span data-testid="hma-not-detected">{t('onboarding.providers.hma.notDetectedTitle')}</span>
           </div>
+          {detected?.hintKey === HMA_UNTRUSTED_HINT && (
+            <p className="helper-note" data-testid="hma-untrusted">
+              <Icon name="alert" />
+              <span>{t(HMA_UNTRUSTED_HINT)}</span>
+            </p>
+          )}
           <ol className="steps">
             <li>{t('onboarding.providers.hma.step1')}</li>
             <li>{t('onboarding.providers.hma.step2')}</li>

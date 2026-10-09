@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFile, unwatchFile, watchFile } from 'node:fs';
 import path from 'node:path';
 import { parseAuthFile, parseDeviceCreds, type DeviceCreds } from '../providers/hma/token';
-import { hmaAuthPath, hmaLastRunPath, hmaMirrorDir, hmaMirrorPath, isLastRunFresh } from './hma-windows';
+import { hmaAuthPath, hmaLastRunPath, hmaMirrorDir, hmaMirrorPath, isLastRunFresh, parseLastRun } from './hma-windows';
 
 /** spec §5.1: world-readable on macOS, no admin needed. */
 export const MAC_HMA_TOKEN_PATH = '/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json';
@@ -13,7 +13,9 @@ export type HmaRead =
   | { status: 'missing' }
   | { status: 'invalid'; message: string }
   /** Windows: HMA installed, but HMA support (the credentials copy, spec §7) isn't enabled. */
-  | { status: 'helper-missing' };
+  | { status: 'helper-missing' }
+  /** Windows: the task refused HMA's folder (owner not TrustedInstaller, SYSTEM or Administrators). */
+  | { status: 'untrusted' };
 
 export interface HmaLocalSource {
   read(): Promise<HmaRead>;
@@ -55,9 +57,9 @@ function parsed(text: string, parse: (text: string) => DeviceCreds): HmaRead {
  * - macOS: parses `tokenCoreSE.json` with the providers module's `parseDeviceCreds`.
  * - Windows: parses the `auth` file with `parseAuthFile`. HMA's own file is admin-only; it
  *   is preferred whenever the app happens to run elevated, and otherwise the copy kept by HMA
- *   support (`hma-windows.ts`) is read. Once HMA support is enabled, a missing copy means
- *   HMA has no credentials (not signed in); before that, an HMA install reports
- *   `helper-missing` so the UI offers "Enable HMA support".
+ *   support (`hma-windows.ts`) is read, as the task's latest run (`last-run`) reports it:
+ *   `none` is HMA uninstalled or signed out, `untrusted` a refused HMA folder. Before HMA
+ *   support is enabled, an HMA install reports `helper-missing` so the UI offers "Enable HMA support".
  */
 export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocalSource {
   const platform = opts.platform ?? process.platform;
@@ -93,14 +95,15 @@ export function createHmaLocalSource(opts: HmaLocalSourceOptions = {}): HmaLocal
     // pair: ask the user to enable HMA support again, which repairs all of these.
     const lastRun = await readText(winLastRunPath);
     if (!('text' in lastRun) || !isLastRunFresh(lastRun.text)) return notEnabled;
+    const result = parseLastRun(lastRun.text)!.result;
+    // The task found no HMA folder or no credentials file in it (and removed the copy).
+    if (result === 'none') return existsSync(winHmaDir) ? { status: 'invalid', message: 'hma: not signed in' } : { status: 'missing' };
+    if (result === 'untrusted') return { status: 'untrusted' };
     const mirror = await readText(winMirrorPath);
+    // `ok`, or an `error` run that kept the previous copy: that copy lags HMA by one run at most.
     if ('text' in mirror) return parsed(mirror.text, parseAuthFile);
-    // HMA support is on but there is no copy: HMA is installed and signed out (the task
-    // removes the copy when HMA has none), so point the user at HMA rather than telling them
-    // it isn't installed.
-    if (mirror.error.code === 'ENOENT') {
-      return { status: 'invalid', message: 'hma: no credentials copy yet (sign in to HMA and connect once)' };
-    }
+    // `ok` but the copy is gone, or an `error` run with no copy: re-enabling HMA support
+    // re-runs the task and reports why.
     return notEnabled;
   }
 

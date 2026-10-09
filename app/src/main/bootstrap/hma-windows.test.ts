@@ -120,6 +120,8 @@ describe('HMA support on Windows (spec §7)', () => {
     expect(setup).not.toContain('hma-sync.ps1');
     // Queue a run requested during another, so a requester always gets a run after its request.
     expect(setup).toContain('$def.Settings.MultipleInstances = 1');
+    // A culture-invariant start time: a custom pattern's ':' follows the locale (Finnish: '.').
+    expect(setup).toContain("$every.StartBoundary = (Get-Date).ToString('s')");
   });
 
   it('the setup creates its folders with their final security descriptor in one step and refuses anything else', () => {
@@ -311,8 +313,8 @@ $out | ConvertTo-Json -Compress`;
     const lastRunPath = () => join(tmp, 'hma', 'last-run');
     const enableFolder = () => mkdirSync(mirrorDir());
     const stamp = (started: number, result = 'ok') => writeFileSync(lastRunPath(), `${started} ${result}`);
-    const make = (runFile: RunFile, refreshTimeoutMs = 2000, staleRefreshTimeoutMs = refreshTimeoutMs) =>
-      createHmaWindowsSupport({ mirrorDir: mirrorDir(), lastRunPath: lastRunPath(), runFile, refreshTimeoutMs, staleRefreshTimeoutMs, refreshPollMs: 5 });
+    const make = (runFile: RunFile, refreshTimeoutMs = 2000, staleRefreshTimeoutMs = refreshTimeoutMs, staleRetryMs = 0) =>
+      createHmaWindowsSupport({ mirrorDir: mirrorDir(), lastRunPath: lastRunPath(), runFile, refreshTimeoutMs, staleRefreshTimeoutMs, refreshPollMs: 5, staleRetryMs });
 
     it('does nothing when HMA support was never enabled (no copy folder)', async () => {
       const calls: string[] = [];
@@ -366,6 +368,33 @@ $out | ConvertTo-Json -Compress`;
       const t0 = Date.now();
       await make(async () => ({ code: 0, stdout: '' }), 5000, 100).refresh();
       expect(Date.now() - t0).toBeLessThan(2000);
+    });
+
+    it('shares one run between callers asking at once', async () => {
+      enableFolder();
+      let runs = 0;
+      const hma = make(async () => {
+        runs += 1;
+        const started = Date.now();
+        setTimeout(() => stamp(started), 30);
+        return { code: 0, stdout: '' };
+      });
+      await Promise.all([hma.refresh(), hma.refresh(), hma.refresh()]);
+      expect(runs).toBe(1);
+    });
+
+    it('after a stopped task again gave no report, does not start it again until the retry delay', async () => {
+      enableFolder();
+      stamp(Date.now() - LAST_RUN_STALE_MS - 60_000);
+      let runs = 0;
+      const hma = make(async () => (runs++, { code: 0, stdout: '' }), 100, 30, 60_000);
+      await hma.refresh();
+      await hma.refresh();
+      expect(runs).toBe(1);
+      // Once the task reports again (HMA support re-enabled), refresh runs it as usual.
+      stamp(Date.now());
+      await hma.refresh();
+      expect(runs).toBe(2);
     });
   });
 });

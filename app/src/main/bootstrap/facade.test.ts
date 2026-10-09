@@ -231,6 +231,8 @@ describe('controller facade', () => {
     expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.notSignedIn' });
     hmaRead = { status: 'helper-missing' };
     expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.helperMissing' });
+    hmaRead = { status: 'untrusted' };
+    expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.untrusted' });
   });
 
   it('listProviders asks the Windows task for a run before offering to enable HMA support again', async () => {

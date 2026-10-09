@@ -619,6 +619,7 @@
     "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
     "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
     "helperMissing": "HMA support isn't enabled on this computer yet. Click \"Enable HMA support\" first.",
+    "untrusted": "Windows' HMA folder isn't owned by Windows or an administrator, so Proxy Farm won't read credentials from it. Reinstall HMA, then try again.",
     "enable": {
       "cancelled": "Administrator approval was cancelled, so HMA support wasn't enabled.",
       "no-credentials": "HMA support is on, but HMA has no device credentials yet. Open HMA, sign in, connect once, then try again.",

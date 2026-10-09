@@ -619,6 +619,7 @@
     "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
     "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
     "helperMissing": "Máy này chưa bật hỗ trợ HMA. Hãy bấm \"Bật hỗ trợ HMA\" trước.",
+    "untrusted": "Thư mục HMA trên Windows không thuộc quyền sở hữu của Windows hoặc quản trị viên nên Proxy Farm không đọc thông tin đăng nhập từ đó. Hãy cài lại HMA rồi thử lại.",
     "enable": {
       "cancelled": "Bạn đã huỷ xác nhận quản trị viên nên hỗ trợ HMA chưa được bật.",
       "no-credentials": "Đã bật hỗ trợ HMA nhưng HMA chưa có thông tin đăng nhập thiết bị. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",

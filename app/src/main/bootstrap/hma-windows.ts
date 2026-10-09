@@ -317,7 +317,8 @@ $def.Principal.UserId = 'S-1-5-18'
 $def.Principal.LogonType = 5
 $boot = $def.Triggers.Create(8)
 $every = $def.Triggers.Create(1)
-$every.StartBoundary = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss')
+# 's' is culture-invariant: a custom pattern's ':' becomes the locale's time separator.
+$every.StartBoundary = (Get-Date).ToString('s')
 $every.Repetition.Interval = 'PT5M'
 # The sync script is embedded in the action (-EncodedCommand), not a file on disk.
 $action = $def.Actions.Create(0)
@@ -442,6 +443,9 @@ export interface HmaWindowsSupportOptions {
   refreshTimeoutMs?: number;
   staleRefreshTimeoutMs?: number;
   refreshPollMs?: number;
+  /** After a run of a task that stopped reporting gets no report, how long refresh() returns
+   * at once instead of queueing yet another SYSTEM run (detection polls every few seconds). */
+  staleRetryMs?: number;
 }
 
 export function createHmaWindowsSupport(opts: HmaWindowsSupportOptions = {}): HmaWindowsSupport {
@@ -453,6 +457,37 @@ export function createHmaWindowsSupport(opts: HmaWindowsSupportOptions = {}): Hm
   const refreshTimeoutMs = opts.refreshTimeoutMs ?? 20_000;
   const staleRefreshTimeoutMs = opts.staleRefreshTimeoutMs ?? 5_000;
   const refreshPollMs = opts.refreshPollMs ?? 100;
+  const staleRetryMs = opts.staleRetryMs ?? 60_000;
+  // Callers asking while a refresh runs share it rather than queue more runs of the task.
+  let inFlight: Promise<void> | null = null;
+  let staleRetryAt = 0;
+
+  async function refreshOnce(): Promise<void> {
+    // No copy folder: HMA support was never enabled for this machine, so there is no task.
+    if (!existsSync(mirrorDir)) return;
+    // A task that stopped reporting (see LAST_RUN_STALE_MS) is not waited for long: the
+    // read that follows then asks the user to enable HMA support again.
+    const before = await readFile(lastRunPath, 'utf8').catch(() => '');
+    const stale = !isLastRunFresh(before);
+    if (stale && Date.now() < staleRetryAt) return;
+    const timeoutMs = stale ? Math.min(refreshTimeoutMs, staleRefreshTimeoutMs) : refreshTimeoutMs;
+    // `schtasks /run` returns once the run is started, not finished: wait for a last-run
+    // stamped at or after the request (the task queues a run asked for during another).
+    const requested = Date.now();
+    const run = await runFile(system32('schtasks.exe'), ['/run', '/tn', `${HMA_TASK_FOLDER}${HMA_TASK_NAME}`]).catch(() => undefined);
+    if (run?.code !== 0) return;
+    while (Date.now() - requested < timeoutMs) {
+      // The run removed HMA support (Proxy Farm uninstalled long enough): nothing will report.
+      if (!existsSync(mirrorDir)) return;
+      const last = parseLastRun(await readFile(lastRunPath, 'utf8').catch(() => ''));
+      if (last && last.started >= requested) {
+        staleRetryAt = 0;
+        return;
+      }
+      await new Promise((r) => setTimeout(r, refreshPollMs));
+    }
+    if (stale) staleRetryAt = Date.now() + staleRetryMs;
+  }
 
   return {
     async enable() {
@@ -479,25 +514,11 @@ export function createHmaWindowsSupport(opts: HmaWindowsSupportOptions = {}): Hm
       return { ok: false, reason: 'failed' };
     },
 
-    async refresh() {
-      // No copy folder: HMA support was never enabled for this machine, so there is no task.
-      if (!existsSync(mirrorDir)) return;
-      // A task that stopped reporting (see LAST_RUN_STALE_MS) is not waited for long: the
-      // read that follows then asks the user to enable HMA support again.
-      const before = await readFile(lastRunPath, 'utf8').catch(() => '');
-      const timeoutMs = isLastRunFresh(before) ? refreshTimeoutMs : Math.min(refreshTimeoutMs, staleRefreshTimeoutMs);
-      // `schtasks /run` returns once the run is started, not finished: wait for a last-run
-      // stamped at or after the request (the task queues a run asked for during another).
-      const requested = Date.now();
-      const run = await runFile(system32('schtasks.exe'), ['/run', '/tn', `${HMA_TASK_FOLDER}${HMA_TASK_NAME}`]).catch(() => undefined);
-      if (run?.code !== 0) return;
-      while (Date.now() - requested < timeoutMs) {
-        // The run removed HMA support (Proxy Farm uninstalled long enough): nothing will report.
-        if (!existsSync(mirrorDir)) return;
-        const last = parseLastRun(await readFile(lastRunPath, 'utf8').catch(() => ''));
-        if (last && last.started >= requested) return;
-        await new Promise((r) => setTimeout(r, refreshPollMs));
-      }
+    refresh() {
+      inFlight ??= refreshOnce().finally(() => {
+        inFlight = null;
+      });
+      return inFlight;
     },
   };
 }

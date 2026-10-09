@@ -32,6 +32,13 @@ describe('Onboarding', () => {
     await waitFor(() => expect(screen.getByTestId('hma-not-detected')).toBeInTheDocument());
     expect(screen.getByTestId('hma-not-detected')).toHaveTextContent('HMA not found');
     expect(screen.queryByText('Enable HMA support')).toBeNull();
+    expect(screen.queryByTestId('hma-untrusted')).toBeNull();
+  });
+
+  it("says why when the task refused HMA's folder", async () => {
+    render(<Onboarding api={apiWithHmaDetected({ found: false, hintKey: 'hma.untrusted' })} onDone={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId('hma-untrusted')).toHaveTextContent('Reinstall HMA'));
+    expect(screen.queryByText('Enable HMA support')).toBeNull();
   });
 
   it('shows the Enable-HMA-support CTA and calls enableHmaSupport() when the helper is missing (ruling A)', async () => {
