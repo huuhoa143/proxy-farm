@@ -63,6 +63,7 @@ so each port has its own stable exit IP.
 | **HMA** | OpenVPN | Nothing: the app reads the device credentials of the HMA app installed on the same computer | macOS only for now. Windows needs a helper service that is not built yet. |
 | **ZoogVPN** | OpenVPN | Account email and password | Your plan decides which servers accept you; refused servers are skipped. |
 | **Surfshark** | WireGuard | Your WireGuard private key (Surfshark manual setup page) | The server list comes from Surfshark's public API. |
+| **NordVPN** | WireGuard (NordLynx) | An access token from Nord Account (NordVPN → Advanced settings → Get access token), or your NordLynx private key | The token is used once to fetch the key and is not kept. The server list comes from NordVPN's public API. |
 | **Config file** | OpenVPN or WireGuard | A `.ovpn` or WireGuard `.conf` file | Works with other providers or your own server. |
 
 Port limits per provider can be set in the app. Many simultaneous tunnels on one account
@@ -82,8 +83,8 @@ Download the latest build from
 
 ## Quick start
 
-1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark or
-   Config file). For HMA, install the HMA app, sign in and connect once; Proxy Farm
+1. Open Proxy Farm and pick a provider on the first screen (HMA, ZoogVPN, Surfshark,
+   NordVPN or Config file). For HMA, install the HMA app, sign in and connect once; Proxy Farm
    picks up its credentials.
 2. Click **Add locations**, choose locations and how many ports each.
 3. When a port shows **Online**, use it:
@@ -175,8 +176,8 @@ share them with others. You are responsible for following your provider's terms 
 service and the laws where you live. Aggressive reconnect attempts, many simultaneous
 tunnels, or sharing can get your VPN account suspended by the provider.
 
-This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN or any other VPN
-provider.
+This project is not affiliated with HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord
+Security or any other VPN provider.
 
 ## Disclaimer
 

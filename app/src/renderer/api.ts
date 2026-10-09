@@ -20,7 +20,7 @@ import type {
   Target,
   UpdateStatus,
 } from '../shared/contracts';
-import { makePortKey, splitPortKey } from '../shared/contracts';
+import { DEFAULT_PORT_LIMITS, makePortKey, splitPortKey } from '../shared/contracts';
 
 export function getProxyFarmApi(): ProxyFarmApi {
   const injected = typeof window !== 'undefined' ? window.proxyFarm : undefined;
@@ -276,7 +276,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   /** Enabled ports this provider may still add; Infinity when unlimited (limit 0). */
   function remainingFor(providerId: ProviderId): number {
-    const limit = limits.get(providerId) ?? 0;
+    const limit = limits.get(providerId) ?? DEFAULT_PORT_LIMITS[providerId] ?? 0;
     if (!limit) return Infinity;
     const enabled = Array.from(ports.values()).filter((p) => p.providerId === providerId && p.enabled).length;
     return Math.max(0, limit - enabled);
@@ -313,11 +313,11 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   const api: FakeProxyFarmApi = {
     async listProviders() {
-      return (['hma', 'zoogvpn', 'surfshark', 'file'] as ProviderId[]).map((id) => ({
+      return (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as ProviderId[]).map((id) => ({
         id,
         accounts: accounts.filter((a) => a.account.providerId === id).map((a) => a.account),
         detected: id === 'hma' ? { found: true } : undefined,
-        limit: limits.get(id) ?? 0,
+        limit: limits.get(id) ?? DEFAULT_PORT_LIMITS[id] ?? 0,
       }));
     },
 
@@ -345,9 +345,28 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         const account: Account = {
           id: `surfshark-${accounts.length + 1}`,
           providerId,
-          label: `key …${privateKey.slice(-4)}`,
+          // The real label is the end of the PUBLIC key (main/providers/wg-key.ts); the
+          // renderer cannot derive it, and nothing here may come from the private key.
+          label: `pubkey …fake${accounts.length + 1}`,
           meta: { address: input.address || '10.14.0.2/16' },
           secretRef: `surfshark-${accounts.length + 1}`,
+        };
+        accounts.push({ account, secret: { kind: 'wgkey', privateKey } });
+        return { ok: true, account, label: account.label };
+      }
+      if (providerId === 'nordvpn') {
+        // The real provider exchanges an access token (64 hex) for the NordLynx key once;
+        // the fake stands a fixed dummy key in for it.
+        const credential = (input.credential ?? '').trim();
+        const isToken = /^[0-9a-fA-F]{64}$/.test(credential);
+        if (!isToken && !/^[A-Za-z0-9+/]{43}=$/.test(credential)) return { ok: false, reasonKey: 'nordvpn.check.invalidInput' };
+        const privateKey = isToken ? 'fakeNordLynxKeyfakeNordLynxKeyfakeNordLynx0=' : credential;
+        const account: Account = {
+          id: `nordvpn-${accounts.length + 1}`,
+          providerId,
+          label: `pubkey …fake${accounts.length + 1}`,
+          meta: {},
+          secretRef: `nordvpn-${accounts.length + 1}`,
         };
         accounts.push({ account, secret: { kind: 'wgkey', privateKey } });
         return { ok: true, account, label: account.label };
@@ -622,7 +641,7 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         os: { platform: 'fake', release: '0', arch: 'fake' },
         versions: { electron: 'fake', chrome: 'fake', node: 'fake' },
         singBox: '1.14.2',
-        providers: (['hma', 'zoogvpn', 'surfshark', 'file'] as ProviderId[]).map((id) => {
+        providers: (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as ProviderId[]).map((id) => {
           const own = rows.filter((r) => r.providerId === id);
           const portStates: Partial<Record<PortRow['state']['kind'], number>> = {};
           for (const r of own) portStates[r.state.kind] = (portStates[r.state.kind] ?? 0) + 1;

@@ -2,6 +2,7 @@ import { lookup, resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import {
+  EXIT_IP_MODELS,
   isTerminalState,
   makePortKey,
   splitPortKey,
@@ -228,10 +229,11 @@ const CONNECTIVITY_RETRY_REASONS = new Set(['timeout', 'unreachable', 'unrespons
  * crash (`exited`) says nothing about the key, and `verify-failed` comes after a 200. */
 const NO_HANDSHAKE_REASONS = new Set(['timeout', 'unreachable']);
 
-/** A WireGuard account: Surfshark, or an imported WireGuard `.conf`. Every port of such
- * an account sends WireGuard handshakes, which fail silently (spec §5.3). */
+/** A WireGuard account: Surfshark, NordVPN (NordLynx), or an imported WireGuard `.conf`.
+ * Every port of such an account sends WireGuard handshakes, which fail silently (spec
+ * §5.3, §5.5). */
 function isWireguardAccount(account: Account, secret: AccountSecret | null): boolean {
-  if (account.providerId === 'surfshark') return true;
+  if (account.providerId === 'surfshark' || account.providerId === 'nordvpn') return true;
   return account.providerId === 'file' && secret?.kind === 'file' && /^\s*\[Interface\]/im.test(secret.content);
 }
 
@@ -295,8 +297,9 @@ const CREDENTIAL_PROBE_BUDGET_MS = 90_000;
 const PROBE_PORT_BASE = 39_000;
 
 /** One server's identity for the allocation invariant (spec §6.8). Each part is compared
- * only with its own kind (a Surfshark exit IP is the server IP + 1, which may well be
- * another server's own IP). */
+ * only with its own kind: an exit IP need not be its server's IP (Surfshark: server IP
+ * + 1; NordVPN: another address of the server's subnet, e.g. .1 → .22), and may well be
+ * another server's own IP. */
 interface Identity {
   token: string;
   ip?: string;
@@ -1043,7 +1046,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * equals another enabled port's of the same provider moves to another server. */
   function onOnline(port: PortRow & { server: string }, exitIp: string): void {
     const serverIp = port.serverIp ?? knownIp(port.server);
-    if (serverIp) exitByIp.set(serverIp, exitIp);
+    // A session exit (NordVPN) is the tunnel's, not the server's: remembered as the
+    // server's identity, a stale one could make another server look like this machine
+    // once its own session drew that exit. Its live value still counts below.
+    if (serverIp && EXIT_IP_MODELS[port.providerId] !== 'session') exitByIp.set(serverIp, exitIp);
     if (rotatingKeys.has(port.key)) return;
     const clash = deps.state
       .getState()

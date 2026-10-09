@@ -65,11 +65,15 @@ export async function recordPid(registryPath: string, key: string, entry: PidEnt
   });
 }
 
-/** Removes the tracked process for `key`, if present. No-op if the key (or the file) doesn't exist. */
-export async function removePid(registryPath: string, key: string): Promise<void> {
+/**
+ * Removes the tracked process for `key`, if present. No-op if the key (or the file)
+ * doesn't exist. With `pid`, only an entry for that very process is removed: an exit
+ * reported late must not drop the record of the process that replaced it.
+ */
+export async function removePid(registryPath: string, key: string, pid?: number): Promise<void> {
   return enqueue(registryPath, async () => {
     const registry = await loadRegistry(registryPath);
-    if (key in registry) {
+    if (key in registry && (pid === undefined || registry[key].pid === pid)) {
       delete registry[key];
       await saveRegistry(registryPath, registry);
     }

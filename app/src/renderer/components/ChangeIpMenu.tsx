@@ -2,8 +2,9 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi, ServerHealth, ServerInfo } from '../../shared/contracts';
-import { splitPortKey } from '../../shared/contracts';
+import { EXIT_IP_MODELS, splitPortKey } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
+import { providerName } from '../ui/providerName';
 import type { StatusTone } from '../portStateView';
 
 export interface ChangeIpMenuProps {
@@ -305,6 +306,12 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange, locatio
                 </div>
               )}
             </div>
+            {EXIT_IP_MODELS[row.providerId] === 'session' && (
+              // The servers above are what a port pins; the exit IP is not tied to them.
+              <p className="cim-msg cim-note" data-testid="session-exit-note">
+                {t('main.changeIp.sessionExitNote', { provider: providerName(row.providerId, t) })}
+              </p>
+            )}
           </div>,
           document.body,
         )}

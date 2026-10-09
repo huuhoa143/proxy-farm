@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PortRow, ProviderId, ProxyFarmApi, Target } from '../../shared/contracts';
+import { EXIT_IP_MODELS, type PortRow, type ProviderId, type ProxyFarmApi, type Target } from '../../shared/contracts';
 import { describePortState, isTerminalFailure } from '../portStateView';
 import { addPortBlock, groupPorts, portNumber, remainingByProvider, type PortGroup } from '../portGroups';
 import { StatusDot } from './StatusDot';
@@ -9,6 +9,7 @@ import { ChangeIpMenu } from './ChangeIpMenu';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
+import { exitCountry, type ExitCountryView } from '../ui/exitCountry';
 import { locationName } from '../ui/locationName';
 import { providerName } from '../ui/providerName';
 
@@ -213,6 +214,11 @@ export function PortTable({
                 <span className="grp-sub">
                   {/* A country-wide location is already named after the country. */}
                   {!group.countryWide && countryName(group.country, language)}
+                  {target?.virtualLocation && (
+                    <span className="pill virt" title={t('main.virtualLocationHint', { provider }) as string} data-testid={`virtual-${group.locationKey}`}>
+                      {t('main.virtualLocation')}
+                    </span>
+                  )}
                   <span className={`psw ${group.providerId}`} aria-hidden="true" />
                   {provider}
                 </span>
@@ -278,6 +284,10 @@ export function PortTable({
         const n = portNumber(row);
         const serverIp = row.serverIp ?? row.server;
         const rowLocation = locationName({ ...row, countryWide: targetByKey.get(row.locationKey)?.countryWide }, language);
+        // Tagged with the location's country; the probe's geolocation is only a hint.
+        const exit: ExitCountryView = state.kind === 'online' ? exitCountry(row.country, state.country) : {};
+        // NordVPN: the exit belongs to the connection, not the server (spec §5.5).
+        const sessionExit = EXIT_IP_MODELS[row.providerId] === 'session';
         const portLabel = n ? (t('main.port.label', { location: rowLocation, n }) as string) : row.label;
         // Change IP picks another server: useful when online and when stuck
         // retrying / failed on a bad server; not while stopped or mid-connect.
@@ -354,7 +364,7 @@ export function PortTable({
                   {serverIp ? (
                     <span
                       className="srv-ip mono"
-                      title={t('main.port.serverTitle', { server: row.server ?? serverIp }) as string}
+                      title={t(sessionExit ? 'main.port.serverTitleSession' : 'main.port.serverTitle', { server: row.server ?? serverIp, provider: providerName(row.providerId, t) }) as string}
                     >
                       {serverIp}
                     </span>
@@ -380,10 +390,33 @@ export function PortTable({
               <td className="c-ip">
                 {state.kind === 'online' ? (
                   <span className="ip">
-                    <span className="mono">{state.exitIp}</span>
-                    <span className="cc" title={countryName(state.country, language)}>
-                      ({state.country})
+                    <span
+                      className="mono"
+                      data-testid={`exit-ip-${row.key}`}
+                      title={sessionExit ? (t('main.port.sessionExitTitle', { provider: providerName(row.providerId, t) }) as string) : undefined}
+                    >
+                      {state.exitIp}
                     </span>
+                    {exit.tag && (
+                      <span className="cc" title={countryName(exit.tag, language)} data-testid={`exit-cc-${row.key}`}>
+                        ({exit.tag})
+                      </span>
+                    )}
+                    {exit.tag && exit.geo && (
+                      <span
+                        className="geo-hint"
+                        data-testid={`geo-hint-${row.key}`}
+                        title={
+                          t('main.port.geoHintTitle', {
+                            ip: state.exitIp,
+                            geo: countryName(exit.geo, language),
+                            country: countryName(exit.tag, language),
+                          }) as string
+                        }
+                      >
+                        {t('main.port.geoHint', { country: exit.geo })}
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span className="none">—</span>

@@ -11,6 +11,8 @@ import type { SecretStore } from '../store/secrets';
 import { createStateStore, type StateStore } from '../store/state';
 import { createControllerFacade, guessCountry, rotateNoteKey, type FacadeDeps } from './facade';
 import type { HmaRead } from './hma-local';
+import { createNordvpnProvider } from '../providers/nordvpn';
+import { wgKeyLabel } from '../providers/wg-key';
 
 function memorySecrets(): SecretStore & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -209,10 +211,14 @@ describe('controller facade', () => {
     const { facade, state } = setup();
     state.setState((s) => ({ ...s, limits: { ...s.limits, zoogvpn: 3 } }));
     const list = await facade.listProviders();
-    expect(list.map((p) => p.id)).toEqual(['hma', 'zoogvpn', 'surfshark', 'file']);
+    expect(list.map((p) => p.id)).toEqual(['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file']);
     expect(list[0].detected).toEqual({ found: true });
     expect(list[1].limit).toBe(3);
     expect(list[2].limit).toBe(0);
+    // NordVPN's default limit until the user sets one; an explicit 0 (unlimited) wins.
+    expect(list[3].limit).toBe(6);
+    state.setState((s) => ({ ...s, limits: { ...s.limits, nordvpn: 0 } }));
+    expect((await facade.listProviders())[3].limit).toBe(0);
   });
 
   it('listProviders maps a missing / unreadable HMA install to not-found hints', async () => {
@@ -269,6 +275,69 @@ describe('controller facade', () => {
     expect(state.getState().accounts).toHaveLength(1);
     expect(state.getState().accounts[0].meta).toEqual({ address: '10.64.1.2/16' });
     expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
+  });
+
+  it('re-adding a key whose account kept its legacy label (secret lost) repairs that account, not a twin', async () => {
+    const KEY = 'kNWOz8Z0Ft2V0vHn8bU1Hc0w2m9yBq7Ri3sXkQe1hGc=';
+    const surfshark: Provider = {
+      ...fakeProvider('surfshark', () => []),
+      check: () => ({ ok: true, label: wgKeyLabel(KEY), secret: { kind: 'wgkey', privateKey: KEY }, meta: {} }),
+    };
+    const { facade, state, secrets, portManager } = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+    // As `migrateKeyLabels` leaves it when the keychain lost the secret: legacy label, no secret.
+    state.setState((s) => ({
+      ...s,
+      accounts: [{ id: 'surfshark-1', providerId: 'surfshark', label: `key …${KEY.slice(-6)}`, meta: {}, secretRef: 'account:surfshark-1' }],
+    }));
+    const r = await facade.addAccount('surfshark', { privateKey: KEY });
+    expect(r).toMatchObject({ ok: true, label: wgKeyLabel(KEY) });
+    expect(state.getState().accounts).toEqual([expect.objectContaining({ id: 'surfshark-1', label: wgKeyLabel(KEY) })]);
+    expect(JSON.parse(secrets.loadSecret('account:surfshark-1')!)).toEqual({ kind: 'wgkey', privateKey: KEY });
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
+  });
+
+  describe('addAccount(nordvpn): an access token is exchanged once and never stored (spec §5.5)', () => {
+    const TOKEN = 'cd'.repeat(32);
+    const KEY = 'kNWOz8Z0Ft2V0vHn8bU1Hc0w2m9yBq7Ri3sXkQe1hGc=';
+
+    function nordSetup(answer: { status: number; body?: unknown }) {
+      const fetchImpl = vi.fn(async () => ({ ok: answer.status === 200, status: answer.status, json: async () => answer.body }));
+      const nordvpn = createNordvpnProvider({ cachePath: join(dir, 'cache', 'nordvpn-servers.json'), fetchImpl });
+      const env = setup({ providers: { get: (id) => (id === 'nordvpn' ? nordvpn : undefined) } });
+      return { ...env, fetchImpl };
+    }
+
+    it('a token → the NordLynx key is stored as a wgkey secret; the token is nowhere', async () => {
+      const { facade, state, secrets, fetchImpl, portManager } = nordSetup({ status: 200, body: { username: 'u', password: 'p', nordlynx_private_key: KEY } });
+      const r = await facade.addAccount('nordvpn', { credential: ` ${TOKEN} ` });
+      expect(r).toMatchObject({ ok: true, label: wgKeyLabel(KEY) });
+      expect(r.label).not.toContain(KEY.slice(-6, -1));
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(secrets.loadSecret(r.account!.secretRef)!)).toEqual({ kind: 'wgkey', privateKey: KEY });
+      expect(JSON.stringify(state.getState())).not.toContain(TOKEN);
+      // A WireGuard key has no live login check (that is the OpenVPN credential probe).
+      expect(portManager.calls.filter((c) => c.startsWith('check:'))).toEqual([]);
+    });
+
+    it('a pasted NordLynx key is stored without any network call', async () => {
+      const { facade, secrets, fetchImpl } = nordSetup({ status: 500 });
+      const r = await facade.addAccount('nordvpn', { credential: KEY });
+      expect(r.ok).toBe(true);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(JSON.parse(secrets.loadSecret(r.account!.secretRef)!)).toEqual({ kind: 'wgkey', privateKey: KEY });
+    });
+
+    it('a refused token, a network error or malformed input store nothing', async () => {
+      for (const [answer, input, reasonKey] of [
+        [{ status: 401 }, TOKEN, 'nordvpn.check.tokenRejected'],
+        [{ status: 503 }, TOKEN, 'nordvpn.check.networkError'],
+        [{ status: 200 }, 'not a token or a key', 'nordvpn.check.invalidInput'],
+      ] as const) {
+        const { facade, state } = nordSetup(answer);
+        expect(await facade.addAccount('nordvpn', { credential: input })).toEqual({ ok: false, reasonKey });
+        expect(state.getState().accounts).toHaveLength(0);
+      }
+    });
   });
 
   it('connectHma: not installed → hma.notFound; not macOS → hma.windowsLater', async () => {
@@ -592,6 +661,7 @@ describe('controller facade', () => {
       { id: 'hma', accounts: 1, ports: 3, portStates: { online: 2, failed: 1 } },
       { id: 'zoogvpn', accounts: 1, ports: 1, portStates: { stopped: 1 } },
       { id: 'surfshark', accounts: 0, ports: 0, portStates: {} },
+      { id: 'nordvpn', accounts: 0, ports: 0, portStates: {} },
       { id: 'file', accounts: 0, ports: 0, portStates: {} },
     ]);
 

@@ -36,7 +36,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(dir, { recursive: true, force: true });
+  // A test can end while the pool is still persisting in the background (the
+  // first round's fire-and-forget write), so a file may appear while the
+  // directory is being removed. rmSync retries ENOTEMPTY/EBUSY with backoff.
+  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 20 });
 });
 
 describe('surfshark pools: discovery', () => {

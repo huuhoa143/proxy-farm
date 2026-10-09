@@ -23,8 +23,9 @@ All files live in the app's data folder (Electron's `userData` folder):
 | File | Contents |
 |---|---|
 | `state.json` | Settings, ports (location, port number, pinned server), account metadata such as the label you see in the app (for example a ZoogVPN email address or the HMA device id), port limits, server health notes. **Not encrypted, but holds no passwords or keys.** |
-| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark private key, imported config files, the HMA device credentials, the proxy password and the webhook key. |
+| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark and NordLynx private keys, imported config files, the HMA device credentials, the proxy password and the webhook key. |
 | `cache/surfshark-clusters.json`, `cache/surfshark-pools.json` | Surfshark's public server list and the server IPs found through DNS. |
+| `cache/nordvpn-servers.json` | NordVPN's public server list (server IPs, load and WireGuard public keys). |
 | `pids.json` | Process ids of running sing-box processes, so a crash does not leave them behind. |
 | `state.json.v1.bak`, `state.json.corrupt-*` | Backups made only when an old or unreadable state file is replaced. |
 
@@ -56,6 +57,8 @@ The app makes these connections. Nothing else is contacted.
 | Your VPN provider's servers | When a port starts | To build the tunnel | Your real IP and your credentials, as with the provider's own app |
 | `https://api.surfshark.com/v4/server/clusters/all` | When Surfshark is used; at most every 12 hours | Surfshark's public server list | Your real IP |
 | Your system DNS resolver and `https://dns.google/resolve` | When Surfshark is used; at most every 12 hours | Find the servers behind each Surfshark location name | Your real IP (Google, for DoH) and the Surfshark hostnames you use |
+| `https://api.nordvpn.com/v1/servers` | When NordVPN is used; at most every 12 hours; no account or token is sent | NordVPN's public server list | Your real IP |
+| `https://api.nordvpn.com/v1/users/services/credentials` | Once, when you add a NordVPN account with an access token | Exchange the token for your NordLynx private key; the token is then discarded, never stored | Your real IP and the access token |
 | Your system DNS resolver | Before a port connects to a server given by hostname (ZoogVPN, config files) | Resolve the server address | The VPN server hostnames |
 | `1.1.1.1` (Cloudflare DNS over HTTPS) | While a port is used | DNS for traffic you send through the proxy | The tunnel's exit IP, not yours |
 | `https://www.gstatic.com/generate_204` | Every 30 s per running port | Check the tunnel works | The tunnel's exit IP, not yours |
@@ -65,7 +68,9 @@ The app makes these connections. Nothing else is contacted.
 
 The connectivity, exit-IP and speed checks go **through the tunnel**, so those services
 see the VPN exit IP, not your own. The Surfshark list and DNS lookups go directly from
-your computer, so they reveal that you use Surfshark and which locations.
+your computer, so they reveal that you use Surfshark and which locations. Likewise the
+NordVPN server list and the token exchange go directly from your computer, so NordVPN
+sees your real IP when you use them.
 
 The optional rotate webhook is a local listener you turn on yourself. It does not
 contact anything.

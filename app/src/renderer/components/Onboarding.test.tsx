@@ -46,12 +46,13 @@ describe('Onboarding', () => {
     await waitFor(() => expect(screen.getByTestId('hma-message')).toHaveTextContent('HMA helper installed'));
   });
 
-  it('renders all four provider cards', async () => {
+  it('renders all five provider cards', async () => {
     render(<Onboarding api={createFakeProxyFarmApi()} onDone={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('onboarding-continue')).toBeEnabled());
     expect(screen.getByTestId('provider-card-hma')).toBeInTheDocument();
     expect(screen.getByTestId('provider-card-zoogvpn')).toBeInTheDocument();
     expect(screen.getByTestId('provider-card-surfshark')).toBeInTheDocument();
+    expect(screen.getByTestId('provider-card-nordvpn')).toBeInTheDocument();
     expect(screen.getByTestId('provider-card-file')).toBeInTheDocument();
   });
 
@@ -63,7 +64,7 @@ describe('Onboarding', () => {
   it('hides the port-limit panel until at least one provider is connected', async () => {
     const api = createFakeProxyFarmApi();
     api.listProviders = async () =>
-      (['hma', 'zoogvpn', 'surfshark', 'file'] as ProviderId[]).map((id) => ({
+      (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'file'] as ProviderId[]).map((id) => ({
         id,
         accounts: [],
         detected: id === 'hma' ? { found: false } : undefined,

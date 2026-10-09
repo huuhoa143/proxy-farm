@@ -176,6 +176,76 @@ describe('PortTable', () => {
     expect(screen.queryByTestId('rotate-note-row-online')).toBeNull();
   });
 
+  describe("an exit is tagged with the location's country, not the IP database's guess", () => {
+    const hanoi: Target = {
+      key: 'nordvpn:VN-HANOI',
+      providerId: 'nordvpn',
+      country: 'VN',
+      city: 'Hanoi',
+      label: 'Vietnam — Hanoi',
+      servers: ['192.0.2.1'],
+      virtualLocation: true,
+    };
+    const vnRow = (country: string) =>
+      row('nordvpn:VN-HANOI#1', { kind: 'online', since: 1, exitIp: '192.0.2.7', country }, {
+        locationKey: 'nordvpn:VN-HANOI',
+        providerId: 'nordvpn',
+        accountId: 'nordvpn-1',
+        country: 'VN',
+        city: 'Hanoi',
+      });
+    const renderRows = (rows: PortRow[]) =>
+      render(
+        <PortTable rows={rows} selectedKeys={new Set()} onToggleSelect={noop} onToggleSelectAll={noop} onCopy={noop} onRotate={noop} api={defaultApi()} targets={[hanoi]} />,
+      );
+
+    it('a disagreeing geolocation is a hint beside the tag, explained in its tooltip', () => {
+      renderRows([vnRow('BR')]);
+      expect(screen.getByTestId('exit-cc-nordvpn:VN-HANOI#1')).toHaveTextContent('(VN)');
+      const hint = screen.getByTestId('geo-hint-nordvpn:VN-HANOI#1');
+      expect(hint).toHaveTextContent('IP geolocates to BR');
+      expect(hint.getAttribute('title')).toMatch(/IP databases place 192\.0\.2\.7 in Brazil, not Vietnam.*virtual locations/);
+    });
+
+    it('no hint when the geolocation agrees', () => {
+      renderRows([vnRow('VN')]);
+      expect(screen.getByTestId('exit-cc-nordvpn:VN-HANOI#1')).toHaveTextContent('(VN)');
+      expect(screen.queryByTestId('geo-hint-nordvpn:VN-HANOI#1')).toBeNull();
+    });
+
+    it('the group header marks a virtual location, and the drawer keeps the raw geolocation', async () => {
+      renderRows([vnRow('HK')]);
+      expect(screen.getByTestId('virtual-nordvpn:VN-HANOI')).toHaveTextContent('virtual location');
+      fireEvent.click(screen.getByText('Details'));
+      const facts = await screen.findByTestId('exit-facts-nordvpn:VN-HANOI#1');
+      expect(facts).toHaveTextContent('192.0.2.7');
+      expect(facts).toHaveTextContent('Vietnam (VN)');
+      expect(facts).toHaveTextContent('Hong Kong SAR China (HK)');
+    });
+
+    it("a NordVPN exit's tooltip says it is fixed while connected and may change on reconnect; HMA's has none", () => {
+      const hma = row('hma:JP-TOKYO#1', { kind: 'online', since: 1, exitIp: '203.0.113.5', country: 'JP' }, { server: '203.0.113.5' });
+      renderRows([{ ...vnRow('VN'), server: '192.0.2.1' }, hma]);
+      expect(screen.getByTestId('exit-ip-nordvpn:VN-HANOI#1').getAttribute('title')).toMatch(
+        /^Exit IP of this connection\. NordVPN keeps it while the port stays connected; after a reconnect .* it may be a different one/,
+      );
+      expect(screen.getByTestId('exit-ip-hma:JP-TOKYO#1')).not.toHaveAttribute('title');
+      expect(screen.getByTitle(/^Pinned to server 192\.0\.2\.1\. NordVPN picks the exit IP when the port connects/)).toBeInTheDocument();
+      expect(screen.getByTitle('Pinned to server 203.0.113.5. This port keeps this exit IP until you change it.')).toBeInTheDocument();
+    });
+
+    it('in Vietnamese', async () => {
+      await act(() => changeLanguage('vi'));
+      try {
+        renderRows([vnRow('HK')]);
+        expect(screen.getByTestId('geo-hint-nordvpn:VN-HANOI#1')).toHaveTextContent('IP định vị ở HK');
+        expect(screen.getByTestId('virtual-nordvpn:VN-HANOI')).toHaveTextContent('vị trí ảo');
+      } finally {
+        await act(() => changeLanguage('en'));
+      }
+    });
+  });
+
   it('Details drawer fetches logs and Refresh re-fetches them', async () => {
     const online = row('online', { kind: 'online', since: Date.now(), exitIp: '1.2.3.4', country: 'JP' });
     const api = defaultApi();
@@ -462,7 +532,7 @@ describe('PortTable', () => {
       renderGrouped({ limits: { hma: 2 } });
       const blocked = screen.getByTestId('add-port-hma:JP-TOKYO');
       expect(blocked).toHaveAttribute('aria-disabled', 'true');
-      expect(blocked).toHaveAttribute('title', 'HMA is at its limit of 2 ports — raise it in Settings.');
+      expect(blocked).toHaveAttribute('title', 'HMA is at its limit of 2 ports — raise it on the Providers screen.');
     });
 
     it('collapsing a group hides its ports and is remembered', () => {

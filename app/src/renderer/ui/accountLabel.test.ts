@@ -18,9 +18,17 @@ describe('accountLabel', () => {
     expect(accountLabel(i18next.t, 'device …A1B2C3')).toBe('Device …A1B2C3');
   });
 
-  it('renders the stored Surfshark key label in the active language', async () => {
+  it('renders the stored public-key label in the active language', async () => {
     await i18next.changeLanguage('vi');
-    expect(accountLabel(i18next.t, 'key …xyz12=')).toBe('Khoá …xyz12=');
+    expect(accountLabel(i18next.t, 'pubkey …qqbTmo')).toBe('Khóa công khai …qqbTmo');
+    await i18next.changeLanguage('en');
+    expect(accountLabel(i18next.t, 'pubkey …qqbTmo')).toBe('Public key …qqbTmo');
+  });
+
+  it('never shows the private-key suffix of a legacy label', async () => {
+    expect(accountLabel(i18next.t, 'key …xyz12=')).toBe('WireGuard key');
+    await i18next.changeLanguage('vi');
+    expect(accountLabel(i18next.t, 'key …xyz12=')).toBe('Khóa WireGuard');
   });
 
   it('shows user-derived labels verbatim', () => {

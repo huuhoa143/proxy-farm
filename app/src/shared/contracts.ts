@@ -5,7 +5,7 @@
  * agreement: every exported name here is relied on by at least two modules.
  *   engine/     renderConfig, invariants, ports, supervisor, pid registry   (spec §6.1–6.3)
  *   health/     log signals, /delay, exit-IP, state machine, backoff        (spec §6.4)
- *   providers/  hma, zoogvpn, surfshark, file + catalogs                    (spec §5)
+ *   providers/  hma, zoogvpn, surfshark, nordvpn, file + catalogs           (spec §5)
  *   controller/ store, accounts, port manager, power, webhook, IPC          (spec §3, §4, §6.5–6.7)
  *   renderer/   React UI + i18n, talks only to `window.proxyFarm`           (spec §4)
  */
@@ -65,7 +65,40 @@ export interface RenderInput {
 
 // ───────────────────────── providers & catalogs (spec §5) ─────────────────────────
 
-export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'file';
+export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'file';
+
+/**
+ * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
+ * unlimited. An explicit user value, 0 included, always wins.
+ */
+export const DEFAULT_PORT_LIMITS: Partial<Record<ProviderId, number>> = { nordvpn: 6 };
+
+/** The port limit in force for a provider: the user's, else the default, else 0. */
+export function portLimitOf(limits: Partial<Record<ProviderId, number>>, providerId: ProviderId): number {
+  return limits[providerId] ?? DEFAULT_PORT_LIMITS[providerId] ?? 0;
+}
+
+/**
+ * How a provider's exit IP relates to the server a port pins (spec §5, §6.8):
+ *   server   — the exit is the server's own IP, for good (HMA, ZoogVPN).
+ *   server+1 — the server's IP + 1, stable per server (Surfshark).
+ *   session  — chosen when the tunnel connects: fixed while it stays connected, but a
+ *              new connection to the same server may get another one (NordVPN). Also
+ *              the safe assumption for an imported file, whose provider is unknown.
+ * For `session` providers an exit seen once says nothing about the server's next
+ * session: it is not a server identity, and a different exit after a reconnect is
+ * normal, never an error.
+ */
+export type ExitIpModel = 'server' | 'server+1' | 'session';
+
+/** Static per provider, like `DEFAULT_PORT_LIMITS`: main and the renderer both read it. */
+export const EXIT_IP_MODELS: Record<ProviderId, ExitIpModel> = {
+  hma: 'server',
+  zoogvpn: 'server',
+  surfshark: 'server+1',
+  nordvpn: 'session',
+  file: 'session',
+};
 
 /** One selectable exit location. `key` is stable across catalog refreshes. */
 export interface Target {
@@ -77,6 +110,13 @@ export interface Target {
   /** The location covers the whole country: `city` is only the country's name, in the
    * provider's language (ZoogVPN "Germany"). The UI shows the localised country name. */
   countryWide?: boolean;
+  /**
+   * The provider marks the location virtual: its servers stand in another country and
+   * only present as `country` (NordVPN's `virtual_location`, Surfshark's `virtual` tag).
+   * `country` is still what the location is sold as, and what the UI tags its exits
+   * with. Optional; absent = not marked.
+   */
+  virtualLocation?: boolean;
   /**
    * The location's server pool, best first (spec §6.8). Each entry is one server = one
    * fixed exit IP: an IP literal (HMA, pinned Surfshark pool IPs) or a hostname
@@ -159,7 +199,7 @@ export type AccountSecret =
 export interface CheckResult {
   ok: boolean;
   reasonKey?: string; // i18n key
-  label?: string; // human label for the account, e.g. 'key …AbC='
+  label?: string; // human label for the account, e.g. 'pubkey …qqbTmo' (never from a secret)
   /** i18n key of a caveat on an accepted result, e.g. the login could not be checked
    * live right now ('zoogvpn.check.unverified'). */
   noteKey?: string;
@@ -167,6 +207,13 @@ export interface CheckResult {
 
 export interface Provider {
   id: ProviderId;
+  /**
+   * Optional network step that runs once, before `check`, when an account is added
+   * (spec §5.5: NordVPN exchanges an access token for the account's NordLynx key).
+   * Resolves to the input `check` should validate instead, or to a refusal (an i18n
+   * key). Never rejects. Providers without it get their input checked as typed.
+   */
+  resolveInput?(input: Record<string, string>): Promise<{ input: Record<string, string> } | { reasonKey: string }>;
   /** Validate user input (format only, no network) and normalise it. */
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */

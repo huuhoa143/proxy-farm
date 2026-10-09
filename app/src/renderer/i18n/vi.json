@@ -67,7 +67,7 @@
       "surfshark": {
         "name": "Surfshark",
         "description": "Dán khóa riêng WireGuard từ tài khoản Surfshark của bạn, hoặc nhập tệp cấu hình WireGuard đã tải về cùng khóa đó.",
-        "keyLabel": "Khoá riêng WireGuard",
+        "keyLabel": "Khóa riêng WireGuard",
         "keyPlaceholder": "Dán khóa riêng, hoặc toàn bộ tệp cấu hình WireGuard",
         "add": "Thêm",
         "initials": "S",
@@ -78,6 +78,18 @@
         "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
         "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
         "importConf": "Nhập tệp .conf…"
+      },
+      "nordvpn": {
+        "name": "NordVPN",
+        "description": "Dán mã truy cập (access token) từ Nord Account của bạn, hoặc khóa riêng NordLynx.",
+        "credentialLabel": "Mã truy cập hoặc khóa riêng NordLynx",
+        "credentialPlaceholder": "Mã 64 ký tự, hoặc khóa 44 ký tự",
+        "hintLead": "Lấy mã tại",
+        "hintPath": "Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token",
+        "hintStored": "Mã truy cập chỉ được dùng một lần để lấy khóa NordLynx và không được giữ lại; chỉ khóa được lưu.",
+        "add": "Thêm",
+        "adding": "Đang thêm…",
+        "initials": "N"
       },
       "file": {
         "name": "Tệp cấu hình",
@@ -267,13 +279,25 @@
       "addPortLabel": "Thêm một cổng ở {{location}}",
       "addPortHint": "Thêm một cổng trên một máy chủ trống — thêm một IP thoát ở {{location}}.",
       "noFreeServer": "Mọi máy chủ ở {{location}} đều đang được dùng hoặc không khả dụng.",
-      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng trong Cài đặt."
+      "limitReached": "{{provider}} đã đạt giới hạn {{limit}} cổng — có thể nâng ở màn hình VPN."
     },
     "port": {
       "label": "{{location}} · cổng #{{n}}",
       "serverTitle": "Đang gắn với máy chủ {{server}}. Cổng giữ IP thoát này cho đến khi bạn đổi.",
-      "noServer": "Chọn khi bật lần đầu"
+      "serverTitleSession": "Đang gắn với máy chủ {{server}}. {{provider}} chọn IP thoát khi cổng kết nối: IP giữ nguyên khi cổng còn kết nối, và có thể đổi khi cổng kết nối lại.",
+      "sessionExitTitle": "IP thoát của lần kết nối này. {{provider}} giữ IP này khi cổng còn kết nối; sau khi kết nối lại (thử lại, Đổi IP hoặc khởi động lại) IP có thể khác, kể cả trên cùng máy chủ.",
+      "noServer": "Chọn khi bật lần đầu",
+      "geoHint": "IP định vị ở {{country}}",
+      "geoHintTitle": "Cơ sở dữ liệu IP xếp {{ip}} vào {{geo}}, không phải {{country}}. Các cơ sở dữ liệu này thường không khớp nhau, và nhà cung cấp VPN hay bán vị trí ảo: máy chủ đặt ở nước khác nhưng hiện ra là nước bạn chọn. Nhãn hiển thị quốc gia của vị trí bạn đã chọn."
     },
+    "exitFacts": {
+      "ip": "IP thoát",
+      "location": "Vị trí",
+      "geo": "Định vị IP",
+      "geoUnknown": "Không rõ"
+    },
+    "virtualLocation": "vị trí ảo",
+    "virtualLocationHint": "{{provider}} ghi đây là vị trí ảo: máy chủ đặt ở nước khác và hiện ra là nước này. Trang web tra IP có thể xếp nó vào nước khác.",
     "changeIp": {
       "menuLabel": "Đổi IP cho cổng #{{n}}",
       "next": "Máy chủ trống tiếp theo",
@@ -303,7 +327,8 @@
       "pick": "Chuyển cổng này sang {{server}}",
       "freeTier": "Miễn phí",
       "freeTierHint": "Máy chủ miễn phí: dùng được với mọi gói.",
-      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ"
+      "noneFreeNoAltHint": "Ở đây hết máy chủ trống, và quốc gia này không có vị trí khác — cổng giữ nguyên máy chủ",
+      "sessionExitNote": "{{provider}} chọn IP thoát khi cổng kết nối, không cố định theo máy chủ: IP giữ nguyên khi cổng còn kết nối, và có thể đổi mỗi khi cổng kết nối lại, kể cả với cùng máy chủ."
     },
     "addResult": {
       "no-free-server_one": "Đã thêm {{added}}/{{count}} cổng ở {{location}} — ở đó không còn máy chủ trống.",
@@ -348,6 +373,7 @@
         "label": "Khóa không được phản hồi",
         "guidance": {
           "surfshark": "Surfshark không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra khóa có trong mục Manual setup → WireGuard của tài khoản Surfshark, địa chỉ khớp với tệp cấu hình của chính khóa đó, và gói đăng ký vẫn còn hiệu lực. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
+          "nordvpn": "NordVPN không phản hồi khóa này trên 3 máy chủ. Hãy kiểm tra tài khoản cấp khóa này vẫn còn gói NordVPN đang hoạt động, hoặc thêm lại tài khoản bằng mã truy cập mới. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần.",
           "generic": "Máy chủ không phản hồi khóa WireGuard này sau 3 lần thử. Hãy kiểm tra khóa và địa chỉ trong tệp vẫn còn hợp lệ với nhà cung cấp. Thử lại quá thường xuyên có thể khiến tài khoản bị đình chỉ, nên Proxy Farm đã ngừng thử — bật lại cổng để thử thêm một lần."
         }
       },
@@ -445,7 +471,7 @@
       "system": "Máy tính này"
     },
     "lanSharingRequiresAuth": "Chia sẻ LAN cần tên đăng nhập và mật khẩu proxy.",
-    "webhookBearerTooShort": "Khoá webhook phải có ít nhất 16 ký tự.",
+    "webhookBearerTooShort": "Khóa webhook phải có ít nhất 16 ký tự.",
     "update": {
       "title": "Cập nhật",
       "currentVersion": "Phiên bản hiện tại",
@@ -487,7 +513,7 @@
     "engineErrorTitle": "Bộ máy proxy không khởi động được",
     "engineErrorBody": "Bộ máy tích hợp của Proxy Farm bị thiếu hoặc bị macOS chặn. Hãy cài lại Proxy Farm từ bản tải chính thức rồi mở lại.",
     "engineErrorDetails": "Chi tiết kỹ thuật",
-    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khoá chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
+    "secretsUnavailable": "Kho lưu trữ bảo mật của máy này không dùng được, nên mật khẩu và khóa chỉ được giữ trong bộ nhớ. Sau khi thoát bạn sẽ phải nhập lại."
   },
   "rotate": {
     "server-refused": "{{server}} không có trong gói của bạn, và ở đây không còn máy chủ trống nào dùng được — cổng không kết nối được.",
@@ -523,11 +549,20 @@
     }
   },
   "surfshark": {
-    "keyLabel": "Khoá …{{suffix}}",
+    "keyLabel": "Khóa công khai …{{suffix}}",
+    "legacyKeyLabel": "Khóa WireGuard",
     "check": {
-      "invalidKey": "Đây không phải khoá riêng WireGuard (44 ký tự, kết thúc bằng =).",
+      "invalidKey": "Đây không phải khóa riêng WireGuard (44 ký tự, kết thúc bằng =).",
       "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
       "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
+    }
+  },
+  "nordvpn": {
+    "check": {
+      "tokenRejected": "Nord từ chối mã truy cập này. Có thể mã bị gõ sai, đã hết hạn hoặc bị thu hồi — hãy tạo mã mới trong Nord Account rồi thử lại.",
+      "networkError": "Không kết nối được tới Nord để kiểm tra mã truy cập. Hãy kiểm tra kết nối mạng rồi thử lại.",
+      "noKey": "Nord chấp nhận mã nhưng không trả về khóa NordLynx. Hãy kiểm tra Nord Account này còn gói NordVPN đang hoạt động.",
+      "invalidInput": "Đây không phải mã truy cập NordVPN (64 ký tự, gồm 0–9 và a–f) hay khóa riêng NordLynx (44 ký tự, kết thúc bằng =)."
     }
   },
   "file": {
@@ -561,15 +596,15 @@
     "read": "Xem",
     "open": "Mở",
     "diagnostics": "Sao chép thông tin chẩn đoán",
-    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khoá, mật khẩu, địa chỉ IP hay tên tài khoản.",
+    "diagnosticsNote": "Phiên bản ứng dụng, hệ điều hành, Electron và sing-box, cùng số tài khoản và số cổng của từng nhà cung cấp. Không có khóa, mật khẩu, địa chỉ IP hay tên tài khoản.",
     "diagnosticsCopied": "Đã sao chép",
     "diagnosticsFailed": "Không sao chép được vào bộ nhớ tạm. Hãy thử lại."
   },
   "privacy": {
     "title": "Quyền riêng tư",
     "collectsNothing": "Proxy Farm không thu thập bất kỳ thông tin nào về bạn. Không có telemetry, không có analytics, không gửi báo cáo lỗi, và cũng không có máy chủ nào của Proxy Farm.",
-    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khoá và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
-    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
+    "local": "Tài khoản, cổng và cài đặt của bạn nằm trên máy này. Mật khẩu, khóa và token được hệ điều hành mã hoá (Keychain trên macOS, DPAPI trên Windows).",
+    "providers": "Mỗi cổng kết nối tới máy chủ của nhà cung cấp VPN bằng chính tài khoản của bạn. Cổng Surfshark còn tải danh sách máy chủ công khai của Surfshark từ api.surfshark.com, và tên máy chủ Surfshark được phân giải qua cả Google Public DNS (dns.google) lẫn DNS thông thường của bạn. Cổng NordVPN tải danh sách máy chủ công khai của NordVPN từ api.nordvpn.com, không kèm tài khoản; khi thêm mã truy cập NordVPN, mã được gửi một lần tới api.nordvpn.com để lấy khóa NordLynx và không được giữ lại. Các yêu cầu này đi từ địa chỉ IP của chính bạn.",
     "ipCheck": "Để xác nhận đường hầm hoạt động, Proxy Farm kiểm tra IP thoát và khả năng truy cập qua chính đường hầm đó, với api.ipify.org, ifconfig.co, ipinfo.io và www.gstatic.com. Các dịch vụ này thấy IP thoát của đường hầm, không phải IP của bạn.",
     "optional": "Đo tốc độ (chỉ khi bạn bấm) tải một tệp thử từ speed.cloudflare.com qua cổng. Kiểm tra cập nhật hỏi GitHub bản phát hành mới nhất, khi khởi động và mỗi ngày một lần; bạn có thể tắt trong mục Cập nhật.",
     "delete": "Để xoá toàn bộ dữ liệu: xoá tài khoản và cổng, thoát Proxy Farm, rồi xoá thư mục dữ liệu: ~/Library/Application Support/Proxy Farm trên macOS, %APPDATA%\\Proxy Farm trên Windows.",
@@ -580,18 +615,18 @@
     "asIs": "Phần mềm được cung cấp “nguyên trạng” (AS IS), không kèm bất kỳ bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở khả năng bán được, sự phù hợp cho một mục đích cụ thể, hay không vi phạm. Bạn dùng công cụ này với rủi ro của chính mình.",
     "liability": "Dự án và những người đóng góp không chịu trách nhiệm cho bất kỳ thiệt hại, mất mát dữ liệu, gián đoạn dịch vụ, chi phí hay hậu quả nào phát sinh từ việc dùng hoặc không dùng được phần mềm.",
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn. Cách dùng công cụ do bạn quyết định và tự chịu trách nhiệm: tuân thủ điều khoản dịch vụ của nhà cung cấp VPN và luật pháp nơi bạn sống. Hầu hết nhà cung cấp cấm chia sẻ hoặc bán lại gói dịch vụ.",
-    "suspension": "Nhà cung cấp có thể tạm khoá hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
+    "suspension": "Nhà cung cấp có thể tạm khóa hoặc đóng tài khoản mà họ cho là lạm dụng, kể cả khi kết nối hoặc kết nối lại quá nhiều trong thời gian ngắn. Rủi ro đó thuộc về bạn, không phải của dự án.",
     "noGuarantee": "Dự án không bảo đảm tính sẵn sàng, tốc độ, số lượng IP hay việc tương thích với bất kỳ nhà cung cấp nào. Nhà cung cấp có thể thay đổi hệ thống và làm công cụ ngừng hoạt động bất kỳ lúc nào.",
-    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
+    "trademarks": "HMA, Gen Digital, Surfshark, ZoogVPN, NordVPN, Nord Security, NordLynx, WireGuard và các tên khác là nhãn hiệu của chủ sở hữu tương ứng. Proxy Farm không liên kết, không được tài trợ hay xác nhận bởi bất kỳ bên nào trong số đó.",
     "full": "Bản miễn trừ trách nhiệm đầy đủ"
   },
   "firstRun": {
     "title": "Trước khi bắt đầu",
     "ownAccounts": "Hãy dùng tài khoản VPN của chính bạn, trên máy của chính bạn.",
     "terms": "Tuân thủ điều khoản của nhà cung cấp: việc chia sẻ hoặc bán lại gói dịch vụ thường bị cấm.",
-    "suspension": "Nhà cung cấp có thể khoá tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
+    "suspension": "Nhà cung cấp có thể khóa tài khoản nếu cho là lạm dụng, kể cả khi kết nối lại quá nhiều.",
     "asIs": "Phần mềm được cung cấp nguyên trạng, không kèm bất kỳ bảo đảm nào.",
-    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark hay ZoogVPN.",
+    "notAffiliated": "Proxy Farm không liên kết với HMA / Gen Digital, Surfshark, ZoogVPN hay NordVPN / Nord Security.",
     "acknowledge": "Tôi đã hiểu",
     "readFull": "Đọc toàn bộ miễn trừ trách nhiệm"
   },

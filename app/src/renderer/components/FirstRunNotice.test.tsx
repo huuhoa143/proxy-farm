@@ -25,7 +25,7 @@ describe('FirstRunNotice', () => {
     const notice = screen.getByTestId('first-run-notice');
     expect(notice.querySelectorAll('li')).toHaveLength(FIRST_RUN_POINTS.length);
     expect(notice).toHaveTextContent('Use your own VPN accounts, on your own computer.');
-    expect(notice).toHaveTextContent('not affiliated with HMA / Gen Digital, Surfshark or ZoogVPN');
+    expect(notice).toHaveTextContent('not affiliated with HMA / Gen Digital, Surfshark, ZoogVPN or NordVPN / Nord Security');
 
     fireEvent.click(screen.getByTestId('first-run-full'));
     expect(screen.getByTestId('disclaimer-full')).toHaveAttribute('href', LINKS.disclaimer);

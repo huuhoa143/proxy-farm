@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
+import { FileCard, NordVpnCard, SurfsharkCard, ZoogVpnCard, guessCountryFromFilename } from './OnboardingCards';
 import { createFakeProxyFarmApi } from '../api';
 import { initI18n } from '../i18n';
 
@@ -132,5 +132,40 @@ describe('SurfsharkCard', () => {
     expect(screen.getByTestId('surfshark-address-hint')).toHaveTextContent('Taken from the config');
     fireEvent.click(screen.getByText('Add'));
     await waitFor(() => expect(spy).toHaveBeenCalledWith('surfshark', { config: conf }));
+  });
+});
+
+describe('NordVpnCard', () => {
+  const TOKEN = 'ab'.repeat(32);
+
+  it('shows the Nord Account path as plain text, with no link', () => {
+    render(<NordVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
+    const card = screen.getByTestId('provider-card-nordvpn');
+    expect(card).toHaveTextContent('Nord Account (my.nordaccount.com) → NordVPN → Advanced settings → Get access token');
+    expect(card.querySelector('a')).toBeNull();
+    expect(screen.getByLabelText('Access token or NordLynx private key')).toHaveAttribute('type', 'password');
+  });
+
+  it('sends the trimmed token or key as `credential`, then clears the field', async () => {
+    const api = createFakeProxyFarmApi();
+    const spy = vi.spyOn(api, 'addAccount');
+    const onAdded = vi.fn();
+    render(<NordVpnCard api={api} onAdded={onAdded} />);
+    const field = screen.getByLabelText('Access token or NordLynx private key');
+    fireEvent.change(field, { target: { value: ` ${TOKEN} ` } });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('nordvpn', { credential: TOKEN }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalled());
+    expect(field).toHaveValue('');
+    expect(screen.getByTestId('nordvpn-message')).toHaveTextContent(/^Public key …/);
+  });
+
+  it('shows a refused token in words', async () => {
+    const api = createFakeProxyFarmApi();
+    api.addAccount = async () => ({ ok: false, reasonKey: 'nordvpn.check.tokenRejected' });
+    render(<NordVpnCard api={api} onAdded={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Access token or NordLynx private key'), { target: { value: TOKEN } });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => expect(screen.getByTestId('nordvpn-message')).toHaveTextContent('Nord refused this access token'));
   });
 });

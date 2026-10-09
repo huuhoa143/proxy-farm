@@ -2548,4 +2548,93 @@ describe('port manager', () => {
       expect(engine.started).toHaveLength(2); // the immediate failover still happens for OpenVPN
     });
   });
+
+  describe('NordVPN (NordLynx) gets the same provider safety (spec §5.5, §6.4)', () => {
+    const NKEY = 'nordvpn:VN-HANOI#1';
+    const nTargets: Target[] = [
+      { key: 'nordvpn:VN-HANOI', providerId: 'nordvpn', country: 'VN', city: 'Hanoi', label: 'Vietnam — Hanoi', servers: ['10.2.0.1', '10.2.0.2', '10.2.0.3', '10.2.0.4'] },
+    ];
+    const nAccount: Account = { id: 'n1', providerId: 'nordvpn', label: 'key …abc', meta: {}, secretRef: 'n1-secret' };
+    const timeout: PortState = { kind: 'retrying', untilMs: 0, attempt: 1, reasonKey: 'timeout' };
+
+    function nSetup(depsOverrides: Partial<PortManagerDeps> = {}) {
+      const ctx = setup({
+        targets: nTargets,
+        port: { key: NKEY, locationKey: 'nordvpn:VN-HANOI', providerId: 'nordvpn', accountId: 'n1', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+        portServers: {},
+        engine: fakeEngine({ autoOnline: false }),
+        depsOverrides: { attemptLimiter: { take: () => 0 }, ...depsOverrides },
+      });
+      ctx.secrets.saveSecret('n1-secret', JSON.stringify({ kind: 'wgkey', privateKey: 'k' }));
+      ctx.state.setState((st) => ({ ...st, accounts: [account, nAccount] }));
+      return ctx;
+    }
+    const stateOf = (ctx: ReturnType<typeof nSetup>) => ctx.state.getState().ports.find((p) => p.key === NKEY)!.state;
+
+    it('an unproven key that gets no handshake 3 times in a row is locked: failed(key-rejected)', async () => {
+      const ctx = nSetup();
+      await ctx.manager.startPort(NKEY);
+      ctx.engine.fireState(NKEY, timeout);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(ctx.engine.started).toHaveLength(1); // no immediate hop, as for Surfshark
+      for (const n of [1, 2]) {
+        ctx.engine.fireRetryDue(NKEY);
+        await vi.waitFor(() => expect(ctx.engine.started).toHaveLength(n + 1));
+        ctx.engine.fireState(NKEY, timeout);
+      }
+      await vi.waitFor(() => expect(stateOf(ctx)).toMatchObject({ kind: 'failed', reason: 'key-rejected' }));
+      expect(Object.keys(ctx.state.getState().wgLockouts)).toEqual(['n1']);
+      await ctx.manager.startPort(NKEY);
+      expect(ctx.engine.started).toHaveLength(3);
+    });
+
+    describe('a session exit IP (spec §5.5): fixed while connected, may change on reconnect', () => {
+      it('a different exit after a reconnect is just the new exit: no failover, no error', async () => {
+        const ctx = nSetup();
+        await ctx.manager.startPort(NKEY);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 1, exitIp: '10.2.0.22', country: 'VN' });
+        ctx.engine.fireState(NKEY, timeout);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 2, exitIp: '10.2.0.15', country: 'VN' });
+        await new Promise((r) => setTimeout(r, 10));
+        expect(stateOf(ctx)).toMatchObject({ kind: 'online', exitIp: '10.2.0.15' });
+        expect(ctx.engine.started).toHaveLength(1);
+        expect(ctx.state.getState().ports.find((p) => p.key === NKEY)!.server).toBe('10.2.0.1');
+      });
+
+      it("an exit a server had in an earlier session does not make it look like another port's server", async () => {
+        const ctx = nSetup();
+        await ctx.manager.startPort(NKEY);
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 1, exitIp: '10.2.0.40', country: 'VN' });
+        // #1 moves on to 10.2.0.3; 10.2.0.1's last exit (.40) is history now.
+        ctx.state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === NKEY ? { ...p, server: '10.2.0.3', serverIp: '10.2.0.3' } : p)) }));
+        ctx.engine.fireState(NKEY, { kind: 'online', since: 2, exitIp: '10.2.0.66', country: 'VN' });
+        // #2's session on 10.2.0.2 happens to draw .40.
+        const k2 = 'nordvpn:VN-HANOI#2';
+        ctx.state.setState((s) => ({
+          ...s,
+          ports: [...s.ports, basePort({ key: k2, locationKey: 'nordvpn:VN-HANOI', providerId: 'nordvpn', accountId: 'n1', proxyPort: 29002, server: '10.2.0.2', serverIp: '10.2.0.2', state: { kind: 'stopped' } })],
+        }));
+        ctx.engine.fireState(k2, { kind: 'online', since: 3, exitIp: '10.2.0.40', country: 'VN' });
+        expect(ctx.state.getState().ports.find((p) => p.key === k2)!.state).toMatchObject({ kind: 'online' });
+        // Free: 10.2.0.1 and 10.2.0.4 (#1 holds .3, #2 holds .2).
+        expect(ctx.manager.freeServerCount(nTargets[0])).toBe(2);
+      });
+    });
+
+    it('its engine starts take from the per-account attempt budget', async () => {
+      const timers: number[] = [];
+      const ctx = nSetup({
+        attemptLimiter: createAttemptLimiter({ now: () => 0, perMinute: 1 }),
+        scheduleRetry: (ms) => {
+          timers.push(ms);
+          return () => undefined;
+        },
+      });
+      await ctx.manager.startPort(NKEY);
+      await ctx.manager.startPort(NKEY);
+      expect(ctx.engine.started).toHaveLength(1);
+      expect(stateOf(ctx)).toMatchObject({ kind: 'retrying', reasonKey: 'rate-limited' });
+      expect(timers).toEqual([60_000]);
+    });
+  });
 });

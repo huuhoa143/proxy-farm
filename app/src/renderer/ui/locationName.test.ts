@@ -15,6 +15,12 @@ describe('locationName', () => {
     expect(locationName({ country: 'JP', city: 'Tokyo' }, 'vi')).toBe('Tokyo');
   });
 
+  it('a city with an established Vietnamese name gets it', () => {
+    expect(locationName({ country: 'VN', city: 'Hanoi' }, 'vi')).toBe('Hà Nội');
+    expect(locationName({ country: 'VN', city: 'Ho Chi Minh City' }, 'vi')).toBe('TP. Hồ Chí Minh');
+    expect(locationName({ country: 'VN', city: 'Ho Chi Minh City' }, 'en')).toBe('Ho Chi Minh City');
+  });
+
   it('without the flag (an old port row), a city that is just the English country name or empty is country-wide', () => {
     expect(isCountryWide({ country: 'DE', city: 'Germany' }, 'vi')).toBe(true);
     expect(isCountryWide({ country: 'GB', city: 'United Kingdom' }, 'vi')).toBe(true);

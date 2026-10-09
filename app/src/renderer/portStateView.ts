@@ -55,7 +55,8 @@ function reasonGuidanceKey(reason: FailReason, providerId: ProviderId): string {
     case 'no-server':
       return 'portState.failed.no-server.guidance';
     case 'key-rejected':
-      return providerId === 'surfshark' ? 'portState.failed.key-rejected.guidance.surfshark' : 'portState.failed.key-rejected.guidance.generic';
+      if (providerId === 'surfshark' || providerId === 'nordvpn') return `portState.failed.key-rejected.guidance.${providerId}`;
+      return 'portState.failed.key-rejected.guidance.generic';
     default:
       return 'portState.failed.no-server.guidance';
   }

@@ -75,7 +75,7 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
       if (provider !== 'all' && target.providerId !== provider) continue;
       const name = countryName(target.country, language);
       if (q) {
-        const haystack = normalise(`${name} ${target.country} ${target.city} ${target.label}`);
+        const haystack = normalise(`${name} ${target.country} ${target.city} ${locationName(target, language)} ${target.label}`);
         if (!haystack.includes(q)) continue;
       }
       let group = byCountry.get(target.country);
@@ -212,7 +212,7 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                     <Flag country={target.country} size="sm" />
                     <span
                       className="pick-chip-t"
-                      title={isCountryWide(target, language) ? locationName(target, language) : `${target.city} · ${countryName(target.country, language)}`}
+                      title={isCountryWide(target, language) ? locationName(target, language) : `${locationName(target, language)} · ${countryName(target.country, language)}`}
                     >
                       {locationName(target, language)}
                     </span>
@@ -295,6 +295,15 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                               : t('main.picker.servers', { count: target.servers.length, free })}
                           </small>
                         </span>
+                        {target.virtualLocation && (
+                          <span
+                            className="pill virt"
+                            title={t('main.virtualLocationHint', { provider: providerName(target.providerId, t) }) as string}
+                            data-testid={`virtual-${target.key}`}
+                          >
+                            {t('main.virtualLocation')}
+                          </span>
+                        )}
                         {have > 0 && <span className="pill ok">{t('main.picker.portsHere', { count: have })}</span>}
                         {!on && (
                           <span className="prov">
