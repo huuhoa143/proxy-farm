@@ -277,6 +277,25 @@ describe('controller facade', () => {
     expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
   });
 
+  it('re-adding a key whose account kept its legacy label (secret lost) repairs that account, not a twin', async () => {
+    const KEY = 'kNWOz8Z0Ft2V0vHn8bU1Hc0w2m9yBq7Ri3sXkQe1hGc=';
+    const surfshark: Provider = {
+      ...fakeProvider('surfshark', () => []),
+      check: () => ({ ok: true, label: wgKeyLabel(KEY), secret: { kind: 'wgkey', privateKey: KEY }, meta: {} }),
+    };
+    const { facade, state, secrets, portManager } = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+    // As `migrateKeyLabels` leaves it when the keychain lost the secret: legacy label, no secret.
+    state.setState((s) => ({
+      ...s,
+      accounts: [{ id: 'surfshark-1', providerId: 'surfshark', label: `key …${KEY.slice(-6)}`, meta: {}, secretRef: 'account:surfshark-1' }],
+    }));
+    const r = await facade.addAccount('surfshark', { privateKey: KEY });
+    expect(r).toMatchObject({ ok: true, label: wgKeyLabel(KEY) });
+    expect(state.getState().accounts).toEqual([expect.objectContaining({ id: 'surfshark-1', label: wgKeyLabel(KEY) })]);
+    expect(JSON.parse(secrets.loadSecret('account:surfshark-1')!)).toEqual({ kind: 'wgkey', privateKey: KEY });
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:surfshark-1']);
+  });
+
   describe('addAccount(nordvpn): an access token is exchanged once and never stored (spec §5.5)', () => {
     const TOKEN = 'cd'.repeat(32);
     const KEY = 'kNWOz8Z0Ft2V0vHn8bU1Hc0w2m9yBq7Ri3sXkQe1hGc=';

@@ -30,6 +30,12 @@ export function wgKeyLabel(privateKey: string): string {
 /** The label template of earlier builds, made from the PRIVATE key's last 6 characters. */
 export const LEGACY_KEY_LABEL_RE = /^key …\S+$/;
 
+/** The legacy label earlier builds stored for this private key. Only used to find such an
+ * account again when its key is re-added; never stored. */
+export function legacyKeyLabel(privateKey: string): string {
+  return `key …${privateKey.slice(-6)}`;
+}
+
 /** The account's `wgkey` secret, or undefined when it is missing or another kind. */
 function wgPrivateKeyOf(secretJson: string | null): string | undefined {
   if (!secretJson) return undefined;

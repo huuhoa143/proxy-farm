@@ -19,6 +19,7 @@ import type { AccountPool } from '../accounts/pool';
 import type { HostVpnDetector } from '../controller/host-vpn';
 import type { CredentialVerdict, PortManager } from '../controller/port-manager';
 import type { PortAllocator } from '../controller/ports';
+import { legacyKeyLabel } from '../providers/wg-key';
 import type { StartQueue } from '../controller/start-queue';
 import { applySettingsPatch } from '../controller/settings';
 import type { ControllerFacade } from '../ipc/index';
@@ -304,7 +305,12 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       const check = provider.check(normalized);
       if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
       const secret = check.secret;
-      const duplicate = accounts().find((a) => a.providerId === providerId && a.label === (check.label ?? ''));
+      // An account whose key could not be read at startup keeps its legacy private-key
+      // label (`migrateKeyLabels`); re-adding that key must still repair it, not add a twin.
+      const legacyLabel = secret.kind === 'wgkey' ? legacyKeyLabel(secret.privateKey) : undefined;
+      const duplicate = accounts().find(
+        (a) => a.providerId === providerId && (a.label === (check.label ?? '') || (legacyLabel !== undefined && a.label === legacyLabel)),
+      );
 
       // spec §5.2: an email/password login is checked live, once, against a free-tier
       // server before it is stored (ZoogVPN: plan refusals and a wrong password look the
@@ -328,10 +334,14 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
         // Re-adding the same key with a corrected interface address (Surfshark) is a
         // credentials change too: what failed under the old address proves nothing.
         const meta = { ...duplicate.meta, ...(check.meta ?? {}) };
+        const metaChanged = JSON.stringify(meta) !== JSON.stringify(duplicate.meta);
+        const label = check.label ?? duplicate.label;
         let account = duplicate;
-        if (JSON.stringify(meta) !== JSON.stringify(duplicate.meta)) {
-          account = { ...duplicate, meta };
+        if (metaChanged || label !== duplicate.label) {
+          account = { ...duplicate, label, meta };
           deps.state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === duplicate.id ? account : a)) }));
+        }
+        if (metaChanged) {
           deps.portManager.credentialsChanged(duplicate.id);
           changed = true;
         }
