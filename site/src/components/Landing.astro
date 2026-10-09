@@ -66,7 +66,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   <a class="brand-by" href={LINGOREUP} rel="noopener">
     <span class="by-text">by</span>
     <img src={lingoreupIcon.src} alt="" width="24" height="24" />
-    <span class="by-text">LingoReUp</span>
+    <span class="by-text">LingoReup</span>
   </a>
   </div>
   <nav class="top-nav" aria-label={t.nav.menu}>
@@ -445,7 +445,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
       </div>
       <a class="foot-credit" href={LINGOREUP} rel="noopener">
         <span>{t.footer.credit}</span>
-        <img src={lingoreupWordmark.src} alt="LingoReUp" width="135" height="28" loading="lazy" />
+        <img src={lingoreupWordmark.src} alt="LingoReup" width="135" height="28" loading="lazy" />
       </a>
     </div>
     <nav class="foot-links" aria-label="Legal">
@@ -528,7 +528,7 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
     letter-spacing: -0.01em;
   }
 
-  /* LingoReUp credit: present, in the muted voice, never in its purple beyond the 24px mark. */
+  /* LingoReup credit: present, in the muted voice, never in its purple beyond the 24px mark. */
   .brand-by {
     display: inline-flex;
     align-items: center;
@@ -1240,9 +1240,11 @@ const pctPickers = '(min-width: 1240px) 1160px, calc(100vw - 2.5rem)';
   }
 
   .dl-note {
-    margin-top: 0.35rem;
+    margin-top: 0.4rem;
+    max-width: 46ch;
     font-size: 0.8125rem;
-    color: var(--amber);
+    line-height: 1.5;
+    color: var(--plate-tx);
   }
 
   .dl .btn {

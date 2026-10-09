@@ -226,8 +226,8 @@ const vi: Copy = {
     title: 'Tải Proxy Farm',
     lede: 'Miễn phí, tải trực tiếp từ GitHub Releases. Sau khi cài, ứng dụng tự cập nhật từ GitHub.',
     targets: {
-      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 trở lên, chip M' },
-      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 trở lên' },
+      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 trở lên, chip M · đã ký và được Apple notarize' },
+      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 trở lên · đã ký và được Apple notarize' },
       'win-x64': { name: 'Windows · x64', detail: 'Cài cho tài khoản của bạn, không cần quyền admin' },
     },
     get: 'Tải về',
@@ -235,7 +235,7 @@ const vi: Copy = {
     version: (v) => `Phiên bản ${v}`,
     all: 'Tất cả phiên bản',
     build: 'Hoặc tự build từ mã nguồn',
-    winNote: null,
+    winNote: 'Bản Windows chưa ký số: nếu Windows SmartScreen cảnh báo, bấm “Thêm thông tin” (More info) → “Vẫn chạy” (Run anyway).',
   },
   faq: {
     title: 'Câu hỏi thường gặp',
@@ -243,6 +243,7 @@ const vi: Copy = {
       { q: 'Proxy Farm có bán IP hay VPN không?', a: 'Không. Bạn cần một gói VPN của riêng mình (hoặc tệp .ovpn/.conf). Proxy Farm chỉ biến gói đó thành các cổng proxy trên máy bạn.' },
       { q: 'Dùng như vậy có vi phạm điều khoản của nhà cung cấp VPN không?', a: 'Có thể. Nhiều nhà cung cấp cấm chia sẻ hoặc bán lại kết nối, và việc mở nhiều đường hầm cùng lúc có thể kích hoạt cơ chế chống lạm dụng, dẫn tới khoá tài khoản. Hãy dùng cho chính bạn, đừng mở proxy ra internet hay chia cho người khác, và tự đọc điều khoản của nhà cung cấp.' },
       { q: 'Chạy trên hệ điều hành nào?', a: 'macOS 12 trở lên (Apple silicon và Intel) và Windows x64. Bản Windows cài cho riêng tài khoản của bạn, không cần quyền admin; riêng HMA trên Windows cần xác nhận quản trị viên một lần khi bật hỗ trợ HMA.' },
+      { q: 'Windows SmartScreen cảnh báo khi cài, phải làm sao?', a: 'Bản Windows chưa ký số nên SmartScreen có thể cảnh báo. Bấm “Thêm thông tin” (More info) → “Vẫn chạy” (Run anyway). Bản macOS đã được ký và Apple notarize.' },
       { q: 'Có mất phí không?', a: 'Không. Proxy Farm miễn phí, mã nguồn mở theo giấy phép MIT. Ứng dụng đi kèm sing-box (GPL-3.0) dưới dạng chương trình riêng, không chỉnh sửa.' },
       { q: 'Một gói VPN cho được bao nhiêu cổng?', a: 'Tuỳ số máy chủ của vị trí và giới hạn thiết bị của gói. Mỗi cổng cần một máy chủ trống. Ứng dụng đặt sẵn giới hạn an toàn cho một số nhà cung cấp, ví dụ 8 cổng cho ExpressVPN để chừa thiết bị cho bạn, và bạn tự chỉnh được.' },
       { q: 'Ứng dụng có thu thập dữ liệu của tôi không?', a: 'Không. Không telemetry, không phân tích, không tài khoản với chúng tôi. Ứng dụng chỉ kết nối tới máy chủ VPN của bạn và vài dịch vụ được liệt kê kèm lý do trong PRIVACY.md.' },
@@ -261,7 +262,7 @@ const vi: Copy = {
     securityBody: 'Báo riêng tư theo SECURITY.md, đừng đăng công khai.',
   },
   footer: {
-    credit: 'Được phát triển bởi đội ngũ LingoReUp',
+    credit: 'Được phát triển bởi đội ngũ LingoReup',
     privacy: 'Quyền riêng tư',
     disclaimer: 'Miễn trừ trách nhiệm',
     license: 'Giấy phép MIT',
@@ -415,8 +416,8 @@ const en: Copy = {
     title: 'Download Proxy Farm',
     lede: 'Free, straight from GitHub Releases. Once installed, the app updates itself from GitHub.',
     targets: {
-      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 or later, M-series' },
-      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 or later' },
+      'mac-arm64': { name: 'macOS · Apple silicon', detail: 'macOS 12 or later, M-series · signed and notarized by Apple' },
+      'mac-x64': { name: 'macOS · Intel', detail: 'macOS 12 or later · signed and notarized by Apple' },
       'win-x64': { name: 'Windows · x64', detail: 'Installs for your user, no admin rights' },
     },
     get: 'Download',
@@ -424,7 +425,7 @@ const en: Copy = {
     version: (v) => `Version ${v}`,
     all: 'All releases',
     build: 'Or build it from source',
-    winNote: null,
+    winNote: 'The Windows build isn’t code-signed yet; if SmartScreen warns, choose More info → Run anyway.',
   },
   faq: {
     title: 'Questions',
@@ -432,6 +433,7 @@ const en: Copy = {
       { q: 'Does Proxy Farm sell IPs or VPN access?', a: 'No. You need your own VPN subscription (or an .ovpn/.conf file). Proxy Farm only turns it into proxy ports on your computer.' },
       { q: 'Is this against my VPN provider’s terms?', a: 'It can be. Many providers forbid sharing or reselling connections, and many simultaneous tunnels can trigger abuse detection and get the account suspended. Use it for yourself, do not expose the proxies to the internet or share them, and read your provider’s terms.' },
       { q: 'Which operating systems does it run on?', a: 'macOS 12 or later (Apple silicon and Intel) and Windows x64. The Windows installer installs for your user only and needs no admin rights; HMA on Windows needs one administrator prompt when you enable HMA support.' },
+      { q: 'Windows SmartScreen warns when I install it. What do I do?', a: 'The Windows build isn’t code-signed yet, so SmartScreen may warn. Choose More info → Run anyway. The macOS builds are signed and notarized by Apple.' },
       { q: 'Does it cost anything?', a: 'No. Proxy Farm is free and open source under the MIT license. It bundles sing-box (GPL-3.0) as a separate, unmodified program.' },
       { q: 'How many ports can one VPN plan give me?', a: 'It depends on the location’s servers and your plan’s device limit. Each port needs a free server. The app sets safe defaults for some providers, such as 8 ports for ExpressVPN to leave devices for you, and you can change them.' },
       { q: 'Does the app collect my data?', a: 'No. No telemetry, no analytics, no account with us. The app talks only to your VPN servers and a few services listed with their reasons in PRIVACY.md.' },
@@ -450,7 +452,7 @@ const en: Copy = {
     securityBody: 'Privately, as described in SECURITY.md. Never in a public issue.',
   },
   footer: {
-    credit: 'Built by the LingoReUp team',
+    credit: 'Built by the LingoReup team',
     privacy: 'Privacy',
     disclaimer: 'Disclaimer',
     license: 'MIT License',
