@@ -41,17 +41,16 @@ Proxy Farm turns the user's own VPN subscription into many local SOCKS5/HTTP pro
 ## Capabilities and Constraints
 
 - **Providers:**
-  - HMA, using the device credentials of the locally installed HMA app (macOS).
+  - HMA, using the device credentials of the locally installed HMA app (on Windows, after one administrator prompt to enable HMA support).
   - ZoogVPN, with email and password.
   - Surfshark, with a WireGuard private key.
   - NordVPN, with an access token or NordLynx key.
   - ExpressVPN, with its Manual-configuration OpenVPN username and password.
   - Imported OpenVPN `.ovpn` and WireGuard `.conf` files.
-- **Platforms:** macOS 12+ (Apple silicon and Intel). The Windows x64 build is code-complete but not released yet.
+- **Platforms:** macOS 12+ (Apple silicon and Intel; signed and notarized by Apple) and Windows x64 (per-user installer, not code-signed, so SmartScreen warns).
 - **Release state:**
-  - Current public release: v0.1.1 (HMA, ZoogVPN, Surfshark, files).
-  - NordVPN, ExpressVPN, filters, Check all and CSV export are merged or in review but not released yet.
-  - Download buttons show "Sắp ra mắt / Coming soon" until the user asks for a release, then link to GitHub Releases.
+  - Current public release: v0.2.0 (2026-10-09), with every provider, filters, Check all and CSV export.
+  - Download buttons link to the GitHub release assets; the version lives in `site/src/data/site.ts`.
 - **Constraints:**
   - Users must follow their VPN provider's terms of service.
   - Proxy Farm is not affiliated with any provider.
@@ -60,7 +59,7 @@ Proxy Farm turns the user's own VPN subscription into many local SOCKS5/HTTP pro
 
 ## Brand Commitments
 
-- **Name and attribution:** "Proxy Farm by LingoReUp". LingoReUp is credited in the header or footer.
+- **Name and attribution:** "Proxy Farm by LingoReup". LingoReup is credited in the header or footer.
 - **Assets:**
   - App icon: `app/icons/icon.png`, plus 256 and 512 px versions.
   - Real screenshots in `docs/screenshots/v2/`, in light and dark themes, vi and en.

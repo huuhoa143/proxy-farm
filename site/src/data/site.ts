@@ -43,7 +43,7 @@ export const downloads = (Object.keys(release.assets) as TargetId[]).map((id) =>
 
 /**
  * Demo media. The poster and captions are static files in public/media/. The mp4 and
- * webm are hosted on TeleCloud (LingoReUp's file host, which serves byte ranges, so
+ * webm are hosted on TeleCloud (LingoReup's file host, which serves byte ranges, so
  * Safari and iOS can play and seek them); see site/README.md to replace them.
  */
 export const media = {
