@@ -22,8 +22,8 @@ All files live in the app's data folder (Electron's `userData` folder):
 
 | File | Contents |
 |---|---|
-| `state.json` | Settings, ports (location, port number, pinned server), account metadata such as the label you see in the app (for example a ZoogVPN email address or the HMA device id), server health notes. For HMA it also stores the data the app needs to re-register its device without asking you again: your **HMA license (activation) key**, a device fingerprint derived from this machine, the tenant and container ids, the device id, and the device's OpenVPN CA certificate. **Not encrypted.** It holds no account login passwords; the HMA license key it does hold is your activation code, not a password. |
-| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark and NordLynx private keys, imported config files, the HMA device credentials, the proxy password and the webhook key. |
+| `state.json` | Settings, ports (location, port number, pinned server), account metadata such as the label you see in the app (for example a ZoogVPN email address or the HMA device id), server health notes. For HMA it also keeps the non-secret parts of the device the app registered (a fingerprint derived from this machine, the tenant and container ids, the device id and the OpenVPN CA certificate), plus a masked hint of the license key — never the key itself. **Not encrypted, but holds no passwords or keys.** |
+| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark and NordLynx private keys, imported config files, the HMA device credentials and **HMA license key**, the proxy password and the webhook key. |
 | `cache/surfshark-clusters.json`, `cache/surfshark-pools.json` | Surfshark's public server list and the server IPs found through DNS. |
 | `cache/nordvpn-servers.json` | NordVPN's public server list (server IPs, load and WireGuard public keys). |
 | `cache/expressvpn-pools.json` | The server IPs found through DNS for ExpressVPN's location names. |
@@ -45,8 +45,9 @@ the license key it looks up your subscription, registers a device identified by 
 fingerprint derived from this machine, and fetches that device's OpenVPN credentials and
 CA certificate. It then asks the backend which gateways serve a location (the same
 "discover" call the HMA app makes on connect), so locations and exit IPs stay fresh and
-rotate like the real app. The device's username and password are kept in the encrypted
-secret store; the license key and the rest of the device identity are in `state.json`
+rotate like the real app. The device's username and password **and your license key** are
+kept in the encrypted secret store; only the non-secret device identity (fingerprint,
+tenant/container/device ids, CA) and a masked hint of the license key are in `state.json`
 (see the table above), so the app can renew the device and its short-lived token without
 asking you again. These requests go directly from your computer, so HMA/Avast sees your
 real IP and your license key, exactly as its own app does.

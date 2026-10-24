@@ -259,8 +259,19 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   async function connectHmaLicense(licenseKey: string): Promise<CheckResult & { account?: Account }> {
     const provider = deps.providers.get('hma');
     if (!provider?.resolveInput) return { ok: false, reasonKey: 'hma.sePlatform.unavailable' };
+    // The license key is in the encrypted secret, not meta, so match re-adds by reading it back.
+    const walletKeyOf = (a: Account): string | undefined => {
+      const raw = deps.secrets.loadSecret(a.secretRef);
+      if (!raw) return undefined;
+      try {
+        const parsed = JSON.parse(raw) as { walletKey?: unknown };
+        return typeof parsed.walletKey === 'string' ? parsed.walletKey : undefined;
+      } catch {
+        return undefined;
+      }
+    };
     const existing = accounts().find(
-      (a) => a.providerId === 'hma' && a.meta.source === 'se-platform' && a.meta.walletKey === licenseKey,
+      (a) => a.providerId === 'hma' && a.meta.source === 'se-platform' && walletKeyOf(a) === licenseKey,
     );
     const resolved = await provider.resolveInput({
       licenseKey,

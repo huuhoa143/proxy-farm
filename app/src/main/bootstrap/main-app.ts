@@ -188,6 +188,28 @@ export function runApp(): void {
       accounts: migrateKeyLabels(s.accounts, (ref) => secrets.loadSecret(ref)),
     }));
 
+    // Earlier builds kept the HMA license key in plaintext `account.meta`. Move it into the
+    // encrypted secret, leave only a masked hint in meta. One-time, idempotent.
+    rawState.setState((s) => ({
+      ...s,
+      accounts: s.accounts.map((a) => {
+        if (a.providerId !== 'hma' || a.meta.source !== 'se-platform' || !a.meta.walletKey) return a;
+        const walletKey = a.meta.walletKey;
+        const raw = secrets.loadSecret(a.secretRef);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            if (typeof parsed.walletKey !== 'string') secrets.saveSecret(a.secretRef, JSON.stringify({ ...parsed, walletKey }));
+          } catch {
+            // leave an unreadable secret alone; the user can re-add the license
+          }
+        }
+        const meta: Record<string, string> = { ...a.meta, licenseHint: `••••-${walletKey.slice(-4)}` };
+        delete meta.walletKey;
+        return { ...a, meta };
+      }),
+    }));
+
     // 4. sing-box present, runnable (not quarantined) and the pinned version — or a
     // clear error screen instead of a crash.
     let engineError: string | undefined;
@@ -224,6 +246,18 @@ export function runApp(): void {
         if (mainWindow && !mainWindow.isDestroyed()) broadcastTargetsChanged([mainWindow.webContents]);
       },
       hmaHeldIps: () => heldIpsHolder.get(),
+      // The HMA license key lives only in the encrypted secret store; the provider reads it
+      // back from there to mint tokens, so it never has to sit in plaintext state.json.
+      hmaLoadWalletKey: (account) => {
+        const raw = secrets.loadSecret(account.secretRef);
+        if (!raw) return undefined;
+        try {
+          const parsed = JSON.parse(raw) as { walletKey?: unknown };
+          return typeof parsed.walletKey === 'string' ? parsed.walletKey : undefined;
+        } catch {
+          return undefined;
+        }
+      },
     });
     const providers = { get: getProvider };
 

@@ -18,12 +18,13 @@ import { jwtExpSeconds } from './jwt';
 import { machineFingerprint } from './fingerprint';
 import type { SeFetch } from './types';
 
-/** The durable, non-password part of a registered device (safe for account.meta). */
+/** The durable, non-secret part of a registered device (safe for plaintext account.meta).
+ * The `walletKey` (license) is a credential and is NOT here — it lives in the encrypted
+ * secret store and is passed to the minter separately. */
 export interface DeviceIdentity {
-  walletKey: string;
-  deviceFingerprint: string; // 64-hex
+  deviceFingerprint: string; // 64-hex (a hash of a machine id; not a credential on its own)
   tenant: string; // GUID
-  containerId: string;
+  containerId: string; // derived from the license; useless without the walletKey
   deviceUdid: string;
   /** PEM CA that signs the OpenVPN server cert, for sing-box `tls.certificate`. */
   openvpnCaCertificate: string;
@@ -71,7 +72,6 @@ export async function registerDevice(walletKey: string, net: SeFetch, opts: Regi
 
   return {
     identity: {
-      walletKey,
       deviceFingerprint,
       tenant,
       containerId: license.id,
@@ -93,7 +93,8 @@ export interface TokenMinter {
 const REFRESH_SKEW_SEC = 60 * 60; // 1 h
 
 export function createTokenMinter(
-  identity: Pick<DeviceIdentity, 'walletKey' | 'deviceFingerprint' | 'tenant' | 'containerId'>,
+  identity: Pick<DeviceIdentity, 'deviceFingerprint' | 'tenant' | 'containerId'>,
+  walletKey: string,
   net: SeFetch,
   opts: { now?: () => number; seedToken?: string } = {},
 ): TokenMinter {
@@ -109,7 +110,7 @@ export function createTokenMinter(
       if (fresh()) return token!;
       inflight ??= (async () => {
         const minted = await associateLicense(
-          { containerId: identity.containerId, deviceFingerprint: identity.deviceFingerprint, walletKey: identity.walletKey, tenantId: identity.tenant },
+          { containerId: identity.containerId, deviceFingerprint: identity.deviceFingerprint, walletKey, tenantId: identity.tenant },
           net,
         );
         token = minted.accessToken;
@@ -128,7 +129,6 @@ export function createTokenMinter(
 export function identityToMeta(id: DeviceIdentity): Record<string, string> {
   return {
     source: 'se-platform',
-    walletKey: id.walletKey,
     deviceFingerprint: id.deviceFingerprint,
     tenant: id.tenant,
     containerId: id.containerId,
@@ -139,7 +139,13 @@ export function identityToMeta(id: DeviceIdentity): Record<string, string> {
 
 export function identityFromMeta(meta: Record<string, string>): DeviceIdentity | undefined {
   if (meta.source !== 'se-platform') return undefined;
-  const { walletKey, deviceFingerprint, tenant, containerId, deviceUdid, openvpnCa } = meta;
-  if (!walletKey || !deviceFingerprint || !tenant || !containerId || !deviceUdid || !openvpnCa) return undefined;
-  return { walletKey, deviceFingerprint, tenant, containerId, deviceUdid, openvpnCaCertificate: openvpnCa };
+  const { deviceFingerprint, tenant, containerId, deviceUdid, openvpnCa } = meta;
+  if (!deviceFingerprint || !tenant || !containerId || !deviceUdid || !openvpnCa) return undefined;
+  return { deviceFingerprint, tenant, containerId, deviceUdid, openvpnCaCertificate: openvpnCa };
+}
+
+/** A masked, non-secret hint of a license key for the UI (never the full key). */
+export function licenseHint(walletKey: string): string {
+  const tail = walletKey.slice(-4);
+  return tail ? `••••-${tail}` : '';
 }

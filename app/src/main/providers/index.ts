@@ -4,6 +4,7 @@
  * `getProvider`/`allProviders` from `./registry` everywhere else.
  */
 import path from 'node:path';
+import type { Account } from './types';
 import { registerProvider } from './registry';
 import { createHmaProvider } from './hma';
 import { createSeCatalogStore } from './hma/se-platform/catalog-store';
@@ -39,6 +40,9 @@ export interface RegisterAllProvidersOptions {
   onTargetsChanged?: () => void;
   /** IPs live HMA ports currently hold; the se-platform catalog never stale-evicts these. */
   hmaHeldIps?: () => ReadonlySet<string>;
+  /** Reads an HMA account's license key from the encrypted secret store (it is never in
+   * `account.meta`); the provider needs it to mint se-platform tokens. */
+  hmaLoadWalletKey?: (account: Account) => string | undefined;
 }
 
 export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
@@ -54,6 +58,7 @@ export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
           onChange: opts.onTargetsChanged,
           heldIps: opts.hmaHeldIps,
         }),
+        loadWalletKey: opts.hmaLoadWalletKey,
       },
     }),
   );

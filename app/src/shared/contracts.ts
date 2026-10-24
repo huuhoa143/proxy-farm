@@ -234,7 +234,9 @@ export interface Account {
 
 /** Decrypted credentials handed to a provider's `bind` (never persisted in plain text). */
 export type AccountSecret =
-  | { kind: 'userpass'; username: string; password: string }
+  // `walletKey` (HMA se-platform license key) is a credential, so it lives here in the
+  // encrypted secret store, never in `account.meta` (which is plaintext in state.json).
+  | { kind: 'userpass'; username: string; password: string; walletKey?: string }
   | { kind: 'wgkey'; privateKey: string }
   | { kind: 'file'; content: string; username?: string; password?: string };
 

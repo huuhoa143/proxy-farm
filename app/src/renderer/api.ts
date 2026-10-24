@@ -129,8 +129,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   const accounts: FakeAccountRecord[] = [
     {
-      account: { id: 'hma-1', providerId: 'hma', label: 'device …fake1', meta: { source: 'se-platform', walletKey: 'DEMO00-DEMO11-DEMO22' }, secretRef: 'hma-1' },
-      secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64) },
+      account: { id: 'hma-1', providerId: 'hma', label: 'device …fake1', meta: { source: 'se-platform', licenseHint: '••••-MO22' }, secretRef: 'hma-1' },
+      secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64), walletKey: 'DEMO00-DEMO11-DEMO22' },
     },
     {
       account: {
@@ -329,10 +329,10 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
           id: `hma-${n}`,
           providerId,
           label: `device …fake${n}`,
-          meta: { source: 'se-platform', walletKey: input.licenseKey.trim() },
+          meta: { source: 'se-platform', licenseHint: `••••-${input.licenseKey.trim().slice(-4)}` },
           secretRef: `hma-${n}`,
         };
-        accounts.push({ account, secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64) } });
+        accounts.push({ account, secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64), walletKey: input.licenseKey.trim() } });
         return { ok: true, account, label: account.label };
       }
       if (providerId === 'zoogvpn') {

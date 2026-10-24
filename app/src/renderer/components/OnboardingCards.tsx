@@ -168,7 +168,7 @@ export function HmaCard({ api, onAdded, accountCount, accounts = [] }: HmaCardPr
               </span>
               <span className="hma-account-id">
                 {a.label}
-                {a.meta.walletKey && <small>{a.meta.walletKey}</small>}
+                {a.meta.licenseHint && <small>{a.meta.licenseHint}</small>}
               </span>
               <button
                 className="icon-btn"

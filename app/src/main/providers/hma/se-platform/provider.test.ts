@@ -54,7 +54,6 @@ function seAccount(): Account {
     secretRef: 'account:hma-1',
     meta: {
       source: 'se-platform',
-      walletKey: WALLET,
       deviceFingerprint: 'fp',
       tenant: TENANT,
       containerId: 'container-1',
@@ -78,8 +77,11 @@ describe('HMA provider — se-platform path', () => {
     // check() turns it into a userpass secret + se-platform meta
     const check = provider.check(input);
     expect(check.ok).toBe(true);
-    expect(check.secret).toEqual({ kind: 'userpass', username: UDID, password: 'CD'.repeat(32) });
+    // The license key goes into the encrypted secret, never into meta.
+    expect(check.secret).toEqual({ kind: 'userpass', username: UDID, password: 'CD'.repeat(32), walletKey: WALLET });
     expect(check.meta?.source).toBe('se-platform');
+    expect(check.meta?.walletKey).toBeUndefined();
+    expect(check.meta?.licenseHint).toContain(WALLET.slice(-4));
     expect(check.meta?.openvpnCa).toContain('CA-LINE-1');
   });
 
@@ -91,7 +93,7 @@ describe('HMA provider — se-platform path', () => {
 
   it('targets() builds locations from geos names + discovered IPs and kicks a refresh', async () => {
     const store = fakeStore();
-    const provider = createHmaProvider({ sePlatform: { net: registrationNet(), store } });
+    const provider = createHmaProvider({ sePlatform: { net: registrationNet(), store, loadWalletKey: () => WALLET } });
     const targets = await provider.targets(seAccount());
     expect(targets).toHaveLength(1);
     expect(targets[0]).toMatchObject({

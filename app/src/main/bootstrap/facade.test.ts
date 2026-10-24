@@ -60,10 +60,18 @@ function fakeProvider(id: ProviderId, targets: (account: Account) => Target[]): 
       if (id === 'hma') {
         if (!input.udid?.startsWith('U1.')) return { ok: false, reasonKey: 'hma.check.invalidUdid' };
         const meta: Record<string, string> = { udid: input.udid };
-        if (input.source === 'se-platform')
-          for (const k of ['source', 'walletKey', 'deviceFingerprint', 'tenant', 'containerId', 'deviceUdid', 'openvpnCa'])
+        if (input.source === 'se-platform') {
+          for (const k of ['source', 'deviceFingerprint', 'tenant', 'containerId', 'deviceUdid', 'openvpnCa'])
             if (input[k]) meta[k] = input[k];
-        return { ok: true, label: `device …${input.udid.slice(-6)}`, secret: { kind: 'userpass', username: input.udid, password: input.password }, meta };
+          if (input.walletKey) meta.licenseHint = `••••-${input.walletKey.slice(-4)}`;
+        }
+        // The license key goes into the encrypted secret, never into meta.
+        return {
+          ok: true,
+          label: `device …${input.udid.slice(-6)}`,
+          secret: { kind: 'userpass', username: input.udid, password: input.password, ...(input.walletKey ? { walletKey: input.walletKey } : {}) },
+          meta,
+        };
       }
       if (id === 'zoogvpn') {
         if (!input.username) return { ok: false, reasonKey: 'zoogvpn.check.missingUsername' };
@@ -251,9 +259,12 @@ describe('controller facade', () => {
     const first = await addHma(facade);
     expect(first.ok).toBe(true);
     expect(first.account?.meta.source).toBe('se-platform');
-    expect(first.account?.meta.walletKey).toBe('TEST00-TEST11-TEST22');
-    expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!)).toEqual({ kind: 'userpass', username: HMA_UDID, password: HMA_PASS });
+    // The license key is NOT in meta/state.json — only a masked hint; the key is in the secret.
+    expect(first.account?.meta.walletKey).toBeUndefined();
+    expect(first.account?.meta.licenseHint).toContain('ST22');
+    expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!)).toEqual({ kind: 'userpass', username: HMA_UDID, password: HMA_PASS, walletKey: 'TEST00-TEST11-TEST22' });
     expect(JSON.stringify(state.getState().accounts)).not.toContain(HMA_PASS);
+    expect(JSON.stringify(state.getState().accounts)).not.toContain('TEST00-TEST11-TEST22');
 
     // Re-adding the same license reuses the one account (same fingerprint → same device).
     const second = await addHma(facade);

@@ -96,7 +96,6 @@ describe('registerDevice', () => {
 describe('identity meta roundtrip', () => {
   it('packs to a flat string map and back', () => {
     const id: DeviceIdentity = {
-      walletKey: WALLET,
       deviceFingerprint: 'fp',
       tenant: TENANT,
       containerId: 'c',
@@ -105,21 +104,22 @@ describe('identity meta roundtrip', () => {
     };
     const meta = identityToMeta(id);
     expect(meta.source).toBe('se-platform');
+    expect(meta.walletKey).toBeUndefined(); // the license key is never written to meta
     expect(identityFromMeta(meta)).toEqual(id);
   });
   it('rejects meta from another source or missing fields', () => {
     expect(identityFromMeta({ source: 'local' })).toBeUndefined();
-    expect(identityFromMeta({ source: 'se-platform', walletKey: 'x' })).toBeUndefined();
+    expect(identityFromMeta({ source: 'se-platform', deviceFingerprint: 'fp' })).toBeUndefined();
   });
 });
 
 describe('createTokenMinter', () => {
-  const identity = { walletKey: WALLET, deviceFingerprint: 'fp', tenant: TENANT, containerId: 'c' };
+  const identity = { deviceFingerprint: 'fp', tenant: TENANT, containerId: 'c' };
 
   it('reuses a fresh seed token without calling the API', async () => {
     const { net, hits } = routeNet({ [ASSOC_URL]: () => jsonRes(200, {}) });
     const nowMs = 1_000_000_000_000;
-    const minter = createTokenMinter(identity, net, { now: () => nowMs, seedToken: fakeJwt(nowMs / 1000 + 6 * 3600) });
+    const minter = createTokenMinter(identity, WALLET, net, { now: () => nowMs, seedToken: fakeJwt(nowMs / 1000 + 6 * 3600) });
     expect(await minter.getToken()).toContain('.');
     expect(hits[ASSOC_URL]).toBeUndefined();
   });
@@ -130,7 +130,7 @@ describe('createTokenMinter', () => {
     const { net, hits } = routeNet({
       [ASSOC_URL]: () => jsonRes(200, { device_udid: UDID, access_token: fresh, refresh_token: 'r' }),
     });
-    const minter = createTokenMinter(identity, net, { now: () => nowMs, seedToken: fakeJwt(nowMs / 1000 + 10 * 60) });
+    const minter = createTokenMinter(identity, WALLET, net, { now: () => nowMs, seedToken: fakeJwt(nowMs / 1000 + 10 * 60) });
     const t = await minter.getToken();
     expect(t).toBe(fresh);
     expect(hits[ASSOC_URL]).toBe(1);
