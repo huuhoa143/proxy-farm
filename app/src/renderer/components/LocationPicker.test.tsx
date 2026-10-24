@@ -48,10 +48,25 @@ describe('LocationPicker', () => {
     expect(row('surfshark:JP-KYO')).toHaveTextContent('4 servers · 4 free');
   });
 
-  it('disables a location with no free server', () => {
+  it('disables a non-dynamic location with no free server', () => {
+    const surfZero = target('surfshark:JP-NOF', 'Nofree', 2, 0, 'surfshark');
+    const { row } = renderPicker({ targets: [TOKYO, surfZero] });
+    expect(row('surfshark:JP-NOF')).toHaveTextContent('No free server');
+    expect(within(row('surfshark:JP-NOF')).getByRole('checkbox')).toBeDisabled();
+  });
+
+  it('keeps a dynamic location selectable even with no free cached server (discover on add)', () => {
+    // HMA discovers gateways on demand, so Osaka (2 cached, 0 free) is still addable.
     const { row } = renderPicker();
-    expect(row('hma:JP-OSAKA')).toHaveTextContent('No free server');
-    expect(within(row('hma:JP-OSAKA')).getByRole('checkbox')).toBeDisabled();
+    expect(within(row('hma:JP-OSAKA')).getByRole('checkbox')).toBeEnabled();
+    expect(row('hma:JP-OSAKA')).not.toHaveTextContent('No free server');
+  });
+
+  it('shows "Fresh IP on add" for a dynamic location with no cached gateway yet', () => {
+    const fresh = target('hma:JP-FUK', 'Fukuoka', 0, 0);
+    const { row } = renderPicker({ targets: [TOKYO, fresh] });
+    expect(row('hma:JP-FUK')).toHaveTextContent('Fresh IP on add');
+    expect(within(row('hma:JP-FUK')).getByRole('checkbox')).toBeEnabled();
   });
 
   it('a location outside the plan says so: not pickable, a disabled stepper, the reason as a tooltip', () => {
@@ -125,7 +140,21 @@ describe('LocationPicker', () => {
     fireEvent.click(screen.getByLabelText('Select every city in Japan'));
     fireEvent.click(screen.getByTestId('picker-submit'));
     const picked = onSubmit.mock.calls[0][0].map((r: { locationKey: string }) => r.locationKey).sort();
-    expect(picked).toEqual(['hma:JP-NGO', 'hma:JP-TOKYO', 'surfshark:JP-KYO']);
+    expect(picked).toEqual(['hma:JP-NGO', 'hma:JP-OSAKA', 'hma:JP-TOKYO', 'surfshark:JP-KYO']);
+  });
+
+  it('"select all" picks every pickable row the provider filter shows, and unpicks them again', () => {
+    const { onSubmit } = renderPicker();
+    fireEvent.click(screen.getByRole('button', { name: /HMA/ }));
+    const all = screen.getByLabelText('Select all 3 HMA locations') as HTMLInputElement;
+    fireEvent.click(all);
+    expect(all.checked).toBe(true);
+    fireEvent.click(all);
+    expect(all.checked).toBe(false);
+    fireEvent.click(all);
+    fireEvent.click(screen.getByTestId('picker-submit'));
+    const picked = onSubmit.mock.calls[0][0].map((r: { locationKey: string }) => r.locationKey).sort();
+    expect(picked).toEqual(['hma:JP-NGO', 'hma:JP-OSAKA', 'hma:JP-TOKYO']);
   });
 
   it('keeps picks visible as removable chips while a search hides their rows', () => {

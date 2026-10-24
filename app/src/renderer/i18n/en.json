@@ -37,21 +37,17 @@
     "providers": {
       "hma": {
         "name": "HMA",
-        "description": "Use your existing HMA VPN device credentials — no password needed.",
-        "detectedTitle": "HMA found on this computer",
-        "detectedSubtitle": "Device credentials are ready to use.",
-        "notDetectedTitle": "HMA not found",
-        "helperMissingTitle": "HMA needs one more step on Windows",
-        "step1": "Install HMA VPN",
-        "step2": "Sign in and connect once",
-        "step3": "Come back here — the app will pick it up automatically",
-        "connect": "Connect",
-        "connecting": "Connecting…",
-        "enableSupport": "Enable HMA support",
-        "enablingSupport": "Enabling…",
-        "windowsHelperNote": "This sets up a small Windows task that keeps a copy of HMA's device credentials that only you and administrators can read. It needs administrator approval once; updates afterwards need none.",
-        "waiting": "Waiting for HMA — watching for credentials…",
-        "initials": "H"
+        "description": "Add HMA with your subscription license key — fresh servers straight from HMA, no app install.",
+        "initials": "H",
+        "licenseLabel": "License key",
+        "licensePlaceholder": "XXXXXX-XXXXXX-XXXXXX",
+        "licenseHint": "Add HMA by your subscription license key — fetches fresh servers from HMA directly, no local install needed.",
+        "licenseAdd": "Add with license key",
+        "licenseAdding": "Registering…",
+        "loadLocations": "Load locations",
+        "loadingLocations": "Loading locations…",
+        "loadedLocations": "{{count}} locations loaded",
+        "removeAccount": "Remove this account"
       },
       "zoogvpn": {
         "name": "ZoogVPN",
@@ -140,20 +136,6 @@
         "username": "VPN username",
         "password": "VPN password",
         "signInNote": "This file signs in with a username and password. Use the ones your provider gives for manual OpenVPN setup; they are stored encrypted with the file."
-      }
-    },
-    "portLimit": {
-      "label": "Port limit",
-      "unlimited": "0 = unlimited",
-      "save": "Save",
-      "title": "Port limits",
-      "note": "Cap how many ports each provider may run at the same time.",
-      "fieldLabel": "Port limit — {{provider}}",
-      "ports_one": "at most {{count}} port",
-      "ports_other": "at most {{count}} ports",
-      "why": {
-        "nordvpn": "Default 6: three tunnels on one key were verified together.",
-        "expressvpn": "Default 8: an ExpressVPN plan allows 10 devices at once, so 2 stay free for your own devices."
       }
     },
     "continueHint": "Connect at least one provider to continue.",
@@ -299,11 +281,16 @@
       "noResults": "No locations match “{{query}}”.",
       "clear": "Clear",
       "selectCountry": "Select every city in {{country}}",
+      "selectAll_one": "Select all {{count}} location",
+      "selectAll_other": "Select all {{count}} locations",
+      "selectAllProvider_one": "Select all {{count}} {{provider}} location",
+      "selectAllProvider_other": "Select all {{count}} {{provider}} locations",
       "cities_one": "{{count}} city",
       "cities_other": "{{count}} cities",
       "servers_one": "{{count}} server · {{free}} free",
       "servers_other": "{{count}} servers · {{free}} free",
       "noFree": "No free server",
+      "ready": "Fresh IP on add",
       "limitReached": "Port limit reached",
       "portsHere_one": "{{count}} port",
       "portsHere_other": "{{count}} ports",
@@ -500,7 +487,8 @@
       "rate-limited": "Waiting before the next try, so the provider isn't contacted too often.",
       "server-not-in-plan": "Your {{provider}} plan doesn't include this server — moving to another one.",
       "checking-sign-in": "The server refused the sign-in — checking your email and password on a {{provider}} free server…",
-      "credentials-changed": "Your sign-in details just changed — connecting again."
+      "credentials-changed": "Your sign-in details just changed — connecting again.",
+      "refreshingCreds": "Refreshing HMA credentials…"
     }
   },
   "settings": {
@@ -607,6 +595,7 @@
     "online-timeout": "The new server didn't come online in time.",
     "probe-failed": "Rotated, but the new exit IP couldn't be checked.",
     "exit-ip-unchanged": "Reconnected, but the exit IP stayed the same.",
+    "no-other-server": "No other IP is free in this location right now — the exit IP stays the same. Pick another location, or try again shortly.",
     "rotate-in-progress": "This port is already rotating.",
     "port-disabled": "Start the port before rotating it.",
     "decrypt-failed": "Your saved credentials couldn't be read.",
@@ -616,19 +605,17 @@
   },
   "hma": {
     "deviceLabel": "Device …{{suffix}}",
-    "notFound": "HMA isn't installed on this computer, or you haven't connected it yet.",
-    "notSignedIn": "HMA is installed but not signed in. Open HMA, sign in, connect once, then try again.",
-    "helperMissing": "HMA support isn't enabled on this computer yet. Click \"Enable HMA support\" first.",
-    "untrusted": "Windows' HMA folder isn't owned by Windows or an administrator, so Proxy Farm won't read credentials from it. Reinstall HMA, then try again.",
-    "enable": {
-      "cancelled": "Administrator approval was cancelled, so HMA support wasn't enabled.",
-      "no-credentials": "HMA support is on, but HMA has no device credentials yet. Open HMA, sign in, connect once, then try again.",
-      "unsupported-location": "Proxy Farm runs from a network, removable or substituted drive, where Windows' own task can't check it. Install or move Proxy Farm to a local disk (for example C:), then try again.",
-      "failed": "Couldn't enable HMA support. Try again, or run Proxy Farm as administrator once."
-    },
     "check": {
       "invalidUdid": "HMA's device ID looks wrong.",
       "invalidPassword": "HMA's device password looks wrong."
+    },
+    "sePlatform": {
+      "unavailable": "The dynamic HMA path is not available in this build.",
+      "network": "Could not reach HMA’s servers. Check your connection and try again.",
+      "noLicense": "That license key did not match an active HMA subscription.",
+      "unauthorized": "HMA rejected the request. The license key may be invalid or expired.",
+      "failed": "Could not register with HMA. Please try again.",
+      "needsLicense": "Enter your HMA subscription license key to continue."
     }
   },
   "zoogvpn": {

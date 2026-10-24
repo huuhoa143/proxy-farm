@@ -21,6 +21,10 @@ export interface CatalogIp {
   ip: string;
   firstSeen: number; // unix seconds
   lastOk: number | null; // unix seconds, or null if never confirmed
+  /** unix seconds a discover last returned this IP. Lets a dynamic provider's catalog drop
+   * gateways the backend has stopped handing out (spec: se-platform discover has a ~120 s
+   * TTL). Absent on entries written before this field existed; treated as `firstSeen`. */
+  lastSeen?: number;
 }
 
 /** One catalog location: a stable key plus the IPs known to serve it. */

@@ -110,9 +110,10 @@ describe('PortTable', () => {
 
     fireEvent.click(screen.getByText('Copy'));
     expect(onCopy).toHaveBeenCalledWith(online);
+    // HMA is dynamic: Change IP is a single click (no server menu) → next IP.
     fireEvent.click(screen.getByText('Change IP'));
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Next free server/ }));
-    expect(onRotate).toHaveBeenCalledWith(online, undefined);
+    expect(onRotate).toHaveBeenCalledWith(online);
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('toggles row selection via the checkbox', () => {
@@ -497,20 +498,9 @@ describe('PortTable', () => {
       }
     });
 
-    it("the Change IP menu learns whether the port's provider has another location in its country", async () => {
-      const api = createFakeProxyFarmApi();
-      const spy = vi.spyOn(api, 'listServers').mockResolvedValue([{ server: '10.0.0.1', health: 'ok', heldBy: 'hma:JP-TOKYO#2' }]);
-      const osaka: Target = { ...tokyo, key: 'hma:JP-OSAKA', city: 'Osaka' };
-      const surfsharkOsaka: Target = { ...osaka, key: 'surfshark:JP-OSA', providerId: 'surfshark' };
-      const { unmount } = renderGrouped({ api, targets: [tokyo, hanoi, surfsharkOsaka] }); // another provider's city does not count
-      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
-      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('no other location in this country');
-      unmount();
-      renderGrouped({ api, targets: [tokyo, hanoi, osaka] });
-      fireEvent.click(screen.getByTestId('change-ip-hma:JP-TOKYO#2'));
-      expect(await screen.findByRole('menuitem', { name: /Next free server/ })).toHaveTextContent('tries another city in the same country');
-      expect(spy).toHaveBeenCalled();
-    });
+    // The Change-IP server menu + its "another city in this country" hint apply only to
+    // pooled (non-dynamic) providers; that logic is covered in ChangeIpMenu.test. HMA is
+    // dynamic here, so its Change IP is a single click with no menu.
 
     it('+ Add port says so when the location is not in the plan', () => {
       renderGrouped({ targets: [tokyo, { ...hanoi, notInPlan: true }] });

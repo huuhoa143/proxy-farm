@@ -10,7 +10,7 @@
  * Run: pnpm run package && pnpm run test:e2e
  */
 import { expect, test, type Page } from '@playwright/test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DISCLAIMER_NOTICE_VERSION, type PortRow, type Settings } from '../../src/shared/contracts';
@@ -19,8 +19,6 @@ import { curlThrough, isAlive, singboxProcesses } from './helpers/procs';
 import { secondPeerHost, startLocalWgPeer, type WgPeer } from './helpers/wg-peer';
 
 const SHOTS = path.join(APP_ROOT, '..', 'docs', 'screenshots', 'v2');
-const HMA_TOKEN = '/Library/Application Support/HMA VPN/state/vpn/tokenCoreSE.json';
-const WIN_HMA_DIR = path.join(process.env.ProgramData ?? 'C:\\ProgramData', 'Privax', 'HMA VPN');
 
 let userData: string;
 let work: string;
@@ -74,15 +72,9 @@ test.describe.serial('packaged Proxy Farm', () => {
     expect(status.engineError).toBeUndefined();
     const providers = await page.evaluate(() => window.proxyFarm.listProviders());
     const hma = providers.find((p) => p.id === 'hma')!;
-    if (IS_WIN) {
-      // Installed HMA is either found (HMA support on, or the app runs elevated) or offers
-      // "Enable HMA support"; without HMA there is nothing to detect.
-      if (existsSync(WIN_HMA_DIR)) expect(hma.detected?.found || hma.detected?.hintKey === 'hma.helperMissing').toBe(true);
-      else expect(hma.detected?.found).toBe(false);
-    } else {
-      expect(hma.detected?.found).toBe(existsSync(HMA_TOKEN));
-      if (existsSync(HMA_TOKEN)) await expect(page.getByTestId('hma-detected')).toBeVisible();
-    }
+    expect(hma).toBeTruthy();
+    // HMA is added by license key now; the card shows the license-key field.
+    await expect(page.getByLabel('License key')).toBeVisible();
     expect(providers.every((p) => p.limit === 0)).toBe(true);
     await shot(page, 'onboarding');
   });

@@ -86,6 +86,26 @@ export interface RenderInput {
 export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
 
 /**
+ * Providers surfaced in the UI right now. Temporarily HMA-only while the HMA flow is being
+ * rebuilt; the other providers' accounts, ports and data are preserved and reappear when
+ * they are added back here. The backend still knows every provider — this only gates what
+ * `listProviders` / `listTargets` / `listPorts` expose to the renderer.
+ */
+export const ENABLED_PROVIDERS: ProviderId[] = ['hma'];
+
+/**
+ * Providers whose servers are discovered fresh on demand rather than chosen from a fixed
+ * pool (HMA se-platform). For these the UI drops all "server" affordances: no per-server
+ * Change-IP menu (Change IP is one click → a brand-new IP), and no "N servers · M free"
+ * counts — the user only ever picks a location.
+ */
+export const DYNAMIC_PROVIDERS: ProviderId[] = ['hma'];
+
+export function isDynamicProvider(id: ProviderId): boolean {
+  return DYNAMIC_PROVIDERS.includes(id);
+}
+
+/**
  * A provider's port limit when the user has not set one (spec §6.8); absent = 0 =
  * unlimited. An explicit user value, 0 included, always wins. ExpressVPN: a plan allows
  * 10 devices at once; 8 leaves 2 for the user's own devices (spec §5.6).
@@ -247,6 +267,28 @@ export interface Provider {
   check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> };
   /** All locations this account can use. Pure over the given catalog. */
   targets(account: Account): Promise<Target[]>;
+  /**
+   * Fetch fresh servers for ONE location right now, for a dynamically-discovered provider
+   * (HMA se-platform): a user Change IP / Add port / server-list open asks for this so the
+   * next `targets()` sees newly discovered IPs instead of only the accumulated pool. Best
+   * effort — resolves when done, never rejects. `locationKey` is the `Target.key`. Absent
+   * for providers whose server list is static per catalog refresh.
+   */
+  refreshLocation?(account: Account, locationKey: string): Promise<void>;
+  /**
+   * Discover the whole catalog now and resolve when a full sweep is done — for a
+   * user-triggered "Load locations" action on a dynamic provider (HMA). Absent for
+   * providers whose list is static per catalog refresh.
+   */
+  refreshAll?(account: Account): Promise<void>;
+  /**
+   * Re-fetch this account's connection credentials, for a provider whose device/session
+   * credentials rotate or expire server-side (HMA: the device password is rotated on the
+   * backend, so a stale one gets AUTH_FAILED even though the account is valid). Returns a
+   * fresh secret (+ any meta to merge), or undefined if it can't. Lets the controller
+   * recover from an auth failure instead of treating it as a wrong login.
+   */
+  refreshCredentials?(account: Account): Promise<{ secret: AccountSecret; meta?: Record<string, string> } | undefined>;
   /** Build the endpoint for one server of one target. Pure. */
   bind(target: Target, serverIp: string, account: Account, secret: AccountSecret): EndpointSpec;
 }
@@ -470,17 +512,10 @@ export interface Diagnostics {
 export interface ProxyFarmApi {
   // providers & accounts
   /** `limit` is the provider's current port limit (0 = unlimited; integration Ruling C). */
-  listProviders(): Promise<
-    Array<{ id: ProviderId; accounts: Account[]; detected?: { found: boolean; hintKey?: string }; limit?: number }>
-  >;
+  listProviders(): Promise<Array<{ id: ProviderId; accounts: Account[]; limit?: number }>>;
+  /** HMA: pass `{ licenseKey }` to register a device from the subscription key. */
   addAccount(providerId: ProviderId, input: Record<string, string>): Promise<CheckResult & { account?: Account }>;
   removeAccount(accountId: string): Promise<void>;
-  /** HMA: (re)import device credentials from the local HMA install. */
-  connectHma(): Promise<CheckResult & { account?: Account }>;
-  /** Windows only: runs the elevated HMA support setup (spec §7, one UAC). Shown when `detected.hintKey`
-   * says the helper is missing. Elsewhere there is nothing to enable: `{ok:true}`. Failures carry
-   * `hma.enable.{cancelled|no-credentials|unsupported-location|failed}`. */
-  enableHmaSupport(): Promise<CheckResult>;
   /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
    * Without them such a file answers `file.check.needsCredentials`. */
   importConfigFile(
@@ -491,6 +526,9 @@ export interface ProxyFarmApi {
   ): Promise<CheckResult & { account?: Account }>;
   /** Locations with `freeServers` filled in (spec §6.8). */
   listTargets(providerId?: ProviderId): Promise<Target[]>;
+  /** Trigger a full server discovery for a dynamic provider (HMA) and resolve with the
+   * number of locations then available. A user "Load locations" action. */
+  refreshTargets(providerId: ProviderId): Promise<number>;
 
   // ports (keys are port keys `<locationKey>#<n>` unless stated otherwise)
   listPorts(): Promise<PortRow[]>;
@@ -557,7 +595,7 @@ export interface ProxyFarmApi {
 /** Channel names used by preload ↔ main. Preload exposes exactly these, nothing else. */
 export const IPC = {
   invoke: [
-    'listProviders', 'addAccount', 'removeAccount', 'connectHma', 'enableHmaSupport', 'importConfigFile', 'listTargets',
+    'listProviders', 'addAccount', 'removeAccount', 'importConfigFile', 'listTargets', 'refreshTargets',
     'listPorts', 'addPorts', 'listServers', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'saveExportFile', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',

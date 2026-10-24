@@ -1,44 +1,5 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadSeed, mergeCatalog } from './catalog';
-
-async function seedFile(locations: unknown[]): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'pf-seed-'));
-  const file = path.join(dir, 'seed.json');
-  await writeFile(file, JSON.stringify({ fetched: 1700000000, locations }));
-  return file;
-}
-
-describe('loadSeed', () => {
-  it('reads the bundled hma-ovpn-seed.json: every location has at least one unique IP, none confirmed yet', async () => {
-    const catalog = await loadSeed();
-    expect(catalog.locations.length).toBe(115);
-    const abuDhabi = catalog.locations.find((l) => l.key === 'AE-1-ABU-DHABI');
-    expect(abuDhabi).toMatchObject({ country: 'AE', city: 'Abu Dhabi' });
-    for (const loc of catalog.locations) {
-      expect(loc.ips.length).toBeGreaterThan(0);
-      expect(new Set(loc.ips.map((i) => i.ip)).size).toBe(loc.ips.length);
-      for (const ip of loc.ips) {
-        expect(ip.lastOk).toBeNull();
-        expect(ip.firstSeen).toBe(catalog.fetched);
-      }
-    }
-  });
-
-  it('a legacy single-ip entry becomes a one-IP location', async () => {
-    const catalog = await loadSeed(await seedFile([{ key: 'X-1', country: 'XX', city: 'X', ip: '10.0.0.1' }]));
-    expect(catalog.locations[0].ips).toEqual([{ ip: '10.0.0.1', firstSeen: 1700000000, lastOk: null }]);
-  });
-
-  it('an `ips` list supersedes `ip`, keeps its order, and drops duplicates', async () => {
-    const catalog = await loadSeed(
-      await seedFile([{ key: 'X-1', country: 'XX', city: 'X', ip: '10.0.0.9', ips: ['10.0.0.2', '10.0.0.3', '10.0.0.2'] }]),
-    );
-    expect(catalog.locations[0].ips.map((i) => i.ip)).toEqual(['10.0.0.2', '10.0.0.3']);
-  });
-});
+import { mergeCatalog } from './catalog';
 
 describe('mergeCatalog', () => {
   it('accumulates a new IP under an existing key', () => {
@@ -98,8 +59,9 @@ describe('mergeCatalog', () => {
     const merged = mergeCatalog(current, feed);
     const loc = merged.locations.find((l) => l.key === 'JP-40-TOKYO-ULT')!;
     expect(loc.ips).toHaveLength(1);
-    // the existing entry (with its lastOk history) is kept, not overwritten by the feed's stub
-    expect(loc.ips[0]).toEqual({ ip: '1.2.3.4', firstSeen: 1000, lastOk: 1500 });
+    // the existing entry keeps its firstSeen/lastOk history; only its freshness (lastSeen)
+    // advances to the feed's time, so it is not overwritten by the feed's stub.
+    expect(loc.ips[0]).toEqual({ ip: '1.2.3.4', firstSeen: 1000, lastOk: 1500, lastSeen: 2000 });
   });
 
   it('adds a brand-new location from the feed', () => {
@@ -117,5 +79,51 @@ describe('mergeCatalog', () => {
     };
     const merged = mergeCatalog(current, feed);
     expect(merged.locations.map((l) => l.key)).toEqual(['FR-2-PARIS']);
+  });
+
+  const loc = (key: string, ips: Array<{ ip: string; firstSeen: number; lastOk: number | null; lastSeen?: number }>) => ({
+    key,
+    country: key.slice(0, 2),
+    city: key,
+    ips,
+  });
+
+  it('with staleSec, drops an unseen IP a touched location has not returned in a while', () => {
+    const current = {
+      fetched: 1000,
+      locations: [loc('US-WA-SEATTLE-ULT', [
+        { ip: 'fresh', firstSeen: 100, lastOk: null, lastSeen: 100 },
+        { ip: 'stale', firstSeen: 100, lastOk: null, lastSeen: 100 },
+      ])],
+    };
+    // A later discover of Seattle returns only `fresh`; `stale` (last seen at 100, well past
+    // the 500 s window before 5000) is dropped.
+    const feed = { fetched: 5000, locations: [loc('US-WA-SEATTLE-ULT', [{ ip: 'fresh', firstSeen: 5000, lastOk: null, lastSeen: 5000 }])] };
+    const merged = mergeCatalog(current, feed, { staleSec: 500 });
+    expect(merged.locations[0].ips.map((i) => i.ip)).toEqual(['fresh']);
+  });
+
+  it('never evicts a protected (held) IP, however stale', () => {
+    const current = {
+      fetched: 1000,
+      locations: [loc('US-WA-SEATTLE-ULT', [
+        { ip: 'fresh', firstSeen: 100, lastOk: null, lastSeen: 100 },
+        { ip: 'held', firstSeen: 100, lastOk: null, lastSeen: 100 },
+      ])],
+    };
+    const feed = { fetched: 5000, locations: [loc('US-WA-SEATTLE-ULT', [{ ip: 'fresh', firstSeen: 5000, lastOk: null, lastSeen: 5000 }])] };
+    const merged = mergeCatalog(current, feed, { staleSec: 500, protect: new Set(['held']) });
+    expect(merged.locations[0].ips.map((i) => i.ip).sort()).toEqual(['fresh', 'held']);
+  });
+
+  it('with staleSec, leaves untouched locations (not in the feed) alone', () => {
+    const current = {
+      fetched: 1000,
+      locations: [loc('JP-40-TOKYO-ULT', [{ ip: 'old', firstSeen: 100, lastOk: null, lastSeen: 100 }])],
+    };
+    const feed = { fetched: 5000, locations: [loc('US-WA-SEATTLE-ULT', [{ ip: 'new', firstSeen: 5000, lastOk: null, lastSeen: 5000 }])] };
+    const merged = mergeCatalog(current, feed, { staleSec: 500 });
+    const tokyo = merged.locations.find((l) => l.key === 'JP-40-TOKYO-ULT')!;
+    expect(tokyo.ips.map((i) => i.ip)).toEqual(['old']); // not pruned: the feed never covered Tokyo
   });
 });

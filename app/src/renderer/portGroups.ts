@@ -1,5 +1,5 @@
 import type { PortRow, ProviderId, Target } from '../shared/contracts';
-import { splitPortKey } from '../shared/contracts';
+import { isDynamicProvider, splitPortKey } from '../shared/contracts';
 import { countryName } from './ui/countryName';
 import { isCountryWide, locationName } from './ui/locationName';
 
@@ -93,6 +93,13 @@ export function addableCount(target: Target, remaining: Partial<Record<ProviderI
   if (target.notInPlan) return 0;
   const free = target.freeServers ?? target.servers.length;
   const cap = remaining[target.providerId];
+  // Dynamic providers (HMA) discover gateways on demand, so a location is addable even
+  // before any IP is cached. Always allow at least one port; a cached pool raises the
+  // ceiling. The plan limit still caps it.
+  if (isDynamicProvider(target.providerId)) {
+    const base = Math.max(1, free);
+    return cap === undefined ? base : Math.min(base, cap);
+  }
   return cap === undefined ? free : Math.min(free, cap);
 }
 
@@ -103,6 +110,7 @@ export function addPortBlock(
 ): 'not-in-plan' | 'no-free-server' | 'limit-reached' | undefined {
   if (target.notInPlan) return 'not-in-plan';
   if (remaining[target.providerId] === 0) return 'limit-reached';
-  if ((target.freeServers ?? target.servers.length) === 0) return 'no-free-server';
+  // A dynamic location with no cached gateway is still addable (discover-on-add).
+  if (!isDynamicProvider(target.providerId) && (target.freeServers ?? target.servers.length) === 0) return 'no-free-server';
   return undefined;
 }

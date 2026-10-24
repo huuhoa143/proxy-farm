@@ -5,7 +5,9 @@
  */
 import path from 'node:path';
 import { registerProvider } from './registry';
-import { hmaProvider } from './hma';
+import { createHmaProvider } from './hma';
+import { createSeCatalogStore } from './hma/se-platform/catalog-store';
+import { defaultSeFetch } from './hma/se-platform/net';
 import { zoogvpnProvider } from './zoogvpn';
 import { createSurfsharkProvider } from './surfshark';
 import { createNordvpnProvider } from './nordvpn';
@@ -30,10 +32,31 @@ export interface RegisterAllProvidersOptions {
    * `expressvpn-pools.json` in the same folder as `surfsharkCachePath`.
    */
   expressvpnPoolPath?: string;
+  /** Where HMA's se-platform geos/discover caches live; defaults beside `surfsharkCachePath`. */
+  hmaSePlatformDir?: string;
+  /** Called when the HMA se-platform catalog gained fresh servers (controller re-emits
+   * `targetsChanged` so the UI re-reads locations). */
+  onTargetsChanged?: () => void;
+  /** IPs live HMA ports currently hold; the se-platform catalog never stale-evicts these. */
+  hmaHeldIps?: () => ReadonlySet<string>;
 }
 
 export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
-  registerProvider(hmaProvider);
+  const seDir = opts.hmaSePlatformDir ?? path.dirname(opts.surfsharkCachePath);
+  registerProvider(
+    createHmaProvider({
+      sePlatform: {
+        net: defaultSeFetch,
+        store: createSeCatalogStore({
+          geosPath: path.join(seDir, 'hma-geos.json'),
+          catalogPath: path.join(seDir, 'hma-se-catalog.json'),
+          net: defaultSeFetch,
+          onChange: opts.onTargetsChanged,
+          heldIps: opts.hmaHeldIps,
+        }),
+      },
+    }),
+  );
   registerProvider(zoogvpnProvider);
   registerProvider(createSurfsharkProvider({ cachePath: opts.surfsharkCachePath }));
   registerProvider(

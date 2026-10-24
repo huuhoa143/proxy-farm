@@ -314,6 +314,58 @@ describe('port manager', () => {
       const result = await manager.rotatePort('zoogvpn:nl-ams');
       expect(result).toEqual({ changed: false, from: '1.1.1.1', to: undefined, noteKey: 'probe-failed' });
     });
+
+    describe('dynamic provider (HMA) Change IP stays in the city', () => {
+      const seattle = (servers: string[]): Target => ({ key: 'hma:US-WA-SEATTLE-ULT', providerId: 'hma', country: 'US', city: 'Seattle', label: 'Seattle', servers });
+      const portland: Target = { key: 'hma:US-OR-PORTLAND', providerId: 'hma', country: 'US', city: 'Portland', label: 'Portland', servers: ['15.220.1.219'] };
+      const seattlePort = {
+        key: 'hma:US-WA-SEATTLE-ULT#1',
+        locationKey: 'hma:US-WA-SEATTLE-ULT',
+        providerId: 'hma' as const,
+        accountId: 'h1',
+        server: '15.181.1.114',
+        serverIp: '15.181.1.114',
+        country: 'US',
+        city: 'Seattle',
+        label: 'Seattle',
+        state: { kind: 'online' as const, since: 1, exitIp: '15.181.1.114', country: 'US' },
+      };
+      const asHmaAccount = (state: StateStore, secrets: ReturnType<typeof fakeSecretStore>) => {
+        secrets.saveSecret('h1-secret', JSON.stringify({ kind: 'userpass', username: 'u', password: 'p' }));
+        state.setState((s) => ({ ...s, accounts: [{ id: 'h1', providerId: 'hma', label: 'h1', meta: {}, secretRef: 'h1-secret' }] }));
+      };
+
+      it('rearms a stale-refused gateway and gives a new IP in the SAME city (no jump to another city)', async () => {
+        const serverHealth = createServerHealth();
+        serverHealth.markRefused('h1', '15.181.1.104'); // stale rotating-password refusal
+        const { manager, state, secrets } = setup({
+          targets: [seattle(['15.181.1.114', '15.181.1.104']), portland],
+          port: seattlePort,
+          depsOverrides: { serverHealth, resolveServer: async (sv) => sv },
+          exitIpResults: [{ ip: '15.181.1.104', country: 'US' }],
+        });
+        asHmaAccount(state, secrets);
+        const result = await manager.rotatePort('hma:US-WA-SEATTLE-ULT#1', undefined, { user: true });
+        expect(result.changed).toBe(true);
+        expect(result.to).toBe('15.181.1.104');
+        const rows = state.getState().ports;
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ locationKey: 'hma:US-WA-SEATTLE-ULT', city: 'Seattle' }); // never moved to Portland
+        expect(serverHealth.isRefused('h1', '15.181.1.104')).toBe(false); // spurious mark cleared
+      });
+
+      it('with no other IP free in the city, reports no-other-server and does NOT relocate', async () => {
+        const { manager, state, secrets } = setup({
+          targets: [seattle(['15.181.1.114']), portland],
+          port: seattlePort,
+          depsOverrides: { resolveServer: async (sv) => sv },
+        });
+        asHmaAccount(state, secrets);
+        const result = await manager.rotatePort('hma:US-WA-SEATTLE-ULT#1', undefined, { user: true });
+        expect(result).toEqual({ changed: false, noteKey: 'no-other-server' });
+        expect(state.getState().ports[0].locationKey).toBe('hma:US-WA-SEATTLE-ULT'); // stayed put
+      });
+    });
   });
 
   describe('a server change never shows the old tunnel as online', () => {
@@ -831,6 +883,29 @@ describe('port manager', () => {
       const t = ber(['1.1.1.1', '2.2.2.2']);
       expect(await manager.addPort(t, 'z1')).toBeUndefined();
       expect((await manager.addPort(t, 'z2'))!.server).toBe('1.1.1.1');
+    });
+
+    it('a dynamic provider (HMA) rearms a spuriously-refused free gateway on a user add', async () => {
+      // HMA gateways refuse only on a stale rotating device password (now auto-refreshed);
+      // a user add on a dynamic location clears those marks and uses the gateway, instead of
+      // a false "no free server" when every free IP of the small per-city pool is refused.
+      const serverHealth = createServerHealth();
+      serverHealth.markRefused('h1', '1.1.1.1');
+      serverHealth.markRefused('h1', '2.2.2.2');
+      const hma: Target = { key: 'hma:US-WA-SEATTLE-ULT', providerId: 'hma', country: 'US', city: 'Seattle', label: 'Seattle', servers: ['1.1.1.1', '2.2.2.2'] };
+      const { manager, state } = setup({ targets: [hma], depsOverrides: { serverHealth } });
+      state.setState((s) => ({ ...s, accounts: [...s.accounts, { id: 'h1', providerId: 'hma', label: 'h1', meta: {}, secretRef: 'h1-secret' }] }));
+      const row = await manager.addPort(hma, 'h1');
+      expect(row?.server).toBe('1.1.1.1');
+      expect(serverHealth.isRefused('h1', '1.1.1.1')).toBe(false); // the spurious mark was cleared
+    });
+
+    it('a non-dynamic provider does NOT rearm: a fully-refused location stays unaddable', async () => {
+      const serverHealth = createServerHealth();
+      serverHealth.markRefused('z1', '1.1.1.1');
+      serverHealth.markRefused('z1', '2.2.2.2');
+      const { manager } = setup({ targets: [], depsOverrides: { serverHealth } });
+      expect(await manager.addPort(ber(['1.1.1.1', '2.2.2.2']), 'z1')).toBeUndefined();
     });
 
     it('serializes concurrent adds so they never race onto the same proxy port or server', async () => {
@@ -2340,6 +2415,27 @@ describe('port manager', () => {
         await vi.waitFor(() => expect(engine.started).toHaveLength(2));
         expect(boundIp(engine.started[1].input)).toBe('10.9.0.2');
         expect(serverOf(state, 'hma:VN-51-HANOI#1')).toBe('10.9.0.2');
+      });
+
+      it('an auth failure first refreshes the rotating device creds and retries, not marking the server refused', async () => {
+        const serverHealth = createServerHealth();
+        serverHealth.markOk('z1', '10.9.9.9'); // proven elsewhere
+        const targets = [hmaTarget(['10.9.0.1', '10.9.0.2'])];
+        const refreshDeviceCredentials = vi.fn(async () => true);
+        const { manager, engine, state } = setup({
+          targets,
+          port: { key: 'hma:VN-51-HANOI#1', locationKey: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, providers: { get: () => fakeProvider(targets) }, refreshDeviceCredentials },
+        });
+        await manager.startPort('hma:VN-51-HANOI#1');
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+
+        expect(refreshDeviceCredentials).toHaveBeenCalledWith('z1');
+        expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI#1')!.state).toMatchObject({ kind: 'retrying', reasonKey: 'refreshingCreds' });
+        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(false); // creds, not the server — don't burn it
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // retried after the refresh
       });
 
       it('with no other server left, the auth failure stays terminal and nothing restarts', async () => {

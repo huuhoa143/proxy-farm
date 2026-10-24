@@ -52,6 +52,10 @@ export interface ServerHealth {
   /** Drops the account's refused marks set at or after `sinceMs`: they were made on an
    * assumption that turned out false (that its credentials work). */
   forgetRefusalsSince(accountId: string, sinceMs: number): void;
+  /** Clears any refused/dead mark for one (account, server) WITHOUT recording a `lastOk`.
+   * For a user action that wants to give a server another chance when the refusal was
+   * likely spurious — a dynamic provider's rotating device password (spec §6.4). */
+  rearm(accountId: string, server: string): void;
   /** The persisted half (refused + lastOk + the token → IP map), for `AppState.serverHealth`. */
   serialize(): ServerHealthState;
 }
@@ -185,6 +189,10 @@ export function createServerHealth(opts: ServerHealthOptions = {}): ServerHealth
       const m = refusedUntil.get(accountId);
       if (!m) return;
       for (const [key, until] of [...m]) if (until - refusedTtlMs >= sinceMs) m.delete(key);
+    },
+    rearm(accountId, server) {
+      clear(refusedUntil, accountId, server);
+      clear(deadUntil, accountId, server);
     },
     serialize,
   };

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { CheckResult, ProviderId, ProxyFarmApi } from '../../shared/contracts';
+import type { Account, CheckResult, ProviderId, ProxyFarmApi } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
 import { Flag } from '../ui/Flag';
 import { countryName } from '../ui/countryName';
@@ -97,122 +97,132 @@ function ProviderGuide({ providerId }: { providerId: keyof typeof PROVIDER_LINKS
   );
 }
 
-export interface HmaDetected {
-  found: boolean;
-  /** e.g. 'hma.helperMissing' — Windows detected an HMA install but the privileged helper isn't set up yet (spec §7). */
-  hintKey?: string;
-}
-
 export interface HmaCardProps {
   api: ProxyFarmApi;
-  detected: HmaDetected | undefined;
   onAdded: () => void;
   accountCount?: number;
+  /** The HMA accounts currently added (one per license/device). */
+  accounts?: Account[];
 }
 
-const HMA_HELPER_MISSING_HINT = 'hma.helperMissing';
-/** Windows: HMA's folder failed the task's ownership check; installing HMA again fixes it. */
-const HMA_UNTRUSTED_HINT = 'hma.untrusted';
-
-export function HmaCard({ api, detected, onAdded, accountCount }: HmaCardProps) {
+export function HmaCard({ api, onAdded, accountCount, accounts = [] }: HmaCardProps) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  const [licenseKey, setLicenseKey] = useState('');
+  const [added, setAdded] = useState((accountCount ?? 0) > 0);
+  const [loading, setLoading] = useState(false);
+  const [loadedCount, setLoadedCount] = useState<number | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
-  async function connect() {
+  async function removeAccount(id: string) {
+    setRemoving(id);
+    try {
+      await api.removeAccount(id);
+      onAdded(); // refresh the list
+    } catch {
+      /* ignore */
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  async function loadLocations() {
+    setLoading(true);
+    try {
+      setLoadedCount(await api.refreshTargets('hma'));
+    } catch {
+      /* leave the previous count; the picker also fills on its own */
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addWithLicense() {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await api.connectHma();
+      const result = await api.addAccount('hma', { licenseKey: licenseKey.trim() });
       setMessage(resultMessage(t, result));
-      if (result.ok) onAdded();
+      if (result.ok) {
+        setLicenseKey('');
+        setAdded(true);
+        onAdded();
+        void loadLocations(); // start pulling the full location list right away
+      }
     } catch (err) {
       setMessage(errorMessage(t, err));
     } finally {
       setBusy(false);
     }
   }
-
-  async function enableSupport() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const result = await api.enableHmaSupport();
-      setMessage(resultMessage(t, result));
-      // The card flips to "HMA found" once detection sees the credentials copy.
-      if (result.ok) onAdded();
-    } catch (err) {
-      setMessage(errorMessage(t, err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const helperMissing = !detected?.found && detected?.hintKey === HMA_HELPER_MISSING_HINT;
 
   return (
-    <CardShell providerId="hma" ready={detected?.found} accountCount={accountCount}>
-      {detected?.found ? (
-        <>
-          <div className="state-line ok">
-            <span className="ic">
-              <Icon name="check" />
-            </span>
-            <span>
-              <span data-testid="hma-detected">{t('onboarding.providers.hma.detectedTitle')}</span>
-              <small>{t('onboarding.providers.hma.detectedSubtitle')}</small>
-            </span>
-          </div>
-          <div className="pc-actions">
-            <button className="btn primary" onClick={connect} disabled={busy}>
-              <Icon name="plug" />
-              {busy ? t('onboarding.providers.hma.connecting') : t('onboarding.providers.hma.connect')}
-            </button>
-          </div>
-        </>
-      ) : helperMissing ? (
-        <>
-          <div className="state-line warn">
-            <span className="ic">
-              <Icon name="shield" />
-            </span>
-            <span data-testid="hma-helper-missing">{t('onboarding.providers.hma.helperMissingTitle')}</span>
-          </div>
-          <p className="helper-note">
-            <Icon name="info" />
-            <span>{t('onboarding.providers.hma.windowsHelperNote')}</span>
-          </p>
-          <div className="pc-actions">
-            <button className="btn primary" onClick={enableSupport} disabled={busy}>
-              <Icon name="shield" />
-              {busy ? t('onboarding.providers.hma.enablingSupport') : t('onboarding.providers.hma.enableSupport')}
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="state-line wait">
-            <span className="ic">
-              <Icon name="search" />
-            </span>
-            <span data-testid="hma-not-detected">{t('onboarding.providers.hma.notDetectedTitle')}</span>
-          </div>
-          {detected?.hintKey === HMA_UNTRUSTED_HINT && (
-            <p className="helper-note" data-testid="hma-untrusted">
-              <Icon name="alert" />
-              <span>{t(HMA_UNTRUSTED_HINT)}</span>
-            </p>
+    <CardShell providerId="hma" accountCount={accountCount}>
+      {accounts.length > 0 && (
+        <ul className="hma-accounts" data-testid="hma-accounts">
+          {accounts.map((a) => (
+            <li key={a.id} className="hma-account" data-testid={`hma-account-${a.id}`}>
+              <span className="ic">
+                <Icon name="check" />
+              </span>
+              <span className="hma-account-id">
+                {a.label}
+                {a.meta.walletKey && <small>{a.meta.walletKey}</small>}
+              </span>
+              <button
+                className="icon-btn"
+                title={t('onboarding.providers.hma.removeAccount') as string}
+                aria-label={t('onboarding.providers.hma.removeAccount') as string}
+                onClick={() => void removeAccount(a.id)}
+                disabled={removing === a.id}
+                data-testid={`hma-remove-${a.id}`}
+              >
+                <Icon name="trash" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="pc-body hma-license"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!busy && licenseKey.trim()) void addWithLicense();
+        }}
+      >
+        <div className="field">
+          <label htmlFor="hma-license">{t('onboarding.providers.hma.licenseLabel')}</label>
+          <input
+            id="hma-license"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t('onboarding.providers.hma.licensePlaceholder') as string}
+            value={licenseKey}
+            onChange={(e) => setLicenseKey(e.target.value)}
+          />
+          <small className="field-hint">{t('onboarding.providers.hma.licenseHint')}</small>
+        </div>
+        <div className="pc-actions">
+          <button className="btn" type="submit" disabled={busy || !licenseKey.trim()}>
+            <Icon name="key" />
+            {busy ? t('onboarding.providers.hma.licenseAdding') : t('onboarding.providers.hma.licenseAdd')}
+          </button>
+        </div>
+      </form>
+      {added && (
+        <div className="pc-actions hma-load">
+          <button className="btn" onClick={() => void loadLocations()} disabled={loading} data-testid="hma-load-locations">
+            {loading ? <span className="spinner" aria-hidden="true" /> : <Icon name="globe" />}
+            {loading ? t('onboarding.providers.hma.loadingLocations') : t('onboarding.providers.hma.loadLocations')}
+          </button>
+          {!loading && loadedCount !== null && (
+            <small className="field-hint" data-testid="hma-loaded-count">
+              {t('onboarding.providers.hma.loadedLocations', { count: loadedCount })}
+            </small>
           )}
-          <ol className="steps">
-            <li>{t('onboarding.providers.hma.step1')}</li>
-            <li>{t('onboarding.providers.hma.step2')}</li>
-            <li>{t('onboarding.providers.hma.step3')}</li>
-          </ol>
-          <p className="watching">
-            <span className="spinner" aria-hidden="true" />
-            {t('onboarding.providers.hma.waiting')}
-          </p>
-        </>
+        </div>
       )}
       <ResultLine message={message} testId="hma-message" />
     </CardShell>

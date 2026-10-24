@@ -199,10 +199,19 @@ function fillDefaults(loaded: LoadedState | undefined, randomPass?: () => string
   const raw = loaded && loaded.schemaVersion !== SCHEMA_VERSION ? migrateV1(loaded) : loaded;
   const rawSettings = (raw?.settings ?? {}) as Partial<Settings>;
   const rawHealth = raw?.serverHealth;
+  // Drop legacy HMA accounts from the removed "local"/detect path (they have no se-platform
+  // device identity, so their ports can never bind) and any ports that belonged to them.
+  const rawAccounts = Array.isArray(raw?.accounts) ? raw!.accounts : defaults.accounts;
+  const rawPorts = Array.isArray(raw?.ports) ? raw!.ports : defaults.ports;
+  const droppedAccountIds = new Set(
+    rawAccounts.filter((a) => a.providerId === 'hma' && (a.meta as { source?: string } | undefined)?.source !== 'se-platform').map((a) => a.id),
+  );
+  const accounts = rawAccounts.filter((a) => !droppedAccountIds.has(a.id));
+  const ports = rawPorts.filter((p) => !droppedAccountIds.has(p.accountId));
   return {
     schemaVersion: SCHEMA_VERSION,
-    ports: Array.isArray(raw?.ports) ? raw!.ports : defaults.ports,
-    accounts: Array.isArray(raw?.accounts) ? raw!.accounts : defaults.accounts,
+    ports,
+    accounts,
     limits: raw?.limits && typeof raw.limits === 'object' ? (raw.limits as Record<ProviderId, number>) : defaults.limits,
     refusals:
       raw?.refusals && typeof raw.refusals === 'object'

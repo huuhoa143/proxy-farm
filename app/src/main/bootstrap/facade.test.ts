@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Account, PortRow, Provider, ProviderId, RotateResult, Target } from '../../shared/contracts';
+import { ENABLED_PROVIDERS, type Account, type PortRow, type Provider, type ProviderId, type RotateResult, type Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
 import type { CredentialVerdict, PortManager } from '../controller/port-manager';
@@ -10,7 +10,6 @@ import type { StartQueue } from '../controller/start-queue';
 import type { SecretStore } from '../store/secrets';
 import { createStateStore, type StateStore } from '../store/state';
 import { createControllerFacade, guessCountry, rotateNoteKey, type FacadeDeps } from './facade';
-import type { HmaRead } from './hma-local';
 import { createNordvpnProvider } from '../providers/nordvpn';
 import { wgKeyLabel } from '../providers/wg-key';
 
@@ -36,10 +35,35 @@ function target(key: string, country = 'NL', servers = ['10.0.0.1']): Target {
 function fakeProvider(id: ProviderId, targets: (account: Account) => Target[]): Provider {
   return {
     id,
+    ...(id === 'hma'
+      ? {
+          async resolveInput(input: Record<string, string>) {
+            const licenseKey = (input.licenseKey ?? '').trim();
+            if (!licenseKey) return { reasonKey: 'hma.sePlatform.needsLicense' };
+            return {
+              input: {
+                source: 'se-platform',
+                walletKey: licenseKey,
+                deviceFingerprint: input.deviceFingerprint || 'fp',
+                tenant: input.tenant || 'tenant',
+                containerId: 'container',
+                deviceUdid: HMA_UDID,
+                openvpnCa: 'CA',
+                udid: HMA_UDID,
+                password: HMA_PASS,
+              },
+            };
+          },
+        }
+      : {}),
     check(input): ReturnType<Provider['check']> {
       if (id === 'hma') {
         if (!input.udid?.startsWith('U1.')) return { ok: false, reasonKey: 'hma.check.invalidUdid' };
-        return { ok: true, label: `device …${input.udid.slice(-6)}`, secret: { kind: 'userpass', username: input.udid, password: input.password }, meta: { udid: input.udid } };
+        const meta: Record<string, string> = { udid: input.udid };
+        if (input.source === 'se-platform')
+          for (const k of ['source', 'walletKey', 'deviceFingerprint', 'tenant', 'containerId', 'deviceUdid', 'openvpnCa'])
+            if (input[k]) meta[k] = input[k];
+        return { ok: true, label: `device …${input.udid.slice(-6)}`, secret: { kind: 'userpass', username: input.udid, password: input.password }, meta };
       }
       if (id === 'zoogvpn') {
         if (!input.username) return { ok: false, reasonKey: 'zoogvpn.check.missingUsername' };
@@ -107,6 +131,7 @@ function fakePortManager(state: StateStore, refusedFor: Record<string, string[]>
     },
     listServers: async (t) => t.servers.map((server) => ({ server, health: 'unknown' as const, ...(held(t).has(server) ? { heldBy: 'x' } : {}) })),
     freeServerCount: (t) => t.servers.filter((sv) => !held(t).has(sv)).length,
+    heldServerIps: () => new Set<string>(),
     // Not in plan when every server is refused for every account (refusedFor['*']).
     locationNotInPlan: (t) => t.servers.length > 0 && t.servers.every((sv) => (refusedFor['*'] ?? []).includes(sv)),
     syncAutoRotate: () => undefined,
@@ -134,12 +159,18 @@ function fakeQueue(): StartQueue & { enqueued: string[] } {
   };
 }
 
+/** Add an HMA account the way the UI does — by license key. */
+async function addHma(
+  facade: { addAccount: (p: ProviderId, input: Record<string, string>) => Promise<{ ok: boolean; account?: Account; reasonKey?: string }> },
+  licenseKey = 'TEST00-TEST11-TEST22',
+) {
+  return facade.addAccount('hma', { licenseKey });
+}
+
 describe('controller facade', () => {
   let dir: string;
-  let hmaRead: HmaRead;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'pf-facade-'));
-    hmaRead = { status: 'found', creds: { udid: HMA_UDID, password: HMA_PASS } };
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -189,7 +220,6 @@ describe('controller facade', () => {
       },
       engineLogs: (key) => [`log for ${key}`],
       hostVpn: { isHostVpnActive: async () => true },
-      hma: { read: async () => hmaRead, watch: () => () => undefined },
       platform: 'darwin',
       speedTest,
       onSettingsChanged,
@@ -208,80 +238,41 @@ describe('controller facade', () => {
     return { facade: createControllerFacade(deps), state, secrets, portManager, queue, allocated, speedTest, onSettingsChanged, updater };
   }
 
-  it('listProviders reports HMA detection and each provider limit (Ruling C)', async () => {
-    const { facade, state } = setup();
-    state.setState((s) => ({ ...s, limits: { ...s.limits, zoogvpn: 3 } }));
-    const list = await facade.listProviders();
-    expect(list.map((p) => p.id)).toEqual(['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file']);
-    expect(list[0].detected).toEqual({ found: true });
-    expect(list[1].limit).toBe(3);
-    expect(list[2].limit).toBe(0);
-    // NordVPN's and ExpressVPN's default limits until the user sets one; an explicit 0 (unlimited) wins.
-    expect(list[3].limit).toBe(6);
-    expect(list[4].limit).toBe(8);
-    state.setState((s) => ({ ...s, limits: { ...s.limits, nordvpn: 0 } }));
-    expect((await facade.listProviders())[3].limit).toBe(0);
-  });
-
-  it('listProviders maps a missing / unreadable HMA install to not-found hints', async () => {
+  it('listProviders lists only the UI-enabled providers (HMA-only for now) with their port limit', async () => {
     const { facade } = setup();
-    hmaRead = { status: 'missing' };
-    expect((await facade.listProviders())[0].detected).toEqual({ found: false });
-    hmaRead = { status: 'invalid', message: 'x' };
-    expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.notSignedIn' });
-    hmaRead = { status: 'helper-missing' };
-    expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.helperMissing' });
-    hmaRead = { status: 'untrusted' };
-    expect((await facade.listProviders())[0].detected).toEqual({ found: false, hintKey: 'hma.untrusted' });
+    const list = await facade.listProviders();
+    expect(list.map((p) => p.id)).toEqual(ENABLED_PROVIDERS);
+    expect(list.map((p) => p.id)).not.toContain('surfshark');
+    expect(list[0].limit).toBe(0);
   });
 
-  it('listProviders asks the Windows task for a run before offering to enable HMA support again', async () => {
-    let refreshes = 0;
-    // The task had not caught up after a sleep: its run brings the copy back.
-    const hmaWindows = {
-      enable: async () => ({ ok: true }) as const,
-      refresh: async () => {
-        refreshes++;
-        hmaRead = { status: 'found', creds: { udid: 'U1.x', password: 'p'.repeat(64) } };
-      },
-    };
-    const { facade } = setup({ platform: 'win32', hmaWindows });
-    hmaRead = { status: 'helper-missing' };
-    expect((await facade.listProviders())[0].detected).toEqual({ found: true });
-    expect(refreshes).toBe(1);
-    // A found copy needs no run.
-    await facade.listProviders();
-    expect(refreshes).toBe(1);
-  });
-
-  it('connectHma stores the device creds as a userpass secret, and a second connect updates the same account', async () => {
+  it('addAccount(hma) registers a device from the license key as a se-platform userpass account', async () => {
     const { facade, state, secrets } = setup();
-    const first = await facade.connectHma();
+    const first = await addHma(facade);
     expect(first.ok).toBe(true);
-    expect(first.account?.meta.source).toBe('local');
-    const stored = JSON.parse(secrets.loadSecret(first.account!.secretRef)!);
-    expect(stored).toEqual({ kind: 'userpass', username: HMA_UDID, password: HMA_PASS });
+    expect(first.account?.meta.source).toBe('se-platform');
+    expect(first.account?.meta.walletKey).toBe('TEST00-TEST11-TEST22');
+    expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!)).toEqual({ kind: 'userpass', username: HMA_UDID, password: HMA_PASS });
     expect(JSON.stringify(state.getState().accounts)).not.toContain(HMA_PASS);
 
-    hmaRead = { status: 'found', creds: { udid: HMA_UDID, password: 'b'.repeat(64) } };
-    const second = await facade.connectHma();
+    // Re-adding the same license reuses the one account (same fingerprint → same device).
+    const second = await addHma(facade);
     expect(second.account?.id).toBe(first.account?.id);
-    expect(state.getState().accounts).toHaveLength(1);
-    expect(JSON.parse(secrets.loadSecret(first.account!.secretRef)!).password).toBe('b'.repeat(64));
+    expect(state.getState().accounts.filter((a) => a.providerId === 'hma')).toHaveLength(1);
   });
 
-  it('a re-import with a changed secret drops server marks earned under the old one; an unchanged one does not', async () => {
-    const { facade, portManager } = setup();
-    await facade.connectHma();
-    await facade.connectHma(); // same creds
-    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual([]);
-    hmaRead = { status: 'found', creds: { udid: HMA_UDID, password: 'b'.repeat(64) } };
-    await facade.connectHma();
-    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:hma-1']);
+  it('addAccount(hma) without a license key is refused', async () => {
+    const { facade } = setup();
+    expect(await facade.addAccount('hma', {})).toEqual({ ok: false, reasonKey: 'hma.sePlatform.needsLicense' });
+  });
 
+  it('a re-add with a changed secret drops server marks earned under the old one; an unchanged one does not', async () => {
+    const { facade, portManager } = setup();
     await facade.addAccount('zoogvpn', { username: 'me', password: 'old' });
+    await facade.addAccount('zoogvpn', { username: 'me', password: 'old' }); // nothing changed
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual([]);
     await facade.addAccount('zoogvpn', { username: 'me', password: 'new' }); // the duplicate-account path
-    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:hma-1', 'creds:zoogvpn-1']);
+    expect(portManager.calls.filter((c) => c.startsWith('creds:'))).toEqual(['creds:zoogvpn-1']);
   });
 
   it('re-adding a Surfshark key with a corrected address updates the account meta and counts as new credentials', async () => {
@@ -361,35 +352,6 @@ describe('controller facade', () => {
         expect(state.getState().accounts).toHaveLength(0);
       }
     });
-  });
-
-  it('connectHma: not installed → hma.notFound; Windows without HMA support → hma.helperMissing', async () => {
-    hmaRead = { status: 'missing' };
-    expect(await setup().facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.notFound' });
-    expect(await setup({ platform: 'linux' }).facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.notFound' });
-    hmaRead = { status: 'helper-missing' };
-    expect(await setup({ platform: 'win32' }).facade.connectHma()).toEqual({ ok: false, reasonKey: 'hma.helperMissing' });
-  });
-
-  it('connectHma on Windows adds the account from the auth file credentials', async () => {
-    const udid = `U1.00000000-0000-4000-8000-000000000000.hma101.${'A'.repeat(64)}`;
-    hmaRead = { status: 'found', creds: { udid, password: 'B'.repeat(64) } };
-    const r = await setup({ platform: 'win32' }).facade.connectHma();
-    expect(r.ok).toBe(true);
-    expect(r.account?.meta).toMatchObject({ udid, source: 'local' });
-  });
-
-  it('enableHmaSupport: nothing to do off Windows; on Windows maps the setup outcome', async () => {
-    expect(await setup().facade.enableHmaSupport()).toEqual({ ok: true });
-    for (const [result, expected] of [
-      [{ ok: true }, { ok: true }],
-      [{ ok: false, reason: 'cancelled' }, { ok: false, reasonKey: 'hma.enable.cancelled' }],
-      [{ ok: false, reason: 'no-credentials' }, { ok: false, reasonKey: 'hma.enable.no-credentials' }],
-      [{ ok: false, reason: 'failed' }, { ok: false, reasonKey: 'hma.enable.failed' }],
-    ] as const) {
-      const hmaWindows = { enable: async () => result, refresh: async () => undefined };
-      expect(await setup({ platform: 'win32', hmaWindows }).facade.enableHmaSupport()).toEqual(expected);
-    }
   });
 
   it('addAccount(zoogvpn) maps the card\'s "email" field to the provider\'s username', async () => {
@@ -490,7 +452,7 @@ describe('controller facade', () => {
 
   it('startPorts: a bare location key adds one port (account from the pool, a port row, through the queue)', async () => {
     const { facade, state, queue } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.startPorts(['hma:NL-AMS', 'hma:JP-TYO', 'hma:NOPE']);
     const rows = state.getState().ports;
     expect(rows.map((r) => [r.key, r.proxyPort, r.enabled, r.state.kind])).toEqual([
@@ -503,7 +465,7 @@ describe('controller facade', () => {
 
   it('startPorts: a port key starts that port; an unknown port key is ignored', async () => {
     const { facade, state, queue } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.addPorts('hma:NL-AMS', 1);
     state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, enabled: false, state: { kind: 'stopped' } })) }));
     queue.enqueued.length = 0;
@@ -514,7 +476,7 @@ describe('controller facade', () => {
 
   it('addPorts adds k ports on different servers and starts them', async () => {
     const { facade, state, queue } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     const r = await facade.addPorts('hma:NL-AMS', 2);
     expect(r.noteKey).toBeUndefined();
     expect(r.added.map((p) => [p.key, p.server])).toEqual([
@@ -527,7 +489,7 @@ describe('controller facade', () => {
 
   it('addPorts with fewer free servers adds that many and says no-free-server', async () => {
     const { facade } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     const r = await facade.addPorts('hma:NL-AMS', 5);
     expect(r.added).toHaveLength(3);
     expect(r.noteKey).toBe('no-free-server');
@@ -536,7 +498,7 @@ describe('controller facade', () => {
 
   it('addPorts stops at the provider limit with limit-reached', async () => {
     const { facade } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.setLimit('hma', 2);
     const r = await facade.addPorts('hma:NL-AMS', 3);
     expect(r.added).toHaveLength(2);
@@ -545,7 +507,7 @@ describe('controller facade', () => {
 
   it('two concurrent addPorts with one slot left add exactly one port; the other says limit-reached', async () => {
     const { facade, state } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.setLimit('hma', 2);
     await facade.addPorts('hma:NL-AMS', 1);
     const [a, b] = await Promise.all([facade.addPorts('hma:NL-AMS', 1), facade.addPorts('hma:NL-AMS', 1)]);
@@ -578,7 +540,7 @@ describe('controller facade', () => {
 
   it('listServers / listTargets come from the port manager, with freeServers filled in', async () => {
     const { facade, portManager } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.addPorts('hma:NL-AMS', 1);
     expect((await facade.listServers('hma:NL-AMS')).map((s) => [s.server, s.heldBy])).toEqual([
       ['10.0.0.1', 'x'],
@@ -599,7 +561,7 @@ describe('controller facade', () => {
 
   it('listTargets flags a location whose every server refused every account as not in the plan', async () => {
     const { facade } = setup({}, { '*': ['10.0.0.1'] });
-    await facade.connectHma();
+    await addHma(facade);
     const targets = await facade.listTargets('hma');
     expect(targets.map((t) => [t.key, t.notInPlan])).toEqual([
       ['hma:NL-AMS', undefined],
@@ -617,7 +579,7 @@ describe('controller facade', () => {
 
   it('startPorts respects the provider limit', async () => {
     const { facade, state, queue } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.setLimit('hma', 1);
     await facade.startPorts(['hma:NL-AMS', 'hma:JP-TYO']);
     expect(state.getState().ports.map((r) => r.key)).toEqual(['hma:NL-AMS#1']);
@@ -627,7 +589,7 @@ describe('controller facade', () => {
 
   it('startPorts on a failed(port-in-use) row moves it to a fresh port ("Move to another port")', async () => {
     const { facade, state, allocated } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.startPorts(['hma:NL-AMS']);
     state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, state: { kind: 'failed', reason: 'port-in-use', untilMs: 0, attempt: 1 } })) }));
     await facade.startPorts(['hma:NL-AMS#1']);
@@ -637,7 +599,7 @@ describe('controller facade', () => {
 
   it('stopPorts / removePorts go through the port manager', async () => {
     const { facade, portManager, state } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.startPorts(['hma:NL-AMS']);
     await facade.stopPorts(['hma:NL-AMS#1']);
     await facade.removePorts(['hma:NL-AMS#1']);
@@ -647,7 +609,7 @@ describe('controller facade', () => {
 
   it('removeAccount removes that account\'s ports and its secret', async () => {
     const { facade, state, secrets } = setup();
-    const { account } = await facade.connectHma();
+    const { account } = await addHma(facade);
     await facade.startPorts(['hma:NL-AMS']);
     await facade.removeAccount(account!.id);
     expect(state.getState().accounts).toEqual([]);
@@ -670,7 +632,7 @@ describe('controller facade', () => {
 
   it('testPort runs the speed test only when asked, through the port with proxy auth', async () => {
     const { facade, speedTest, state } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.startPorts(['hma:NL-AMS']);
     expect(await facade.testPort('hma:NL-AMS#1', false)).toEqual({ ok: true, exitIp: '9.9.9.9', latencyMs: 12 });
     expect(speedTest).not.toHaveBeenCalled();
@@ -701,7 +663,7 @@ describe('controller facade', () => {
 
   it('getDiagnostics reports versions and per-provider counts, and nothing identifying', async () => {
     const { facade, state, secrets } = setup();
-    await facade.connectHma();
+    await addHma(facade);
     await facade.addAccount('zoogvpn', { email: 'someone@example.com', password: 'zoog-secret-pw' });
     const base = { providerId: 'hma' as const, accountId: 'hma-1', label: 'Amsterdam', country: 'NL', city: 'Amsterdam', enabled: true, autoRotateMin: 0 };
     state.setState((s) => ({
