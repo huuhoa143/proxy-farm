@@ -86,13 +86,14 @@ export interface RenderInput {
 export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
 
 /**
- * Providers surfaced in the UI right now. HMA and Surfshark are the rebuilt, live-validated
- * flows (HMA se-platform; Surfshark account login + WireGuard key registration); the other
+ * Providers surfaced in the UI right now. HMA, Surfshark and NordVPN are the rebuilt,
+ * live-validated flows (HMA se-platform; Surfshark account login + WireGuard key
+ * registration; NordVPN standard-group servers in Nord's recommended order); the other
  * providers' accounts, ports and data are preserved and reappear when they are added back
  * here. The backend still knows every provider — this only gates what `listProviders` /
  * `listTargets` / `listPorts` expose to the renderer.
  */
-export const ENABLED_PROVIDERS: ProviderId[] = ['hma', 'surfshark'];
+export const ENABLED_PROVIDERS: ProviderId[] = ['hma', 'surfshark', 'nordvpn'];
 
 /**
  * Providers whose servers are discovered fresh on demand rather than chosen from a fixed

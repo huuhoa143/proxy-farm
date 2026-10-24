@@ -5,11 +5,11 @@ import path from 'node:path';
 import type { Account, AccountSecret, WireguardEndpoint } from '../types';
 import { renderConfig } from '../../engine/render-config';
 import { assertConfigInvariants } from '../../engine/invariants';
-import { createNordvpnProvider, NORDLYNX_ADDRESS } from './index';
-import { CREDENTIALS_URL } from './credentials';
+import { createNordvpnProvider, NORDLYNX_ADDRESS, RECOMMENDATION_MIN_INTERVAL_MS } from './index';
+import { CREDENTIALS_URL, SERVICES_URL } from './credentials';
 import { wgKeyLabel } from '../wg-key';
-import { SERVERS_URL, type FetchLike } from './servers';
-import { PK_HANOI, PK_HCMC, samplePayload } from './fixtures/sample-servers';
+import { recommendationsUrl, SERVERS_URL, type FetchLike } from './servers';
+import { apiServer, NORD_IDS, PK_HANOI, PK_HCMC, samplePayload } from './fixtures/sample-servers';
 
 // Dummy values of the right shape, not real credentials.
 const TOKEN = 'ef'.repeat(32);
@@ -30,6 +30,7 @@ function fakeNord(creds: { status: number; body?: unknown } = { status: 200, bod
   return vi.fn<FetchLike>(async (url) => {
     if (url === SERVERS_URL) return { ok: true, status: 200, json: async () => samplePayload() };
     if (url === CREDENTIALS_URL) return { ok: creds.status === 200, status: creds.status, json: async () => creds.body };
+    if (url === SERVICES_URL) return { ok: true, status: 200, json: async () => [{ service: { identifier: 'vpn' }, expires_at: '2099-01-01 00:00:00' }] };
     throw new Error(`unexpected URL ${url}`);
   });
 }
@@ -49,12 +50,12 @@ describe('nordvpn provider: adding an account', () => {
     expect(provider.check({ credential: TOKEN }).ok).toBe(false);
   });
 
-  it('resolveInput() exchanges an access token for the NordLynx key with one call', async () => {
+  it('resolveInput() exchanges an access token for the NordLynx key (credentials + services)', async () => {
     const fetchImpl = fakeNord();
     const provider = createNordvpnProvider({ cachePath, fetchImpl });
     const resolved = await provider.resolveInput!({ credential: TOKEN });
     expect(resolved).toEqual({ input: { privateKey: KEY } });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls.map((c) => c[0])).toEqual([CREDENTIALS_URL, SERVICES_URL]);
     expect(provider.check((resolved as { input: Record<string, string> }).input)).toMatchObject({ ok: true, secret: SECRET });
   });
 
@@ -138,5 +139,55 @@ describe('nordvpn provider: bind', () => {
     const endpoint = provider.bind(hanoi, hanoi.servers[0], ACCOUNT, SECRET);
     const text = renderConfig({ endpoint, listen: { host: '127.0.0.1', port: 29001 }, clash: { port: 40001, secret: 's' } });
     expect(() => assertConfigInvariants(JSON.parse(text))).not.toThrow();
+  });
+});
+
+describe('nordvpn provider: refreshLocation (Nord recommendations)', () => {
+  const HCMC = 'nordvpn:VN-HO-CHI-MINH-CITY';
+  const ids = NORD_IDS['Ho Chi Minh City'];
+  const recUrl = recommendationsUrl(ids.countryId, ids.cityId);
+
+  /** fakeNord plus a recommendations endpoint answering `answer`. */
+  function withRecommendations(answer: () => { status: number; body: unknown }) {
+    const base = fakeNord();
+    return vi.fn<FetchLike>(async (url, init) => {
+      if (url === recUrl) {
+        const { status, body } = answer();
+        return { ok: status === 200, status, json: async () => body };
+      }
+      return base(url, init);
+    });
+  }
+  const vn57 = apiServer('vn57.nordvpn.com', '198.51.100.67', 4, 'VN', 'Vietnam', 'Ho Chi Minh City', PK_HCMC, true);
+
+  it("puts Nord's recommended server first in the location's servers", async () => {
+    const fetchImpl = withRecommendations(() => ({ status: 200, body: [vn57] }));
+    const provider = createNordvpnProvider({ cachePath, fetchImpl });
+    expect((await provider.targets(ACCOUNT)).find((t) => t.key === HCMC)!.servers[0]).toBe('198.51.100.45');
+    await provider.refreshLocation!(ACCOUNT, HCMC);
+    expect(fetchImpl.mock.calls.map((c) => c[0])).toContain(recUrl);
+    expect((await provider.targets(ACCOUNT)).find((t) => t.key === HCMC)!.servers).toEqual(['198.51.100.67', '198.51.100.45', '198.51.100.111']);
+  });
+
+  it('asks at most once a minute per location, and shares a call already running', async () => {
+    let now = 1_000_000;
+    const fetchImpl = withRecommendations(() => ({ status: 200, body: [vn57] }));
+    const provider = createNordvpnProvider({ cachePath, fetchImpl, now: () => now });
+    const recCalls = () => fetchImpl.mock.calls.filter((c) => c[0] === recUrl).length;
+    await Promise.all([provider.refreshLocation!(ACCOUNT, HCMC), provider.refreshLocation!(ACCOUNT, HCMC)]);
+    await provider.refreshLocation!(ACCOUNT, HCMC);
+    expect(recCalls()).toBe(1);
+    now += RECOMMENDATION_MIN_INTERVAL_MS;
+    await provider.refreshLocation!(ACCOUNT, HCMC);
+    expect(recCalls()).toBe(2);
+  });
+
+  it('never rejects: an API failure or an unknown location leaves the list as it was', async () => {
+    const fetchImpl = withRecommendations(() => ({ status: 503, body: {} }));
+    const provider = createNordvpnProvider({ cachePath, fetchImpl });
+    const before = await provider.targets(ACCOUNT);
+    await expect(provider.refreshLocation!(ACCOUNT, HCMC)).resolves.toBeUndefined();
+    await expect(provider.refreshLocation!(ACCOUNT, 'nordvpn:XX-NOWHERE')).resolves.toBeUndefined();
+    expect(await provider.targets(ACCOUNT)).toEqual(before);
   });
 });

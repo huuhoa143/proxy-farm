@@ -8,7 +8,11 @@
  * key is stored, as a `wgkey` secret.
  *
  * Locations come from the public server list (servers.ts), one per (country, city);
- * a location's servers are its servers' IPs, least loaded first. Each server has its
+ * a location's servers are its servers' IPs, least loaded first. `refreshLocation()` then
+ * orders them the way the Windows app picks (8.14.3 `ServerPicker.PickBestServer`):
+ * Nord's `v1/servers/recommendations` for the location first ✅ 2026-10-24. A server that
+ * fails is left by the port manager's usual failover, as the app rotates to the next one.
+ * Each server has its
  * own WireGuard public key, kept in the on-disk cache, so `bind()` reads it from there
  * synchronously and deterministically, like Surfshark's cluster cache.
  *
@@ -21,10 +25,13 @@
  */
 import type { Account, AccountSecret, CheckResult, Provider, Target } from '../types';
 import { ACCESS_TOKEN_RE, exchangeAccessToken, WG_KEY_RE } from './credentials';
-import { getServers, readServersCacheSync, type FetchLike, type NordLocation } from './servers';
+import { applyRecommendations, getServers, readServersCacheSync, recommendServers, type FetchLike, type NordLocation } from './servers';
 import { wgKeyLabel } from '../wg-key';
 
 const WG_PORT = 51820;
+/** One recommendation per location at most this often: Change IP, Add port and the
+ * periodic refresh can all ask within moments of each other. */
+export const RECOMMENDATION_MIN_INTERVAL_MS = 60_000;
 /** NordLynx's interface address: the same for every key ✅ 2026-10-09. */
 export const NORDLYNX_ADDRESS = '10.5.0.2/32';
 
@@ -63,6 +70,10 @@ export function createNordvpnProvider(deps: NordvpnProviderDeps): Provider {
     });
     return inflight;
   };
+  // locationKey -> when it was last asked, and the request still running.
+  const recommendedAt = new Map<string, number>();
+  const recommending = new Map<string, Promise<void>>();
+  const clock = now ?? Date.now;
 
   return {
     id: 'nordvpn',
@@ -94,6 +105,25 @@ export function createNordvpnProvider(deps: NordvpnProviderDeps): Provider {
 
     async targets(_account: Account): Promise<Target[]> {
       return (await loadLocations()).map(toTarget);
+    },
+
+    /** Nord's recommended servers for one location first (the account plays no part: the
+     * list is public). Best effort, never rejects; at most once a minute per location. */
+    async refreshLocation(_account: Account, locationKey: string): Promise<void> {
+      const running = recommending.get(locationKey);
+      if (running) return running;
+      const last = recommendedAt.get(locationKey);
+      if (last !== undefined && clock() - last < RECOMMENDATION_MIN_INTERVAL_MS) return;
+      const job = (async () => {
+        const location = (await loadLocations()).find((l) => l.key === locationKey);
+        if (!location?.countryId || !location.cityId) return;
+        recommendedAt.set(locationKey, clock());
+        await applyRecommendations(cachePath, locationKey, await recommendServers(location, fetchImpl));
+      })()
+        .catch(() => undefined)
+        .finally(() => recommending.delete(locationKey));
+      recommending.set(locationKey, job);
+      return job;
     },
 
     bind(target: Target, serverIp: string, _account: Account, secret: AccountSecret) {

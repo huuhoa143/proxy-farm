@@ -49,6 +49,15 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   account-bound and expire, so Proxy Farm re-registers the key before it lapses and when a
   handshake stops working; this fixes keys that silently stopped connecting. Pasting a
   WireGuard key or importing a `.conf` still works as before.
+- NordVPN is back, and picks servers the way the NordVPN app does. The server list now
+  holds only online servers of Nord's "Standard VPN servers" group; before, about 1,700
+  Dedicated IP, Double VPN and Onion servers were mixed in, and a port pinned to one of
+  those never came up on an ordinary account. Before Add port and Change IP, and on the
+  periodic refresh of active locations, Proxy Farm asks Nord's server recommendations for
+  the city and tries the recommended servers first, as the app does on every connect. An
+  old server cache is refreshed automatically. Adding an account whose NordVPN
+  subscription has ended is now refused with a clear message, instead of a port that
+  never connects.
 - Removed the per-provider port-limit field from the UI; it defaulted to unlimited.
 
 ## [0.2.0] — 2026-10-09
