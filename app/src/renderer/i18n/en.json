@@ -488,7 +488,8 @@
       "server-not-in-plan": "Your {{provider}} plan doesn't include this server — moving to another one.",
       "checking-sign-in": "The server refused the sign-in — checking your email and password on a {{provider}} free server…",
       "credentials-changed": "Your sign-in details just changed — connecting again.",
-      "refreshingCreds": "Refreshing HMA credentials…"
+      "refreshingCreds": "Refreshing HMA credentials…",
+      "reconnecting": "Reconnecting to another HMA gateway…"
     }
   },
   "settings": {

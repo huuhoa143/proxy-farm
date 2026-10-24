@@ -21,6 +21,11 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   current IP. Discovered gateways refresh on a 2-minute timer for active locations and
   stale ones are pruned, so the pool follows HMA's rotation. Works the same on macOS and
   Windows; the Windows "Enable HMA support" administrator task is gone.
+- Running several HMA ports at once on one license is now reliable. One HMA device holds
+  many concurrent OpenVPN sessions on a single shared password (verified live), so when a
+  port's sibling is already online, an auth failure is treated as a transient reconnect —
+  the shared credentials are no longer refreshed/rotated (which would drop the online
+  siblings) and the gateway is no longer marked "refused / not in your plan".
 - Removed the per-provider port-limit field from the UI; it defaulted to unlimited.
 
 ## [0.2.0] — 2026-10-09

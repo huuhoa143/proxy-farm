@@ -915,10 +915,20 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * outcome either moves the port to another server or leaves it terminally failed. */
   function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     if (port.providerId === 'hma') {
-      // §5.1: HMA's device password rotates/expires server-side, so a stale one gets
-      // AUTH_FAILED even for a perfectly valid account. First response: refresh the device
-      // creds once (throttled) and retry on a fresh server — NOT mark the server refused or
-      // blame the login. Only if that already happened recently do we fall through.
+      // One HMA device runs many concurrent OpenVPN sessions on ONE shared device password
+      // (verified live). So if another port of this account is already ONLINE, that password
+      // is valid — this auth failure is a transient gateway hiccup, not a stale credential.
+      // Retry (startPort re-selects a gateway); never refresh the credentials here, because
+      // a passage refresh ROTATES the shared password and would knock the online siblings
+      // off, and never mark the server refused / blame the plan.
+      if (anyOnline(port.accountId, port.key)) {
+        return restartElsewhere(port.key, 'reconnecting');
+      }
+      // §5.1: HMA's device password can expire server-side, so a stale one gets AUTH_FAILED
+      // even for a valid account. With nothing online (no session proving the password), the
+      // first response is to refresh the device creds once (throttled) and retry on a fresh
+      // server — NOT mark the server refused or blame the login. Safe to rotate here: no
+      // online sibling to break. Only if that already happened recently do we fall through.
       const lastRefresh = credsRefreshAt.get(port.accountId) ?? 0;
       if (deps.refreshDeviceCredentials && now() - lastRefresh > CREDS_REFRESH_MIN_GAP_MS) {
         credsRefreshAt.set(port.accountId, now());

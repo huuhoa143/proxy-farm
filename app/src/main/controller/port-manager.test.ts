@@ -2489,8 +2489,23 @@ describe('port manager', () => {
         expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(false);
       });
 
-      it('another port of the account being online is proof: the server is refused and the port moves', async () => {
-        const { manager, engine, state, serverHealth } = hmaSetup(['10.9.0.1', '10.9.0.2', '10.9.0.3'], createServerHealth(), false);
+      it('another port of the account being online means the shared device password is valid: a transient retry, NOT a refusal', async () => {
+        // Verified live: one HMA device runs many concurrent OpenVPN sessions on one shared
+        // password. So if a sibling port is online, that password works — an auth failure
+        // here is a transient gateway hiccup. The server must NOT be marked refused (that,
+        // plus "works elsewhere", used to show a terminal "location rejected"), and the
+        // credentials must NOT be refreshed (a passage refresh rotates the shared password
+        // and would drop the online sibling).
+        const refreshDeviceCredentials = vi.fn(async () => true);
+        const serverHealth = createServerHealth();
+        const targets = [hmaTarget(['10.9.0.1', '10.9.0.2', '10.9.0.3'])];
+        const { manager, engine, state } = setup({
+          targets,
+          port: { key: 'hma:VN-51-HANOI#1', locationKey: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, providers: { get: () => fakeProvider(targets) }, refreshDeviceCredentials },
+        });
         state.setState((s) => ({
           ...s,
           ports: [
@@ -2500,8 +2515,10 @@ describe('port manager', () => {
         }));
         await manager.startPort('hma:VN-51-HANOI#1');
         engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
-        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(true);
-        await vi.waitFor(() => expect(engine.started).toHaveLength(2));
+        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(false); // transient, not refused
+        expect(refreshDeviceCredentials).not.toHaveBeenCalled(); // must not rotate the shared password
+        expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI#1')!.state).toMatchObject({ kind: 'retrying', reasonKey: 'reconnecting' });
+        await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // retried
       });
 
       it('credentialsChanged forgets refused/dead marks earned under the old creds, persisted', async () => {

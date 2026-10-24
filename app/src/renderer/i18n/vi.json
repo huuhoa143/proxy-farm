@@ -488,7 +488,8 @@
       "server-not-in-plan": "Gói {{provider}} của bạn không bao gồm máy chủ này — đang chuyển sang máy chủ khác.",
       "checking-sign-in": "Máy chủ từ chối đăng nhập — đang kiểm tra email và mật khẩu qua một máy chủ miễn phí của {{provider}}…",
       "credentials-changed": "Thông tin đăng nhập vừa thay đổi — đang kết nối lại.",
-      "refreshingCreds": "Đang làm mới thông tin HMA…"
+      "refreshingCreds": "Đang làm mới thông tin HMA…",
+      "reconnecting": "Đang kết nối lại qua cổng HMA khác…"
     }
   },
   "settings": {
