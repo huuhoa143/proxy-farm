@@ -9,7 +9,7 @@
  * gateway with those credentials and the device's own CA.
  */
 import type { Account, AccountSecret, Catalog, CheckResult, Provider, Target } from '../types';
-import { fetchDeviceCredentials, SeError } from './se-platform/client';
+import { fetchDeviceCredentials, SeError, tenantOfUdid } from './se-platform/client';
 import type { SeCatalogStore } from './se-platform/catalog-store';
 import {
   createTokenMinter,
@@ -17,10 +17,11 @@ import {
   identityToMeta,
   licenseHint,
   registerDevice,
+  withToken,
   type DeviceIdentity,
   type TokenMinter,
 } from './se-platform/device';
-import type { SeFetch } from './se-platform/types';
+import type { SeDeviceToken, SeFetch } from './se-platform/types';
 
 const SERVER_PORT = 1194;
 const SERVER_NAME = 'openvpn.gen-vpn.com';
@@ -30,8 +31,9 @@ const UDID_RE = /^U1\./;
 const PASSWORD_RE = /^[0-9a-fA-F]{64}$/;
 
 /** Non-secret fields `identityToMeta` writes into `account.meta`, copied through `check`.
- * The license key (`walletKey`) is NOT here — it goes into the encrypted secret. */
-const SE_META_KEYS = ['source', 'deviceFingerprint', 'tenant', 'containerId', 'deviceUdid', 'openvpnCa'] as const;
+ * The license key (`walletKey`) and refresh token are NOT here — they go into the encrypted
+ * secret. */
+const SE_META_KEYS = ['source', 'deviceFingerprint', 'tenant', 'containerId', 'deviceUdid', 'openvpnCa', 'credsAt'] as const;
 
 export interface HmaSePlatformDeps {
   store: SeCatalogStore;
@@ -40,6 +42,14 @@ export interface HmaSePlatformDeps {
   /** Reads an account's license key back from the encrypted secret store (it is never in
    * `account.meta`). Without it the provider cannot mint a token, so targets come back empty. */
   loadWalletKey?: (account: Account) => string | undefined;
+  /** Reads the account's stored elysium refresh token (encrypted secret), so a restart renews
+   * the token like the app instead of re-associating the license. */
+  loadRefreshToken?: (account: Account) => string | undefined;
+  /** Stores a new refresh token in the account's encrypted secret (each renew spends the old). */
+  saveRefreshToken?: (account: Account, refreshToken: string) => void;
+  /** The license now binds a different device (the old one was removed from the license):
+   * store these replacement credentials + identity for the account. */
+  onCredentialsReplaced?: (account: Account, update: { secret: AccountSecret; meta: Record<string, string> }) => void;
 }
 
 export interface HmaProviderDeps {
@@ -77,12 +87,42 @@ function locationKeyOf(targetKey: string): string {
 
 export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
   const se = deps.sePlatform;
+  const now = () => (se?.now ?? Date.now)();
   const minters = new Map<string, TokenMinter>();
 
-  function minterFor(identity: DeviceIdentity, walletKey: string): TokenMinter {
+  /** The license re-associated to a new device (the stored one was removed from it): fetch
+   * the new device's OpenVPN credentials with the token that came back and hand the account
+   * its replacement secret + identity. */
+  async function replaceDevice(account: Account, identity: DeviceIdentity, walletKey: string, minted: SeDeviceToken): Promise<void> {
+    if (!se?.onCredentialsReplaced) return;
+    const tenant = tenantOfUdid(minted.deviceUdid) ?? identity.tenant;
+    const creds = await fetchDeviceCredentials({ deviceUdid: minted.deviceUdid, tenantId: tenant, token: minted.accessToken }, se.net);
+    const next: DeviceIdentity = {
+      ...identity,
+      tenant,
+      deviceUdid: minted.deviceUdid,
+      openvpnCaCertificate: creds.openvpnCaCertificate,
+      credentialsAt: now(),
+    };
+    se.onCredentialsReplaced(account, {
+      secret: { kind: 'userpass', username: creds.deviceUdid, password: creds.devicePassword, walletKey, refreshToken: minted.refreshToken },
+      meta: { ...identityToMeta(next), licenseHint: licenseHint(walletKey) },
+    });
+  }
+
+  function minterFor(account: Account, identity: DeviceIdentity, walletKey: string): TokenMinter {
     let m = minters.get(identity.deviceUdid);
     if (!m) {
-      m = createTokenMinter(identity, walletKey, se!.net, { now: se?.now });
+      const minter = createTokenMinter(identity, walletKey, se!.net, {
+        now: se?.now,
+        refreshToken: se?.loadRefreshToken?.(account),
+        onRefreshToken: (token) => se?.saveRefreshToken?.(account, token),
+        onDeviceChanged: (minted) => {
+          minters.set(minted.deviceUdid, minter);
+          void replaceDevice(account, identity, walletKey, minted).catch(() => undefined);
+        },
+      });
+      m = minter;
       minters.set(identity.deviceUdid, m);
     }
     return m;
@@ -90,11 +130,11 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
 
   /** An account's device identity (from meta) plus its license key (from the encrypted
    * secret). Returns undefined if either is missing, so callers degrade to "no device". */
-  function deviceOf(account: Account): { identity: DeviceIdentity; minter: TokenMinter } | undefined {
+  function deviceOf(account: Account): { identity: DeviceIdentity; minter: TokenMinter; walletKey: string } | undefined {
     const identity = identityFromMeta(account.meta);
     const walletKey = se?.loadWalletKey?.(account);
     if (!identity || !walletKey || !se) return undefined;
-    return { identity, minter: minterFor(identity, walletKey) };
+    return { identity, minter: minterFor(account, identity, walletKey), walletKey };
   }
 
   return {
@@ -112,11 +152,17 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
           deviceFingerprint: input.deviceFingerprint || undefined,
           tenant: input.tenant || undefined,
         });
-        minters.set(
-          dev.identity.deviceUdid,
-          createTokenMinter(dev.identity, licenseKey, se.net, { now: se.now, seedToken: dev.accessToken }),
-        );
-        return { input: { ...identityToMeta(dev.identity), udid: dev.username, password: dev.password, walletKey: licenseKey } };
+        // No minter is seeded here: the account does not exist yet, so a rotated refresh
+        // token could not be saved. The first `deviceOf` builds one from the stored secret.
+        return {
+          input: {
+            ...identityToMeta(dev.identity),
+            udid: dev.username,
+            password: dev.password,
+            walletKey: licenseKey,
+            refreshToken: dev.refreshToken,
+          },
+        };
       } catch (err) {
         return { reasonKey: seErrorKey(err) };
       }
@@ -126,6 +172,7 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
       const udid = input.udid ?? '';
       const password = input.password ?? '';
       const walletKey = input.walletKey ?? '';
+      const refreshToken = input.refreshToken ?? '';
 
       if (!UDID_RE.test(udid)) return { ok: false, reasonKey: 'hma.check.invalidUdid' };
       if (!PASSWORD_RE.test(password)) return { ok: false, reasonKey: 'hma.check.invalidPassword' };
@@ -138,8 +185,15 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
       return {
         ok: true,
         label: `device …${udid.slice(-6)}`,
-        // The license key goes into the encrypted secret, never into `meta` / state.json.
-        secret: { kind: 'userpass', username: udid, password, ...(walletKey ? { walletKey } : {}) },
+        // The license key and refresh token go into the encrypted secret, never into
+        // `meta` / state.json.
+        secret: {
+          kind: 'userpass',
+          username: udid,
+          password,
+          ...(walletKey ? { walletKey } : {}),
+          ...(refreshToken ? { refreshToken } : {}),
+        },
         meta,
       };
     },
@@ -147,13 +201,12 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
     async targets(account: Account): Promise<Target[]> {
       const device = deviceOf(account);
       if (!device || !se) return [];
-      const ctx = { minter: device.minter, tenant: device.identity.tenant };
-      const geos = await se.store.geos(ctx).catch(() => []);
-      se.store.kickRefresh(ctx);
+      const geos = await se.store.geos({ tenant: device.identity.tenant }).catch(() => []);
       // Show the FULL location list the HMA app shows — every active geos city, whether or
       // not discover has cached a gateway for it yet. Undiscovered cities come back with an
       // empty `servers`; they stay selectable (HMA is a dynamic provider) and get their
-      // gateways discovered on Add / Change IP. `servers` carries whatever IPs are cached.
+      // gateways discovered on Add / Change IP, like the app discovers on Connect.
+      // `servers` carries whatever IPs are cached.
       const byKey = new Map(se.store.snapshot().locations.map((loc) => [loc.key, loc]));
       const out: Target[] = [];
       for (const g of geos) {
@@ -181,23 +234,36 @@ export function createHmaProvider(deps: HmaProviderDeps = {}): Provider {
         .catch(() => undefined);
     },
 
+    /** The user's "Load locations": re-fetch the location list now. Gateways are still
+     * discovered per location on demand — never a sweep of every country. */
     async refreshAll(account: Account): Promise<void> {
       const device = deviceOf(account);
       if (!device || !se) return;
-      await se.store.refreshAll({ minter: device.minter, tenant: device.identity.tenant }).catch(() => undefined);
+      await se.store.geos({ tenant: device.identity.tenant }, { force: true }).catch(() => undefined);
     },
 
+    /** New OpenVPN password + CA from passage (the app does this every 7 days). Note: this
+     * ROTATES the device password shared by every port of the account. */
     async refreshCredentials(account: Account) {
       const device = deviceOf(account);
-      const walletKey = se?.loadWalletKey?.(account);
-      if (!device || !walletKey || !se) return undefined;
+      if (!device || !se) return undefined;
+      const { identity, minter, walletKey } = device;
       try {
-        const token = await device.minter.getToken();
-        const creds = await fetchDeviceCredentials({ deviceUdid: device.identity.deviceUdid, tenantId: device.identity.tenant, token }, se.net);
-        const refreshed: DeviceIdentity = { ...device.identity, openvpnCaCertificate: creds.openvpnCaCertificate };
+        const creds = await withToken(minter, (token) =>
+          fetchDeviceCredentials({ deviceUdid: identity.deviceUdid, tenantId: identity.tenant, token }, se.net),
+        );
+        const refreshed: DeviceIdentity = { ...identity, openvpnCaCertificate: creds.openvpnCaCertificate, credentialsAt: now() };
+        const refreshToken = minter.refreshToken();
         return {
-          // Keep the license key in the refreshed secret so the account stays mintable.
-          secret: { kind: 'userpass' as const, username: creds.deviceUdid, password: creds.devicePassword, walletKey },
+          // Keep the license key (and refresh token) in the refreshed secret so the account
+          // stays mintable.
+          secret: {
+            kind: 'userpass' as const,
+            username: creds.deviceUdid,
+            password: creds.devicePassword,
+            walletKey,
+            ...(refreshToken ? { refreshToken } : {}),
+          },
           meta: { ...identityToMeta(refreshed), licenseHint: licenseHint(walletKey) },
         };
       } catch {

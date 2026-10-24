@@ -5,8 +5,8 @@
  * (username/password), and their IPs accumulate over repeated discovers into the large,
  * fresh, rotating pool the real app shows.
  */
-import { discover } from './client';
-import type { TokenMinter } from './device';
+import { discover, SeError } from './client';
+import { withToken, type TokenMinter } from './device';
 import type { Catalog, CatalogLocation } from '../../types';
 import type { SeFetch, SeGateway } from './types';
 
@@ -34,32 +34,29 @@ export function gatewaysToCatalog(gateways: SeGateway[], fetchedSec: number): Ca
   return { fetched: fetchedSec, locations: [...byKey.values()] };
 }
 
-/** Discover each location_key once and return a single feed catalog of every OpenVPN IP
- * seen. Runs up to `concurrency` discovers at a time (default 1 = sequential, gentle); a
- * failed location is skipped, not fatal. */
+/** Discover each location_key once, one after another, and return a single feed catalog of
+ * every OpenVPN IP seen. A failed location is skipped, not fatal; a rejected token is
+ * re-minted once (see `withToken`) instead of failing every location until it expires. */
 export async function discoverFeed(
   locationKeys: string[],
   minter: TokenMinter,
   net: SeFetch,
-  opts: { now?: () => number; tenant: string; concurrency?: number } = { tenant: '' },
+  opts: { now?: () => number; tenant: string } = { tenant: '' },
 ): Promise<Catalog> {
   const now = opts.now ?? Date.now;
-  const concurrency = Math.max(1, opts.concurrency ?? 1);
-  const token = await minter.getToken();
+  await minter.getToken(); // no token at all: fail the whole feed once, not per location
   const all: SeGateway[] = [];
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < locationKeys.length) {
-      const key = locationKeys[next++];
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const result = await discover({ locationKey: key, tenantId: opts.tenant, token }, net);
-        all.push(...result.gateways);
-      } catch {
-        // skip this location; discovering the rest is still useful
-      }
+  for (const key of locationKeys) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await withToken(minter, (token) => discover({ locationKey: key, tenantId: opts.tenant, token }, net));
+      all.push(...result.gateways);
+    } catch (err) {
+      // Offline, or the device's token can't be had even after a re-mint: the remaining
+      // locations would fail the same way, so stop instead of hammering the API.
+      if (err instanceof SeError && (err.kind === 'network' || err.kind === 'unauthorized' || err.kind === 'gone')) break;
+      // otherwise skip this location; discovering the rest is still useful
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, locationKeys.length || 1) }, () => worker()));
   return gatewaysToCatalog(all, Math.floor(now() / 1000));
 }

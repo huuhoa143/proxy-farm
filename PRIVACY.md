@@ -23,7 +23,7 @@ All files live in the app's data folder (Electron's `userData` folder):
 | File | Contents |
 |---|---|
 | `state.json` | Settings, ports (location, port number, pinned server), account metadata such as the label you see in the app (for example a ZoogVPN email address or the HMA device id), server health notes. For HMA it also keeps the non-secret parts of the device the app registered (a fingerprint derived from this machine, the tenant and container ids, the device id and the OpenVPN CA certificate), plus a masked hint of the license key — never the key itself. **Not encrypted, but holds no passwords or keys.** |
-| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark and NordLynx private keys, imported config files, the HMA device credentials and **HMA license key**, the proxy password and the webhook key. |
+| `secrets/*.bin` | One encrypted file per secret: provider passwords, the Surfshark and NordLynx private keys, imported config files, the HMA device credentials, **HMA license key** and its token-renewal (refresh) token, the proxy password and the webhook key. |
 | `cache/surfshark-clusters.json`, `cache/surfshark-pools.json` | Surfshark's public server list and the server IPs found through DNS. |
 | `cache/nordvpn-servers.json` | NordVPN's public server list (server IPs, load and WireGuard public keys). |
 | `cache/expressvpn-pools.json` | The server IPs found through DNS for ExpressVPN's location names. |
@@ -45,9 +45,10 @@ the license key it looks up your subscription, registers a device identified by 
 fingerprint derived from this machine, and fetches that device's OpenVPN credentials and
 CA certificate. It then asks the backend which gateways serve a location (the same
 "discover" call the HMA app makes on connect), so locations and exit IPs stay fresh and
-rotate like the real app. The device's username and password **and your license key** are
-kept in the encrypted secret store; only the non-secret device identity (fingerprint,
-tenant/container/device ids, CA) and a masked hint of the license key are in `state.json`
+rotate like the real app. The device's username and password, **your license key** and the
+token-renewal (refresh) token are kept in the encrypted secret store; only the non-secret
+device identity (fingerprint, tenant/container/device ids, CA, when its credentials were
+last fetched) and a masked hint of the license key are in `state.json`
 (see the table above), so the app can renew the device and its short-lived token without
 asking you again. These requests go directly from your computer, so HMA/Avast sees your
 real IP and your license key, exactly as its own app does.
@@ -67,7 +68,7 @@ The app makes these connections. Nothing else is contacted.
 |---|---|---|---|
 | Your VPN provider's servers | When a port starts | To build the tunnel | Your real IP and your credentials, as with the provider's own app |
 | `https://my-win.avast.com/v1/query/get-exact-application-licenses` | Once, when you add an HMA license key | Look up the subscription behind your HMA license key | Your real IP and the license key |
-| `https://api.se-platform.com/…` (`aladdin`, `passage`, `discovery/geos`, `discovery/discover`, `elysium`) | When HMA is used: registering the device, renewing its token (~12 h), listing locations (at most every 12 h), and discovering gateways on add / Change IP / a 2-minute refresh for active locations | Register Proxy Farm's HMA device, fetch its connection credentials, and get fresh gateway IPs — the same backend the HMA app uses | Your real IP, the license key, and the device identity |
+| `https://api.se-platform.com/…` (`aladdin`, `passage`, `discovery/geos`, `discovery/discover`, `elysium`) | When HMA is used: registering the device, renewing its token (~12 h), re-fetching its credentials (every 7 days, like the HMA app), listing locations (at most every 12 h), and discovering gateways for one location at a time — on add / Change IP / opening its server list, and every 10 minutes for locations with an active port | Register Proxy Farm's HMA device, fetch its connection credentials, and get fresh gateway IPs — the same backend the HMA app uses | Your real IP, the license key, and the device identity |
 | `https://api.surfshark.com/v4/server/clusters/all` | When Surfshark is used; at most every 12 hours | Surfshark's public server list | Your real IP |
 | Your system DNS resolver and `https://dns.google/resolve` | When Surfshark is used; at most every 12 hours | Find the servers behind each Surfshark location name | Your real IP (Google, for DoH) and the Surfshark hostnames you use |
 | `https://api.nordvpn.com/v1/servers` | When NordVPN is used; at most every 12 hours; no account or token is sent | NordVPN's public server list | Your real IP |

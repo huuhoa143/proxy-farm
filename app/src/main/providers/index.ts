@@ -4,7 +4,7 @@
  * `getProvider`/`allProviders` from `./registry` everywhere else.
  */
 import path from 'node:path';
-import type { Account } from './types';
+import type { Account, AccountSecret } from './types';
 import { registerProvider } from './registry';
 import { createHmaProvider } from './hma';
 import { createSeCatalogStore } from './hma/se-platform/catalog-store';
@@ -43,6 +43,11 @@ export interface RegisterAllProvidersOptions {
   /** Reads an HMA account's license key from the encrypted secret store (it is never in
    * `account.meta`); the provider needs it to mint se-platform tokens. */
   hmaLoadWalletKey?: (account: Account) => string | undefined;
+  /** Read/store an HMA account's single-use elysium refresh token in its encrypted secret. */
+  hmaLoadRefreshToken?: (account: Account) => string | undefined;
+  hmaSaveRefreshToken?: (account: Account, refreshToken: string) => void;
+  /** The HMA license now binds a different device: store its replacement secret + meta. */
+  hmaOnCredentialsReplaced?: (account: Account, update: { secret: AccountSecret; meta: Record<string, string> }) => void;
 }
 
 export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
@@ -59,6 +64,9 @@ export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
           heldIps: opts.hmaHeldIps,
         }),
         loadWalletKey: opts.hmaLoadWalletKey,
+        loadRefreshToken: opts.hmaLoadRefreshToken,
+        saveRefreshToken: opts.hmaSaveRefreshToken,
+        onCredentialsReplaced: opts.hmaOnCredentialsReplaced,
       },
     }),
   );

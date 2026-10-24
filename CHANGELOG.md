@@ -18,9 +18,24 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cached gateway yet is still selectable and discovers one when you add a port. Change IP
   on an HMA port gets a new IP **within the same city** and no longer silently moves the
   port to another city; when a city has no other free gateway it says so and keeps the
-  current IP. Discovered gateways refresh on a 2-minute timer for active locations and
-  stale ones are pruned, so the pool follows HMA's rotation. Works the same on macOS and
+  current IP. Discovered gateways refresh every 10 minutes for active locations and stale
+  ones are pruned, so the pool follows HMA's rotation. Works the same on macOS and
   Windows; the Windows "Enable HMA support" administrator task is gone.
+- HMA now talks to its backend the way the HMA app does (confirmed by decompiling it):
+  - Gateways are discovered one location at a time, only when needed (adding a port,
+    Change IP, opening a server list, active locations). There is no longer a sweep of
+    every country at once.
+  - The device token is renewed with its refresh token like the app, instead of
+    re-registering the license each time.
+  - The device's OpenVPN credentials are re-fetched every 7 days, like the app.
+  - Request headers, the tenant and the license id format match the app's.
+- HMA no longer gets stuck reconnecting forever when the shared device password has gone
+  stale while another port of the account is still online: after three refusals in a row
+  the credentials are re-fetched.
+- A rejected HMA token is re-minted at once, so discovery no longer silently stops for
+  hours.
+- If the HMA device was removed from the license, Proxy Farm picks up the replacement
+  device's credentials, so ports keep connecting.
 - Running several HMA ports at once on one license is now reliable. One HMA device holds
   many concurrent OpenVPN sessions on a single shared password (verified live), so when a
   port's sibling is already online, an auth failure is treated as a transient reconnect —

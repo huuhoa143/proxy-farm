@@ -26,13 +26,18 @@ export interface SeLicense {
   mode?: string;
 }
 
-/** associate-license result (step 2). */
-export interface SeDeviceToken {
-  /** `U1.<tenant>.hma101.<64hex>` — the OpenVPN username and the token subject. */
-  deviceUdid: string;
+/** An elysium token pair (associate-license / elysium renew). */
+export interface SeTokens {
   /** elysium RS256 JWT, ~12h TTL. */
   accessToken: string;
+  /** Single-use: a renew spends it and returns the next one. */
   refreshToken: string;
+}
+
+/** associate-license result (step 2). */
+export interface SeDeviceToken extends SeTokens {
+  /** `U1.<tenant>.hma101.<64hex>` — the OpenVPN username and the token subject. */
+  deviceUdid: string;
 }
 
 /** passage credentials (step 3). */

@@ -26,7 +26,9 @@ import { assertSingboxVersion, SINGBOX_PINNED_VERSION, singboxPath } from '../en
 import { PortHealth } from '../health/state-machine';
 import { broadcastHostVpnChanged, broadcastPortsChanged, broadcastTargetsChanged, broadcastUpdateStatus, registerIpcHandlers } from '../ipc/index';
 import { installPowerHooks, type PowerManager } from '../power/index';
-import { getProvider, registerAllProviders } from '../providers/index';
+import { getProvider, registerAllProviders, type Account, type AccountSecret } from '../providers/index';
+import { DEVICE_CREDENTIALS_VALIDITY_MS } from '../providers/hma/se-platform/constants';
+import { credentialsDue, identityFromMeta } from '../providers/hma/se-platform/device';
 import { migrateKeyLabels } from '../providers/wg-key';
 import { setResourcesRoot } from '../resources-root';
 import { createStateStore } from '../store/state';
@@ -238,6 +240,29 @@ export function runApp(): void {
     // drop one a live port still holds; the port manager (created below) knows which those
     // are, so the provider reads them through this holder, filled once it exists.
     const heldIpsHolder: { get: () => ReadonlySet<string> } = { get: () => new Set<string>() };
+    /** An account's decrypted secret as a JSON object, or undefined if missing/unreadable. */
+    const readSecretJson = (account: Account): Record<string, unknown> | undefined => {
+      const raw = secrets.loadSecret(account.secretRef);
+      if (!raw) return undefined;
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    /** Store credentials a provider re-fetched (HMA passage / device replacement): the new
+     * secret, plus its non-secret meta merged over the account's. */
+    const storeRefreshedCredentials = (accountId: string, refreshed: { secret: AccountSecret; meta?: Record<string, string> }): boolean => {
+      const account = state.getState().accounts.find((a) => a.id === accountId);
+      if (!account) return false;
+      secrets.saveSecret(account.secretRef, JSON.stringify(refreshed.secret));
+      if (refreshed.meta) {
+        const meta = { ...account.meta, ...refreshed.meta };
+        state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, meta } : a)) }));
+      }
+      return true;
+    };
     registerAllProviders({
       surfsharkCachePath: path.join(userData, 'cache', 'surfshark-clusters.json'),
       nordvpnCachePath: path.join(userData, 'cache', 'nordvpn-servers.json'),
@@ -249,14 +274,22 @@ export function runApp(): void {
       // The HMA license key lives only in the encrypted secret store; the provider reads it
       // back from there to mint tokens, so it never has to sit in plaintext state.json.
       hmaLoadWalletKey: (account) => {
-        const raw = secrets.loadSecret(account.secretRef);
-        if (!raw) return undefined;
-        try {
-          const parsed = JSON.parse(raw) as { walletKey?: unknown };
-          return typeof parsed.walletKey === 'string' ? parsed.walletKey : undefined;
-        } catch {
-          return undefined;
-        }
+        const walletKey = readSecretJson(account)?.walletKey;
+        return typeof walletKey === 'string' ? walletKey : undefined;
+      },
+      // Its elysium refresh token sits beside it; each renew spends it, so the new one is
+      // written back at once (a restart then renews like the app, without re-associating).
+      hmaLoadRefreshToken: (account) => {
+        const refreshToken = readSecretJson(account)?.refreshToken;
+        return typeof refreshToken === 'string' ? refreshToken : undefined;
+      },
+      hmaSaveRefreshToken: (account, refreshToken) => {
+        const parsed = readSecretJson(account);
+        if (parsed) secrets.saveSecret(account.secretRef, JSON.stringify({ ...parsed, refreshToken }));
+      },
+      hmaOnCredentialsReplaced: (account, update) => {
+        storeRefreshedCredentials(account.id, update);
+        log(`hma: license re-bound account ${account.id} to a new device`);
       },
     });
     const providers = { get: getProvider };
@@ -297,6 +330,15 @@ export function runApp(): void {
     };
     const state = observeStateStore(rawState, onPortsChanged);
 
+    /** Re-fetch an account's rotating connection credentials (HMA passage) and store them.
+     * Resolves true if fresh ones were stored. */
+    async function refreshDeviceCredentials(accountId: string): Promise<boolean> {
+      const account = state.getState().accounts.find((a) => a.id === accountId);
+      const provider = account && getProvider(account.providerId);
+      const refreshed = await provider?.refreshCredentials?.(account!).catch(() => undefined);
+      return refreshed ? storeRefreshedCredentials(accountId, refreshed) : false;
+    }
+
     const allocator = createRealPortAllocator();
     const pool = createAccountPool({
       listAccounts: () => state.getState().accounts,
@@ -322,20 +364,9 @@ export function runApp(): void {
       onHealthChanged: () => {
         if (mainWindow && !mainWindow.isDestroyed()) broadcastTargetsChanged([mainWindow.webContents]);
       },
-      // HMA's device password rotates server-side; re-fetch it (and the CA) on an auth
-      // failure so the port can retry with a fresh, valid credential.
-      refreshDeviceCredentials: async (accountId) => {
-        const account = state.getState().accounts.find((a) => a.id === accountId);
-        const provider = account && getProvider(account.providerId);
-        const refreshed = await provider?.refreshCredentials?.(account!).catch(() => undefined);
-        if (!account || !refreshed) return false;
-        secrets.saveSecret(account.secretRef, JSON.stringify(refreshed.secret));
-        if (refreshed.meta) {
-          const meta = { ...account.meta, ...refreshed.meta };
-          state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, meta } : a)) }));
-        }
-        return true;
-      },
+      // HMA's device password is only trusted for 7 days; re-fetch it (and the CA) on an
+      // auth failure so the port can retry with a fresh, valid credential.
+      refreshDeviceCredentials,
     });
     heldIpsHolder.get = () => portManager.heldServerIps();
     const queue = createStartQueue({ onTaskError: (key, err) => log(`start ${key} failed`, err) });
@@ -634,12 +665,13 @@ export function runApp(): void {
     portManager.syncAutoRotate();
     if (!engineError) for (const p of state.getState().ports.filter((r) => r.enabled)) restartPort(p.key);
 
-    // Dynamic providers (HMA): the backend's discover answer has a ~120 s TTL and rotates
-    // its gateways over time. Re-discover each location that has a live port on a quiet
-    // timer so the catalog follows those changes (fresh IPs in, stale IPs pruned) instead
-    // of only learning when a held gateway finally fails. One discover per (account,
-    // location), deduped; errors are swallowed.
-    const DYNAMIC_REFRESH_MS = 2 * 60 * 1000;
+    // Dynamic providers (HMA): the backend rotates its gateways over time (a city's pair
+    // stays the same for many minutes). Re-discover each location that has a live port on
+    // a slow timer so the catalog follows those changes (fresh IPs in, stale IPs pruned,
+    // after an hour unseen) instead of only learning when a held gateway finally fails.
+    // One discover per (account, location), deduped; errors are swallowed. Kept slow on
+    // purpose: the real app only discovers when it connects.
+    const DYNAMIC_REFRESH_MS = 10 * 60 * 1000;
     async function refreshActiveDynamicLocations(): Promise<void> {
       const { ports, accounts } = state.getState();
       const seen = new Set<string>();
@@ -653,7 +685,24 @@ export function runApp(): void {
         if (account && provider?.refreshLocation) await provider.refreshLocation(account, p.locationKey).catch(() => undefined);
       }
     }
-    const dynamicRefreshTimer = setInterval(() => void refreshActiveDynamicLocations(), DYNAMIC_REFRESH_MS);
+    // The HMA app re-fetches its device credentials once they are 7 days old. Do the same,
+    // but only for an account with no port switched on: a re-fetch rotates the password
+    // every port of the account shares. A busy account renews through the port manager
+    // instead, when a connection is refused.
+    async function refreshDueDeviceCredentials(): Promise<void> {
+      const { ports, accounts } = state.getState();
+      for (const account of accounts) {
+        if (account.providerId !== 'hma') continue;
+        const identity = identityFromMeta(account.meta);
+        if (!identity || !credentialsDue(identity, Date.now(), DEVICE_CREDENTIALS_VALIDITY_MS)) continue;
+        if (ports.some((p) => p.accountId === account.id && p.enabled)) continue;
+        if (await refreshDeviceCredentials(account.id)) log(`hma: refreshed 7-day device credentials of ${account.id}`);
+      }
+    }
+    const dynamicRefreshTimer = setInterval(() => {
+      void refreshActiveDynamicLocations();
+      void refreshDueDeviceCredentials().catch(() => undefined);
+    }, DYNAMIC_REFRESH_MS);
     dynamicRefreshTimer.unref?.();
 
     // Auto-update: check on start + daily, only while the user leaves it enabled (spec §9).

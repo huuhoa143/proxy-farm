@@ -2521,6 +2521,67 @@ describe('port manager', () => {
         await vi.waitFor(() => expect(engine.started).toHaveLength(2)); // retried
       });
 
+      it('refused again and again while a sibling stays online: the shared password is stale, so it is re-fetched (no endless reconnect loop)', async () => {
+        // The app trusts the device password for 7 days. A sibling opened before it expired
+        // keeps its session, so "a sibling is online" stops proving the password after a few
+        // refusals in a row; then the credentials are re-fetched instead of retrying forever.
+        const refreshDeviceCredentials = vi.fn(async () => true);
+        const serverHealth = createServerHealth();
+        const targets = [hmaTarget(['10.9.0.1', '10.9.0.2', '10.9.0.3'])];
+        const { manager, engine, state } = setup({
+          targets,
+          port: { key: 'hma:VN-51-HANOI#1', locationKey: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth, providers: { get: () => fakeProvider(targets) }, refreshDeviceCredentials },
+        });
+        state.setState((s) => ({
+          ...s,
+          ports: [
+            ...s.ports,
+            basePort({ key: 'hma:JP-1#1', locationKey: 'hma:JP-1', providerId: 'hma', proxyPort: 29009, server: '10.8.0.1', state: { kind: 'online', since: 1, exitIp: '10.8.0.1', country: 'JP' } }),
+          ],
+        }));
+        await manager.startPort('hma:VN-51-HANOI#1');
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt });
+          await vi.waitFor(() => expect(engine.started).toHaveLength(attempt + 1));
+        }
+        expect(refreshDeviceCredentials).not.toHaveBeenCalled(); // two refusals: still a hiccup
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 3 });
+        expect(refreshDeviceCredentials).toHaveBeenCalledWith('z1');
+        expect(state.getState().ports.find((p) => p.key === 'hma:VN-51-HANOI#1')!.state).toMatchObject({ kind: 'retrying', reasonKey: 'refreshingCreds' });
+        expect(serverHealth.isRefused('z1', '10.9.0.1')).toBe(false);
+        await vi.waitFor(() => expect(engine.started).toHaveLength(4)); // retried with the fresh password
+      });
+
+      it('coming online resets the refusal streak', async () => {
+        const refreshDeviceCredentials = vi.fn(async () => true);
+        const targets = [hmaTarget(['10.9.0.1', '10.9.0.2'])];
+        const { manager, engine, state } = setup({
+          targets,
+          port: { key: 'hma:VN-51-HANOI#1', locationKey: 'hma:VN-51-HANOI', providerId: 'hma', country: 'VN', city: 'Hanoi', label: 'Hanoi', enabled: false, state: { kind: 'stopped' } },
+          portServers: {},
+          engine: fakeEngine({ autoOnline: false }),
+          depsOverrides: { serverHealth: createServerHealth(), providers: { get: () => fakeProvider(targets) }, refreshDeviceCredentials },
+        });
+        state.setState((s) => ({
+          ...s,
+          ports: [
+            ...s.ports,
+            basePort({ key: 'hma:JP-1#1', locationKey: 'hma:JP-1', providerId: 'hma', proxyPort: 29009, server: '10.8.0.1', state: { kind: 'online', since: 1, exitIp: '10.8.0.1', country: 'JP' } }),
+          ],
+        }));
+        await manager.startPort('hma:VN-51-HANOI#1');
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt });
+          await vi.waitFor(() => expect(engine.started).toHaveLength(attempt + 1));
+        }
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'online', since: 5, exitIp: '10.9.0.1', country: 'VN' });
+        engine.fireState('hma:VN-51-HANOI#1', { kind: 'failed', reason: 'auth', untilMs: 0, attempt: 1 });
+        expect(refreshDeviceCredentials).not.toHaveBeenCalled(); // a fresh streak of one
+      });
+
       it('credentialsChanged forgets refused/dead marks earned under the old creds, persisted', async () => {
         const serverHealth = createServerHealth();
         serverHealth.markRefused('z1', '10.9.0.1');
