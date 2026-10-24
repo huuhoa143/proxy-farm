@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Account, CheckResult, ProviderId, ProxyFarmApi } from '../../shared/contracts';
+import { activeAccountId, usesActiveAccountModel } from '../../shared/activeAccount';
 import { Icon } from '../ui/Icon';
 import { Flag } from '../ui/Flag';
 import { countryName } from '../ui/countryName';
@@ -78,6 +79,88 @@ function CardShell({ providerId, ready, accountCount = 0, children }: CardShellP
 }
 
 /**
+ * The list of a provider's added accounts, with a radio to pick the single **active** one
+ * (the only account the app uses — a provider's servers/IPs are shared, so one account is
+ * enough; more add no IPs) and a button to remove each. The `file` provider and single-account
+ * providers show no radio (every file is its own server; one account is trivially active).
+ */
+function AccountList({
+  api,
+  providerId,
+  accounts,
+  onChanged,
+}: {
+  api: ProxyFarmApi;
+  providerId: ProviderId;
+  accounts: Account[];
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState<string | null>(null);
+  if (accounts.length === 0) return null;
+  const activeId = activeAccountId(accounts, providerId);
+  const showActive = accounts.length > 1 && usesActiveAccountModel(providerId);
+
+  async function run(id: string, op: () => Promise<unknown>) {
+    setBusy(id);
+    try {
+      await op();
+      onChanged();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <ul className="account-list" data-testid={`${providerId}-accounts`}>
+      {accounts.map((a) => {
+        const active = a.id === activeId;
+        return (
+          <li key={a.id} className={`account-row${active && showActive ? ' active' : ''}`} data-testid={`${providerId}-account-${a.id}`}>
+            {showActive ? (
+              <label className="account-pick" title={t('onboarding.accounts.useThis') as string}>
+                <input
+                  type="radio"
+                  name={`active-${providerId}`}
+                  checked={active}
+                  disabled={busy !== null}
+                  onChange={() => void run(a.id, () => api.setActiveAccount(providerId, a.id))}
+                  data-testid={`${providerId}-active-${a.id}`}
+                />
+              </label>
+            ) : (
+              <span className="ic">
+                <Icon name="check" />
+              </span>
+            )}
+            <span className="account-label">
+              {accountLabel(t, a.label)}
+              {a.meta.licenseHint && <small>{a.meta.licenseHint}</small>}
+            </span>
+            {showActive && active && <span className="pill ok">{t('onboarding.accounts.active')}</span>}
+            <button
+              className="icon-btn"
+              title={t('onboarding.accounts.remove') as string}
+              aria-label={t('onboarding.accounts.remove') as string}
+              disabled={busy === a.id}
+              onClick={() => void run(a.id, () => api.removeAccount(a.id))}
+              data-testid={`${providerId}-remove-${a.id}`}
+            >
+              <Icon name="trash" />
+            </button>
+          </li>
+        );
+      })}
+      {showActive && (
+        <li className="account-hint">
+          <small>{t('onboarding.accounts.oneActiveHint')}</small>
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/**
  * A card's credential guide, from `onboarding.providers.<id>.guide`: `title`, `step1`…,
  * any `note…` keys (in file order) and `link`, the label of the `PROVIDER_LINKS` button.
  */
@@ -113,19 +196,6 @@ export function HmaCard({ api, onAdded, accountCount, accounts = [] }: HmaCardPr
   const [added, setAdded] = useState((accountCount ?? 0) > 0);
   const [loading, setLoading] = useState(false);
   const [loadedCount, setLoadedCount] = useState<number | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
-
-  async function removeAccount(id: string) {
-    setRemoving(id);
-    try {
-      await api.removeAccount(id);
-      onAdded(); // refresh the list
-    } catch {
-      /* ignore */
-    } finally {
-      setRemoving(null);
-    }
-  }
 
   async function loadLocations() {
     setLoading(true);
@@ -159,31 +229,7 @@ export function HmaCard({ api, onAdded, accountCount, accounts = [] }: HmaCardPr
 
   return (
     <CardShell providerId="hma" accountCount={accountCount}>
-      {accounts.length > 0 && (
-        <ul className="hma-accounts" data-testid="hma-accounts">
-          {accounts.map((a) => (
-            <li key={a.id} className="hma-account" data-testid={`hma-account-${a.id}`}>
-              <span className="ic">
-                <Icon name="check" />
-              </span>
-              <span className="hma-account-id">
-                {a.label}
-                {a.meta.licenseHint && <small>{a.meta.licenseHint}</small>}
-              </span>
-              <button
-                className="icon-btn"
-                title={t('onboarding.providers.hma.removeAccount') as string}
-                aria-label={t('onboarding.providers.hma.removeAccount') as string}
-                onClick={() => void removeAccount(a.id)}
-                disabled={removing === a.id}
-                data-testid={`hma-remove-${a.id}`}
-              >
-                <Icon name="trash" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AccountList api={api} providerId="hma" accounts={accounts} onChanged={onAdded} />
       <form
         className="pc-body hma-license"
         onSubmit={(e) => {
@@ -303,9 +349,10 @@ export interface SurfsharkCardProps {
   api: ProxyFarmApi;
   onAdded: () => void;
   accountCount?: number;
+  accounts?: Account[];
 }
 
-export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps) {
+export function SurfsharkCard({ api, onAdded, accountCount, accounts = [] }: SurfsharkCardProps) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -354,6 +401,7 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
 
   return (
     <CardShell providerId="surfshark" accountCount={accountCount}>
+      <AccountList api={api} providerId="surfshark" accounts={accounts} onChanged={onAdded} />
       <div className="field">
         <label htmlFor="surfshark-email">{t('onboarding.providers.surfshark.emailLabel')}</label>
         <input
@@ -447,11 +495,12 @@ export interface NordVpnCardProps {
   api: ProxyFarmApi;
   onAdded: () => void;
   accountCount?: number;
+  accounts?: Account[];
 }
 
 /** spec §5.5: one field takes a Nord Account access token (exchanged once in main, never
  * stored) or the NordLynx private key itself. Masked: both are secrets. */
-export function NordVpnCard({ api, onAdded, accountCount }: NordVpnCardProps) {
+export function NordVpnCard({ api, onAdded, accountCount, accounts = [] }: NordVpnCardProps) {
   const { t } = useTranslation();
   const [credential, setCredential] = useState('');
   const [busy, setBusy] = useState(false);
@@ -476,6 +525,7 @@ export function NordVpnCard({ api, onAdded, accountCount }: NordVpnCardProps) {
 
   return (
     <CardShell providerId="nordvpn" accountCount={accountCount}>
+      <AccountList api={api} providerId="nordvpn" accounts={accounts} onChanged={onAdded} />
       <form
         className="pc-body"
         onSubmit={(e) => {

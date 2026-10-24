@@ -7,7 +7,17 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.4.0] — 2026-10-24
+### Added
+
+- Each VPN provider now uses a single **active account** that you pick in its card. A
+  provider's servers and exit IPs are shared infrastructure, not per-account, so adding more
+  accounts of the same provider gives you no extra IPs — only one need be active; the rest
+  are kept but idle. The provider card lists every account with a radio to choose the active
+  one and a button to remove any. Switching the active account moves that provider's existing
+  ports onto it and re-handshakes them; the **exit IP is unchanged** because it is pinned to
+  the server, not the account. (The Config-file provider is exempt: each imported file is its
+  own server.) This also frees a port that was stranded on an account whose stored login
+  could no longer be read.
 
 ### Added
 

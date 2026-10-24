@@ -523,6 +523,10 @@ export interface ProxyFarmApi {
   /** HMA: pass `{ licenseKey }` to register a device from the subscription key. */
   addAccount(providerId: ProviderId, input: Record<string, string>): Promise<CheckResult & { account?: Account }>;
   removeAccount(accountId: string): Promise<void>;
+  /** Make `accountId` the single account its provider uses (the others are kept but idle).
+   * Existing ports of the provider migrate to it and re-handshake; the exit IP is unchanged
+   * because it is pinned to the server, not the account. No-op for the `file` provider. */
+  setActiveAccount(providerId: ProviderId, accountId: string): Promise<void>;
   /** `credentials`: the username/password an `.ovpn` with `auth-user-pass` signs in with.
    * Without them such a file answers `file.check.needsCredentials`. */
   importConfigFile(
@@ -602,7 +606,7 @@ export interface ProxyFarmApi {
 /** Channel names used by preload ↔ main. Preload exposes exactly these, nothing else. */
 export const IPC = {
   invoke: [
-    'listProviders', 'addAccount', 'removeAccount', 'importConfigFile', 'listTargets', 'refreshTargets',
+    'listProviders', 'addAccount', 'removeAccount', 'setActiveAccount', 'importConfigFile', 'listTargets', 'refreshTargets',
     'listPorts', 'addPorts', 'listServers', 'startPorts', 'stopPorts', 'removePorts', 'rotatePort', 'setAutoRotate', 'setLimit',
     'testPort', 'getLogs', 'exportPorts', 'saveExportFile', 'getSettings', 'setSettings', 'getHostVpnActive', 'getAppStatus',
     'getUpdateStatus', 'checkForUpdate', 'downloadAndInstallUpdate', 'getDiagnostics',

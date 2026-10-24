@@ -19,6 +19,8 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     listProviders: () => ipcRenderer.invoke('listProviders') as ReturnType<ProxyFarmApi['listProviders']>,
     addAccount: (providerId, input) => ipcRenderer.invoke('addAccount', providerId, input) as ReturnType<ProxyFarmApi['addAccount']>,
     removeAccount: (accountId) => ipcRenderer.invoke('removeAccount', accountId) as ReturnType<ProxyFarmApi['removeAccount']>,
+    setActiveAccount: (providerId, accountId) =>
+      ipcRenderer.invoke('setActiveAccount', providerId, accountId) as ReturnType<ProxyFarmApi['setActiveAccount']>,
     importConfigFile: (name, content, country, credentials) =>
       ipcRenderer.invoke('importConfigFile', name, content, country, ...(credentials === undefined ? [] : [credentials])) as ReturnType<
         ProxyFarmApi['importConfigFile']

@@ -14,6 +14,7 @@ import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
 import { isDynamicProvider, isTerminalState, portLimitOf, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
+import { isActiveAccount } from '../../shared/activeAccount';
 import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
 import { createHostVpnMonitor } from '../controller/host-vpn';
@@ -362,7 +363,13 @@ export function runApp(): void {
       setPortAccount: (key, accountId) =>
         state.setState((s) => ({ ...s, ports: s.ports.map((p) => (p.key === key ? { ...p, accountId } : p)) })),
       getLimit: (providerId) => portLimitOf(state.getState().limits, providerId),
-      isUsable: () => true,
+      // Only the provider's single active account is usable (shared infra → one is enough);
+      // the others are kept but idle. `file` accounts are each their own server, so all stay usable.
+      isUsable: (accountId) => {
+        const accts = state.getState().accounts;
+        const a = accts.find((x) => x.id === accountId);
+        return !!a && isActiveAccount(a, accts);
+      },
       refusals,
     });
     // Owns server-pool failover (spec §6.8), including ZoogVPN plan refusals and moving
