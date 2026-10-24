@@ -135,7 +135,7 @@ const vi: Copy = {
     steps: [
       {
         title: 'Kết nối gói VPN của bạn',
-        body: 'Chọn nhà cung cấp và nhập thông tin mà chính nhà cung cấp cấp cho bạn. Mỗi thẻ có hướng dẫn lấy thông tin đó. Với HMA, ứng dụng tự đọc thông tin của app HMA trên cùng máy.',
+        body: 'Chọn nhà cung cấp và nhập thông tin mà chính nhà cung cấp cấp cho bạn. Mỗi thẻ có hướng dẫn lấy thông tin đó. Với HMA, chỉ cần nhập mã kích hoạt (license key) của gói HMA.',
         alt: 'Màn hình thêm nhà cung cấp VPN của Proxy Farm',
       },
       {
@@ -194,9 +194,9 @@ const vi: Copy = {
     lede: 'Proxy Farm không bán IP hay quyền truy cập VPN. Bạn mang tài khoản của mình, ứng dụng biến nó thành các cổng proxy.',
     cols: { provider: 'Nhà cung cấp', signIn: 'Bạn nhập', protocol: 'Giao thức' },
     list: [
-      { name: 'HMA', key: 'hma', signIn: 'Không cần nhập gì: ứng dụng đọc thông tin thiết bị của app HMA cài trên cùng máy', protocol: 'OpenVPN', note: 'Trên Windows: bấm “Bật hỗ trợ HMA” một lần (cần xác nhận quản trị viên một lần)' },
+      { name: 'HMA', key: 'hma', signIn: 'Mã kích hoạt (license key) của gói HMA', protocol: 'OpenVPN' },
       { name: 'ZoogVPN', key: 'zoogvpn', signIn: 'Email và mật khẩu tài khoản', protocol: 'OpenVPN' },
-      { name: 'Surfshark', key: 'surfshark', signIn: 'Khoá riêng WireGuard từ trang cài đặt thủ công', protocol: 'WireGuard' },
+      { name: 'Surfshark', key: 'surfshark', signIn: 'Email và mật khẩu tài khoản Surfshark (hoặc khoá riêng WireGuard)', protocol: 'WireGuard' },
       { name: 'NordVPN', key: 'nordvpn', signIn: 'Access token từ Nord Account, hoặc khoá NordLynx', protocol: 'WireGuard (NordLynx)' },
       { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Tên đăng nhập và mật khẩu ở trang Manual configuration → OpenVPN', protocol: 'OpenVPN' },
       { name: 'Tệp cấu hình', key: 'file', signIn: 'Tệp .ovpn hoặc .conf của WireGuard, từ nhà cung cấp khác hay máy chủ của bạn', protocol: 'OpenVPN / WireGuard' },
@@ -242,7 +242,7 @@ const vi: Copy = {
     list: [
       { q: 'Proxy Farm có bán IP hay VPN không?', a: 'Không. Bạn cần một gói VPN của riêng mình (hoặc tệp .ovpn/.conf). Proxy Farm chỉ biến gói đó thành các cổng proxy trên máy bạn.' },
       { q: 'Dùng như vậy có vi phạm điều khoản của nhà cung cấp VPN không?', a: 'Có thể. Nhiều nhà cung cấp cấm chia sẻ hoặc bán lại kết nối, và việc mở nhiều đường hầm cùng lúc có thể kích hoạt cơ chế chống lạm dụng, dẫn tới khoá tài khoản. Hãy dùng cho chính bạn, đừng mở proxy ra internet hay chia cho người khác, và tự đọc điều khoản của nhà cung cấp.' },
-      { q: 'Chạy trên hệ điều hành nào?', a: 'macOS 12 trở lên (Apple silicon và Intel) và Windows x64. Bản Windows cài cho riêng tài khoản của bạn, không cần quyền admin; riêng HMA trên Windows cần xác nhận quản trị viên một lần khi bật hỗ trợ HMA.' },
+      { q: 'Chạy trên hệ điều hành nào?', a: 'macOS 12 trở lên (Apple silicon và Intel) và Windows x64. Bản Windows cài cho riêng tài khoản của bạn, không cần quyền admin.' },
       { q: 'Windows SmartScreen cảnh báo khi cài, phải làm sao?', a: 'Bản Windows chưa ký số nên SmartScreen có thể cảnh báo. Bấm “Thêm thông tin” (More info) → “Vẫn chạy” (Run anyway). Bản macOS đã được ký và Apple notarize.' },
       { q: 'Có mất phí không?', a: 'Không. Proxy Farm miễn phí, mã nguồn mở theo giấy phép MIT. Ứng dụng đi kèm sing-box (GPL-3.0) dưới dạng chương trình riêng, không chỉnh sửa.' },
       { q: 'Một gói VPN cho được bao nhiêu cổng?', a: 'Tuỳ số máy chủ của vị trí và giới hạn thiết bị của gói. Mỗi cổng cần một máy chủ trống. Ứng dụng đặt sẵn giới hạn an toàn cho một số nhà cung cấp, ví dụ 8 cổng cho ExpressVPN để chừa thiết bị cho bạn, và bạn tự chỉnh được.' },
@@ -325,7 +325,7 @@ const en: Copy = {
     steps: [
       {
         title: 'Connect your VPN subscription',
-        body: 'Pick a provider and enter the credential that provider gives you. Each card has a guide for getting it. For HMA, the app reads the credentials of the HMA app on the same computer.',
+        body: 'Pick a provider and enter the credential that provider gives you. Each card has a guide for getting it. For HMA, just enter your HMA license (activation) key.',
         alt: 'Proxy Farm screen for adding a VPN provider',
       },
       {
@@ -384,9 +384,9 @@ const en: Copy = {
     lede: 'Proxy Farm does not sell IPs or VPN access. You bring your own account; the app turns it into proxy ports.',
     cols: { provider: 'Provider', signIn: 'You enter', protocol: 'Protocol' },
     list: [
-      { name: 'HMA', key: 'hma', signIn: 'Nothing: the app reads the device credentials of the HMA app on the same computer', protocol: 'OpenVPN', note: 'On Windows: click “Enable HMA support” once (one administrator prompt)' },
+      { name: 'HMA', key: 'hma', signIn: 'Your HMA license (activation) key', protocol: 'OpenVPN' },
       { name: 'ZoogVPN', key: 'zoogvpn', signIn: 'Account email and password', protocol: 'OpenVPN' },
-      { name: 'Surfshark', key: 'surfshark', signIn: 'WireGuard private key from the manual setup page', protocol: 'WireGuard' },
+      { name: 'Surfshark', key: 'surfshark', signIn: 'Surfshark account email and password (or a WireGuard private key)', protocol: 'WireGuard' },
       { name: 'NordVPN', key: 'nordvpn', signIn: 'An access token from Nord Account, or your NordLynx key', protocol: 'WireGuard (NordLynx)' },
       { name: 'ExpressVPN', key: 'expressvpn', signIn: 'Username and password from Manual configuration → OpenVPN', protocol: 'OpenVPN' },
       { name: 'Config file', key: 'file', signIn: 'An .ovpn or WireGuard .conf file, from another provider or your own server', protocol: 'OpenVPN / WireGuard' },
@@ -432,7 +432,7 @@ const en: Copy = {
     list: [
       { q: 'Does Proxy Farm sell IPs or VPN access?', a: 'No. You need your own VPN subscription (or an .ovpn/.conf file). Proxy Farm only turns it into proxy ports on your computer.' },
       { q: 'Is this against my VPN provider’s terms?', a: 'It can be. Many providers forbid sharing or reselling connections, and many simultaneous tunnels can trigger abuse detection and get the account suspended. Use it for yourself, do not expose the proxies to the internet or share them, and read your provider’s terms.' },
-      { q: 'Which operating systems does it run on?', a: 'macOS 12 or later (Apple silicon and Intel) and Windows x64. The Windows installer installs for your user only and needs no admin rights; HMA on Windows needs one administrator prompt when you enable HMA support.' },
+      { q: 'Which operating systems does it run on?', a: 'macOS 12 or later (Apple silicon and Intel) and Windows x64. The Windows installer installs for your user only and needs no admin rights.' },
       { q: 'Windows SmartScreen warns when I install it. What do I do?', a: 'The Windows build isn’t code-signed yet, so SmartScreen may warn. Choose More info → Run anyway. The macOS builds are signed and notarized by Apple.' },
       { q: 'Does it cost anything?', a: 'No. Proxy Farm is free and open source under the MIT license. It bundles sing-box (GPL-3.0) as a separate, unmodified program.' },
       { q: 'How many ports can one VPN plan give me?', a: 'It depends on the location’s servers and your plan’s device limit. Each port needs a free server. The app sets safe defaults for some providers, such as 8 ports for ExpressVPN to leave devices for you, and you can change them.' },
