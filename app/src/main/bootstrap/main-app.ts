@@ -12,7 +12,7 @@ import { mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { networkInterfaces, release as osRelease } from 'node:os';
 import path from 'node:path';
-import { isTerminalState, portLimitOf, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
+import { isDynamicProvider, isTerminalState, portLimitOf, type AppStatus, type PortRow, type PortState, type ProviderId, type Settings, type Target } from '../../shared/contracts';
 import { createAccountPool } from '../accounts/pool';
 import { createRefusalTracker } from '../accounts/refusals';
 import { createRealEngine, reapOrphanedEngines } from '../controller/engine-adapter';
@@ -36,9 +36,6 @@ import { aboutPanelOptions, buildAppMenuTemplate, menuLabels } from './app-menu'
 import { openExternalIfAllowed } from './external-links';
 import { createControllerFacade, rotateNoteKey } from './facade';
 import { createSaveExport } from './save-export';
-import { createHmaLocalSource } from './hma-local';
-import { createHmaCredsSync } from './hma-sync';
-import { createHmaWindowsSupport } from './hma-windows';
 import { mainStrings, resolveMainLanguage, type MainLanguage } from './main-strings';
 import { observeStateStore } from './observed-state';
 import { createSessionSecretStore } from './session-secrets';
@@ -191,6 +188,28 @@ export function runApp(): void {
       accounts: migrateKeyLabels(s.accounts, (ref) => secrets.loadSecret(ref)),
     }));
 
+    // Earlier builds kept the HMA license key in plaintext `account.meta`. Move it into the
+    // encrypted secret, leave only a masked hint in meta. One-time, idempotent.
+    rawState.setState((s) => ({
+      ...s,
+      accounts: s.accounts.map((a) => {
+        if (a.providerId !== 'hma' || a.meta.source !== 'se-platform' || !a.meta.walletKey) return a;
+        const walletKey = a.meta.walletKey;
+        const raw = secrets.loadSecret(a.secretRef);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Record<string, unknown>;
+            if (typeof parsed.walletKey !== 'string') secrets.saveSecret(a.secretRef, JSON.stringify({ ...parsed, walletKey }));
+          } catch {
+            // leave an unreadable secret alone; the user can re-add the license
+          }
+        }
+        const meta: Record<string, string> = { ...a.meta, licenseHint: `••••-${walletKey.slice(-4)}` };
+        delete meta.walletKey;
+        return { ...a, meta };
+      }),
+    }));
+
     // 4. sing-box present, runnable (not quarantined) and the pinned version — or a
     // clear error screen instead of a crash.
     let engineError: string | undefined;
@@ -215,11 +234,30 @@ export function runApp(): void {
     // 6. ONE refusal tracker, shared by port manager and pool.
     const refusals = createRefusalTracker({ initial: rawState.getState().refusals });
 
-    // 7. providers.
+    // 7. providers. HMA's catalog stale-prunes IPs the backend rotated out, but must never
+    // drop one a live port still holds; the port manager (created below) knows which those
+    // are, so the provider reads them through this holder, filled once it exists.
+    const heldIpsHolder: { get: () => ReadonlySet<string> } = { get: () => new Set<string>() };
     registerAllProviders({
       surfsharkCachePath: path.join(userData, 'cache', 'surfshark-clusters.json'),
       nordvpnCachePath: path.join(userData, 'cache', 'nordvpn-servers.json'),
       expressvpnPoolPath: path.join(userData, 'cache', 'expressvpn-pools.json'),
+      onTargetsChanged: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) broadcastTargetsChanged([mainWindow.webContents]);
+      },
+      hmaHeldIps: () => heldIpsHolder.get(),
+      // The HMA license key lives only in the encrypted secret store; the provider reads it
+      // back from there to mint tokens, so it never has to sit in plaintext state.json.
+      hmaLoadWalletKey: (account) => {
+        const raw = secrets.loadSecret(account.secretRef);
+        if (!raw) return undefined;
+        try {
+          const parsed = JSON.parse(raw) as { walletKey?: unknown };
+          return typeof parsed.walletKey === 'string' ? parsed.walletKey : undefined;
+        } catch {
+          return undefined;
+        }
+      },
     });
     const providers = { get: getProvider };
 
@@ -284,7 +322,22 @@ export function runApp(): void {
       onHealthChanged: () => {
         if (mainWindow && !mainWindow.isDestroyed()) broadcastTargetsChanged([mainWindow.webContents]);
       },
+      // HMA's device password rotates server-side; re-fetch it (and the CA) on an auth
+      // failure so the port can retry with a fresh, valid credential.
+      refreshDeviceCredentials: async (accountId) => {
+        const account = state.getState().accounts.find((a) => a.id === accountId);
+        const provider = account && getProvider(account.providerId);
+        const refreshed = await provider?.refreshCredentials?.(account!).catch(() => undefined);
+        if (!account || !refreshed) return false;
+        secrets.saveSecret(account.secretRef, JSON.stringify(refreshed.secret));
+        if (refreshed.meta) {
+          const meta = { ...account.meta, ...refreshed.meta };
+          state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === accountId ? { ...a, meta } : a)) }));
+        }
+        return true;
+      },
     });
+    heldIpsHolder.get = () => portManager.heldServerIps();
     const queue = createStartQueue({ onTaskError: (key, err) => log(`start ${key} failed`, err) });
     /** An automatic restart (app start, resume, a settings change). A terminally failed
      * port is left alone unless `retryTerminal` (its credentials were just replaced). */
@@ -295,23 +348,6 @@ export function runApp(): void {
       queue.enqueue(key, () => portManager.startPort(key, opts));
     };
     const onPortState = (cb: (key: string, st: PortState) => void) => engine.onStateChange(cb);
-
-    // HMA local credentials: detection, connect, lazy apply on change (spec §5.1).
-    const hma = createHmaLocalSource();
-    // Windows: HMA support's task refreshes the readable copy of HMA's credentials (spec §7).
-    const hmaWindows = process.platform === 'win32' ? createHmaWindowsSupport({ appExe: process.execPath }) : undefined;
-    const hmaSync = createHmaCredsSync({
-      source: hma,
-      state,
-      secrets,
-      onPortState,
-      // New device credentials: a port refused under the old ones may work now.
-      restartPort: (key) => restartPort(key, { retryTerminal: true }),
-      onCredentialsChanged: (accountId) => portManager.credentialsChanged(accountId),
-    });
-    void (hmaWindows?.refresh() ?? Promise.resolve())
-      .then(() => hmaSync.check())
-      .catch((err) => log('hma credential check failed', err));
 
     // Webhook (spec §6.6): only while enabled; rebuilt on LAN/webhook changes.
     let webhook: Webhook | undefined;
@@ -371,8 +407,6 @@ export function runApp(): void {
       allocator,
       engineLogs: (key) => engine.getLogs(key),
       hostVpn,
-      hma,
-      hmaWindows,
       platform: process.platform,
       speedTest: (port, auth) => measureDownloadMbps(port, { auth }),
       saveExport: createSaveExport({
@@ -600,14 +634,36 @@ export function runApp(): void {
     portManager.syncAutoRotate();
     if (!engineError) for (const p of state.getState().ports.filter((r) => r.enabled)) restartPort(p.key);
 
+    // Dynamic providers (HMA): the backend's discover answer has a ~120 s TTL and rotates
+    // its gateways over time. Re-discover each location that has a live port on a quiet
+    // timer so the catalog follows those changes (fresh IPs in, stale IPs pruned) instead
+    // of only learning when a held gateway finally fails. One discover per (account,
+    // location), deduped; errors are swallowed.
+    const DYNAMIC_REFRESH_MS = 2 * 60 * 1000;
+    async function refreshActiveDynamicLocations(): Promise<void> {
+      const { ports, accounts } = state.getState();
+      const seen = new Set<string>();
+      for (const p of ports) {
+        if (!p.enabled || !isDynamicProvider(p.providerId)) continue;
+        const sig = `${p.accountId}|${p.locationKey}`;
+        if (seen.has(sig)) continue;
+        seen.add(sig);
+        const account = accounts.find((a) => a.id === p.accountId);
+        const provider = account && getProvider(p.providerId);
+        if (account && provider?.refreshLocation) await provider.refreshLocation(account, p.locationKey).catch(() => undefined);
+      }
+    }
+    const dynamicRefreshTimer = setInterval(() => void refreshActiveDynamicLocations(), DYNAMIC_REFRESH_MS);
+    dynamicRefreshTimer.unref?.();
+
     // Auto-update: check on start + daily, only while the user leaves it enabled (spec §9).
     if (settingsNow().autoCheckUpdates) updater.startPeriodicCheck(24);
 
     shutdown = async () => {
       shuttingDown = true;
+      clearInterval(dynamicRefreshTimer);
       updater.stopPeriodicCheck();
       portManager.stopAutoRotate();
-      hmaSync.dispose();
       hostVpn.stop();
       power?.dispose();
       await webhook?.close().catch(() => undefined);

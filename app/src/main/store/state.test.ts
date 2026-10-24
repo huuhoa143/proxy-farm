@@ -397,7 +397,7 @@ describe('state store', () => {
     });
 
     it('a v1 file whose migration throws starts over without crashing, but keeps its accounts and settings', () => {
-      const accounts = [{ id: 'hma-1', providerId: 'hma', label: 'device', meta: {}, secretRef: 'account:hma-1' }];
+      const accounts = [{ id: 'hma-1', providerId: 'hma', label: 'device', meta: { source: 'se-platform' }, secretRef: 'account:hma-1' }];
       const original = JSON.stringify({
         schemaVersion: 1,
         ports: [null, v1Row('hma:VN-51-HANOI')], // a malformed row makes the migration throw
@@ -415,6 +415,27 @@ describe('state store', () => {
       expect(state.ports).toEqual([]);
       expect(readFileSync(`${filePath}.v1.bak`, 'utf8')).toBe(original); // nothing lost for good
       expect(store.takeSecretNotice()).toContain('state.json.v1.bak');
+    });
+
+    it('drops legacy HMA accounts (no se-platform identity) and their ports, keeping everything else', () => {
+      writeFileSync(
+        filePath,
+        JSON.stringify({
+          schemaVersion: 2,
+          accounts: [
+            { id: 'hma-1', providerId: 'hma', label: 'old', meta: { source: 'local' }, secretRef: 'account:hma-1' },
+            { id: 'hma-2', providerId: 'hma', label: 'new', meta: { source: 'se-platform', walletKey: 'K' }, secretRef: 'account:hma-2' },
+            { id: 'surfshark-1', providerId: 'surfshark', label: 'ss', meta: {}, secretRef: 'account:surfshark-1' },
+          ],
+          ports: [
+            { key: 'hma:US#1', locationKey: 'hma:US', accountId: 'hma-1', providerId: 'hma', label: 'x', country: 'US', city: 'x', proxyPort: 29001, enabled: true, state: { kind: 'stopped' }, autoRotateMin: 0 },
+            { key: 'hma:JP#1', locationKey: 'hma:JP', accountId: 'hma-2', providerId: 'hma', label: 'y', country: 'JP', city: 'y', proxyPort: 29002, enabled: true, state: { kind: 'stopped' }, autoRotateMin: 0 },
+          ],
+        }),
+      );
+      const state = createStateStore(filePath, secrets()).getState();
+      expect(state.accounts.map((a) => a.id)).toEqual(['hma-2', 'surfshark-1']);
+      expect(state.ports.map((p) => p.key)).toEqual(['hma:JP#1']); // the port on the dropped account is gone
     });
 
     it('persists the webhook location-alias map, defaulting to empty', () => {

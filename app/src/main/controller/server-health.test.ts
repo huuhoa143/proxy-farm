@@ -169,5 +169,21 @@ describe('server health (spec §6.8, per account and server)', () => {
       expect(h.isRefused('a', 'new')).toBe(false);
       expect(h.isRefused('b', 'new')).toBe(true);
     });
+
+    it('rearm clears refused and dead for one pair, without recording a lastOk', () => {
+      const h = createServerHealth();
+      h.markRefused('a', '1.1.1.1');
+      h.markDead('a', '2.2.2.2');
+      h.rearm('a', '1.1.1.1');
+      h.rearm('a', '2.2.2.2');
+      expect(h.isRefused('a', '1.1.1.1')).toBe(false);
+      expect(h.isDead('a', '2.2.2.2')).toBe(false);
+      expect(h.isUsable('a', '1.1.1.1')).toBe(true);
+      // rearm is not "confirmed online": it leaves no lastOk, and it only touches the pair asked.
+      expect(h.lastOk('a', '1.1.1.1')).toBeUndefined();
+      h.markRefused('b', '1.1.1.1');
+      h.rearm('a', '1.1.1.1');
+      expect(h.isRefused('b', '1.1.1.1')).toBe(true);
+    });
   });
 });

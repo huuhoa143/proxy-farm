@@ -129,8 +129,8 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
 
   const accounts: FakeAccountRecord[] = [
     {
-      account: { id: 'hma-1', providerId: 'hma', label: 'HMA (this device)', meta: { udid: 'device-demo' }, secretRef: 'hma-1' },
-      secret: { kind: 'userpass', username: 'device-demo', password: 'demo' },
+      account: { id: 'hma-1', providerId: 'hma', label: 'device …fake1', meta: { source: 'se-platform', licenseHint: '••••-MO22' }, secretRef: 'hma-1' },
+      secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64), walletKey: 'DEMO00-DEMO11-DEMO22' },
     },
     {
       account: {
@@ -317,12 +317,24 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       return (['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'] as ProviderId[]).map((id) => ({
         id,
         accounts: accounts.filter((a) => a.account.providerId === id).map((a) => a.account),
-        detected: id === 'hma' ? { found: true } : undefined,
         limit: limits.get(id) ?? DEFAULT_PORT_LIMITS[id] ?? 0,
       }));
     },
 
     async addAccount(providerId, input) {
+      if (providerId === 'hma') {
+        if (!input.licenseKey?.trim()) return { ok: false, reasonKey: 'hma.sePlatform.needsLicense' };
+        const n = accounts.length + 1;
+        const account: Account = {
+          id: `hma-${n}`,
+          providerId,
+          label: `device …fake${n}`,
+          meta: { source: 'se-platform', licenseHint: `••••-${input.licenseKey.trim().slice(-4)}` },
+          secretRef: `hma-${n}`,
+        };
+        accounts.push({ account, secret: { kind: 'userpass', username: 'U1.fake', password: 'f'.repeat(64), walletKey: input.licenseKey.trim() } });
+        return { ok: true, account, label: account.label };
+      }
       if (providerId === 'zoogvpn') {
         if (!input.email || !input.password) {
           return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
@@ -397,23 +409,6 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       if (idx >= 0) accounts.splice(idx, 1);
     },
 
-    async connectHma() {
-      const account: Account = accounts.find((a) => a.account.providerId === 'hma')?.account ?? {
-        id: 'hma-1',
-        providerId: 'hma',
-        label: 'HMA (this device)',
-        meta: { udid: 'device-demo' },
-        secretRef: 'hma-1',
-      };
-      return { ok: true, account, label: account.label };
-    },
-
-    async enableHmaSupport() {
-      // Simulates spec §7: install the elevated Windows helper (one UAC).
-      // The fake has no real installer to run, so it just reports success.
-      return { ok: true, label: 'HMA helper installed' };
-    },
-
     async importConfigFile(name, content, country, credentials) {
       if (!content.includes('PrivateKey') && !content.includes('remote ')) {
         return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
@@ -438,6 +433,10 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
         servers: [...t.servers],
         freeServers: freeServersOf(t).length,
       }));
+    },
+
+    async refreshTargets(providerId) {
+      return SAMPLE_TARGETS.filter((t) => t.providerId === providerId).length;
     },
 
     // The fake keeps one health map for every account, so `portKey` changes nothing here.

@@ -12,7 +12,10 @@ beforeAll(() => {
 async function setup(props: { disabled?: boolean; busy?: boolean } = {}) {
   const api = createFakeProxyFarmApi();
   const rows = await api.listPorts();
-  const row = rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow;
+  // The server-selection menu is for NON-dynamic providers; reuse the rich JP-TOKYO server
+  // fixture (keyed by locationKey) but mark the row as a pooled provider so the menu renders.
+  const base = rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow;
+  const row: PortRow = { ...base, providerId: 'surfshark' };
   const onChange = vi.fn();
   render(<ChangeIpMenu row={row} api={api} rows={rows} onChange={onChange} {...props} />);
   const trigger = screen.getByTestId('change-ip-hma:JP-TOKYO#1');
@@ -28,6 +31,19 @@ async function openMenu(trigger: HTMLElement) {
 }
 
 describe('ChangeIpMenu', () => {
+  it('dynamic provider (HMA): one click changes IP, no server menu', async () => {
+    const api = createFakeProxyFarmApi();
+    const rows = await api.listPorts();
+    const row = rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow; // HMA = dynamic
+    const onChange = vi.fn();
+    render(<ChangeIpMenu row={row} api={api} rows={rows} onChange={onChange} />);
+    const trigger = screen.getByTestId('change-ip-hma:JP-TOKYO#1');
+    expect(trigger).not.toHaveAttribute('aria-haspopup'); // not a menu
+    fireEvent.click(trigger);
+    expect(onChange).toHaveBeenCalledWith(row); // next IP, no server argument
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('is a labelled menu button', async () => {
     const { trigger } = await setup();
     expect(trigger).toHaveAccessibleName('Change IP for port #1');
@@ -92,7 +108,7 @@ describe('ChangeIpMenu', () => {
   it('the heading names the location as the table does (a localised country for a country-wide one)', async () => {
     const api = createFakeProxyFarmApi();
     const rows = await api.listPorts();
-    const row = { ...(rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow), city: 'Japan' };
+    const row: PortRow = { ...(rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow), city: 'Japan', providerId: 'surfshark' };
     render(<ChangeIpMenu row={row} api={api} rows={rows} onChange={() => {}} locationName="Nhật Bản" />);
     await openMenu(screen.getByTestId('change-ip-hma:JP-TOKYO#1'));
     expect(screen.getByText('Servers in Nhật Bản')).toBeInTheDocument();
@@ -103,7 +119,7 @@ describe('ChangeIpMenu', () => {
     async function noneFree(sameCountryAlternative?: boolean) {
       const api = createFakeProxyFarmApi();
       const rows = await api.listPorts();
-      const row = rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow;
+      const row: PortRow = { ...(rows.find((r) => r.key === 'hma:JP-TOKYO#1') as PortRow), providerId: 'surfshark' };
       vi.spyOn(api, 'listServers').mockResolvedValue([
         { server: '203.0.113.10', health: 'ok', heldBy: 'hma:JP-TOKYO#1' },
         { server: '203.0.113.13', health: 'refused' },

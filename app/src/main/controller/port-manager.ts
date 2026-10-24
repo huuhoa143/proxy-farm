@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import {
   EXIT_IP_MODELS,
+  isDynamicProvider,
   isTerminalState,
   makePortKey,
   splitPortKey,
@@ -58,6 +59,13 @@ export interface PortManagerDeps {
    * `attemptLimiter`.
    */
   credentialProbe?: CredentialProbe;
+  /**
+   * Re-fetch an account's connection credentials when they rotate/expire server-side
+   * (HMA device password). Resolves true if a fresh secret was stored. The controller
+   * calls it on an HMA auth failure, then retries on a fresh server instead of treating
+   * the failure as a wrong login. Injectable for tests.
+   */
+  refreshDeviceCredentials?: (accountId: string) => Promise<boolean>;
   /** How long `rotatePort` waits for the restarted port to actually reach `online`
    * (verified by `PortHealth`, via `Engine.onStateChange`) before giving up on
    * confirming the new exit IP (reviewer item 1). @default 45_000 */
@@ -164,6 +172,9 @@ export interface PortManager {
   listServers(target: Target, portKey?: string): Promise<ServerInfo[]>;
   /** Servers of `target` that some account of its provider may use and no enabled port holds. */
   freeServerCount(target: Target): number;
+  /** The resolved IPs every current port holds — what a dynamic provider's catalog must
+   * not evict while a port is still using them. */
+  heldServerIps(): Set<string>;
   /** Every server of `target` has refused every account of its provider (spec §6.8):
    * the location is outside the user's plan(s). False with no account to judge by. */
   locationNotInPlan(target: Target): boolean;
@@ -388,6 +399,11 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       forgetRefusalsSince(accountId, sinceMs) {
         inner.forgetRefusalsSince(accountId, sinceMs);
         healthChanged();
+      },
+      rearm(accountId, server) {
+        const wasUsable = inner.isUsable(accountId, server);
+        inner.rearm(accountId, server);
+        if (!wasUsable) healthChanged();
       },
     };
   }
@@ -672,6 +688,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   // engine (`onRetryDue`) — this is only for the states set directly here.
   const localRetryAttempts = new Map<string, number>();
   const localRetryCancel = new Map<string, () => void>();
+  /** Last time we refreshed an account's rotating device creds after an auth failure, so a
+   * genuinely-bad login can't loop the refresh (HMA). */
+  const credsRefreshAt = new Map<string, number>();
+  const CREDS_REFRESH_MIN_GAP_MS = 30_000;
 
   function cancelLocalRetry(key: string): void {
     localRetryCancel.get(key)?.();
@@ -895,9 +915,36 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * outcome either moves the port to another server or leaves it terminally failed. */
   function onAuthFailure(port: PortRow & { server: string }, state: Extract<PortState, { kind: 'failed' }>): void {
     if (port.providerId === 'hma') {
-      // §5.1: device creds, per-server tenant — but a refusal only once the creds are
-      // known to work somewhere; otherwise (stale or revoked device creds) walking the
-      // pool would just mark every server refused for a week.
+      // One HMA device runs many concurrent OpenVPN sessions on ONE shared device password
+      // (verified live). So if another port of this account is already ONLINE, that password
+      // is valid — this auth failure is a transient gateway hiccup, not a stale credential.
+      // Retry (startPort re-selects a gateway); never refresh the credentials here, because
+      // a passage refresh ROTATES the shared password and would knock the online siblings
+      // off, and never mark the server refused / blame the plan.
+      if (anyOnline(port.accountId, port.key)) {
+        return restartElsewhere(port.key, 'reconnecting');
+      }
+      // §5.1: HMA's device password can expire server-side, so a stale one gets AUTH_FAILED
+      // even for a valid account. With nothing online (no session proving the password), the
+      // first response is to refresh the device creds once (throttled) and retry on a fresh
+      // server — NOT mark the server refused or blame the login. Safe to rotate here: no
+      // online sibling to break. Only if that already happened recently do we fall through.
+      const lastRefresh = credsRefreshAt.get(port.accountId) ?? 0;
+      if (deps.refreshDeviceCredentials && now() - lastRefresh > CREDS_REFRESH_MIN_GAP_MS) {
+        credsRefreshAt.set(port.accountId, now());
+        updatePort(port.key, { state: { kind: 'retrying', untilMs: now(), attempt: 1, reasonKey: 'refreshingCreds' } });
+        void deps
+          .refreshDeviceCredentials(port.accountId)
+          .then((ok) => {
+            if (ok) credentialsChanged(port.accountId); // forget the transient refusal under the old password
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            if (findPort(port.key)?.enabled) void startPort(port.key).catch(() => undefined);
+          });
+        return;
+      }
+      // Already refreshed lately and still failing: treat as a real server/account refusal.
       if (!accountWorksElsewhere(port)) return failTerminal(port.key, 'auth', state);
       health.markRefused(port.accountId, port.server);
       persistHealth();
@@ -1180,7 +1227,17 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   async function addPort(target: Target, accountId: string, opts: { atLimit?: () => boolean } = {}): Promise<PortRow | undefined> {
     return withClaimLock(async () => {
       if (opts.atLimit?.()) return undefined;
-      const { pick } = await selectServer({ target, accountId, mode: 'strict' });
+      let sel = await selectServer({ target, accountId, mode: 'strict' });
+      if (!sel.pick && sel.onlyRefused && isDynamicProvider(target.providerId)) {
+        // Dynamic (HMA): the only free gateways left are marked refused — almost always a
+        // stale device-password refusal (now auto-refreshed) on a gateway that a fresh
+        // discover just confirmed live. Clear those spurious marks and try once more, so
+        // the real per-city pool (2 IPs) is usable instead of a false "no free server".
+        for (const server of target.servers) health.rearm(accountId, server);
+        persistHealth();
+        sel = await selectServer({ target, accountId, mode: 'strict' });
+      }
+      const pick = sel.pick;
       if (!pick) return undefined;
       const { settings } = deps.state.getState();
       const proxyPort = await deps.allocator.allocate({ preferred: settings.basePort, taken: takenProxyPorts(), base: settings.basePort });
@@ -1476,6 +1533,30 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
         }
       }
 
+      // 1b. Dynamic providers (HMA): one city IS the pool, and a stale rotating-password
+      // refusal can hide the city's other gateway. Rearm this location's servers and try
+      // the SAME city once more, so Change IP gives a real new IP there — and never
+      // silently jumps to another city (unlike catalog providers below). Still nothing free
+      // here → keep the current IP and say so, clearly, rather than relocating the port.
+      if (currentTarget && isDynamicProvider(fresh.providerId)) {
+        for (const server of currentTarget.servers) health.rearm(fresh.accountId, server);
+        persistHealth();
+        const { pick } = await selectServer({
+          target: currentTarget,
+          accountId: fresh.accountId,
+          portKey: key,
+          mode: 'strict',
+          exclude: current,
+          roundRobinFrom: fresh.server,
+        });
+        if (pick) {
+          rememberReturn(key, currentTarget, fresh.server);
+          updatePort(key, onNewServer(pick.server, pick.ip));
+          return { target: currentTarget, pick, account, finalKey: key, fellBackToAnotherCity: false };
+        }
+        return { noteKey: 'no-other-server' };
+      }
+
       // 2. Another location in the same country (§6.5); the row moves to its group.
       const sameCountry = targets.filter((t) => t.key !== fresh.locationKey && t.country === fresh.country).sort((a, b) => a.key.localeCompare(b.key));
       for (const alt of sameCountry) {
@@ -1730,6 +1811,17 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     ).length;
   }
 
+  function heldServerIps(): Set<string> {
+    const out = new Set<string>();
+    for (const p of deps.state.getState().ports) {
+      if (p.serverIp) out.add(p.serverIp);
+      if (p.server && isIP(p.server)) out.add(p.server);
+      const ip = p.server ? knownIp(p.server) : undefined;
+      if (ip) out.add(ip);
+    }
+    return out;
+  }
+
   async function setAutoRotate(key: string, minutes: number): Promise<void> {
     updatePort(key, { autoRotateMin: Math.max(0, Math.floor(minutes)) });
     syncAutoRotate();
@@ -1804,6 +1896,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     addPort,
     listServers,
     freeServerCount,
+    heldServerIps,
     locationNotInPlan,
     setAutoRotate,
     exportPorts,

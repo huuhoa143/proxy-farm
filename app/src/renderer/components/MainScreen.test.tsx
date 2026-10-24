@@ -34,7 +34,15 @@ function addLocationsButton(): HTMLElement {
 
 /** Open a row's Change IP menu and pick "Next free server", or a given server. */
 async function changeIp(portKey: string, server?: string) {
-  fireEvent.click(screen.getByTestId(`change-ip-${portKey}`));
+  const trigger = screen.getByTestId(`change-ip-${portKey}`);
+  // Dynamic providers (HMA): the button itself changes IP (next) — no server menu.
+  if (portKey.startsWith('hma:') && !server) {
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+    return;
+  }
+  fireEvent.click(trigger);
   const menu = await screen.findByTestId('change-ip-menu');
   const item = server
     ? await within(menu).findByTestId(`server-${server}`)
@@ -66,7 +74,7 @@ describe('MainScreen', () => {
     expect(within(screen.getByTestId('stat-rail')).getByText('Locations').nextSibling).toHaveTextContent('4');
   });
 
-  it('+ Add port adds a port on a free server, then disables itself when none is left', async () => {
+  it('+ Add port adds a port on a free server; on a dynamic location it stays enabled (discover on add)', async () => {
     const api = await renderMain();
     const addSpy = vi.spyOn(api, 'addPorts');
     const add = await screen.findByTestId('add-port-hma:JP-TOKYO');
@@ -78,10 +86,10 @@ describe('MainScreen', () => {
 
     fireEvent.click(screen.getByTestId('add-port-hma:JP-TOKYO'));
     await waitFor(() => expect(screen.getByTestId('port-row-hma:JP-TOKYO#4')).toBeInTheDocument());
-    await waitFor(() =>
-      expect(screen.getByTestId('add-port-hma:JP-TOKYO')).toHaveAttribute('aria-disabled', 'true'),
-    );
-    expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('0 free');
+    await waitFor(() => expect(screen.getByTestId('group-stats-hma:JP-TOKYO')).toHaveTextContent('0 free'));
+    // HMA is dynamic: even with no cached free server, "+ Add port" stays enabled because
+    // the next add discovers a fresh gateway — no "no free server" dead-end.
+    expect(screen.getByTestId('add-port-hma:JP-TOKYO')).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('tells the user when fewer ports than asked could be added', async () => {
@@ -172,14 +180,6 @@ describe('MainScreen', () => {
       ),
     );
     expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toHaveTextContent('203.0.113.12');
-  });
-
-  it('Change IP → a picked server moves the port to that server', async () => {
-    const api = await renderMain();
-    const rotateSpy = vi.spyOn(api, 'rotatePort');
-    await changeIp(TOKYO_1, '203.0.113.15');
-    expect(rotateSpy).toHaveBeenCalledWith(TOKYO_1, '203.0.113.15');
-    await waitFor(() => expect(screen.getByTestId(`port-row-${TOKYO_1}`)).toHaveTextContent('203.0.113.15'));
   });
 
   describe('free-server counts after a change', () => {

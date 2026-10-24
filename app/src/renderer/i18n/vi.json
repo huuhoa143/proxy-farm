@@ -37,21 +37,17 @@
     "providers": {
       "hma": {
         "name": "HMA",
-        "description": "Dùng thông tin đăng nhập thiết bị HMA VPN có sẵn — không cần mật khẩu.",
-        "detectedTitle": "Đã tìm thấy HMA trên máy này",
-        "detectedSubtitle": "Thông tin đăng nhập thiết bị đã sẵn sàng sử dụng.",
-        "notDetectedTitle": "Chưa tìm thấy HMA",
-        "helperMissingTitle": "HMA cần thêm một bước trên Windows",
-        "step1": "Cài đặt HMA VPN",
-        "step2": "Đăng nhập và kết nối một lần",
-        "step3": "Quay lại đây — ứng dụng sẽ tự nhận ra",
-        "connect": "Kết nối",
-        "connecting": "Đang kết nối…",
-        "enableSupport": "Bật hỗ trợ HMA",
-        "enablingSupport": "Đang bật…",
-        "windowsHelperNote": "Thao tác này tạo một tác vụ nhỏ của Windows để giữ bản sao thông tin đăng nhập thiết bị HMA mà chỉ bạn và quản trị viên đọc được. Cần xác nhận quản trị viên một lần; các lần cập nhật sau không cần nữa.",
-        "waiting": "Đang chờ HMA — theo dõi thông tin đăng nhập…",
-        "initials": "H"
+        "description": "Thêm HMA bằng mã license gói đăng ký — server tươi lấy thẳng từ HMA, không cần cài app.",
+        "initials": "H",
+        "licenseLabel": "Mã license",
+        "licensePlaceholder": "XXXXXX-XXXXXX-XXXXXX",
+        "licenseHint": "Thêm HMA bằng mã license của gói đăng ký — tự lấy server tươi trực tiếp từ HMA, không cần cài app.",
+        "licenseAdd": "Thêm bằng mã license",
+        "licenseAdding": "Đang đăng ký…",
+        "loadLocations": "Tải danh sách vị trí",
+        "loadingLocations": "Đang tải vị trí…",
+        "loadedLocations": "Đã tải {{count}} vị trí",
+        "removeAccount": "Xóa tài khoản này"
       },
       "zoogvpn": {
         "name": "ZoogVPN",
@@ -140,20 +136,6 @@
         "username": "Tên đăng nhập VPN",
         "password": "Mật khẩu VPN",
         "signInNote": "Tệp này đăng nhập bằng tên đăng nhập và mật khẩu. Dùng bộ mà nhà cung cấp cho để cài OpenVPN thủ công; chúng được lưu mã hóa cùng tệp."
-      }
-    },
-    "portLimit": {
-      "label": "Giới hạn số cổng",
-      "unlimited": "0 = không giới hạn",
-      "save": "Lưu",
-      "title": "Giới hạn cổng",
-      "note": "Giới hạn số cổng mỗi nhà cung cấp được chạy cùng lúc.",
-      "fieldLabel": "Giới hạn cổng — {{provider}}",
-      "ports_one": "tối đa {{count}} cổng",
-      "ports_other": "tối đa {{count}} cổng",
-      "why": {
-        "nordvpn": "Mặc định 6: đã kiểm chứng ba đường hầm cùng lúc trên một khóa.",
-        "expressvpn": "Mặc định 8: gói ExpressVPN cho phép 10 thiết bị cùng lúc, chừa 2 cho thiết bị của bạn."
       }
     },
     "continueHint": "Kết nối ít nhất một nhà cung cấp để tiếp tục.",
@@ -299,11 +281,16 @@
       "noResults": "Không có vị trí nào khớp “{{query}}”.",
       "clear": "Bỏ chọn",
       "selectCountry": "Chọn mọi thành phố ở {{country}}",
+      "selectAll_one": "Chọn tất cả {{count}} vị trí",
+      "selectAll_other": "Chọn tất cả {{count}} vị trí",
+      "selectAllProvider_one": "Chọn tất cả {{count}} vị trí {{provider}}",
+      "selectAllProvider_other": "Chọn tất cả {{count}} vị trí {{provider}}",
       "cities_one": "{{count}} thành phố",
       "cities_other": "{{count}} thành phố",
       "servers_one": "{{count}} máy chủ · {{free}} trống",
       "servers_other": "{{count}} máy chủ · {{free}} trống",
       "noFree": "Hết máy chủ trống",
+      "ready": "IP mới khi thêm",
       "limitReached": "Đã đạt giới hạn cổng",
       "portsHere_one": "{{count}} cổng",
       "portsHere_other": "{{count}} cổng",
@@ -500,7 +487,9 @@
       "rate-limited": "Đang chờ trước lần thử tiếp theo để không liên hệ nhà cung cấp quá thường xuyên.",
       "server-not-in-plan": "Gói {{provider}} của bạn không bao gồm máy chủ này — đang chuyển sang máy chủ khác.",
       "checking-sign-in": "Máy chủ từ chối đăng nhập — đang kiểm tra email và mật khẩu qua một máy chủ miễn phí của {{provider}}…",
-      "credentials-changed": "Thông tin đăng nhập vừa thay đổi — đang kết nối lại."
+      "credentials-changed": "Thông tin đăng nhập vừa thay đổi — đang kết nối lại.",
+      "refreshingCreds": "Đang làm mới thông tin HMA…",
+      "reconnecting": "Đang kết nối lại qua cổng HMA khác…"
     }
   },
   "settings": {
@@ -607,6 +596,7 @@
     "online-timeout": "Máy chủ mới không lên kịp.",
     "probe-failed": "Đã đổi, nhưng không kiểm tra được IP mới.",
     "exit-ip-unchanged": "Đã kết nối lại nhưng IP ra không đổi.",
+    "no-other-server": "Vị trí này hiện không còn IP trống nào khác — IP ra giữ nguyên. Hãy chọn vị trí khác, hoặc thử lại sau giây lát.",
     "rotate-in-progress": "Cổng này đang được đổi IP.",
     "port-disabled": "Hãy bật cổng trước khi đổi IP.",
     "decrypt-failed": "Không đọc được thông tin đăng nhập đã lưu.",
@@ -616,19 +606,17 @@
   },
   "hma": {
     "deviceLabel": "Thiết bị …{{suffix}}",
-    "notFound": "Máy này chưa cài HMA hoặc bạn chưa kết nối HMA lần nào.",
-    "notSignedIn": "Đã cài HMA nhưng chưa đăng nhập. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
-    "helperMissing": "Máy này chưa bật hỗ trợ HMA. Hãy bấm \"Bật hỗ trợ HMA\" trước.",
-    "untrusted": "Thư mục HMA trên Windows không thuộc quyền sở hữu của Windows hoặc quản trị viên nên Proxy Farm không đọc thông tin đăng nhập từ đó. Hãy cài lại HMA rồi thử lại.",
-    "enable": {
-      "cancelled": "Bạn đã huỷ xác nhận quản trị viên nên hỗ trợ HMA chưa được bật.",
-      "no-credentials": "Đã bật hỗ trợ HMA nhưng HMA chưa có thông tin đăng nhập thiết bị. Mở HMA, đăng nhập, kết nối một lần rồi thử lại.",
-      "unsupported-location": "Proxy Farm đang chạy từ ổ mạng, ổ rời hoặc ổ ảo, nơi tác vụ của Windows không kiểm tra được. Hãy cài hoặc chuyển Proxy Farm sang ổ cục bộ (ví dụ C:) rồi thử lại.",
-      "failed": "Không bật được hỗ trợ HMA. Hãy thử lại, hoặc chạy Proxy Farm bằng quyền quản trị viên một lần."
-    },
     "check": {
       "invalidUdid": "Mã thiết bị HMA không hợp lệ.",
       "invalidPassword": "Mật khẩu thiết bị HMA không hợp lệ."
+    },
+    "sePlatform": {
+      "unavailable": "Bản dựng này không hỗ trợ chế độ HMA động.",
+      "network": "Không kết nối được tới máy chủ HMA. Kiểm tra mạng rồi thử lại.",
+      "noLicense": "Mã license không khớp gói đăng ký HMA đang hoạt động.",
+      "unauthorized": "HMA từ chối yêu cầu. Mã license có thể sai hoặc đã hết hạn.",
+      "failed": "Không đăng ký được với HMA. Vui lòng thử lại.",
+      "needsLicense": "Nhập mã license gói đăng ký HMA của bạn để tiếp tục."
     }
   },
   "zoogvpn": {

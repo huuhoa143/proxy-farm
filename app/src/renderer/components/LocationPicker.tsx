@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderId, Target } from '../../shared/contracts';
+import { isDynamicProvider } from '../../shared/contracts';
 import { Flag } from '../ui/Flag';
 import { Icon } from '../ui/Icon';
 import { countryName } from '../ui/countryName';
@@ -126,10 +127,11 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
     });
   }
 
-  function toggleGroup(group: CountryGroup) {
+  /** Pick every available target in `list`, or unpick them all if they already are. */
+  function toggleMany(list: Target[]) {
     setPicked((prev) => {
       const next = new Map(prev);
-      const available = group.targets.filter((tg) => next.has(tg.key) || maxFor(tg, next) > 0);
+      const available = list.filter((tg) => next.has(tg.key) || maxFor(tg, next) > 0);
       const all = available.length > 0 && available.every((tg) => next.has(tg.key));
       for (const tg of available) {
         if (all) next.delete(tg.key);
@@ -140,6 +142,12 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
   }
 
   const totalPorts = Array.from(picked.values()).reduce((a, b) => a + b, 0);
+
+  // "Select all" covers exactly the rows the provider filter and search show.
+  const visible = groups.flatMap((group) => group.targets);
+  const pickedVisible = visible.filter((tg) => picked.has(tg.key)).length;
+  const pickableVisible = visible.filter((tg) => picked.has(tg.key) || maxFor(tg) > 0).length;
+  const allVisible = pickableVisible > 0 && pickedVisible === pickableVisible;
 
   return (
     <>
@@ -223,6 +231,25 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
             </ul>
           )}
         </div>
+        {visible.length > 0 && (
+          <label className="pick-all" data-testid="pick-all">
+            <input
+              type="checkbox"
+              className="ck"
+              checked={allVisible}
+              disabled={pickableVisible === 0}
+              ref={(el) => {
+                if (el) el.indeterminate = pickedVisible > 0 && !allVisible;
+              }}
+              onChange={() => toggleMany(visible)}
+            />
+            <span className="nm">
+              {provider === 'all'
+                ? t('main.picker.selectAll', { count: visible.length })
+                : t('main.picker.selectAllProvider', { count: visible.length, provider: providerName(provider, t) })}
+            </span>
+          </label>
+        )}
         <div className="picklist">
           {groups.length === 0 && <p className="pick-empty">{t('main.picker.noResults', { query })}</p>}
           {groups.map((group) => {
@@ -240,7 +267,7 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                     ref={(el) => {
                       if (el) el.indeterminate = pickedInGroup > 0 && !all;
                     }}
-                    onChange={() => toggleGroup(group)}
+                    onChange={() => toggleMany(group.targets)}
                     aria-label={t('main.picker.selectCountry', { country: group.name }) as string}
                   />
                   <Flag country={group.country} size="sm" />
@@ -258,9 +285,11 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                   const unavailable = notInPlan || (!on && max === 0);
                   const unavailableLabel = notInPlan
                     ? t('main.picker.notInPlan')
-                    : free === 0
-                      ? t('main.picker.noFree')
-                      : t('main.picker.limitReached');
+                    : isDynamicProvider(target.providerId)
+                      ? t('main.picker.limitReached') // dynamic is never "no free server"
+                      : free === 0
+                        ? t('main.picker.noFree')
+                        : t('main.picker.limitReached');
                   const notInPlanHint = notInPlan ? (t('main.picker.notInPlanHint', { provider: providerName(target.providerId, t) }) as string) : undefined;
                   // A country-wide location is named after the country, in the UI language.
                   const name = locationName(target, language);
@@ -284,7 +313,9 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
                           <small className="pool">
                             {unavailable
                               ? unavailableLabel
-                              : t('main.picker.servers', { count: target.servers.length, free })}
+                              : isDynamicProvider(target.providerId) && target.servers.length === 0
+                                ? t('main.picker.ready')
+                                : t('main.picker.servers', { count: target.servers.length, free })}
                           </small>
                         </span>
                         {target.virtualLocation && (

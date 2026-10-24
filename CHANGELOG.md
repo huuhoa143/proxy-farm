@@ -7,6 +7,27 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- HMA now works like the real HMA app: it connects to HMA's Avast/NLOK "se-platform"
+  backend. You add HMA with your license (activation) key instead of relying on the HMA
+  app's files; Proxy Farm registers its own device (from a fingerprint derived from this
+  machine, reused across restarts), fetches the device's OpenVPN credentials, and
+  **discovers gateways dynamically** per location — a large, rotating pool like the app,
+  not a fixed seed list. The location list now shows every HMA city; a city with no
+  cached gateway yet is still selectable and discovers one when you add a port. Change IP
+  on an HMA port gets a new IP **within the same city** and no longer silently moves the
+  port to another city; when a city has no other free gateway it says so and keeps the
+  current IP. Discovered gateways refresh on a 2-minute timer for active locations and
+  stale ones are pruned, so the pool follows HMA's rotation. Works the same on macOS and
+  Windows; the Windows "Enable HMA support" administrator task is gone.
+- Running several HMA ports at once on one license is now reliable. One HMA device holds
+  many concurrent OpenVPN sessions on a single shared password (verified live), so when a
+  port's sibling is already online, an auth failure is treated as a transient reconnect —
+  the shared credentials are no longer refreshed/rotated (which would drop the online
+  siblings) and the gateway is no longer marked "refused / not in your plan".
+- Removed the per-provider port-limit field from the UI; it defaulted to unlimited.
+
 ## [0.2.0] — 2026-10-09
 
 ### Added

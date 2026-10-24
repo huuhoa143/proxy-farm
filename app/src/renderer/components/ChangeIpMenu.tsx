@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { PortRow, ProxyFarmApi, ServerHealth, ServerInfo } from '../../shared/contracts';
-import { EXIT_IP_MODELS, splitPortKey } from '../../shared/contracts';
+import { EXIT_IP_MODELS, isDynamicProvider, splitPortKey } from '../../shared/contracts';
 import { Icon } from '../ui/Icon';
 import { providerName } from '../ui/providerName';
 import type { StatusTone } from '../portStateView';
@@ -186,6 +186,25 @@ export function ChangeIpMenu({ row, api, rows, disabled, busy, onChange, locatio
   }
 
   const label = n ? t('main.changeIp.menuLabel', { n }) : t('main.rotate');
+
+  // Dynamic providers (HMA): no server pool to choose from — Change IP is one click that
+  // discovers a brand-new exit IP for the same location.
+  if (isDynamicProvider(row.providerId)) {
+    return (
+      <button
+        ref={triggerRef}
+        className="btn ghost sm cim-trigger"
+        title={(disabled ? t('main.rotateDisabledHint') : label) as string}
+        aria-label={label as string}
+        disabled={disabled || busy}
+        onClick={() => onChange(row)}
+        data-testid={`change-ip-${row.key}`}
+      >
+        <Icon name="rotate" className={busy ? 'spin' : undefined} />
+        <span>{busy ? t('main.rotating') : t('main.rotate')}</span>
+      </button>
+    );
+  }
 
   return (
     <>

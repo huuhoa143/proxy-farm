@@ -19,13 +19,12 @@ export function createProxyFarmApi(ipcRenderer: IpcRendererLike): ProxyFarmApi {
     listProviders: () => ipcRenderer.invoke('listProviders') as ReturnType<ProxyFarmApi['listProviders']>,
     addAccount: (providerId, input) => ipcRenderer.invoke('addAccount', providerId, input) as ReturnType<ProxyFarmApi['addAccount']>,
     removeAccount: (accountId) => ipcRenderer.invoke('removeAccount', accountId) as ReturnType<ProxyFarmApi['removeAccount']>,
-    connectHma: () => ipcRenderer.invoke('connectHma') as ReturnType<ProxyFarmApi['connectHma']>,
-    enableHmaSupport: () => ipcRenderer.invoke('enableHmaSupport') as ReturnType<ProxyFarmApi['enableHmaSupport']>,
     importConfigFile: (name, content, country, credentials) =>
       ipcRenderer.invoke('importConfigFile', name, content, country, ...(credentials === undefined ? [] : [credentials])) as ReturnType<
         ProxyFarmApi['importConfigFile']
       >,
     listTargets: (providerId) => ipcRenderer.invoke('listTargets', providerId) as ReturnType<ProxyFarmApi['listTargets']>,
+    refreshTargets: (providerId) => ipcRenderer.invoke('refreshTargets', providerId) as ReturnType<ProxyFarmApi['refreshTargets']>,
 
     listServers: (locationKey, portKey) =>
       ipcRenderer.invoke('listServers', locationKey, ...(portKey === undefined ? [] : [portKey])) as ReturnType<ProxyFarmApi['listServers']>,

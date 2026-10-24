@@ -31,11 +31,11 @@ describe('createFakeProxyFarmApi', () => {
     api = createFakeProxyFarmApi();
   });
 
-  it('ships sample providers, including a detected HMA and an existing ZoogVPN account', async () => {
+  it('ships sample providers, including an HMA and an existing ZoogVPN account', async () => {
     const providers = await api.listProviders();
     const hma = providers.find((p) => p.id === 'hma');
     const zoog = providers.find((p) => p.id === 'zoogvpn');
-    expect(hma?.detected?.found).toBe(true);
+    expect(hma?.accounts.length).toBeGreaterThan(0);
     expect(zoog?.accounts.length).toBeGreaterThan(0);
   });
 
@@ -128,10 +128,16 @@ describe('createFakeProxyFarmApi', () => {
     expect(bad.ok).toBe(false);
   });
 
-  it('connectHma succeeds when the fake HMA install is marked detected', async () => {
-    const result = await api.connectHma();
+  it('addAccount(hma) registers a device from a license key', async () => {
+    const result = await api.addAccount('hma', { licenseKey: 'TEST00-TEST11-TEST22' });
     expect(result.ok).toBe(true);
     expect(result.account?.providerId).toBe('hma');
+    expect(result.account?.meta.source).toBe('se-platform');
+  });
+
+  it('addAccount(hma) without a license key is refused', async () => {
+    const result = await api.addAccount('hma', {});
+    expect(result.ok).toBe(false);
   });
 
   it('importConfigFile accepts a minimal wireguard conf', async () => {
@@ -147,11 +153,6 @@ describe('createFakeProxyFarmApi', () => {
     const result = await api.importConfigFile('mullvad-se-got.conf', content, 'SE');
     expect(result.ok).toBe(true);
     expect(result.account?.meta.country).toBe('SE');
-  });
-
-  it('enableHmaSupport reports success (spec §7 elevated helper installer)', async () => {
-    const result = await api.enableHmaSupport();
-    expect(result.ok).toBe(true);
   });
 
   it('rotatePort moves to another city in the same country when the location has no free server (§6.5 step 2)', async () => {

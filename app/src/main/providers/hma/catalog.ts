@@ -1,53 +1,31 @@
 /**
- * HMA catalog (spec §5.1): `{key, country, city, ips: [{ip, firstSeen, lastOk}]}`.
+ * HMA catalog helpers. The on-disk catalog is `{key, country, city, ips: [{ip, firstSeen,
+ * lastOk, lastSeen}]}` per location; `mergeCatalog()` folds a freshly discovered feed
+ * (se-platform/discover-source.ts) into the current catalog: new IPs are appended under
+ * their location's key, deduped by IP, and existing IP entries keep whatever `lastOk`
+ * history they carry (a feed's stub never overwrites them) while their `lastSeen` is
+ * bumped to the feed's time.
  *
- * `loadSeed()` reads the bundled seed file (a verbatim copy of PR #2's
- * `hma-ovpn-seed.json`, one IP per location in its own `{key, country, ip,
- * ...}` shape) and converts it to the catalog schema above.
- *
- * `mergeCatalog()` folds a freshly fetched feed into the current on-disk
- * catalog: new IPs are appended under their location's key, deduped by IP,
- * and existing IP entries (with whatever `lastOk` history they carry) are
- * never overwritten by a feed's stub entry for the same IP.
+ * With `opts.staleSec`, a location the feed TOUCHED (so we have fresh truth for it) drops
+ * any IP the feed did not return and that no live port is holding (`opts.protect`) once it
+ * has gone unseen that long — so a dynamic provider's catalog follows the backend's
+ * rotating gateways instead of accumulating dead IPs forever.
  */
-import { readFile } from 'node:fs/promises';
-import { resourcePath } from '../../resources-root';
-import type { Catalog, CatalogLocation } from '../types';
+import type { Catalog, CatalogLocation, CatalogIp } from '../types';
 
-interface SeedLocation {
-  key: string;
-  country: string;
-  countryName?: string;
-  city: string;
-  /** Primary server (the original PR #2 seed shape). */
-  ip: string;
-  /** Every server of the location verified to accept HMA device credentials, best
-   * first. Optional; when present it supersedes `ip` (scripts/hma-scan-servers.ts). */
-  ips?: string[];
-  port?: number;
-  proto?: string;
+export interface MergeOptions {
+  /** Drop a touched location's unseen, unheld IPs once their `lastSeen` is older than this
+   * many seconds before the feed's time. Omit to keep the old accumulate-only behaviour. */
+  staleSec?: number;
+  /** IPs a live port currently holds — never evicted, however stale. */
+  protect?: ReadonlySet<string>;
 }
 
-interface SeedFile {
-  fetched: number;
-  locations: SeedLocation[];
+function seenAt(ip: CatalogIp): number {
+  return ip.lastSeen ?? ip.firstSeen;
 }
 
-export async function loadSeed(seedPath: string = resourcePath('catalogs', 'hma-ovpn-seed.json')): Promise<Catalog> {
-  const text = await readFile(seedPath, 'utf8');
-  const seed = JSON.parse(text) as SeedFile;
-  return {
-    fetched: seed.fetched,
-    locations: seed.locations.map((loc) => ({
-      key: loc.key,
-      country: loc.country,
-      city: loc.city,
-      ips: [...new Set(loc.ips?.length ? loc.ips : [loc.ip])].map((ip) => ({ ip, firstSeen: seed.fetched, lastOk: null })),
-    })),
-  };
-}
-
-export function mergeCatalog(current: Catalog, feed: Catalog): Catalog {
+export function mergeCatalog(current: Catalog, feed: Catalog, opts: MergeOptions = {}): Catalog {
   const byKey = new Map<string, CatalogLocation>();
   for (const loc of current.locations) {
     byKey.set(loc.key, { ...loc, ips: loc.ips.map((ip) => ({ ...ip })) });
@@ -59,14 +37,21 @@ export function mergeCatalog(current: Catalog, feed: Catalog): Catalog {
       byKey.set(feedLoc.key, { ...feedLoc, ips: feedLoc.ips.map((ip) => ({ ...ip })) });
       continue;
     }
-    const knownIps = new Set(existing.ips.map((ip) => ip.ip));
+    const known = new Map(existing.ips.map((ip) => [ip.ip, ip]));
     for (const ip of feedLoc.ips) {
-      if (!knownIps.has(ip.ip)) {
+      const prev = known.get(ip.ip);
+      if (!prev) {
         existing.ips.push({ ...ip });
-        knownIps.add(ip.ip);
+        known.set(ip.ip, ip);
+      } else {
+        // An IP already known to `current` keeps its firstSeen/lastOk; only its freshness
+        // (lastSeen) advances to this feed's time.
+        prev.lastSeen = Math.max(seenAt(prev), ip.lastSeen ?? feed.fetched);
       }
-      // an IP already known to `current` keeps its own firstSeen/lastOk —
-      // the feed's entry for the same IP is never used to overwrite it.
+    }
+    if (opts.staleSec !== undefined) {
+      const cutoff = feed.fetched - opts.staleSec;
+      existing.ips = existing.ips.filter((ip) => seenAt(ip) >= cutoff || opts.protect?.has(ip.ip));
     }
   }
 

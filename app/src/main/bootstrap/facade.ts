@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import path from 'node:path';
 import {
+  ENABLED_PROVIDERS,
   isTerminalState,
   portLimitOf,
   splitPortKey,
@@ -28,8 +29,6 @@ import type { SecretStore } from '../store/secrets';
 import type { StateStore } from '../store/state';
 import type { UpdateStatus } from '../../shared/contracts';
 import { collectDiagnostics, type DiagnosticsEnv } from './diagnostics';
-import type { HmaLocalSource } from './hma-local';
-import type { HmaWindowsSupport } from './hma-windows';
 
 export const PROVIDER_IDS: ProviderId[] = ['hma', 'zoogvpn', 'surfshark', 'nordvpn', 'expressvpn', 'file'];
 
@@ -50,9 +49,6 @@ export interface FacadeDeps {
   allocator: PortAllocator;
   engineLogs(key: string): string[];
   hostVpn: HostVpnDetector;
-  hma: HmaLocalSource;
-  /** Windows only: turns on HMA support (spec §7); absent elsewhere. */
-  hmaWindows?: HmaWindowsSupport;
   platform: NodeJS.Platform;
   /** Throughput through a port's own proxy (spec §4.2 speed test). */
   speedTest(proxyPort: number, auth?: { username: string; password: string }): Promise<number>;
@@ -149,21 +145,6 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     return account;
   }
 
-  async function detectHma(): Promise<{ found: boolean; hintKey?: string }> {
-    let r = await deps.hma.read();
-    // Windows: a copy whose task has not reported lately reads as helper-missing. After a
-    // sleep the task may simply not have caught up yet: ask it for a run (returns at once
-    // when HMA support was never enabled) before offering to enable it again.
-    if (r.status === 'helper-missing' && deps.hmaWindows) {
-      await deps.hmaWindows.refresh().catch(() => undefined);
-      r = await deps.hma.read();
-    }
-    if (r.status === 'found') return { found: true };
-    if (r.status === 'helper-missing') return { found: false, hintKey: 'hma.helperMissing' };
-    if (r.status === 'untrusted') return { found: false, hintKey: 'hma.untrusted' };
-    if (r.status === 'invalid') return { found: false, hintKey: 'hma.notSignedIn' };
-    return { found: false };
-  }
 
   async function targetsFor(providerId: ProviderId): Promise<Target[]> {
     const provider = deps.providers.get(providerId);
@@ -189,6 +170,19 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     return providerId ? (await targetsFor(providerId)).find((t) => t.key === locationKey) : undefined;
   }
 
+  /** Dynamic HMA: pull fresh gateway IPs for one location right now, so Change IP / Add port
+   * / opening its server list offer brand-new IPs rather than only the accumulated pool.
+   * Best effort; a no-op for providers without a dynamic `refreshLocation`. */
+  async function refreshDynamicLocation(locationKey: string): Promise<void> {
+    const providerId = providerOf(locationKey);
+    if (!providerId) return;
+    const provider = deps.providers.get(providerId);
+    if (!provider?.refreshLocation) return;
+    const account = accounts().find((a) => a.providerId === providerId && a.meta.source === 'se-platform');
+    if (!account) return;
+    await provider.refreshLocation(account, locationKey).catch(() => undefined);
+  }
+
   /** Accounts to try for a new port, best first: the pool's least-loaded pick, then the
    * provider's other accounts (a server refused for one account may still be usable by
    * another — spec §6.8). A file target belongs to exactly one imported file. */
@@ -202,6 +196,7 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   /** spec §6.8 "Add k ports": each on a different free usable server, spread across the
    * provider's accounts, capped by the provider's port limit. */
   async function addPorts(locationKey: string, count: number): Promise<{ added: PortRow[]; noteKey?: string }> {
+    await refreshDynamicLocation(locationKey);
     const target = await findTarget(locationKey);
     if (!target) {
       log(`addPorts: unknown location ${locationKey}`);
@@ -258,22 +253,34 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     enqueueStart(row.key);
   }
 
-  async function connectHma(): Promise<CheckResult & { account?: Account }> {
-    if (deps.platform !== 'darwin' && deps.platform !== 'win32') return { ok: false, reasonKey: 'hma.notFound' };
-    // Windows: ask the task for a fresh copy first, so a Connect right after HMA rotated
-    // its credentials reads the new ones rather than the previous copy.
-    await deps.hmaWindows?.refresh().catch(() => undefined);
-    const r = await deps.hma.read();
-    if (r.status === 'helper-missing') return { ok: false, reasonKey: 'hma.helperMissing' };
-    if (r.status === 'untrusted') return { ok: false, reasonKey: 'hma.untrusted' };
-    if (r.status === 'missing') return { ok: false, reasonKey: 'hma.notFound' };
-    if (r.status !== 'found') return { ok: false, reasonKey: 'hma.notSignedIn' };
+  /** Register (or refresh) an HMA device from the user's subscription license key via the
+   * se-platform backend (docs/HMA-SE-PLATFORM.md). Re-adding the same license reuses the
+   * existing device identity, so it never burns a fresh license device slot. */
+  async function connectHmaLicense(licenseKey: string): Promise<CheckResult & { account?: Account }> {
     const provider = deps.providers.get('hma');
-    if (!provider) return { ok: false, reasonKey: 'hma.notFound' };
-    const check = provider.check({ udid: r.creds.udid, password: r.creds.password });
+    if (!provider?.resolveInput) return { ok: false, reasonKey: 'hma.sePlatform.unavailable' };
+    // The license key is in the encrypted secret, not meta, so match re-adds by reading it back.
+    const walletKeyOf = (a: Account): string | undefined => {
+      const raw = deps.secrets.loadSecret(a.secretRef);
+      if (!raw) return undefined;
+      try {
+        const parsed = JSON.parse(raw) as { walletKey?: unknown };
+        return typeof parsed.walletKey === 'string' ? parsed.walletKey : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const existing = accounts().find(
+      (a) => a.providerId === 'hma' && a.meta.source === 'se-platform' && walletKeyOf(a) === licenseKey,
+    );
+    const resolved = await provider.resolveInput({
+      licenseKey,
+      ...(existing ? { deviceFingerprint: existing.meta.deviceFingerprint ?? '', tenant: existing.meta.tenant ?? '' } : {}),
+    });
+    if ('reasonKey' in resolved) return { ok: false, reasonKey: resolved.reasonKey };
+    const check = provider.check(resolved.input);
     if (!check.ok || !check.secret) return { ok: false, reasonKey: check.reasonKey, label: check.label };
-    const meta = { ...(check.meta ?? {}), source: 'local' };
-    const existing = accounts().find((a) => a.providerId === 'hma' && a.meta.source === 'local');
+    const meta = check.meta ?? {};
     if (existing) {
       replaceAccountSecret(existing, check.secret);
       const updated: Account = { ...existing, label: check.label ?? existing.label, meta };
@@ -306,17 +313,15 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
   return {
     async listProviders() {
       const { limits } = deps.state.getState();
-      const hmaDetected = await detectHma();
-      return PROVIDER_IDS.map((id) => ({
+      return ENABLED_PROVIDERS.map((id) => ({
         id,
         accounts: accounts().filter((a) => a.providerId === id),
-        detected: id === 'hma' ? hmaDetected : undefined,
         limit: portLimitOf(limits, id),
       }));
     },
 
     async addAccount(providerId, input) {
-      if (providerId === 'hma' && !input.udid) return connectHma();
+      if (providerId === 'hma') return connectHmaLicense((input.licenseKey ?? '').trim());
       if (providerId === 'file') return importConfigFile(input.name ?? '', input.content ?? '', input.country);
       const provider = deps.providers.get(providerId);
       if (!provider) return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
@@ -394,20 +399,10 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       deps.state.setState((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== accountId) }));
     },
 
-    connectHma,
-
-    async enableHmaSupport() {
-      // spec §7: only Windows needs it (macOS reads HMA's file directly).
-      if (!deps.hmaWindows) return { ok: true };
-      const r = await deps.hmaWindows.enable();
-      if (r.ok) return { ok: true };
-      return { ok: false, reasonKey: `hma.enable.${r.reason}` };
-    },
-
     importConfigFile,
 
     async listTargets(providerId) {
-      const ids = providerId ? [providerId] : PROVIDER_IDS;
+      const ids = providerId ? [providerId] : ENABLED_PROVIDERS;
       const out: Target[] = [];
       for (const id of ids) {
         for (const t of await targetsFor(id)) {
@@ -418,13 +413,22 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       return out;
     },
 
+    async refreshTargets(providerId) {
+      const provider = deps.providers.get(providerId);
+      const account = accounts().find((a) => a.providerId === providerId && a.meta.source === 'se-platform');
+      if (provider?.refreshAll && account) await provider.refreshAll(account).catch(() => undefined);
+      return (await targetsFor(providerId)).length;
+    },
+
     async listServers(locationKey, portKey) {
+      await refreshDynamicLocation(locationKey);
       const target = await findTarget(locationKey);
       return target ? deps.portManager.listServers(target, portKey) : [];
     },
 
     async listPorts() {
-      return deps.state.getState().ports;
+      // Only ports of UI-enabled providers (others are temporarily hidden, not removed).
+      return deps.state.getState().ports.filter((p) => ENABLED_PROVIDERS.includes(p.providerId));
     },
 
     addPorts,
@@ -454,6 +458,12 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     },
 
     async rotatePort(key, toServer): Promise<RotateResult> {
+      // Change IP to "the next server": pull fresh gateways first so dynamic HMA hands out a
+      // brand-new IP. Skipped when the user pinned a specific server.
+      if (!toServer) {
+        const loc = splitPortKey(key)?.locationKey;
+        if (loc) await refreshDynamicLocation(loc);
+      }
       const result = await deps.portManager.rotatePort(key, toServer, { user: true });
       return { ...result, noteKey: rotateNoteKey(result.noteKey) };
     },
