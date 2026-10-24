@@ -12,6 +12,9 @@ import { createStateStore, type StateStore } from '../store/state';
 import { createControllerFacade, guessCountry, rotateNoteKey, type FacadeDeps } from './facade';
 import { createNordvpnProvider } from '../providers/nordvpn';
 import { wgKeyLabel } from '../providers/wg-key';
+import { createSurfsharkProvider } from '../providers/surfshark';
+import { wgPublicKey } from '../providers/wg-key';
+import type { SsFetch } from '../providers/surfshark/account/types';
 
 function memorySecrets(): SecretStore & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -175,6 +178,27 @@ async function addHma(
   return facade.addAccount('hma', { licenseKey });
 }
 
+
+function ssJwt(expSec: number): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64({ alg: 'none' })}.${b64({ exp: expSec })}.sig`;
+}
+
+/** A fake mTLS network standing in for api.surfshark.com. */
+function ssNet(opts: { expiresAt?: string } = {}): { net: SsFetch; urls: string[] } {
+  const urls: string[] = [];
+  const net: SsFetch = async (url, init) => {
+    urls.push(url);
+    const body = init.body ? JSON.parse(init.body) : undefined;
+    let res: unknown = {};
+    if (url.endsWith('/v1/auth/login')) res = { renewalToken: 'RENEW', authenticationToken: ssJwt(2_000_000_000) };
+    else if (url.endsWith('/v1/auth/renew')) res = { renewalToken: 'RENEW2', authenticationToken: ssJwt(2_000_000_000) };
+    else if (url.endsWith('/v1/account/users/public-keys')) res = { publicKey: (body as { pubKey: string }).pubKey, expiresAt: opts.expiresAt ?? '2030-01-01T00:00:00Z' };
+    return { status: 200, json: async () => res, text: async () => JSON.stringify(res) };
+  };
+  return { net, urls };
+}
+
 describe('controller facade', () => {
   let dir: string;
   beforeEach(() => {
@@ -246,11 +270,12 @@ describe('controller facade', () => {
     return { facade: createControllerFacade(deps), state, secrets, portManager, queue, allocated, speedTest, onSettingsChanged, updater };
   }
 
-  it('listProviders lists only the UI-enabled providers (HMA-only for now) with their port limit', async () => {
+  it('listProviders lists only the UI-enabled providers (HMA + Surfshark for now) with their port limit', async () => {
     const { facade } = setup();
     const list = await facade.listProviders();
     expect(list.map((p) => p.id)).toEqual(ENABLED_PROVIDERS);
-    expect(list.map((p) => p.id)).not.toContain('surfshark');
+    expect(list.map((p) => p.id)).toContain('surfshark');
+    expect(list.map((p) => p.id)).not.toContain('zoogvpn');
     expect(list[0].limit).toBe(0);
   });
 
@@ -734,4 +759,51 @@ describe('controller facade', () => {
     expect(guessCountry('us-nyc.ovpn')).toBe('US');
     expect(guessCountry('home.conf')).toBe('');
   });
+
+  describe('Surfshark account (login) path — real provider end to end', () => {
+    it('addAccount({username,password}) logs in, registers a key, and stores a wgkey+renewalToken secret', async () => {
+      const { net, urls } = ssNet();
+      let secretsRef: ReturnType<typeof memorySecrets>;
+      const surfshark = createSurfsharkProvider({
+        cachePath: join(dir, 'ss-clusters.json'),
+        loadClusters: async () => [],
+        account: {
+          net,
+          loadWgSecret: (a) => {
+            const raw = secretsRef.loadSecret(a.secretRef);
+            if (!raw) return undefined;
+            const pr = JSON.parse(raw) as { kind?: string; privateKey?: string; renewalToken?: string };
+            return pr.kind === 'wgkey' && pr.privateKey ? { privateKey: pr.privateKey, renewalToken: pr.renewalToken } : undefined;
+          },
+        },
+      });
+      const env = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+      secretsRef = env.secrets;
+
+      const r = await env.facade.addAccount('surfshark', { username: 'me@example.com', password: 'pw' });
+      expect(r.ok).toBe(true);
+      expect(urls).toEqual([
+        'https://api.surfshark.com/v1/auth/login',
+        'https://api.surfshark.com/v1/account/users/public-keys',
+      ]);
+      const account = env.state.getState().accounts.find((a) => a.providerId === 'surfshark')!;
+      expect(account.meta.source).toBe('account');
+      expect(account.meta.keyExpiresAt).toBe(String(Date.parse('2030-01-01T00:00:00Z')));
+      const secret = JSON.parse(env.secrets.loadSecret(account.secretRef)!) as { kind: string; privateKey: string; renewalToken: string };
+      expect(secret.kind).toBe('wgkey');
+      expect(secret.renewalToken).toBe('RENEW');
+      expect(wgPublicKey(secret.privateKey)).toBe(account.meta.publicKey);
+      expect(env.secrets.loadSecret(account.secretRef)).not.toContain('pw');
+    });
+
+    it('a wrong password is reported and stores nothing', async () => {
+      const net: SsFetch = async (url) => ({ status: url.endsWith('/v1/auth/login') ? 401 : 200, json: async () => ({}), text: async () => '' });
+      const surfshark = createSurfsharkProvider({ cachePath: join(dir, 'ss-clusters.json'), loadClusters: async () => [], account: { net } });
+      const env = setup({ providers: { get: (id) => (id === 'surfshark' ? surfshark : undefined) } });
+      const r = await env.facade.addAccount('surfshark', { username: 'me@example.com', password: 'bad' });
+      expect(r).toMatchObject({ ok: false, reasonKey: 'surfshark.account.invalidCredentials' });
+      expect(env.state.getState().accounts).toEqual([]);
+    });
+  });
+
 });

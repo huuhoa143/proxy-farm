@@ -307,12 +307,35 @@ export interface SurfsharkCardProps {
 
 export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps) {
   const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
   const [key, setKey] = useState('');
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   // A pasted/imported .conf carries its own Address, so the field would be ignored.
   const isConf = /\[\s*interface\s*\]/i.test(key);
+
+  async function logIn() {
+    setLoginBusy(true);
+    setMessage(null);
+    try {
+      // The account path: proxy-farm logs in, registers its own WireGuard key, and keeps only
+      // the renewal token — the password is used once and never stored.
+      const result = await api.addAccount('surfshark', { username: email.trim(), password });
+      setMessage(resultMessage(t, result));
+      if (result.ok) {
+        setEmail('');
+        setPassword('');
+        onAdded();
+      }
+    } catch (err) {
+      setMessage(errorMessage(t, err));
+    } finally {
+      setLoginBusy(false);
+    }
+  }
 
   async function add() {
     setBusy(true);
@@ -331,6 +354,42 @@ export function SurfsharkCard({ api, onAdded, accountCount }: SurfsharkCardProps
 
   return (
     <CardShell providerId="surfshark" accountCount={accountCount}>
+      <div className="field">
+        <label htmlFor="surfshark-email">{t('onboarding.providers.surfshark.emailLabel')}</label>
+        <input
+          id="surfshark-email"
+          type="email"
+          autoComplete="username"
+          spellCheck={false}
+          placeholder={t('onboarding.providers.surfshark.emailPlaceholder') as string}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="surfshark-password">{t('onboarding.providers.surfshark.passwordLabel')}</label>
+        <input
+          id="surfshark-password"
+          type="password"
+          autoComplete="current-password"
+          placeholder={t('onboarding.providers.surfshark.passwordPlaceholder') as string}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <small className="field-hint">{t('onboarding.providers.surfshark.loginHint')}</small>
+      </div>
+      <div className="pc-actions">
+        <button
+          className="btn primary"
+          data-testid="surfshark-login"
+          onClick={() => void logIn()}
+          disabled={loginBusy || !email.trim() || password.length < 1}
+        >
+          <Icon name="key" />
+          {loginBusy ? t('onboarding.providers.surfshark.loggingIn') : t('onboarding.providers.surfshark.logIn')}
+        </button>
+      </div>
+      <div className="pc-divider">{t('onboarding.providers.surfshark.orManual')}</div>
       <div className="field">
         <label htmlFor="surfshark-key">{t('onboarding.providers.surfshark.keyLabel')}</label>
         <textarea

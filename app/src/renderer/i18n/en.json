@@ -81,7 +81,15 @@
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "The Address line of the config Surfshark gave you with this key, e.g. 10.14.0.2/16 or 10.64.x.y/16. Each key has its own. Empty means 10.14.0.2/16.",
         "addressFromConf": "Taken from the config you pasted.",
-        "importConf": "Import .conf…"
+        "importConf": "Import .conf…",
+        "emailLabel": "Surfshark email",
+        "emailPlaceholder": "you@example.com",
+        "passwordLabel": "Password",
+        "passwordPlaceholder": "Your Surfshark password",
+        "loginHint": "Proxy Farm signs in once, registers its own WireGuard key, and stores only a renewal token — your password is never saved.",
+        "logIn": "Log in & set up",
+        "loggingIn": "Signing in…",
+        "orManual": "or add a key manually"
       },
       "nordvpn": {
         "name": "NordVPN",
@@ -634,6 +642,14 @@
       "invalidKey": "That isn't a WireGuard private key (44 characters ending in =).",
       "invalidAddress": "The address must be an IPv4 address with a prefix, like 10.14.0.2/16.",
       "invalidConfig": "That WireGuard config has no PrivateKey line under [Interface]."
+    },
+    "account": {
+      "unavailable": "The Surfshark account sign-in isn't available in this build.",
+      "network": "Couldn't reach Surfshark. Check your connection and try again.",
+      "invalidCredentials": "That email or password is incorrect.",
+      "twoFactorRequired": "This account needs two-factor authentication, which isn't supported here yet. Use the WireGuard key below instead.",
+      "unauthorized": "Surfshark rejected the request. Sign in again.",
+      "failed": "Couldn't sign in to Surfshark. Try again."
     }
   },
   "nordvpn": {

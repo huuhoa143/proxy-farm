@@ -20,10 +20,10 @@ describe('Onboarding', () => {
     await waitFor(() => expect(spy).toHaveBeenCalledWith('hma', { licenseKey: 'TEST00-TEST11-TEST22' }));
   });
 
-  it('renders only the enabled provider cards (HMA-only for now)', async () => {
+  it('renders only the enabled provider cards (HMA + Surfshark for now)', async () => {
     render(<Onboarding api={createFakeProxyFarmApi()} onDone={() => {}} />);
     await waitFor(() => expect(screen.getByTestId('provider-card-hma')).toBeInTheDocument());
-    expect(screen.queryByTestId('provider-card-surfshark')).toBeNull();
+    expect(screen.getByTestId('provider-card-surfshark')).toBeInTheDocument();
     expect(screen.queryByTestId('provider-card-zoogvpn')).toBeNull();
     expect(screen.queryByTestId('provider-card-file')).toBeNull();
   });

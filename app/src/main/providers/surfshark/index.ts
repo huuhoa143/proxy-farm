@@ -34,12 +34,27 @@ import type { Account, AccountSecret, CheckResult, Provider, Target } from '../t
 import { getClusters, readClustersCacheSync, type SurfsharkCluster } from './clusters';
 import { createSurfsharkPools, type PoolNet, type SurfsharkPools } from './pool';
 import { wgKeyLabel } from '../wg-key';
+import { registerPublicKey } from './account/client';
+import { defaultSsFetch } from './account/net';
+import {
+  createTokenMinter,
+  identityFromMeta,
+  identityToMeta,
+  registerAccount,
+  ssErrorKey,
+  type AccountIdentity,
+} from './account/session';
+import type { SsFetch } from './account/types';
 
 const WG_PORT = 51820;
 const WG_KEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 
 /** The interface address of most Surfshark keys; used when the user gives none. */
 export const DEFAULT_SURFSHARK_ADDRESS = '10.14.0.2/16';
+
+/** Non-secret meta keys the account (login) path writes, copied through `check`. The WG
+ * private key and renewal token are NOT here — they go into the encrypted secret. */
+const ACCOUNT_META_KEYS = ['source', 'deviceFingerprint', 'publicKey', 'keyExpiresAt', 'address'] as const;
 
 /** An IPv4 CIDR such as `10.14.0.2/16`, normalised (no spaces, no leading zeros), or
  * undefined if `raw` is not one. */
@@ -91,6 +106,17 @@ function looksLikeConf(text: string): boolean {
   return /\[\s*interface\s*\]/i.test(text);
 }
 
+/** The account (email+password → mTLS API) path: login, device registration, and WG-key
+ * registration/renewal against api.surfshark.com. Absent → only the manual-`.conf` path works. */
+export interface SurfsharkAccountDeps {
+  /** mTLS network; defaults to the real `defaultSsFetch` (carries the Cloudflare client cert). */
+  net?: SsFetch;
+  now?: () => number;
+  /** Reads an account's WireGuard secret (private key + renewal token) back from the encrypted
+   * store; the provider needs it to mint tokens and re-register the key. */
+  loadWgSecret?: (account: Account) => { privateKey: string; renewalToken?: string } | undefined;
+}
+
 export interface SurfsharkProviderDeps {
   /** Required: where the 12h cluster cache lives. No cwd-based default. */
   cachePath: string;
@@ -101,6 +127,8 @@ export interface SurfsharkProviderDeps {
   poolNet?: PoolNet;
   /** A ready-made pool store; overrides `poolPath` / `poolNet`. */
   pools?: SurfsharkPools;
+  /** Enables the account (login) path; omit to keep only the manual-`.conf` path. */
+  account?: SurfsharkAccountDeps;
 }
 
 function targetKeyFor(cluster: SurfsharkCluster): string {
@@ -119,14 +147,46 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
       poolPath: deps.poolPath ?? path.join(path.dirname(cachePath), 'surfshark-pools.json'),
       net: deps.poolNet,
     });
+  const acct = deps.account;
+  const ssNet: SsFetch = acct?.net ?? defaultSsFetch;
 
   return {
     id: 'surfshark',
 
     /**
-     * Input: `privateKey` (the bare key, or a whole pasted `.conf`) or `config` (an
-     * imported `.conf`), plus an optional `address` (IPv4 CIDR). A config's own Address
-     * wins over the field; with neither, the address is `DEFAULT_SURFSHARK_ADDRESS`.
+     * Account (login) path: with `username` + `password`, log in to api.surfshark.com over
+     * mTLS, register a self-generated WireGuard key, and hand `check` the resulting identity
+     * + secrets. Without credentials (a pasted key / `.conf`), the input passes through
+     * unchanged for the manual path. Never rejects.
+     */
+    async resolveInput(input: Record<string, string>) {
+      const username = (input.username ?? input.email ?? '').trim();
+      const password = input.password ?? '';
+      if (!username || !password) return { input }; // manual `.conf` / key path
+      if (!acct) return { reasonKey: 'surfshark.account.unavailable' };
+      try {
+        const reg = await registerAccount({ username, password }, ssNet, {
+          now: acct.now,
+          deviceFingerprint: input.deviceFingerprint || undefined,
+        });
+        return {
+          input: {
+            ...identityToMeta(reg.identity),
+            privateKey: reg.privateKey,
+            renewalToken: reg.renewalToken,
+          },
+        };
+      } catch (err) {
+        return { reasonKey: ssErrorKey(err) };
+      }
+    },
+
+    /**
+     * Input: either the account path (`source=account` with `privateKey` + `renewalToken` +
+     * identity meta, produced by `resolveInput`), or the manual path — `privateKey` (the bare
+     * key, or a whole pasted `.conf`) or `config` (an imported `.conf`), plus an optional
+     * `address` (IPv4 CIDR). A config's own Address wins over the field; with neither, the
+     * address is `DEFAULT_SURFSHARK_ADDRESS`.
      */
     check(input: Record<string, string>): CheckResult & { secret?: AccountSecret; meta?: Record<string, string> } {
       const pasted = (input.config ?? '').trim() || (input.privateKey ?? '').trim();
@@ -148,12 +208,14 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
           if (!address) return { ok: false, reasonKey: 'surfshark.check.invalidAddress' };
         }
       }
-      return {
-        ok: true,
-        label: wgKeyLabel(privateKey),
-        secret: { kind: 'wgkey', privateKey },
-        meta: { address: address ?? DEFAULT_SURFSHARK_ADDRESS },
-      };
+
+      const meta: Record<string, string> = { address: address ?? input.address ?? DEFAULT_SURFSHARK_ADDRESS };
+      let secret: AccountSecret = { kind: 'wgkey', privateKey };
+      if (input.source === 'account') {
+        for (const k of ACCOUNT_META_KEYS) if (input[k]) meta[k] = input[k];
+        if (input.renewalToken) secret = { kind: 'wgkey', privateKey, renewalToken: input.renewalToken };
+      }
+      return { ok: true, label: wgKeyLabel(privateKey), secret, meta };
     },
 
     async targets(_account: Account): Promise<Target[]> {
@@ -172,6 +234,39 @@ export function createSurfsharkProvider(deps: SurfsharkProviderDeps): Provider {
           ...(cluster.virtual ? { virtualLocation: true } : {}),
         };
       });
+    },
+
+    /**
+     * Re-register this account's WireGuard key (and renew its Bearer token) for the account
+     * path. Called to recover from a failed handshake (a key gone stale/expired) and to renew
+     * proactively: Surfshark keys are account-bound and expire (~1 day), so a stale key simply
+     * stops handshaking. Returns the fresh secret (key unchanged, renewal token may rotate) +
+     * the updated key-expiry meta, or undefined when there is nothing to refresh.
+     */
+    async refreshCredentials(account: Account) {
+      if (!acct) return undefined;
+      const identity = identityFromMeta(account.meta);
+      const stored = acct.loadWgSecret?.(account);
+      if (!identity || !stored?.renewalToken) return undefined;
+      try {
+        const minter = createTokenMinter(
+          { renewalToken: stored.renewalToken, deviceId: identity.deviceFingerprint },
+          ssNet,
+          { now: acct.now },
+        );
+        const token = await minter.getToken();
+        const registered = await registerPublicKey(
+          { pubKey: identity.publicKey, deviceId: identity.deviceFingerprint, token },
+          ssNet,
+        );
+        const fresh: AccountIdentity = { ...identity, keyExpiresAtMs: registered.expiresAtMs };
+        return {
+          secret: { kind: 'wgkey' as const, privateKey: stored.privateKey, renewalToken: minter.renewalToken() },
+          meta: identityToMeta(fresh),
+        };
+      } catch {
+        return undefined;
+      }
     },
 
     bind(target: Target, serverIp: string, account: Account, secret: AccountSecret) {

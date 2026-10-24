@@ -58,6 +58,9 @@ export function MainScreen({ api }: MainScreenProps) {
   const [rotateNotes, setRotateNotes] = useState<Record<string, string>>({});
   const [bulkRotateSummary, setBulkRotateSummary] = useState<string | null>(null);
   const [limits, setLimits] = useState<Partial<Record<ProviderId, number>>>({});
+  // Providers the user has an account for — drives the picker's provider filter so it stays
+  // stable even when a dynamic provider (HMA) has momentarily discovered no locations.
+  const [accountProviders, setAccountProviders] = useState<ProviderId[]>([]);
   const [rotating, setRotating] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilterState] = useState<PortFilter>(loadFilter);
@@ -90,9 +93,10 @@ export function MainScreen({ api }: MainScreenProps) {
       setLoaded(true);
     });
     void api.getHostVpnActive().then(setHostVpnActive);
-    void api.listProviders().then((providers) =>
-      setLimits(Object.fromEntries(providers.map((p) => [p.id, p.limit ?? 0])) as Partial<Record<ProviderId, number>>),
-    );
+    void api.listProviders().then((providers) => {
+      setLimits(Object.fromEntries(providers.map((p) => [p.id, p.limit ?? 0])) as Partial<Record<ProviderId, number>>);
+      setAccountProviders(providers.filter((p) => p.accounts.length > 0).map((p) => p.id));
+    });
     const offPorts = api.onPortsChanged(setPorts);
     const offVpn = api.onHostVpnChanged(setHostVpnActive);
     return () => {
@@ -548,6 +552,7 @@ export function MainScreen({ api }: MainScreenProps) {
       {picking && (
         <LocationPicker
           targets={targets}
+          accountProviders={accountProviders}
           portCounts={portCounts}
           remaining={remaining}
           onClose={closePicker}
