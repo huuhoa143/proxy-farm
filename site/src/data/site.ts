@@ -25,9 +25,9 @@ export const links = {
 export const release = {
   version: '0.5.0',
   assets: {
-    'mac-arm64': { file: (v: string) => `ProxyFarm-darwin-arm64-${v}.dmg`, bytes: 145_703_663 },
-    'mac-x64': { file: (v: string) => `ProxyFarm-darwin-x64-${v}.dmg`, bytes: 155_575_098 },
-    'win-x64': { file: (v: string) => `Proxy.Farm.Setup.${v}.exe`, bytes: 120_838_280 },
+    'mac-arm64': { file: (v: string) => `ProxyFarm-darwin-arm64-${v}.dmg`, bytes: 145_704_446 },
+    'mac-x64': { file: (v: string) => `ProxyFarm-darwin-x64-${v}.dmg`, bytes: 155_578_207 },
+    'win-x64': { file: (v: string) => `Proxy.Farm.Setup.${v}.exe`, bytes: 120_839_752 },
   },
 };
 
