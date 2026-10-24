@@ -13,6 +13,7 @@ import {
   AVAST_APP_PRODUCT_EDITION,
   AVAST_APP_PRODUCT_MODE,
   AVAST_LICENSE_HOST,
+  ELYSIUM_RENEW_USER,
   SE_CLIENT_API_KEY,
   SE_CLIENT_NAME,
   SE_CLIENT_TYPE,
@@ -33,6 +34,7 @@ import type {
   SeLicense,
   SeProtocol,
   SeResponse,
+  SeTokens,
 } from './types';
 
 export type SeErrorKind =
@@ -40,7 +42,8 @@ export type SeErrorKind =
   | 'http' // non-2xx status
   | 'badResponse' // 2xx but the body was not the shape we expect
   | 'noLicense' // the wallet key matched no usable license
-  | 'unauthorized'; // 401/403 — token rejected or wrong API key
+  | 'unauthorized' // 401/403 — token rejected or wrong API key
+  | 'gone'; // 410 — the device was removed from the license (the app then drops its bind data)
 
 export class SeError extends Error {
   constructor(
@@ -59,27 +62,42 @@ export function tenantOfUdid(deviceUdid: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
-/** Common SE-Client-* headers for every se-platform call. */
-function seHeaders(opts: { token?: string; tenantId: string; json?: boolean }): Record<string, string> {
-  const h: Record<string, string> = {
-    Accept: 'application/json',
-    'Cache-Control': 'no-cache',
-    'SE-Client-API-Key': SE_CLIENT_API_KEY,
-    'SE-Client-Locale': 'en-US',
-    'SE-Client-Name': SE_CLIENT_NAME,
-    'SE-Client-Type': SE_CLIENT_TYPE,
-    'SE-Client-Version': SE_CLIENT_VERSION,
-    'SE-Operating-System-Type': SE_OS_TYPE,
-    'SE-Operating-System-Version': SE_OS_VERSION,
-    'SE-Platform-ID': SE_PLATFORM_ID,
-    'SE-SDK-Version': SE_SDK_VERSION,
-    'User-Agent': SE_CLIENT_NAME,
-    'X-NLok-Tenant-ID': opts.tenantId,
-  };
-  if (opts.json) h['Content-Type'] = 'application/json; charset=utf-8';
-  if (opts.token) h.Authorization = `Bearer ${opts.token}`;
+/** The license id as associate-license expects it: the app strips every '-' from it. */
+export function containerIdOf(licenseId: string): string {
+  return licenseId.replace(/-/g, '');
+}
+
+/**
+ * The SE-Client-* headers, per endpoint, exactly as the app sends them (captured live):
+ *   - `register` (associate-license): the full set, incl. locale + OS/platform/SDK;
+ *   - `geos`: adds only the locale;
+ *   - `api` (passage, discover, renew): the bare client identity.
+ * Every call carries `Content-Type: application/json`, GETs included.
+ */
+type HeaderProfile = 'register' | 'geos' | 'api';
+
+function seHeaders(profile: HeaderProfile, opts: { tenantId: string; authorization?: string }): Record<string, string> {
+  const h: Record<string, string> = { Accept: 'application/json' };
+  if (opts.authorization) h.Authorization = opts.authorization;
+  h['Cache-Control'] = 'no-cache';
+  h['Content-Type'] = 'application/json; charset=utf-8';
+  h['SE-Client-API-Key'] = SE_CLIENT_API_KEY;
+  if (profile !== 'api') h['SE-Client-Locale'] = 'en-US';
+  h['SE-Client-Name'] = SE_CLIENT_NAME;
+  h['SE-Client-Type'] = SE_CLIENT_TYPE;
+  h['SE-Client-Version'] = SE_CLIENT_VERSION;
+  if (profile === 'register') {
+    h['SE-Operating-System-Type'] = SE_OS_TYPE;
+    h['SE-Operating-System-Version'] = SE_OS_VERSION;
+    h['SE-Platform-ID'] = SE_PLATFORM_ID;
+    h['SE-SDK-Version'] = SE_SDK_VERSION;
+  }
+  h['User-Agent'] = SE_CLIENT_NAME;
+  h['X-NLok-Tenant-ID'] = opts.tenantId;
   return h;
 }
+
+const bearer = (token: string) => `Bearer ${token}`;
 
 async function call(net: SeFetch, url: string, init: Parameters<SeFetch>[1]): Promise<SeResponse> {
   let res: SeResponse;
@@ -91,6 +109,7 @@ async function call(net: SeFetch, url: string, init: Parameters<SeFetch>[1]): Pr
   if (res.status === 401 || res.status === 403) {
     throw new SeError('unauthorized', `se-platform returned HTTP ${res.status}`, res.status);
   }
+  if (res.status === 410) throw new SeError('gone', 'se-platform returned HTTP 410', 410);
   if (res.status < 200 || res.status >= 300) {
     throw new SeError('http', `se-platform returned HTTP ${res.status}`, res.status);
   }
@@ -127,9 +146,9 @@ function unwrap(payload: unknown): Record<string, unknown> {
 export async function fetchLicense(walletKey: string, deviceFingerprint: string, net: SeFetch): Promise<SeLicense> {
   const res = await call(net, `${AVAST_LICENSE_HOST}/v1/query/get-exact-application-licenses`, {
     method: 'POST',
+    // The app sends no Content-Type here (captured live), only the Vaar headers.
     headers: {
       'User-Agent': 'Avast Antivirus',
-      'Content-Type': 'application/json',
       'Vaar-Version': '0',
       'Vaar-Header-App-Build-Version': AVAST_APP_BUILD_VERSION,
       'Vaar-Header-App-Id': '00000000-0000-0000-0000-000000000000',
@@ -169,21 +188,50 @@ export async function associateLicense(
 ): Promise<SeDeviceToken> {
   const res = await call(net, `${SE_HOST}/aladdin/v1/authorization/associate-license`, {
     method: 'POST',
-    headers: seHeaders({ tenantId: args.tenantId, json: true }),
+    headers: seHeaders('register', { tenantId: args.tenantId }),
     body: JSON.stringify({
-      container_id: args.containerId,
+      container_id: containerIdOf(args.containerId),
       device_fingerprint: args.deviceFingerprint,
       wallet_key: args.walletKey,
     }),
   });
   const root = asRecord(await asJson(res));
   const deviceUdid = root.device_udid;
-  const accessToken = root.access_token;
-  const refreshToken = root.refresh_token;
-  if (typeof deviceUdid !== 'string' || typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+  if (typeof deviceUdid !== 'string') {
     throw new SeError('badResponse', 'associate-license response missing device_udid/access_token/refresh_token');
   }
-  return { deviceUdid, accessToken, refreshToken };
+  return { deviceUdid, ...tokensOf(root, 'associate-license') };
+}
+
+/** `{access_token, refresh_token}` from a token response (top level, as the app reads it). */
+function tokensOf(root: Record<string, unknown>, what: string): SeTokens {
+  const accessToken = root.access_token;
+  const refreshToken = root.refresh_token;
+  if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+    throw new SeError('badResponse', `${what} response missing access_token/refresh_token`);
+  }
+  return { accessToken, refreshToken };
+}
+
+// ───────────────────────── token renewal ─────────────────────────
+
+/** POST elysium/v1/renew — the app's own token refresh (decompiled from VpnSvc): Basic auth
+ * `nsv:<device_udid>`, body `{grant_type: refresh_token, refresh_token}`. Returns the next
+ * JWT AND a new refresh token (the old one is spent). A 401/403/410 means the refresh token
+ * or the device is no longer valid; the caller then falls back to associate-license. */
+export async function renewToken(
+  args: { deviceUdid: string; refreshToken: string; tenantId: string },
+  net: SeFetch,
+): Promise<SeTokens> {
+  const basic = Buffer.from(`${ELYSIUM_RENEW_USER}:${args.deviceUdid}`, 'utf8').toString('base64');
+  const res = await call(net, `${SE_HOST}/elysium/v1/renew`, {
+    method: 'POST',
+    headers: seHeaders('api', { tenantId: args.tenantId, authorization: `Basic ${basic}` }),
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: args.refreshToken }),
+  });
+  const root = asRecord(await asJson(res));
+  // The app reads the tokens at the top level; tolerate the usual envelope too.
+  return tokensOf(typeof root.access_token === 'string' ? root : asRecord(root.data ?? {}), 'elysium renew');
 }
 
 // ───────────────────────── step 3: passage credentials ─────────────────────────
@@ -196,7 +244,7 @@ export async function fetchDeviceCredentials(
 ): Promise<SeDeviceCredentials> {
   const res = await call(net, `${SE_HOST}/passage/v6/devices/${encodeURIComponent(args.deviceUdid)}/credentials`, {
     method: 'PUT',
-    headers: seHeaders({ token: args.token, tenantId: args.tenantId, json: true }),
+    headers: seHeaders('api', { tenantId: args.tenantId, authorization: bearer(args.token) }),
     body: 'null',
   });
   const data = unwrap(await asJson(res));
@@ -218,11 +266,12 @@ export async function fetchDeviceCredentials(
 
 // ───────────────────────── step 4: geos (location list) ─────────────────────────
 
-/** GET discovery/v12/geos → the full list of selectable countries and their cities. */
-export async function fetchGeos(args: { tenantId: string; token: string }, net: SeFetch): Promise<SeGeoCountry[]> {
+/** GET discovery/v12/geos → the full list of selectable countries and their cities. The app
+ * calls it without a token (captured live), so this needs no device at all. */
+export async function fetchGeos(args: { tenantId: string }, net: SeFetch): Promise<SeGeoCountry[]> {
   const res = await call(net, `${SE_HOST}/discovery/v12/geos`, {
     method: 'GET',
-    headers: seHeaders({ token: args.token, tenantId: args.tenantId }),
+    headers: seHeaders('geos', { tenantId: args.tenantId }),
   });
   const data = unwrap(await asJson(res));
   const geos = Array.isArray(data.geos) ? data.geos : [];
@@ -277,7 +326,7 @@ export async function discover(
   net: SeFetch,
 ): Promise<SeDiscoverResult> {
   const url = `${SE_HOST}/discovery/v9/discover?location_key=${encodeURIComponent(args.locationKey)}`;
-  const res = await call(net, url, { method: 'GET', headers: seHeaders({ token: args.token, tenantId: args.tenantId }) });
+  const res = await call(net, url, { method: 'GET', headers: seHeaders('api', { tenantId: args.tenantId, authorization: bearer(args.token) }) });
   const data = unwrap(await asJson(res));
   const ips = Array.isArray(data.ips) ? data.ips : [];
   const gateways: SeGateway[] = [];

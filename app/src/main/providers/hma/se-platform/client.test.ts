@@ -5,6 +5,7 @@ import {
   fetchDeviceCredentials,
   fetchGeos,
   fetchLicense,
+  renewToken,
   SeError,
   tenantOfUdid,
 } from './client';
@@ -61,6 +62,8 @@ describe('fetchLicense', () => {
     const body = JSON.parse(calls[0].init!.body!);
     expect(body).toEqual({ walletKeys: [WALLET] });
     expect(calls[0].init!.headers!['Vaar-Header-Device-Id']).toBe('fp-hex');
+    // like the app: Vaar headers only, no Content-Type
+    expect(calls[0].init!.headers!['Content-Type']).toBeUndefined();
   });
 
   it('throws noLicense when the wallet key matches nothing', async () => {
@@ -82,11 +85,21 @@ describe('associateLicense', () => {
     );
     expect(tok).toEqual({ deviceUdid: UDID, accessToken: 'jwt-abc', refreshToken: 'refresh-abc' });
     const body = JSON.parse(calls[0].init!.body!);
-    expect(body).toEqual({ container_id: 'container-xyz', device_fingerprint: 'fp-hex', wallet_key: WALLET });
+    expect(body).toEqual({ container_id: 'containerxyz', device_fingerprint: 'fp-hex', wallet_key: WALLET });
     expect(calls[0].init!.headers!['SE-Client-API-Key']).toBeTruthy();
     expect(calls[0].init!.headers!['X-NLok-Tenant-ID']).toBe(TENANT);
-    // associate-license carries no Authorization header
+    // associate-license carries no Authorization header, but the full client identity
     expect(calls[0].init!.headers!.Authorization).toBeUndefined();
+    expect(calls[0].init!.headers!['SE-Platform-ID']).toBe('win-x86-64');
+    expect(calls[0].init!.headers!['SE-Client-Locale']).toBe('en-US');
+  });
+
+  it('strips the dashes from the license id, like the app', async () => {
+    const { net, calls } = fakeNet({
+      [route]: () => jsonRes(200, { device_udid: UDID, access_token: 'a', refresh_token: 'r' }),
+    });
+    await associateLicense({ containerId: 'cba31cd9-3f1c-4e75', deviceFingerprint: 'f', walletKey: WALLET, tenantId: TENANT }, net);
+    expect(JSON.parse(calls[0].init!.body!).container_id).toBe('cba31cd93f1c4e75');
   });
 
   it('maps 401 to unauthorized', async () => {
@@ -125,6 +138,29 @@ describe('fetchDeviceCredentials', () => {
     expect(calls[0].init!.body).toBe('null');
     expect(calls[0].init!.headers!.Authorization).toBe('Bearer jwt-abc');
     expect(calls[0].url).toContain(encodeURIComponent(UDID));
+    // the bare client identity, as the app sends it on passage
+    expect(calls[0].init!.headers!['SE-Platform-ID']).toBeUndefined();
+    expect(calls[0].init!.headers!['SE-Client-Locale']).toBeUndefined();
+  });
+});
+
+describe('renewToken', () => {
+  const route = 'https://api.se-platform.com/elysium/v1/renew';
+
+  it('POSTs the refresh token with Basic nsv:<udid> and returns the next pair', async () => {
+    const { net, calls } = fakeNet({ [route]: () => jsonRes(200, { access_token: 'jwt-2', refresh_token: 'refresh-2' }) });
+    const tokens = await renewToken({ deviceUdid: UDID, refreshToken: 'refresh-1', tenantId: TENANT }, net);
+    expect(tokens).toEqual({ accessToken: 'jwt-2', refreshToken: 'refresh-2' });
+    expect(calls[0].init!.method).toBe('POST');
+    expect(JSON.parse(calls[0].init!.body!)).toEqual({ grant_type: 'refresh_token', refresh_token: 'refresh-1' });
+    const auth = calls[0].init!.headers!.Authorization;
+    expect(auth.startsWith('Basic ')).toBe(true);
+    expect(Buffer.from(auth.slice(6), 'base64').toString('utf8')).toBe(`nsv:${UDID}`);
+  });
+
+  it('maps 410 to gone (device removed from the license)', async () => {
+    const { net } = fakeNet({ [route]: () => jsonRes(410, {}) });
+    await expect(renewToken({ deviceUdid: UDID, refreshToken: 'r', tenantId: TENANT }, net)).rejects.toMatchObject({ kind: 'gone' });
   });
 });
 
@@ -132,7 +168,7 @@ describe('fetchGeos', () => {
   const route = 'https://api.se-platform.com/discovery/v12/geos';
 
   it('flattens countries and their cities, dropping inactive ones', async () => {
-    const { net } = fakeNet({
+    const { net, calls } = fakeNet({
       [route]: () =>
         jsonRes(200, {
           status: { code: 0 },
@@ -153,7 +189,10 @@ describe('fetchGeos', () => {
           },
         }),
     });
-    const geos = await fetchGeos({ tenantId: TENANT, token: 'jwt' }, net);
+    const geos = await fetchGeos({ tenantId: TENANT }, net);
+    // the app fetches geos without a token
+    expect(calls[0].init!.headers!.Authorization).toBeUndefined();
+    expect(calls[0].init!.headers!['SE-Client-Locale']).toBe('en-US');
     expect(geos.map((g) => g.locationKey)).toEqual(['US']); // inactive country ZZ dropped
     const us = geos[0];
     expect(us.countryName).toBe('United States');
@@ -188,6 +227,9 @@ describe('discover', () => {
     expect(ovpn.udpPorts).toEqual([1194]);
     expect(ovpn.locationKey).toBe('US-OR-PORTLAND');
     expect(calls[0].url).toContain('location_key=US');
+    expect(calls[0].init!.headers!.Authorization).toBe('Bearer jwt');
+    expect(calls[0].init!.headers!['Content-Type']).toBe('application/json; charset=utf-8');
+    expect(calls[0].init!.headers!['SE-Operating-System-Type']).toBeUndefined();
   });
 
   it('maps a non-zero status code to badResponse', async () => {

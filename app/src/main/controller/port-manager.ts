@@ -692,6 +692,12 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
    * genuinely-bad login can't loop the refresh (HMA). */
   const credsRefreshAt = new Map<string, number>();
   const CREDS_REFRESH_MIN_GAP_MS = 30_000;
+  /** Consecutive HMA auth failures of a port while a sibling of its account stayed online
+   * (cleared when the port comes online). A few are gateway hiccups; past the limit the
+   * shared device password itself has gone stale (the sibling only survives on a session
+   * opened before it expired), so the credentials are re-fetched. */
+  const siblingAuthFailures = new Map<string, number>();
+  const SIBLING_AUTH_RETRY_LIMIT = 3;
 
   function cancelLocalRetry(key: string): void {
     localRetryCancel.get(key)?.();
@@ -918,18 +924,27 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
       // One HMA device runs many concurrent OpenVPN sessions on ONE shared device password
       // (verified live). So if another port of this account is already ONLINE, that password
       // is valid — this auth failure is a transient gateway hiccup, not a stale credential.
-      // Retry (startPort re-selects a gateway); never refresh the credentials here, because
-      // a passage refresh ROTATES the shared password and would knock the online siblings
-      // off, and never mark the server refused / blame the plan.
-      if (anyOnline(port.accountId, port.key)) {
-        return restartElsewhere(port.key, 'reconnecting');
-      }
-      // §5.1: HMA's device password can expire server-side, so a stale one gets AUTH_FAILED
-      // even for a valid account. With nothing online (no session proving the password), the
-      // first response is to refresh the device creds once (throttled) and retry on a fresh
-      // server — NOT mark the server refused or blame the login. Safe to rotate here: no
-      // online sibling to break. Only if that already happened recently do we fall through.
+      // Retry (startPort re-selects a gateway); don't refresh the credentials on the first
+      // failures, because a passage refresh ROTATES the shared password, and never mark the
+      // server refused / blame the plan.
       const lastRefresh = credsRefreshAt.get(port.accountId) ?? 0;
+      if (anyOnline(port.accountId, port.key)) {
+        const failures = (siblingAuthFailures.get(port.key) ?? 0) + 1;
+        siblingAuthFailures.set(port.key, failures);
+        if (failures < SIBLING_AUTH_RETRY_LIMIT) return restartElsewhere(port.key, 'reconnecting');
+        // Refused again and again while the sibling stays up: the password is stale (the
+        // app only trusts it for 7 days). Re-fetch it below, like with nothing online; the
+        // online sibling keeps its already-authenticated session. If a refresh just ran,
+        // back off instead of hammering the gateways.
+        if (!deps.refreshDeviceCredentials || now() - lastRefresh <= CREDS_REFRESH_MIN_GAP_MS) {
+          return failWithRetry(port.key, { kind: 'retrying', reasonKey: 'reconnecting' });
+        }
+        siblingAuthFailures.delete(port.key);
+      }
+      // §5.1: HMA's device password expires (the app re-fetches it every 7 days), so a stale
+      // one gets AUTH_FAILED even for a valid account. The response is to refresh the device
+      // creds once (throttled) and retry on a fresh server — NOT mark the server refused or
+      // blame the login. Only if that already happened recently do we fall through.
       if (deps.refreshDeviceCredentials && now() - lastRefresh > CREDS_REFRESH_MIN_GAP_MS) {
         credsRefreshAt.set(port.accountId, now());
         updatePort(port.key, { state: { kind: 'retrying', untilMs: now(), attempt: 1, reasonKey: 'refreshingCreds' } });
@@ -1147,6 +1162,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     let incident: ProviderId | '*' | undefined;
     if (state.kind === 'online') {
       returnTo.delete(key);
+      siblingAuthFailures.delete(key);
       onlineSinceStart.add(key);
       lastOnlineServer.set(key, port.server);
       stickyFailures.delete(key);
@@ -1384,6 +1400,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function stopPort(key: string): Promise<void> {
     cancelLocalRetry(key); // the user explicitly stopped it — no surprise restarts later
+    siblingAuthFailures.delete(key);
     returnTo.delete(key);
     backoffAttempts.delete(key);
     await deps.engine.stop(key);
@@ -1393,6 +1410,7 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
 
   async function removePort(key: string): Promise<void> {
     cancelLocalRetry(key);
+    siblingAuthFailures.delete(key);
     returnTo.delete(key);
     lastOnlineServer.delete(key);
     backoffAttempts.delete(key);
