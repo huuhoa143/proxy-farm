@@ -41,6 +41,12 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   port's sibling is already online, an auth failure is treated as a transient reconnect —
   the shared credentials are no longer refreshed/rotated (which would drop the online
   siblings) and the gateway is no longer marked "refused / not in your plan".
+- Surfshark can now be added with your **account email and password**, like the real app:
+  Proxy Farm signs in over Surfshark's mutual-TLS API, registers its own WireGuard key, and
+  keeps only a renewal token — your password is never stored. Surfshark WireGuard keys are
+  account-bound and expire, so Proxy Farm re-registers the key before it lapses and when a
+  handshake stops working; this fixes keys that silently stopped connecting. Pasting a
+  WireGuard key or importing a `.conf` still works as before.
 - Removed the per-provider port-limit field from the UI; it defaulted to unlimited.
 
 ## [0.2.0] — 2026-10-09

@@ -6,10 +6,24 @@
  * also what the user can match against the provider's dashboard (Surfshark lists the
  * public keys of the key pairs it generated).
  */
-import { createPrivateKey, createPublicKey } from 'node:crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
 
 /** DER prefix of a PKCS#8 X25519 private key; the 32 raw key bytes follow it. */
 const PKCS8_X25519_PREFIX = Buffer.from('302e020100300506032b656e04220420', 'hex');
+
+/**
+ * A fresh WireGuard key pair, both keys base64 as WireGuard writes them. The private key is
+ * the 32 raw scalar bytes of a new X25519 key (OpenSSL already stores it clamped); the
+ * public key is derived the same way `wgPublicKey` does, so the two always match.
+ */
+export function generateWgKeyPair(): { privateKey: string; publicKey: string } {
+  const { privateKey } = generateKeyPairSync('x25519');
+  const pkcs8 = privateKey.export({ format: 'der', type: 'pkcs8' });
+  // PKCS#8 X25519 is the 16-byte prefix above followed by the 32 raw key bytes.
+  const raw = pkcs8.subarray(pkcs8.length - 32);
+  const privB64 = raw.toString('base64');
+  return { privateKey: privB64, publicKey: wgPublicKey(privB64) };
+}
 
 /** The X25519 public key (base64) of a base64 WireGuard private key. Throws on a key
  * that is not 32 bytes. */

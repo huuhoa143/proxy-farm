@@ -19,6 +19,10 @@ export interface PortRequest {
 
 export interface LocationPickerProps {
   targets: Target[];
+  /** Providers the user has an account for. The provider filter is offered for these (plus
+   * any provider present in `targets`), so it stays visible even when a dynamic provider has
+   * momentarily discovered no locations. Defaults to the providers present in `targets`. */
+  accountProviders?: ProviderId[];
   /** Ports each location already has (location key → count), shown as a tag. */
   portCounts?: ReadonlyMap<string, number>;
   /** Ports each provider may still add under its limit; a missing provider is unlimited. */
@@ -39,7 +43,7 @@ interface CountryGroup {
  * (default 1, max = its free servers, capped by what the provider's port
  * limit still allows across every picked city); the sticky footer adds them.
  */
-export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, onClose }: LocationPickerProps) {
+export function LocationPicker({ targets, accountProviders, portCounts, remaining = {}, onSubmit, onClose }: LocationPickerProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
@@ -57,9 +61,12 @@ export function LocationPicker({ targets, portCounts, remaining = {}, onSubmit, 
 
   const providers = useMemo(() => {
     const counts = new Map<ProviderId, number>();
+    // Seed with the providers the user has accounts for (count 0) so their chip shows even
+    // when that provider has discovered no locations yet; target counts fill in below.
+    for (const id of accountProviders ?? []) counts.set(id, 0);
     for (const target of targets) counts.set(target.providerId, (counts.get(target.providerId) ?? 0) + 1);
     return Array.from(counts.entries());
-  }, [targets]);
+  }, [targets, accountProviders]);
 
   const groups = useMemo<CountryGroup[]>(() => {
     const q = normaliseSearch(query.trim());

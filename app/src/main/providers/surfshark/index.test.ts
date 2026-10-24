@@ -241,3 +241,95 @@ describe('surfshark provider: bind (deterministic, reads the on-disk cache direc
     expect(() => provider.bind(unknownTarget, '1.2.3.4', account, secret)).toThrow(/no cached cluster/);
   });
 });
+
+// ───────────────────────── account (login) path ─────────────────────────
+
+import { wgPublicKey } from '../wg-key';
+import type { SsFetch } from './account/types';
+
+/** A minimal JWT carrying only `exp` (epoch seconds). */
+function jwtWithExp(expSec: number): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64({ alg: 'none' })}.${b64({ exp: expSec })}.sig`;
+}
+
+/** Fake mTLS network for the account path; records request bodies by URL. */
+function fakeAccountNet(opts: { expiresAt?: string; renewalToken?: string } = {}): { net: SsFetch; calls: Array<{ url: string; body: unknown }> } {
+  const calls: Array<{ url: string; body: unknown }> = [];
+  const net: SsFetch = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : undefined;
+    calls.push({ url, body });
+    let resBody: unknown = {};
+    if (url.endsWith('/v1/auth/login')) resBody = { renewalToken: opts.renewalToken ?? 'R0', authenticationToken: jwtWithExp(2_000_000_000) };
+    else if (url.endsWith('/v1/auth/renew')) resBody = { renewalToken: 'R1', authenticationToken: jwtWithExp(2_000_000_000) };
+    else if (url.endsWith('/v1/account/users/public-keys')) resBody = { publicKey: (body as { pubKey: string }).pubKey, expiresAt: opts.expiresAt ?? '2030-01-01T00:00:00Z' };
+    return { status: 200, json: async () => resBody, text: async () => JSON.stringify(resBody) };
+  };
+  return { net, calls };
+}
+
+describe('surfshark provider: account path', () => {
+  it('resolveInput logs in, registers a key, and check() yields a wgkey+renewalToken secret', async () => {
+    const { net, calls } = fakeAccountNet();
+    const provider = createSurfsharkProvider({ cachePath, loadClusters: async () => fakeClusters(), account: { net } });
+    const resolved = await provider.resolveInput!({ username: 'u@e.com', password: 'pw', deviceFingerprint: 'f'.repeat(64) });
+    expect('input' in resolved).toBe(true);
+    const input = (resolved as { input: Record<string, string> }).input;
+    expect(input.source).toBe('account');
+    expect(input.renewalToken).toBe('R0');
+    expect(wgPublicKey(input.privateKey)).toBe(input.publicKey);
+    expect(calls.map((c) => c.url)).toEqual([
+      'https://api.surfshark.com/v1/auth/login',
+      'https://api.surfshark.com/v1/account/users/public-keys',
+    ]);
+
+    const checked = provider.check(input);
+    expect(checked.ok).toBe(true);
+    expect(checked.secret).toEqual({ kind: 'wgkey', privateKey: input.privateKey, renewalToken: 'R0' });
+    expect(checked.meta?.source).toBe('account');
+    expect(checked.meta?.publicKey).toBe(input.publicKey);
+    expect(checked.meta?.keyExpiresAt).toBe(String(Date.parse('2030-01-01T00:00:00Z')));
+  });
+
+  it('resolveInput passes input through unchanged when no credentials are given (manual path)', async () => {
+    const provider = createSurfsharkProvider({ cachePath, account: { net: fakeAccountNet().net } });
+    const resolved = await provider.resolveInput!({ privateKey: DUMMY_PRIVATE_KEY });
+    expect(resolved).toEqual({ input: { privateKey: DUMMY_PRIVATE_KEY } });
+  });
+
+  it('resolveInput reports invalid credentials', async () => {
+    const net: SsFetch = async () => ({ status: 401, json: async () => ({}), text: async () => '' });
+    const provider = createSurfsharkProvider({ cachePath, account: { net } });
+    const resolved = await provider.resolveInput!({ username: 'u', password: 'bad' });
+    expect(resolved).toEqual({ reasonKey: 'surfshark.account.invalidCredentials' });
+  });
+
+  it('refreshCredentials re-registers the key and returns a fresh secret + expiry', async () => {
+    const { net, calls } = fakeAccountNet({ expiresAt: '2031-02-03T00:00:00Z' });
+    const privateKey = DUMMY_PRIVATE_KEY;
+    const account: Account = {
+      id: 'ss-1',
+      providerId: 'surfshark',
+      label: 'Surfshark',
+      meta: { source: 'account', deviceFingerprint: 'f'.repeat(64), publicKey: wgPublicKey(privateKey), keyExpiresAt: '1000', address: '10.14.0.2/16' },
+      secretRef: 'ss-1',
+    };
+    const provider = createSurfsharkProvider({
+      cachePath,
+      account: { net, loadWgSecret: () => ({ privateKey, renewalToken: 'R0' }) },
+    });
+    const refreshed = await provider.refreshCredentials!(account);
+    expect(refreshed?.secret).toMatchObject({ kind: 'wgkey', privateKey });
+    expect((refreshed?.secret as { renewalToken?: string }).renewalToken).toBe('R1'); // token renewed first
+    expect(refreshed?.meta?.keyExpiresAt).toBe(String(Date.parse('2031-02-03T00:00:00Z')));
+    // renew (token near-dead seed → renew) then re-register
+    expect(calls.some((c) => c.url.endsWith('/v1/auth/renew'))).toBe(true);
+    expect(calls.some((c) => c.url.endsWith('/v1/account/users/public-keys'))).toBe(true);
+  });
+
+  it('refreshCredentials returns undefined for a manual (.conf) account', async () => {
+    const provider = createSurfsharkProvider({ cachePath, account: { net: fakeAccountNet().net, loadWgSecret: () => undefined } });
+    const account: Account = { id: 'ss-2', providerId: 'surfshark', label: 'x', meta: { address: '10.14.0.2/16' }, secretRef: 'ss-2' };
+    expect(await provider.refreshCredentials!(account)).toBeUndefined();
+  });
+});

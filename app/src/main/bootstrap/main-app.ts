@@ -291,6 +291,22 @@ export function runApp(): void {
         storeRefreshedCredentials(account.id, update);
         log(`hma: license re-bound account ${account.id} to a new device`);
       },
+      // The Surfshark WireGuard private key + renewal token live only in the encrypted secret;
+      // the provider reads them back to mint Bearer tokens and re-register the (expiring) key.
+      surfsharkLoadWgSecret: (account) => {
+        const raw = secrets.loadSecret(account.secretRef);
+        if (!raw) return undefined;
+        try {
+          const parsed = JSON.parse(raw) as { kind?: unknown; privateKey?: unknown; renewalToken?: unknown };
+          if (parsed.kind !== 'wgkey' || typeof parsed.privateKey !== 'string') return undefined;
+          return {
+            privateKey: parsed.privateKey,
+            renewalToken: typeof parsed.renewalToken === 'string' ? parsed.renewalToken : undefined,
+          };
+        } catch {
+          return undefined;
+        }
+      },
     });
     const providers = { get: getProvider };
 

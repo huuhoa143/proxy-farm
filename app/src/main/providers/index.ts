@@ -48,6 +48,9 @@ export interface RegisterAllProvidersOptions {
   hmaSaveRefreshToken?: (account: Account, refreshToken: string) => void;
   /** The HMA license now binds a different device: store its replacement secret + meta. */
   hmaOnCredentialsReplaced?: (account: Account, update: { secret: AccountSecret; meta: Record<string, string> }) => void;
+  /** Reads a Surfshark account's WireGuard secret (private key + renewal token) from the
+   * encrypted store; the provider needs it to mint tokens and re-register the key. */
+  surfsharkLoadWgSecret?: (account: Account) => { privateKey: string; renewalToken?: string } | undefined;
 }
 
 export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
@@ -71,7 +74,12 @@ export function registerAllProviders(opts: RegisterAllProvidersOptions): void {
     }),
   );
   registerProvider(zoogvpnProvider);
-  registerProvider(createSurfsharkProvider({ cachePath: opts.surfsharkCachePath }));
+  registerProvider(
+    createSurfsharkProvider({
+      cachePath: opts.surfsharkCachePath,
+      account: { loadWgSecret: opts.surfsharkLoadWgSecret },
+    }),
+  );
   registerProvider(
     createNordvpnProvider({
       cachePath: opts.nordvpnCachePath ?? path.join(path.dirname(opts.surfsharkCachePath), 'nordvpn-servers.json'),

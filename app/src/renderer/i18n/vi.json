@@ -81,7 +81,15 @@
         "addressPlaceholder": "10.14.0.2/16",
         "addressHint": "Dòng Address trong tệp cấu hình Surfshark cấp cùng khóa này, ví dụ 10.14.0.2/16 hoặc 10.64.x.y/16. Mỗi khóa có địa chỉ riêng. Để trống nghĩa là 10.14.0.2/16.",
         "addressFromConf": "Lấy từ tệp cấu hình bạn đã dán.",
-        "importConf": "Nhập tệp .conf…"
+        "importConf": "Nhập tệp .conf…",
+        "emailLabel": "Email Surfshark",
+        "emailPlaceholder": "ban@vidu.com",
+        "passwordLabel": "Mật khẩu",
+        "passwordPlaceholder": "Mật khẩu Surfshark của bạn",
+        "loginHint": "Proxy Farm đăng nhập một lần, tự đăng ký khóa WireGuard riêng và chỉ lưu renewal token — mật khẩu của bạn không bao giờ bị lưu.",
+        "logIn": "Đăng nhập & thiết lập",
+        "loggingIn": "Đang đăng nhập…",
+        "orManual": "hoặc thêm khóa thủ công"
       },
       "nordvpn": {
         "name": "NordVPN",
@@ -634,6 +642,14 @@
       "invalidKey": "Đây không phải khóa riêng WireGuard (44 ký tự, kết thúc bằng =).",
       "invalidAddress": "Địa chỉ phải là địa chỉ IPv4 kèm tiền tố, ví dụ 10.14.0.2/16.",
       "invalidConfig": "Tệp cấu hình WireGuard này không có dòng PrivateKey trong [Interface]."
+    },
+    "account": {
+      "unavailable": "Bản dựng này chưa hỗ trợ đăng nhập tài khoản Surfshark.",
+      "network": "Không kết nối được tới Surfshark. Kiểm tra mạng rồi thử lại.",
+      "invalidCredentials": "Email hoặc mật khẩu không đúng.",
+      "twoFactorRequired": "Tài khoản này cần xác thực hai lớp — hiện chưa hỗ trợ ở đây. Hãy dùng khóa WireGuard bên dưới.",
+      "unauthorized": "Surfshark từ chối yêu cầu. Hãy đăng nhập lại.",
+      "failed": "Không đăng nhập được Surfshark. Thử lại."
     }
   },
   "nordvpn": {

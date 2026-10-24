@@ -86,12 +86,13 @@ export interface RenderInput {
 export type ProviderId = 'hma' | 'zoogvpn' | 'surfshark' | 'nordvpn' | 'expressvpn' | 'file';
 
 /**
- * Providers surfaced in the UI right now. Temporarily HMA-only while the HMA flow is being
- * rebuilt; the other providers' accounts, ports and data are preserved and reappear when
- * they are added back here. The backend still knows every provider — this only gates what
- * `listProviders` / `listTargets` / `listPorts` expose to the renderer.
+ * Providers surfaced in the UI right now. HMA and Surfshark are the rebuilt, live-validated
+ * flows (HMA se-platform; Surfshark account login + WireGuard key registration); the other
+ * providers' accounts, ports and data are preserved and reappear when they are added back
+ * here. The backend still knows every provider — this only gates what `listProviders` /
+ * `listTargets` / `listPorts` expose to the renderer.
  */
-export const ENABLED_PROVIDERS: ProviderId[] = ['hma'];
+export const ENABLED_PROVIDERS: ProviderId[] = ['hma', 'surfshark'];
 
 /**
  * Providers whose servers are discovered fresh on demand rather than chosen from a fixed
@@ -238,7 +239,9 @@ export type AccountSecret =
   // refresh token) are credentials, so they live here in the encrypted secret store, never
   // in `account.meta` (which is plaintext in state.json).
   | { kind: 'userpass'; username: string; password: string; walletKey?: string; refreshToken?: string }
-  | { kind: 'wgkey'; privateKey: string }
+  // `renewalToken` (Surfshark account path) is a credential, so it rides in the encrypted
+  // secret next to the WireGuard private key, never in plaintext `account.meta`.
+  | { kind: 'wgkey'; privateKey: string; renewalToken?: string }
   | { kind: 'file'; content: string; username?: string; password?: string };
 
 export interface CheckResult {
