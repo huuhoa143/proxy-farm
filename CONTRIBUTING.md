@@ -96,9 +96,12 @@ Proxy Farm runs on other companies' VPN infrastructure. Do not make it look like
   attempt per location per 10 minutes). A WireGuard key that gets no answer is not a dead
   server: stop after two or three tries. Mass failed WireGuard handshakes got a Surfshark
   account's VPN access suspended on 2026-10-08.
-- Server discovery that probes networks (`pnpm scan:hma-servers`,
-  `pnpm scan:zoog-servers`) is a maintainer job, run rarely. Do not add probing to code
-  that runs on users' machines.
+- Server discovery that probes networks (`pnpm scan:zoog-servers`) is a maintainer job,
+  run rarely. Do not add probing to code that runs on users' machines.
+- `pnpm e2e:hma` is a maintainer end-to-end check of the HMA flow (add ports, concurrent
+  ports in one location, Change IP, delete) against the live backend with real sing-box
+  tunnels. It needs your own HMA license in `PF_HMA_LICENSE` and opens only a few
+  connections; do not run it in a loop. It is not part of `pnpm test`.
 - Use your own accounts only.
 
 ## Adding a provider
