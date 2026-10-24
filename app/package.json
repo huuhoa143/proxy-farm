@@ -60,7 +60,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.16",
-    "socks-proxy-agent": "^7.0.0",
+    "socks-proxy-agent": "^10.1.0",
     "undici": "^8.11.2"
   }
 }
