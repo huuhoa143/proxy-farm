@@ -23,11 +23,11 @@ export const links = {
  * fallback used when GitHub can't be reached, so refresh it when convenient.
  */
 export const release = {
-  version: '0.2.0',
+  version: '0.5.0',
   assets: {
-    'mac-arm64': { file: (v: string) => `ProxyFarm-darwin-arm64-${v}.dmg`, bytes: 145_413_281 },
-    'mac-x64': { file: (v: string) => `ProxyFarm-darwin-x64-${v}.dmg`, bytes: 155_535_377 },
-    'win-x64': { file: (v: string) => `Proxy.Farm.Setup.${v}.exe`, bytes: 120_702_529 },
+    'mac-arm64': { file: (v: string) => `ProxyFarm-darwin-arm64-${v}.dmg`, bytes: 145_704_446 },
+    'mac-x64': { file: (v: string) => `ProxyFarm-darwin-x64-${v}.dmg`, bytes: 155_578_207 },
+    'win-x64': { file: (v: string) => `Proxy.Farm.Setup.${v}.exe`, bytes: 120_839_752 },
   },
 };
 

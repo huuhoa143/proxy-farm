@@ -41,17 +41,18 @@ Proxy Farm turns the user's own VPN subscription into many local SOCKS5/HTTP pro
 ## Capabilities and Constraints
 
 - **Providers:**
-  - HMA, using the device credentials of the locally installed HMA app (on Windows, after one administrator prompt to enable HMA support).
+  - HMA, with a license (activation) key.
   - ZoogVPN, with email and password.
-  - Surfshark, with a WireGuard private key.
+  - Surfshark, with account email and password, or a WireGuard private key.
   - NordVPN, with an access token or NordLynx key.
   - ExpressVPN, with its Manual-configuration OpenVPN username and password.
   - Imported OpenVPN `.ovpn` and WireGuard `.conf` files.
 - **Platforms:** macOS 12+ (Apple silicon and Intel; signed and notarized by Apple) and Windows x64.
 - **Windows signing:** the .exe is intentionally unsigned (the owner's decision), so SmartScreen warns; the site shows a SmartScreen note next to the Windows download and in the FAQ.
 - **Release state:**
-  - Current public release: v0.2.0 (2026-10-09). It includes every provider (HMA, ZoogVPN, Surfshark, NordVPN, ExpressVPN, files), filters, Check all and CSV export.
-  - Download buttons link to the v0.2.0 GitHub release assets; the version lives in `release` in `site/src/data/site.ts`.
+  - Current public release: v0.5.0 (2026-10-24, macOS and Windows): one active account per provider, spelled-out port limits (NordVPN 6, ExpressVPN 8). Since 0.3.0/0.4.0, HMA signs in with a license key and discovers gateways like the HMA app, Surfshark signs in with account email and password, and NordVPN picks servers like the NordVPN app. v0.3.0 shipped for Windows only.
+  - Whichever platform releases first sets the version; the other platform releases the same version into the same GitHub release.
+  - Download buttons link to the v0.5.0 GitHub release assets; the version lives in `release` in `site/src/data/site.ts`.
 - **Constraints:**
   - Users must follow their VPN provider's terms of service.
   - Proxy Farm is not affiliated with any provider.
