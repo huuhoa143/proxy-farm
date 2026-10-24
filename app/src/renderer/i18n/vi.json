@@ -109,7 +109,8 @@
         },
         "add": "Thêm",
         "adding": "Đang thêm…",
-        "initials": "N"
+        "initials": "N",
+        "limitNote": "Tối đa {{limit}} cổng cùng lúc. NordVPN cho mỗi tài khoản 10 kết nối; Proxy Farm chừa phần còn lại cho thiết bị của bạn — vượt quá thì Nord tạm chặn kết nối mới."
       },
       "expressvpn": {
         "name": "ExpressVPN",
@@ -128,7 +129,8 @@
           "noteActivation": "Chỉ có mã kích hoạt thì không lấy được — cần đăng nhập trang web bằng email của tài khoản.",
           "noteOvpn": "Có thể tải tệp .ovpn ở mục 2 và nhập qua Tệp cấu hình.",
           "link": "Mở expressvpn.com/setup"
-        }
+        },
+        "limitNote": "Tối đa {{limit}} cổng cùng lúc. ExpressVPN cho mỗi gói 10 thiết bị; Proxy Farm chừa phần còn lại cho thiết bị của bạn."
       },
       "file": {
         "name": "Tệp cấu hình",
@@ -317,7 +319,12 @@
       "picked": "Vị trí đã chọn",
       "unpick": "Bỏ chọn {{location}}",
       "notInPlan": "Không có trong gói",
-      "notInPlanHint": "Gói {{provider}} của bạn không bao gồm vị trí này — mọi máy chủ ở đây đều từ chối tài khoản của bạn. Hãy chọn vị trí khác hoặc nâng cấp gói."
+      "notInPlanHint": "Gói {{provider}} của bạn không bao gồm vị trí này — mọi máy chủ ở đây đều từ chối tài khoản của bạn. Hãy chọn vị trí khác hoặc nâng cấp gói.",
+      "budget": "{{provider}}: còn {{left}}/{{limit}} cổng",
+      "budgetFull": "{{provider}}: đã dùng hết {{limit}} cổng — xóa bớt một cổng để thêm cổng khác",
+      "limitReachedOf": "Đã dùng hết {{limit}} cổng {{provider}}",
+      "maxHintLimit": "Tối đa {{max}} — {{provider}} cho {{limit}} cổng cùng lúc",
+      "selectAllCapped": "Đã chọn {{picked}}/{{count}} vị trí — giới hạn cổng không cho chọn thêm"
     },
     "group": {
       "toggle": "Hiện hoặc ẩn các cổng ở {{location}}",

@@ -566,12 +566,16 @@ describe('controller facade', () => {
     expect(r.noteKey).toBe('no-free-server');
   });
 
-  it('addPorts tries another account when the pooled one has no usable free server', async () => {
+  it('addPorts never puts a port on an idle account, even when the active one has no usable server', async () => {
     const { facade } = setup({}, { 'zoogvpn-1': ['10.0.0.1'] });
     await facade.addAccount('zoogvpn', { username: 'a', password: 'p' });
     await facade.addAccount('zoogvpn', { username: 'b', password: 'p' });
     const r = await facade.addPorts('zoogvpn:nl1', 1);
-    expect(r.added.map((p) => p.accountId)).toEqual(['zoogvpn-2']);
+    expect(r.added).toEqual([]);
+    expect(r.noteKey).toBe('no-free-server');
+    // Choosing the other account makes it the one new ports use.
+    await facade.setActiveAccount('zoogvpn', 'zoogvpn-2');
+    expect((await facade.addPorts('zoogvpn:nl1', 1)).added.map((p) => p.accountId)).toEqual(['zoogvpn-2']);
   });
 
   it('listServers / listTargets come from the port manager, with freeServers filled in', async () => {

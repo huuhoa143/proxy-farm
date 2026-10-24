@@ -245,6 +245,11 @@ describe('NordVpnCard', () => {
     expect(screen.getByTestId('nordvpn-message')).toHaveTextContent(/^Public key …/);
   });
 
+  it("states the port limit on the card (6 at once, the rest kept for the user's own devices)", () => {
+    render(<NordVpnCard api={createFakeProxyFarmApi()} onAdded={() => {}} />);
+    expect(screen.getByTestId('limit-note-nordvpn')).toHaveTextContent('Up to 6 ports at once. NordVPN allows 10 connections per account');
+  });
+
   it('shows a refused token in words', async () => {
     const api = createFakeProxyFarmApi();
     api.addAccount = async () => ({ ok: false, reasonKey: 'nordvpn.check.tokenRejected' });

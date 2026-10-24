@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Account, CheckResult, ProviderId, ProxyFarmApi } from '../../shared/contracts';
+import { DEFAULT_PORT_LIMITS, type Account, type CheckResult, type ProviderId, type ProxyFarmApi } from '../../shared/contracts';
 import { activeAccountId, usesActiveAccountModel } from '../../shared/activeAccount';
 import { Icon } from '../ui/Icon';
 import { Flag } from '../ui/Flag';
@@ -73,6 +73,12 @@ function CardShell({ providerId, ready, accountCount = 0, children }: CardShellP
           <p>{t(`onboarding.providers.${providerId}.description`)}</p>
         </div>
       </div>
+      {DEFAULT_PORT_LIMITS[providerId] !== undefined && (
+        <p className="pc-limit" data-testid={`limit-note-${providerId}`}>
+          <Icon name="info" />
+          <span>{t(`onboarding.providers.${providerId}.limitNote`, { limit: DEFAULT_PORT_LIMITS[providerId] })}</span>
+        </p>
+      )}
       <div className="pc-body">{children}</div>
     </section>
   );

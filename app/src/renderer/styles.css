@@ -1986,6 +1986,38 @@ table.port-table {
   margin-top: auto;
   flex-wrap: wrap;
 }
+/* a provider's port limit, stated on its card (DEFAULT_PORT_LIMITS) */
+.pc-limit {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--warn-soft);
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.pc-limit svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  color: var(--warn);
+}
+/* picker: what a capped provider still allows */
+.pick-budget {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--dim);
+  font-size: 12px;
+}
+.pick-budget.is-full {
+  color: var(--warn);
+}
 /* add-account credential guide (CredentialGuide.tsx) */
 .cred-guide {
   border: 1px solid var(--line-2);

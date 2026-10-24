@@ -555,6 +555,7 @@ export function MainScreen({ api }: MainScreenProps) {
           accountProviders={accountProviders}
           portCounts={portCounts}
           remaining={remaining}
+          limits={limits}
           onClose={closePicker}
           onSubmit={(requests) => {
             setPicking(false);
