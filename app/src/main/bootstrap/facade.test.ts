@@ -817,4 +817,61 @@ describe('controller facade', () => {
     });
   });
 
+
+  // ───────────────── setActiveAccount: one active account per provider ─────────────────
+
+  describe('facade: setActiveAccount', () => {
+    function seedTwoSurfshark(env: ReturnType<typeof setup>) {
+      env.state.setState((s) => ({
+        ...s,
+        accounts: [
+          { id: 'surfshark-1', providerId: 'surfshark', label: 'a', meta: {}, secretRef: 'account:surfshark-1' },
+          { id: 'surfshark-2', providerId: 'surfshark', label: 'b', meta: {}, secretRef: 'account:surfshark-2' },
+        ],
+      }));
+    }
+
+    it('flips meta.active to the chosen account and clears it from siblings', async () => {
+      const env = setup();
+      seedTwoSurfshark(env);
+      await env.facade.setActiveAccount('surfshark', 'surfshark-2');
+      const accts = env.state.getState().accounts;
+      expect(accts.find((a) => a.id === 'surfshark-2')!.meta.active).toBe('1');
+      expect(accts.find((a) => a.id === 'surfshark-1')!.meta.active).toBeUndefined();
+      // switching back clears it again
+      await env.facade.setActiveAccount('surfshark', 'surfshark-1');
+      const accts2 = env.state.getState().accounts;
+      expect(accts2.find((a) => a.id === 'surfshark-1')!.meta.active).toBe('1');
+      expect(accts2.find((a) => a.id === 'surfshark-2')!.meta.active).toBeUndefined();
+    });
+
+    it('is a no-op when the account is already active (the default first)', async () => {
+      const env = setup();
+      seedTwoSurfshark(env);
+      // surfshark-1 is the default active (first); selecting it changes nothing.
+      await env.facade.setActiveAccount('surfshark', 'surfshark-1');
+      expect(env.state.getState().accounts.every((a) => a.meta.active === undefined)).toBe(true);
+    });
+
+    it('ignores an unknown account id', async () => {
+      const env = setup();
+      seedTwoSurfshark(env);
+      await env.facade.setActiveAccount('surfshark', 'surfshark-nope');
+      expect(env.state.getState().accounts.every((a) => a.meta.active === undefined)).toBe(true);
+    });
+
+    it('is a no-op for the file provider (each file is its own server)', async () => {
+      const env = setup();
+      env.state.setState((s) => ({
+        ...s,
+        accounts: [
+          { id: 'file-1', providerId: 'file', label: 'f1', meta: { country: 'VN' }, secretRef: 'account:file-1' },
+          { id: 'file-2', providerId: 'file', label: 'f2', meta: { country: 'US' }, secretRef: 'account:file-2' },
+        ],
+      }));
+      await env.facade.setActiveAccount('file', 'file-2');
+      expect(env.state.getState().accounts.every((a) => a.meta.active === undefined)).toBe(true);
+    });
+  });
+
 });

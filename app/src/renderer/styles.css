@@ -3129,3 +3129,58 @@ svg.i.spin {
     animation: none;
   }
 }
+
+/* Account list in a provider card: pick the single active account + remove. */
+.account-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.account-row.active {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+.account-row .ic {
+  display: inline-flex;
+  color: var(--ok);
+}
+.account-pick {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.account-pick input {
+  cursor: pointer;
+}
+.account-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-label small {
+  color: var(--mut);
+  font-size: 11px;
+}
+.account-hint {
+  list-style: none;
+  color: var(--mut);
+  font-size: 11px;
+  padding: 0 2px;
+}

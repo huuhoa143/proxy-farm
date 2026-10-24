@@ -152,6 +152,12 @@
       "connected_other": "{{count}} accounts",
       "total_one": "{{count}} account connected — you can add more any time.",
       "total_other": "{{count}} accounts connected — you can add more any time."
+    },
+    "accounts": {
+      "active": "Active",
+      "useThis": "Use this account",
+      "remove": "Remove account",
+      "oneActiveHint": "Only the selected account is used — a provider's IPs are shared, so more accounts add no IPs."
     }
   },
   "checkResult": {

@@ -254,3 +254,43 @@ describe('NordVpnCard', () => {
     await waitFor(() => expect(screen.getByTestId('nordvpn-message')).toHaveTextContent('Nord refused this access token'));
   });
 });
+
+describe('AccountList — one active account per provider', () => {
+  const two = [
+    { id: 'surfshark-1', providerId: 'surfshark', label: 'pubkey …aaaaaa', meta: {}, secretRef: 'account:surfshark-1' },
+    { id: 'surfshark-2', providerId: 'surfshark', label: 'pubkey …bbbbbb', meta: {}, secretRef: 'account:surfshark-2' },
+  ] as import('../../shared/contracts').Account[];
+
+  it('lists accounts with an active radio (default = first) and a remove button', async () => {
+    const api = createFakeProxyFarmApi();
+    const setActive = vi.spyOn(api, 'setActiveAccount');
+    const remove = vi.spyOn(api, 'removeAccount');
+    render(<SurfsharkCard api={api} onAdded={() => {}} accountCount={2} accounts={two} />);
+
+    expect(screen.getByTestId('surfshark-accounts')).toBeInTheDocument();
+    const r1 = screen.getByTestId('surfshark-active-surfshark-1') as HTMLInputElement;
+    const r2 = screen.getByTestId('surfshark-active-surfshark-2') as HTMLInputElement;
+    expect(r1.checked).toBe(true); // first is the default active
+    expect(r2.checked).toBe(false);
+
+    fireEvent.click(r2);
+    await waitFor(() => expect(setActive).toHaveBeenCalledWith('surfshark', 'surfshark-2'));
+
+    fireEvent.click(screen.getByTestId('surfshark-remove-surfshark-1'));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('surfshark-1'));
+  });
+
+  it('shows no active radio when there is a single account', () => {
+    const api = createFakeProxyFarmApi();
+    render(
+      <SurfsharkCard
+        api={api}
+        onAdded={() => {}}
+        accountCount={1}
+        accounts={[two[0]]}
+      />,
+    );
+    expect(screen.queryByTestId('surfshark-active-surfshark-1')).toBeNull();
+    expect(screen.getByTestId('surfshark-remove-surfshark-1')).toBeInTheDocument();
+  });
+});

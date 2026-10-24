@@ -152,6 +152,12 @@
       "connected_other": "{{count}} tài khoản",
       "total_one": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào.",
       "total_other": "Đã kết nối {{count}} tài khoản — có thể thêm bất cứ lúc nào."
+    },
+    "accounts": {
+      "active": "Đang dùng",
+      "useThis": "Dùng tài khoản này",
+      "remove": "Xóa tài khoản",
+      "oneActiveHint": "Chỉ tài khoản được chọn mới dùng — IP của mỗi provider là dùng chung, thêm tài khoản không thêm IP."
     }
   },
   "checkResult": {

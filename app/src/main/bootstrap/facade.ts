@@ -17,6 +17,7 @@ import {
   type Settings,
   type Target,
 } from '../../shared/contracts';
+import { activeAccountId, isActiveAccount, usesActiveAccountModel, ACTIVE_META_KEY } from '../../shared/activeAccount';
 import type { AccountPool } from '../accounts/pool';
 import type { HostVpnDetector } from '../controller/host-vpn';
 import type { CredentialVerdict, PortManager } from '../controller/port-manager';
@@ -150,7 +151,8 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
     const provider = deps.providers.get(providerId);
     if (!provider) return [];
     const seen = new Map<string, Target>();
-    for (const account of accounts().filter((a) => a.providerId === providerId)) {
+    const all = accounts();
+    for (const account of all.filter((a) => a.providerId === providerId && isActiveAccount(a, all))) {
       try {
         for (const t of await provider.targets(account)) if (!seen.has(t.key)) seen.set(t.key, t);
       } catch (err) {
@@ -399,6 +401,33 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
       // Its server marks and login check go with it (an id may be reused by a new account).
       deps.portManager.credentialsChanged(accountId);
       deps.state.setState((s) => ({ ...s, accounts: s.accounts.filter((a) => a.id !== accountId) }));
+    },
+
+    async setActiveAccount(providerId, accountId) {
+      if (!usesActiveAccountModel(providerId)) return; // `file`: every account is its own server
+      const mine = accounts().filter((a) => a.providerId === providerId);
+      if (!mine.some((a) => a.id === accountId)) return;
+      if (activeAccountId(accounts(), providerId) === accountId) return; // already active
+      // Flip the flag: the chosen account gets meta.active, its siblings lose it.
+      deps.state.setState((s) => ({
+        ...s,
+        accounts: s.accounts.map((a) => {
+          if (a.providerId !== providerId) return a;
+          const meta = { ...a.meta };
+          if (a.id === accountId) meta[ACTIVE_META_KEY] = '1';
+          else delete meta[ACTIVE_META_KEY];
+          return { ...a, meta };
+        }),
+      }));
+      // Move this provider's enabled ports onto the now-active account and re-handshake them.
+      // The exit IP is pinned to the server, so it is unchanged — only the WireGuard/login
+      // key the tunnel uses changes. This also frees any port stranded on a now-idle account.
+      deps.portManager.credentialsChanged(accountId);
+      const moved = deps.pool.rebalance(providerId);
+      for (const key of moved) {
+        await deps.portManager.stopPort(key).catch(() => undefined);
+        enqueueStart(key);
+      }
     },
 
     importConfigFile,

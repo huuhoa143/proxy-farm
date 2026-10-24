@@ -16,15 +16,20 @@ const NO_ACCOUNTS: Counts = { hma: 0, zoogvpn: 0, surfshark: 0, nordvpn: 0, expr
 export function Onboarding({ api, onDone }: OnboardingProps) {
   const { t } = useTranslation();
   const [counts, setCounts] = useState<Counts>(NO_ACCOUNTS);
-  const [hmaAccounts, setHmaAccounts] = useState<Account[]>([]);
+  const [accountsByProvider, setAccountsByProvider] = useState<Partial<Record<ProviderId, Account[]>>>({});
+  const accountsOf = (id: ProviderId): Account[] => accountsByProvider[id] ?? [];
 
   async function refresh(cancelled: () => boolean = () => false) {
     const providers = await api.listProviders();
     if (cancelled()) return;
     const next = { ...NO_ACCOUNTS };
-    for (const p of providers) next[p.id] = p.accounts.length;
+    const byProvider: Partial<Record<ProviderId, Account[]>> = {};
+    for (const p of providers) {
+      next[p.id] = p.accounts.length;
+      byProvider[p.id] = p.accounts;
+    }
     setCounts(next);
-    setHmaAccounts(providers.find((p) => p.id === 'hma')?.accounts ?? []);
+    setAccountsByProvider(byProvider);
   }
 
   useEffect(() => {
@@ -47,10 +52,10 @@ export function Onboarding({ api, onDone }: OnboardingProps) {
   return (
     <div className="screen" data-testid="onboarding">
       <div className="provider-cards">
-        {ENABLED_PROVIDERS.includes('hma') && <HmaCard api={api} onAdded={markAdded} accountCount={counts.hma} accounts={hmaAccounts} />}
+        {ENABLED_PROVIDERS.includes('hma') && <HmaCard api={api} onAdded={markAdded} accountCount={counts.hma} accounts={accountsOf('hma')} />}
         {ENABLED_PROVIDERS.includes('zoogvpn') && <ZoogVpnCard api={api} onAdded={markAdded} accountCount={counts.zoogvpn} />}
-        {ENABLED_PROVIDERS.includes('surfshark') && <SurfsharkCard api={api} onAdded={markAdded} accountCount={counts.surfshark} />}
-        {ENABLED_PROVIDERS.includes('nordvpn') && <NordVpnCard api={api} onAdded={markAdded} accountCount={counts.nordvpn} />}
+        {ENABLED_PROVIDERS.includes('surfshark') && <SurfsharkCard api={api} onAdded={markAdded} accountCount={counts.surfshark} accounts={accountsOf('surfshark')} />}
+        {ENABLED_PROVIDERS.includes('nordvpn') && <NordVpnCard api={api} onAdded={markAdded} accountCount={counts.nordvpn} accounts={accountsOf('nordvpn')} />}
         {ENABLED_PROVIDERS.includes('expressvpn') && <ExpressVpnCard api={api} onAdded={markAdded} accountCount={counts.expressvpn} />}
         {ENABLED_PROVIDERS.includes('file') && <FileCard api={api} onAdded={markAdded} accountCount={counts.file} />}
       </div>

@@ -7,6 +7,7 @@ function fakeController(): ControllerFacade {
     listProviders: vi.fn(async () => []),
     addAccount: vi.fn(async () => ({ ok: true })),
     removeAccount: vi.fn(async () => undefined),
+    setActiveAccount: vi.fn(async () => undefined),
     importConfigFile: vi.fn(async () => ({ ok: true })),
     listTargets: vi.fn(async () => []),
     refreshTargets: vi.fn(async () => 0),

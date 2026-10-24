@@ -409,6 +409,16 @@ export function createFakeProxyFarmApi(): FakeProxyFarmApi {
       if (idx >= 0) accounts.splice(idx, 1);
     },
 
+    async setActiveAccount(providerId, accountId) {
+      for (const a of accounts) {
+        if (a.account.providerId !== providerId) continue;
+        const meta = { ...a.account.meta };
+        if (a.account.id === accountId) meta.active = '1';
+        else delete meta.active;
+        a.account = { ...a.account, meta };
+      }
+    },
+
     async importConfigFile(name, content, country, credentials) {
       if (!content.includes('PrivateKey') && !content.includes('remote ')) {
         return { ok: false, reasonKey: 'checkResult.reason.invalid-format' };
