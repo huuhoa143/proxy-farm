@@ -27,6 +27,8 @@ export interface LocationPickerProps {
   portCounts?: ReadonlyMap<string, number>;
   /** Ports each provider may still add under its limit; a missing provider is unlimited. */
   remaining?: Partial<Record<ProviderId, number>>;
+  /** Each provider's port limit (0 / missing = unlimited), to say what a cap is. */
+  limits?: Partial<Record<ProviderId, number>>;
   onSubmit: (requests: PortRequest[]) => void;
   onClose: () => void;
 }
@@ -43,7 +45,7 @@ interface CountryGroup {
  * (default 1, max = its free servers, capped by what the provider's port
  * limit still allows across every picked city); the sticky footer adds them.
  */
-export function LocationPicker({ targets, accountProviders, portCounts, remaining = {}, onSubmit, onClose }: LocationPickerProps) {
+export function LocationPicker({ targets, accountProviders, portCounts, remaining = {}, limits = {}, onSubmit, onClose }: LocationPickerProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
@@ -92,6 +94,19 @@ export function LocationPicker({ targets, accountProviders, portCounts, remainin
   }, [targets, provider, query, language]);
 
   const targetByKey = useMemo(() => new Map(targets.map((tg) => [tg.key, tg])), [targets]);
+
+  /** Ports of `providerId` picked in `picks` (every city), optionally leaving one out. */
+  function pickedOf(providerId: ProviderId, picks: ReadonlyMap<string, number> = picked, exceptKey?: string): number {
+    let n = 0;
+    for (const [key, count] of picks) if (key !== exceptKey && targetByKey.get(key)?.providerId === providerId) n += count;
+    return n;
+  }
+
+  /** The provider's limit, not the city's free servers, is what stops `target` going higher. */
+  function cappedByLimit(target: Target): boolean {
+    const cap = remaining[target.providerId];
+    return cap !== undefined && cap - pickedOf(target.providerId, picked, target.key) < addableCount(target, {});
+  }
 
   /** Max ports for `target` given what the other picks of its provider already use. */
   function maxFor(target: Target, picks: ReadonlyMap<string, number> = picked): number {
@@ -207,6 +222,20 @@ export function LocationPicker({ targets, accountProviders, portCounts, remainin
               ))}
             </div>
           )}
+          {providers
+            .filter(([id]) => remaining[id] !== undefined && (limits[id] ?? 0) > 0 && (provider === 'all' || provider === id))
+            .map(([id]) => {
+              const limit = limits[id]!;
+              const left = Math.max(0, remaining[id]! - pickedOf(id));
+              return (
+                <p key={id} className={`pick-budget${left === 0 ? ' is-full' : ''}`} data-testid={`pick-budget-${id}`}>
+                  <span className={`psw ${id}`} />
+                  {left === 0
+                    ? t('main.picker.budgetFull', { provider: providerName(id, t), limit })
+                    : t('main.picker.budget', { provider: providerName(id, t), left, limit })}
+                </p>
+              );
+            })}
           {picked.size > 0 && (
             // Every pick stays visible (and removable) here, even when a search
             // or provider filter hides its row — the footer counts them all.
@@ -251,9 +280,12 @@ export function LocationPicker({ targets, accountProviders, portCounts, remainin
               onChange={() => toggleMany(visible)}
             />
             <span className="nm">
-              {provider === 'all'
-                ? t('main.picker.selectAll', { count: visible.length })
-                : t('main.picker.selectAllProvider', { count: visible.length, provider: providerName(provider, t) })}
+              {allVisible && pickedVisible < visible.length
+                ? // A port limit stopped "select all" short: say so instead of looking like every row.
+                  t('main.picker.selectAllCapped', { picked: pickedVisible, count: visible.length })
+                : provider === 'all'
+                  ? t('main.picker.selectAll', { count: visible.length })
+                  : t('main.picker.selectAllProvider', { count: visible.length, provider: providerName(provider, t) })}
             </span>
           </label>
         )}
@@ -292,10 +324,10 @@ export function LocationPicker({ targets, accountProviders, portCounts, remainin
                   const unavailable = notInPlan || (!on && max === 0);
                   const unavailableLabel = notInPlan
                     ? t('main.picker.notInPlan')
-                    : isDynamicProvider(target.providerId)
-                      ? t('main.picker.limitReached') // dynamic is never "no free server"
-                      : free === 0
-                        ? t('main.picker.noFree')
+                    : !isDynamicProvider(target.providerId) && free === 0 // dynamic is never "no free server"
+                      ? t('main.picker.noFree')
+                      : (limits[target.providerId] ?? 0) > 0
+                        ? t('main.picker.limitReachedOf', { provider: providerName(target.providerId, t), limit: limits[target.providerId] })
                         : t('main.picker.limitReached');
                   const notInPlanHint = notInPlan ? (t('main.picker.notInPlanHint', { provider: providerName(target.providerId, t) }) as string) : undefined;
                   // A country-wide location is named after the country, in the UI language.
@@ -359,7 +391,11 @@ export function LocationPicker({ targets, accountProviders, portCounts, remainin
                           className="stepper"
                           role="group"
                           aria-label={t('main.picker.qty', { location: name }) as string}
-                          title={t('main.picker.maxHint', { max }) as string}
+                          title={
+                            (cappedByLimit(target) && (limits[target.providerId] ?? 0) > 0
+                              ? t('main.picker.maxHintLimit', { max, provider: providerName(target.providerId, t), limit: limits[target.providerId] })
+                              : t('main.picker.maxHint', { max })) as string
+                          }
                         >
                           <button
                             type="button"

@@ -242,3 +242,61 @@ describe('LocationPicker', () => {
     }
   });
 });
+
+describe('a provider port limit is spelled out (NordVPN: 6)', () => {
+  const nord = (key: string, city: string, servers: number) => target(key, city, servers, servers, 'nordvpn');
+  const TIRANA = nord('nordvpn:AL-TIRANA', 'Tirana', 67);
+  const CAIRO = nord('nordvpn:EG-CAIRO', 'Cairo', 2);
+  const KABUL = nord('nordvpn:AF-KABUL', 'Kabul', 2);
+
+  function renderNord(remaining: number) {
+    const onSubmit = vi.fn();
+    render(
+      <LocationPicker
+        targets={[TIRANA, CAIRO, KABUL]}
+        remaining={{ nordvpn: remaining }}
+        limits={{ nordvpn: 6 }}
+        onSubmit={onSubmit}
+        onClose={() => {}}
+      />,
+    );
+    return (key: string) => screen.getByTestId(`pick-${key}`);
+  }
+
+  it('shows what is left of the limit, counting the picks as they are made', () => {
+    const row = renderNord(3);
+    expect(screen.getByTestId('pick-budget-nordvpn')).toHaveTextContent('NordVPN: 3 of 6 ports left');
+    fireEvent.click(within(row('nordvpn:EG-CAIRO')).getByRole('checkbox'));
+    expect(screen.getByTestId('pick-budget-nordvpn')).toHaveTextContent('NordVPN: 2 of 6 ports left');
+  });
+
+  it('a city with many free servers says the LIMIT caps it, not its servers', () => {
+    const row = renderNord(2);
+    fireEvent.click(within(row('nordvpn:EG-CAIRO')).getByRole('checkbox'));
+    fireEvent.click(within(row('nordvpn:AL-TIRANA')).getByRole('checkbox'));
+    const stepper = within(row('nordvpn:AL-TIRANA')).getByRole('group');
+    expect(stepper).toHaveAttribute('title', 'Up to 1 — NordVPN allows 6 ports at once');
+    expect(within(row('nordvpn:AL-TIRANA')).getByRole('button', { name: /^One more port in/ })).toBeDisabled();
+    // the budget is spent: the line says so, and the remaining city says why it is off
+    expect(screen.getByTestId('pick-budget-nordvpn')).toHaveTextContent('NordVPN: all 6 ports in use — remove a port to add another');
+    expect(row('nordvpn:AF-KABUL')).toHaveTextContent('All 6 NordVPN ports in use');
+  });
+
+  it('a city limited by its own servers keeps the free-server hint', () => {
+    const row = renderNord(6);
+    fireEvent.click(within(row('nordvpn:EG-CAIRO')).getByRole('checkbox'));
+    expect(within(row('nordvpn:EG-CAIRO')).getByRole('group')).toHaveAttribute('title', 'Up to 2 — one per free server');
+  });
+
+  it('"select all" stopped by the limit says how many it picked, not that it picked every row', () => {
+    renderNord(2);
+    fireEvent.click(within(screen.getByTestId('pick-all')).getByRole('checkbox'));
+    expect(screen.getByTestId('pick-all')).toHaveTextContent('2 of 3 locations picked — the port limit allows no more');
+  });
+
+  it('an unlimited provider shows no budget line', () => {
+    render(<LocationPicker targets={[TOKYO, KYOTO]} onSubmit={() => {}} onClose={() => {}} />);
+    expect(screen.queryByTestId('pick-budget-hma')).toBeNull();
+    expect(screen.queryByTestId('pick-budget-surfshark')).toBeNull();
+  });
+});

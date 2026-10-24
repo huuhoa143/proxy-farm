@@ -7,6 +7,17 @@ desktop app follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- "+ Add port" could do nothing on a location that showed free servers. The free count and
+  "not in your plan" were judged for any account of the provider, while a new port only
+  goes on the active one; they now follow the active account, and a new port never lands
+  on an idle account.
+- Port limits are spelled out. A provider with a limit (NordVPN 6, ExpressVPN 8) says so on
+  its card, with why; the location picker shows what is left ("NordVPN: 2 of 6 ports
+  left"), names the limit when it is what stops a city (instead of "one per free server"),
+  and "select all" stopped by the limit says how many it picked.
+
 ### Added
 
 - Each VPN provider now uses a single **active account** that you pick in its card. A

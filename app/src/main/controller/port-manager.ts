@@ -21,6 +21,7 @@ import {
   type ServerInfo,
   type Target,
 } from '../../shared/contracts';
+import { activeAccountId } from '../../shared/activeAccount';
 import type { AccountPool } from '../accounts/pool';
 import { createRefusalTracker, type RefusalTracker } from '../accounts/refusals';
 import { createAutoRotateScheduler, type AutoRotateScheduler } from './auto-rotate';
@@ -1787,8 +1788,11 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
     // location's ports use; with no port yet, for every account of the provider (any of
     // them may take the next one).
     const forPort = portKey === undefined ? undefined : ports.find((p) => p.key === portKey);
-    const used = new Set(forPort ? [forPort.accountId] : ports.filter((p) => p.locationKey === target.key).map((p) => p.accountId));
     const ofProvider = all.filter((a) => a.providerId === target.providerId);
+    // One active account per provider: a NEW port goes on it, so the location's free count
+    // is judged for it alone — never "free for an idle account" while the add then fails.
+    const active = forPort ? undefined : activeAccountId(all, target.providerId);
+    const used = new Set(forPort ? [forPort.accountId] : active ? [active] : ports.filter((p) => p.locationKey === target.key).map((p) => p.accountId));
     const accounts = used.size > 0 ? ofProvider.filter((a) => used.has(a.id)) : ofProvider;
     return target.servers.map((server) => {
       const ip = knownIp(server);
@@ -1817,7 +1821,10 @@ export function createPortManager(deps: PortManagerDeps): PortManager {
   }
 
   function locationNotInPlan(target: Target): boolean {
-    const accounts = deps.state.getState().accounts.filter((a) => a.providerId === target.providerId);
+    // Judged for the account new ports use (the active one), else every account (`file`).
+    const all = deps.state.getState().accounts;
+    const active = activeAccountId(all, target.providerId);
+    const accounts = all.filter((a) => a.providerId === target.providerId && (!active || a.id === active));
     if (accounts.length === 0 || target.servers.length === 0) return false;
     return target.servers.every((server) => accounts.every((a) => health.isRefused(a.id, server)));
   }

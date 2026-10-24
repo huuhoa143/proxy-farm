@@ -530,15 +530,19 @@ describe('port manager', () => {
       expect(await manager.addPort(ams(['10.0.0.1', '10.0.0.2']), 'z1')).toBeUndefined();
     });
 
-    it("health is for the accounts of the location's ports", async () => {
+    it('without a port key, health is for the active account: the one a new port goes on', async () => {
       const serverHealth = createServerHealth();
       serverHealth.markRefused('z2', '10.0.0.3');
       const { manager, state } = twoPorts(['10.0.0.1', '10.0.0.2', '10.0.0.3'], '10.0.0.2', { depsOverrides: { serverHealth } });
       const z2: Account = { ...account, id: 'z2', secretRef: 'z2-secret' };
       state.setState((s) => ({ ...s, accounts: [...s.accounts, z2] }));
-      expect((await manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3'])))[2].health).toBe('unknown'); // ports use z1
+      const third = async () => (await manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3'])))[2].health;
+      expect(await third()).toBe('unknown'); // z1 (first) is active
+      // Ports left on an idle account do not decide it: a new port still goes on z1.
       state.setState((s) => ({ ...s, ports: s.ports.map((p) => ({ ...p, accountId: 'z2' })) }));
-      expect((await manager.listServers(ams(['10.0.0.1', '10.0.0.2', '10.0.0.3'])))[2].health).toBe('refused');
+      expect(await third()).toBe('unknown');
+      state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === 'z2' ? { ...a, meta: { ...a.meta, active: '1' } } : a)) }));
+      expect(await third()).toBe('refused');
     });
 
     it("with a port key, health is for that port's account only (its Change-IP menu)", async () => {
@@ -550,10 +554,10 @@ describe('port manager', () => {
       const z2: Account = { ...account, id: 'z2', secretRef: 'z2-secret' };
       state.setState((s) => ({ ...s, accounts: [...s.accounts, z2], ports: s.ports.map((p) => (p.key === 'zoogvpn:nl-ams#2' ? { ...p, accountId: 'z2' } : p)) }));
       const health = async (portKey?: string) => (await manager.listServers(ams(pool), portKey)).slice(2).map((s) => s.health);
-      expect(await health()).toEqual(['unknown', 'unknown']); // merged: usable by one of z1/z2 each
+      expect(await health()).toEqual(['unknown', 'dead']); // no port: the active account (z1)
       expect(await health('zoogvpn:nl-ams#1')).toEqual(['unknown', 'dead']);
       expect(await health('zoogvpn:nl-ams#2')).toEqual(['refused', 'unknown']);
-      expect(await health('zoogvpn:nl-ams#9')).toEqual(['unknown', 'unknown']); // unknown port: merged
+      expect(await health('zoogvpn:nl-ams#9')).toEqual(['unknown', 'dead']); // unknown port: the active account
     });
 
     it('one round-robin hostname (a Surfshark cluster before discovery) can back two ports on different IPs', async () => {
@@ -2294,14 +2298,17 @@ describe('port manager', () => {
         expect((await manager.listServers(fr)).find((s) => s.server === 'fr4.webunlim.com')?.health).toBe('refused');
       });
 
-      it('a location is "not in plan" once every server refused every account of the provider', async () => {
+      it('a location is "not in plan" once every server refused the active account', async () => {
         const { manager, serverHealth, state } = frSetup();
         expect(manager.locationNotInPlan(fr)).toBe(false); // fr1 not refused
         serverHealth.markRefused('z1', 'fr1.webunlim.com');
         serverHealth.noteIp('fr4.webunlim.com', '185.177.229.121');
         expect(manager.locationNotInPlan(fr)).toBe(true);
-        // A second account that has not been refused there may still use it.
+        // An idle second account changes nothing: new ports still go on z1.
         state.setState((s) => ({ ...s, accounts: [...s.accounts, { ...account, id: 'z2', secretRef: 'z2' }] }));
+        expect(manager.locationNotInPlan(fr)).toBe(true);
+        // Made active, z2 (never refused there) can use it.
+        state.setState((s) => ({ ...s, accounts: s.accounts.map((a) => (a.id === 'z2' ? { ...a, meta: { ...a.meta, active: '1' } } : a)) }));
         expect(manager.locationNotInPlan(fr)).toBe(false);
         serverHealth.markRefused('z2', 'fr1.webunlim.com');
         serverHealth.markRefused('z2', 'fr4.webunlim.com');

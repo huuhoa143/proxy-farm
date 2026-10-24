@@ -192,6 +192,11 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
    * another — spec §6.8). A file target belongs to exactly one imported file. */
   function accountsForNewPort(providerId: ProviderId, locationKey: string): Account[] {
     if (providerId === 'file') return accounts().filter((a) => `file:${a.id}` === locationKey);
+    // One active account per provider: a new port goes on it, never on an idle one.
+    if (usesActiveAccountModel(providerId)) {
+      const active = accounts().find((a) => a.id === activeAccountId(accounts(), providerId));
+      return active ? [active] : [];
+    }
     const first = deps.pool.pickAccount(providerId);
     const rest = accounts().filter((a) => a.providerId === providerId && a.id !== first?.id);
     return first ? [first, ...rest] : rest;
