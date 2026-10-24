@@ -362,7 +362,7 @@ describe('controller facade', () => {
       const r = await facade.addAccount('nordvpn', { credential: ` ${TOKEN} ` });
       expect(r).toMatchObject({ ok: true, label: wgKeyLabel(KEY) });
       expect(r.label).not.toContain(KEY.slice(-6, -1));
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).toHaveBeenCalledTimes(2); // credentials, then the subscription check
       expect(JSON.parse(secrets.loadSecret(r.account!.secretRef)!)).toEqual({ kind: 'wgkey', privateKey: KEY });
       expect(JSON.stringify(state.getState())).not.toContain(TOKEN);
       // A WireGuard key has no live login check (that is the OpenVPN credential probe).
@@ -593,6 +593,17 @@ describe('controller facade', () => {
       ['hma:JP-TYO', 1],
     ]);
     expect(targets.some((t) => 'notInPlan' in t)).toBe(false);
+  });
+
+  it("asks a non-HMA provider's refreshLocation (NordVPN recommendations) with any of its accounts", async () => {
+    const refreshLocation = vi.fn(async () => undefined);
+    const zoog: Provider = { ...fakeProvider('zoogvpn', () => [target('zoogvpn:nl1', 'NL', ['10.0.0.1', '10.0.0.2'])]), refreshLocation };
+    const { facade } = setup({ providers: { get: (id) => (id === 'zoogvpn' ? zoog : undefined) } });
+    await facade.addAccount('zoogvpn', { username: 'a', password: 'p' });
+    await facade.addPorts('zoogvpn:nl1', 1);
+    await facade.listServers('zoogvpn:nl1');
+    expect(refreshLocation).toHaveBeenCalledTimes(2);
+    expect(refreshLocation).toHaveBeenCalledWith(expect.objectContaining({ providerId: 'zoogvpn' }), 'zoogvpn:nl1');
   });
 
   it('listTargets flags a location whose every server refused every account as not in the plan', async () => {

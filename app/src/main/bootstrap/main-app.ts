@@ -686,13 +686,14 @@ export function runApp(): void {
     // a slow timer so the catalog follows those changes (fresh IPs in, stale IPs pruned,
     // after an hour unseen) instead of only learning when a held gateway finally fails.
     // One discover per (account, location), deduped; errors are swallowed. Kept slow on
-    // purpose: the real app only discovers when it connects.
+    // purpose: the real app only discovers when it connects. NordVPN rides the same timer:
+    // its recommendations keep the order of a live location's servers current.
     const DYNAMIC_REFRESH_MS = 10 * 60 * 1000;
     async function refreshActiveDynamicLocations(): Promise<void> {
       const { ports, accounts } = state.getState();
       const seen = new Set<string>();
       for (const p of ports) {
-        if (!p.enabled || !isDynamicProvider(p.providerId)) continue;
+        if (!p.enabled || !(isDynamicProvider(p.providerId) || p.providerId === 'nordvpn')) continue;
         const sig = `${p.accountId}|${p.locationKey}`;
         if (seen.has(sig)) continue;
         seen.add(sig);

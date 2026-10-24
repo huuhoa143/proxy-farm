@@ -172,13 +172,15 @@ export function createControllerFacade(deps: FacadeDeps): ControllerFacade {
 
   /** Dynamic HMA: pull fresh gateway IPs for one location right now, so Change IP / Add port
    * / opening its server list offer brand-new IPs rather than only the accumulated pool.
-   * Best effort; a no-op for providers without a dynamic `refreshLocation`. */
+   * NordVPN: put Nord's recommended servers first, as its app does before connecting.
+   * Best effort; a no-op for providers without a `refreshLocation`. */
   async function refreshDynamicLocation(locationKey: string): Promise<void> {
     const providerId = providerOf(locationKey);
     if (!providerId) return;
     const provider = deps.providers.get(providerId);
     if (!provider?.refreshLocation) return;
-    const account = accounts().find((a) => a.providerId === providerId && a.meta.source === 'se-platform');
+    // HMA discovers through a se-platform device; other providers take any account.
+    const account = accounts().find((a) => a.providerId === providerId && (providerId !== 'hma' || a.meta.source === 'se-platform'));
     if (!account) return;
     await provider.refreshLocation(account, locationKey).catch(() => undefined);
   }

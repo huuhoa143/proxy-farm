@@ -657,6 +657,7 @@
       "tokenRejected": "Nord từ chối mã truy cập này. Có thể mã bị gõ sai, đã hết hạn hoặc bị thu hồi — hãy tạo mã mới trong Nord Account rồi thử lại.",
       "networkError": "Không kết nối được tới Nord để kiểm tra mã truy cập. Hãy kiểm tra kết nối mạng rồi thử lại.",
       "noKey": "Nord chấp nhận mã nhưng không trả về khóa NordLynx. Hãy kiểm tra Nord Account này còn gói NordVPN đang hoạt động.",
+      "expired": "Gói NordVPN của Nord Account này đã hết hạn nên server của Nord sẽ không nhận khóa của nó. Hãy gia hạn gói, hoặc dùng mã truy cập của tài khoản còn gói đang hoạt động.",
       "invalidInput": "Đây không phải mã truy cập NordVPN (64 ký tự, gồm 0–9 và a–f) hay khóa riêng NordLynx (44 ký tự, kết thúc bằng =)."
     }
   },

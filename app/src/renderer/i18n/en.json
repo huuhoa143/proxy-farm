@@ -657,6 +657,7 @@
       "tokenRejected": "Nord refused this access token. It may be mistyped, expired or revoked — create a new one in your Nord Account and try again.",
       "networkError": "Couldn't reach Nord to check the access token. Check your connection and try again.",
       "noKey": "Nord accepted the token but returned no NordLynx key. Check that this Nord Account has an active NordVPN subscription.",
+      "expired": "This Nord Account's NordVPN subscription has ended, so Nord's servers won't accept its key. Renew the subscription, or use an access token from an account with an active plan.",
       "invalidInput": "That isn't a NordVPN access token (64 characters, 0–9 and a–f) or a NordLynx private key (44 characters ending in =)."
     }
   },
